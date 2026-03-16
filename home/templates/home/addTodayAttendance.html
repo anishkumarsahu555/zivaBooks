@@ -1,0 +1,277 @@
+{% extends 'home/baseIndex.html' %}
+{% load static %}
+
+{% block title %}
+    <title>Attendance</title>
+{% endblock %}
+{% block css %}
+
+{% endblock %}
+{% block body %}
+    <div class="ui left aligned basic  grid">
+        <div class="sixteen wide column">
+            <div class="ui  pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user"
+                >My Attendance - {{ date|date }}
+                </div>
+            </div>
+
+            <div class="ui tab " data-tab="user">
+                <div style=" position: absolute;right: 1.5rem;top: 18px;">
+
+                </div>
+                <div class="row" style="padding-left: 5px; padding-right: 5px">
+                    <div class="ui two cloumn cards grid">
+                        <div class="ui fluid card">
+                            <div class="content">
+                                <div class="header">Log-In</div>
+                                <div class="description">
+                                    This will record the Login time .
+                                </div>
+                                {% if obj.isLogIn == True %}
+                                <div class="sub-header">
+                                    <div class="ui purple label">
+                                        <i class="clock outline icon"></i>
+                                        <a class="detail">{{ obj.loginDateTime }}</a>
+                                    </div>
+                                </div>
+                                 <div class="sub-header" style="margin-top: 5px">
+                                    <div class="ui primary label">
+                                        <i class="map marker icon"></i>
+                                        <a class="detail">{{ obj.login_location }}</a>
+                                    </div>
+                                </div>
+                                <div class="sub-header" style="margin-top: 5px">
+                                    <div class="ui violet label">
+                                        <i class="receipt icon"></i>
+                                        <a class="detail">{{ obj.login_remark }}</a>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="ui green button {% if obj.isLogIn == True %} disabled {% endif %}"
+                                 onclick="showUserModal('Login')">
+                                <i class="add icon"></i>
+                                Login
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="content">
+                                <div class="header">Log-Out</div>
+                                <div class="description">
+                                    This will record the Logout time .
+                                </div>
+                                 {% if obj.isLogOut == True %}
+                                <div class="sub-header">
+                                    <div class="ui purple label">
+                                        <i class="clock outline icon"></i>
+                                        <a class="detail">{{ obj.logoutDateTime }}</a>
+                                    </div>
+                                </div>
+                                 <div class="sub-header" style="margin-top: 5px">
+                                    <div class="ui primary label">
+                                        <i class="map marker icon"></i>
+                                        <a class="detail">{{ obj.logout_location }}</a>
+                                    </div>
+                                </div>
+                                <div class="sub-header" style="margin-top: 5px">
+                                    <div class="ui violet label">
+                                        <i class="receipt icon"></i>
+                                        <a class="detail">{{ obj.logout_remark }}</a>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="ui teal button {% if obj.isLogOut == True %} disabled {% endif %}" onclick="showUserModal('Logout')">
+                                <i class="add icon"></i>
+                                Logout
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+        <div style="margin-left: 20px;" class="ui label teal" data-variation="mini" data-inverted=""
+             data-tooltip="Location"
+             data-position="bottom center">
+            <i class="map marked alternate icon"></i>
+
+            <a class="detail"><span id="htmlLat">0.0</span>,<span id="htmlLong">0.0</span> </a>
+        </div>
+    </div>
+
+
+
+    <div class="ui tiny modal" id="myModalUser">
+        <i class="close icon"></i>
+        <div class="header">
+            Are you sure you want to <span class="statusL"></span>?
+        </div>
+        <div class="content">
+
+            <form class="ui tiny form" id="addForm">{% csrf_token %}
+
+                <div class="one fields">
+                    <div class="sixteen wide field">
+                        <label>Any Remark</label>
+                        <input type="text" name="remark" placeholder="Remark" id="remark">
+                        <input type="hidden" id="stat">
+                    </div>
+
+                </div>
+
+
+            </form>
+
+            <div class="actions" style="padding-top: 20px; padding-bottom: 20px ;float: right">
+                <div class="ui cancel button">Cancel</div>
+                <button class="ui right labeled icon button green saveBtn" onclick="takeAttendance()">
+                    Submit
+                    <i class="checkmark icon"></i>
+                </button>
+                <button style="display: none" class="ui right labeled icon button green saveBtnLoad">
+                    Saving ...
+                    <i class="checkmark icon"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    <input type="hidden" id="lat" value="24.809611">
+    <input type="hidden" id="lng" value="93.935577">
+    <input type="hidden" id="loc" value="N/A">
+
+    <p id="demo"></p>
+{% endblock %}
+
+
+{% block js %}
+    <script>
+
+        function showUserModal(status) {
+            $('#myModalUser').modal('show');
+            $('.statusL').html("" + status);
+            $("#stat").val(status);
+        }
+
+        function takeAttendance() {
+            showLoading();
+            var remark = $('#remark').val();
+            var stat = $('#stat').val();
+            var lat = $('#lat').val();
+            var lng = $('#lng').val();
+            var csrfmiddlewaretoken = $("input[name='csrfmiddlewaretoken']").val();
+
+            data = new FormData();
+            data.append('remark', remark);
+            data.append('stat', stat);
+            data.append('lat', lat);
+            data.append('lng', lng);
+            data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:add_attendance_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body')
+                            .toast({
+                                class: 'success',
+                                message: stat + ' added Successfully.'
+                            })
+                        ;
+
+                        $('#addForm').trigger('reset');
+                        $('#myModalUser').modal('toggle');
+                        hideLoading();
+                        location.reload();
+                    } else {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                        hideLoading();
+
+                    }
+
+                    return response;
+                },
+                error: function () {
+                    $('body')
+                        .toast({
+                            class: 'error',
+                            message: 'An error occurred !'
+                        })
+                    ;
+                    hideLoading();
+
+
+                }
+            });
+
+
+        }
+
+        var x = document.getElementById("demo");
+        var options = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else {
+                x.innerHTML = "Geolocation is not supported by this browser.";
+            }
+        }
+
+        function showPosition(position) {
+            $('#lat').val(position.coords.latitude);
+            $('#lng').val(position.coords.longitude);
+            $('#htmlLat').html(position.coords.latitude);
+            $('#htmlLong').html(position.coords.longitude);
+            console.log(position)
+
+
+        }
+
+        function showError(error) {
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    x.innerHTML = "User denied the request for Geolocation."
+                    alert("Please Allow location service request to take collections.")
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    x.innerHTML = "Location information is unavailable."
+                    break;
+                case error.TIMEOUT:
+                    x.innerHTML = "The request to get user location timed out."
+                    break;
+                case error.UNKNOWN_ERROR:
+                    x.innerHTML = "An unknown error occurred."
+                    break;
+            }
+        }
+
+        $(getLocation());
+        navigator.permissions.query({name: 'geolocation'}).then(function (result) {
+            console.log(result);
+            {% comment %}       if (result.state === 'granted') {
+                       $('#saveBtn').prop('disabled', false);
+                   } else {
+                       $('#saveBtn').prop('disabled', true);
+                   }{% endcomment %}
+            // Don't do anything if the permission was denied.
+        });
+
+
+    </script>
+{% endblock %}

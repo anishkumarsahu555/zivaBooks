@@ -1,0 +1,68 @@
+{% load custom_has_group_tag %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>zivaBooks</title>
+    <style>
+        @page {
+            size: A5;
+            margin: .3cm;
+        }
+
+
+    </style>
+    <style>
+        table {
+            font-family: arial, sans-serif;
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        td, th {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 5px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #dddddd;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="row">
+        <span style="font-size: 10px;">(zivaBooks) Attendance Report from {{ startDate|date }} to {{ endDate|date }} - {{ staffName }}</span>
+    </div>
+
+    <p style="font-size: 10px; margin: 2px;padding-top: 10px">Attendance Details</p>
+
+    <table style="font-size: 10px">
+        <tr>
+            <th>Date</th>
+            <th>LoginTime</th>
+            <th>LoginRemark</th>
+{#            <th>LoginLocation</th>#}
+            <th>LogoutTime</th>
+            <th>LogoutRemark</th>
+{#            <th>LogoutLocation</th>#}
+        </tr>
+        {% for foo in col %}
+
+            <tr>
+                <td>{{ foo.datetime|date }}</td>
+                <td>{{ foo.loginDateTime|time:'h:i A' }}</td>
+                <td>{{ foo.login_remark }}</td>
+{#                <td>{{ foo.login_location }}</td>#}
+                <td>{{ foo.logoutDateTime|time:'h:i A' }}</td>
+                <td>{{ foo.logout_remark }}</td>
+{#                <td>{{ foo.logout_location }}</td>#}
+            </tr>
+        {% endfor %}
+
+    </table>
+</div>
+
+</body>
+</html>

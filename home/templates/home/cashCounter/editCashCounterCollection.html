@@ -1,0 +1,504 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+{% block title %}
+    <title>Edit Collection</title>
+{% endblock %}
+{% block css %}
+    <style>
+        .avatar-upload {
+            position: relative;
+            max-width: 115px;
+            margin: 5px auto;
+        }
+
+        .avatar-upload .avatar-edit {
+            position: absolute;
+            right: 12px;
+            z-index: 1;
+            top: 10px;
+        }
+
+        .avatar-upload .avatar-edit input {
+            display: none;
+        }
+
+        .avatar-upload .avatar-edit input + label {
+            display: inline-block;
+            width: 25px;
+            height: 25px;
+            margin-bottom: 0;
+            border-radius: 100%;
+            background: #FFFFFF;
+            border: 1px solid transparent;
+            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.12);
+            cursor: pointer;
+            font-weight: normal;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .avatar-upload .avatar-edit input + label:hover {
+            background: #f1f1f1;
+            border-color: #d6d6d6;
+        }
+
+        .avatar-upload .avatar-edit input + label:after {
+            color: #757575;
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            margin: auto;
+
+        }
+
+        .avatar-upload .avatar-preview {
+            width: 100px;
+            height: 100px;
+            position: relative;
+            border-radius: 100%;
+            border: 6px solid #F8F8F8;
+            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.1);
+        }
+
+        .avatar-upload .avatar-preview > div {
+            width: 100%;
+            height: 100%;
+            border-radius: 100%;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+    </style>
+{% endblock %}
+{% block body %}
+
+    <div class="ui aligned basic  grid">
+        <div class="sixteen wide column">
+            <div class="ui  pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user"
+                >Edit Collection
+                </div>
+            </div>
+            <div class="ui tab " data-tab="user">
+
+                <div class="ui row teal stacked segment padded">
+                    <div class="content">
+
+                        <form class="ui  small form " id="addForm">{% csrf_token %}
+                            <div class="one fields">
+                                <div class="sixteen wide field required">
+                                    <label>Collection Date</label>
+                                    <div class="ui calendar" id="cDate">
+                                        <div class="ui input">
+                                            <input type="text" placeholder="Date/Time" id="colDate">
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                            <div class="one fields">
+                                <div class="sixteen wide field required">
+                                    <label>Party Name</label>
+                                    <select class="ui clearable search dropdown" id="party">
+                                        <option value="">Search By Party Name</option>
+                                    </select>
+                                </div>
+
+                            </div>
+                            <div class="two required fields ">
+                                <div class=" field required">
+                                    <label>Mode Of Payment</label>
+                                    <select class="ui dropdown search fluid " id="paymentMode" onchange="isCash()">
+                                        <option value="">Select Mode Of Payment</option>
+                                        <option value="Cash">Cash</option>
+                                        <option value="Cheque CC">Cheque CC</option>
+                                        <option value="Cheque">Cheque</option>
+                                        <option value="Online">Online</option>
+                                        <option value="Party">Party</option>
+                                    </select>
+                                </div>
+
+                                <div class="eight wide field required">
+                                    <label>Amount Paid (₹ <a class="ui violet label" id="money">{{ obj.paidAmount }}</a>
+                                        )</label>
+                                    <input type="number" name="amountPaid" id="amountPaid" placeholder="Amount Paid"
+                                           value="{{ obj.paidAmount }}" onkeyup="toIndianCurrency()">
+
+
+                                </div>
+
+
+                            </div>
+                            <div class="one fields" id="partyDiv" style="display: None">
+                                <div class="sixteen wide field required">
+                                    <label>Transferred Party Name</label>
+                                    <select class="ui clearable search dropdown" id="TransferredParty">
+                                        <option value="">Search By Party Name</option>
+                                    </select>
+                                </div>
+
+                            </div>
+                            <div class="two required fields ">
+                                <div class=" field required" id="bankDiv" style="display: none">
+                                    <label>Bank </label>
+                                    <select class="ui dropdown search clearable fluid " id="bank">
+                                        <option value="">Select Bank</option>
+                                        {% for foo in instance %}
+                                            <option value="{{ foo.id }}">{{ foo.name }}
+                                                - {{ foo.accountNumber }} </option>
+                                        {% endfor %}
+
+
+                                    </select>
+                                </div>
+
+
+                                <div class="eight wide field required" id="detailDiv" style="display: none">
+                                    <label>Detail</label>
+                                    <input type="text" name="detail" id="detail" placeholder="Detail"
+                                           value="{{ obj.detail }}">
+
+                                </div>
+                                <div class="eight wide field required" id="chequeDatelDiv" style="display: none">
+                                    <label>Cheque Date</label>
+                                    <div class="ui calendar" id="cheqDate">
+                                        <input type="text" name="chequeDate" id="chequeDate" placeholder="chequeDate">
+                                    </div>
+                                </div>
+
+
+                            </div>
+                            <div class="one  fields ">
+
+                                <div class="sixteen wide  field ">
+                                    <label>Remark</label>
+                                    <textarea name="" id="remark" placeholder="Any Remark"
+                                              rows="3">{{ obj.remark }}</textarea>
+                                </div>
+
+
+                            </div>
+
+                            <div class="ui label teal" data-variation="mini" data-inverted="" data-tooltip="Location"
+                                 data-position="bottom center">
+                                <i class="map marked alternate icon"></i>
+
+                                <a class="detail"><span id="htmlLat">0.0</span>,<span id="htmlLong">0.0</span> </a>
+                            </div>
+                            <input type="hidden" id="ID" value="{{ obj.pk }}">
+
+                        </form>
+                    </div>
+                    <div class="ui  aligned basic  grid">
+                        <div class="row" style="padding-left: 5px;padding-right: 5px">
+                            <div class="16 wide column center aligned">
+                                <button onclick="salesSave()" id="saveBtn" class="ui green  button saveBtn">
+                                    Submit Detail
+                                </button>
+                                <button style="display: none;" class="ui teal double loading button saveBtnLoad">
+                                    Saving ....
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+
+
+            </div>
+        </div>
+
+
+    </div>
+
+    <input type="hidden" id="lat" value="24.809611">
+    <input type="hidden" id="lng" value="93.935577">
+    <input type="hidden" id="loc" value="N/A">
+
+    <p id="demo"></p>
+
+
+{% endblock %}
+
+{% block js %}
+    <script type="text/javascript">
+        $('.ui.dropdown').dropdown({fullTextSearch: true});
+    </script>
+
+    <script>
+        var today = new Date();
+        $('#cDate')
+            .calendar({
+                    {#                    initialDate: today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear(),#}
+                    initialDate: {{ obj.collectionDateTime|date:'d' }} + '/' + {{ obj.collectionDateTime|date:'m' }} + '/' + {{ obj.collectionDateTime|date:'Y' }},
+                    monthFirst: false,
+                    type: 'date',
+                    formatter: {
+                        date: function (date, settings) {
+
+                            if (!date) return '';
+                            var day = String(date.getDate());
+                            var month = String(date.getMonth() + 1);
+                            var year = date.getFullYear();
+                            {#                            return '{{ sale.invoiceDate|date:'d/m/Y' }}';#}
+                            return day + '/' + month + '/' + year;
+                        }
+                    }
+                }
+            );
+        $('#cheqDate')
+            .calendar({
+                    {% if obj.chequeDate is not None %}
+                        initialDate: {{ obj.chequeDate|date:'d' }} + '/' + {{ obj.chequeDate|date:'m' }} + '/' + {{ obj.chequeDate|date:'Y' }},
+                    {% else %}
+                        initialDate: today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear(),
+
+                    {% endif %}
+                    monthFirst: false,
+                    type: 'date',
+                    formatter: {
+                        date: function (date, settings) {
+
+                            if (!date) return '';
+                            var day = String(date.getDate());
+                            var month = String(date.getMonth() + 1);
+                            var year = date.getFullYear();
+                            {#                            return '{{ sale.invoiceDate|date:'d/m/Y' }}';#}
+                            return day + '/' + month + '/' + year;
+                        }
+                    }
+                }
+            );
+        $(loadDetail());
+
+        function loadDetail() {
+
+            setTimeout(function () {
+                {#$('#party').val("{{ obj.partyID.name  }} - {% if obj.partyID.name %}{{obj.partyID.partyGroupID.name}}{% else %}N/A{% endif %} @ {{obj.partyID.pk}}").change();#}
+                $('#paymentMode').val("{{ obj.modeOfPayment }}").change();
+                try {
+                    $('#bank').val("{{ obj.bankID.id }}").change();
+                } catch (err) {
+
+
+                }
+
+
+            }, 200);
+
+        }
+
+        function isCash() {
+            var mode = $('#paymentMode').val();
+            console.log(mode);
+            if (mode === 'Cash' || mode === 'Cheque CC') {
+                $('#bankDiv').css('display', "none");
+                $('#detailDiv').css('display', "none");
+                $('#chequeDatelDiv').css('display', "none");
+                $('#partyDiv').css('display', "none");
+            } else if (mode === 'Cheque') {
+                $('#bankDiv').css('display', "none");
+                $('#detailDiv').css('display', "");
+                $('#chequeDatelDiv').css('display', "");
+                $('#partyDiv').css('display', "none");
+            } else if (mode === 'Party') {
+                $('#bankDiv').css('display', "none");
+                $('#detailDiv').css('display', "none");
+                $('#chequeDatelDiv').css('display', "none");
+                $('#partyDiv').css('display', "");
+            } else {
+                $('#bankDiv').css('display', "");
+                $('#detailDiv').css('display', "");
+                $('#chequeDatelDiv').css('display', "None");
+                $('#partyDiv').css('display', "none");
+            }
+        }
+
+        function salesSave() {
+            showLoading();
+            var party = $('#party').val();
+            var paymentMode = $('#paymentMode').val();
+            var amountPaid = $('#amountPaid').val();
+            var bank = $('#bank').val();
+            var detail = $('#detail').val();
+            var remark = $('#remark').val();
+            var lat = $('#lat').val();
+            var lng = $('#lng').val();
+            var cDate = $('#colDate').val();
+            var ID = $('#ID').val();
+            var chequeDate = $('#chequeDate').val();
+            var TransferredParty = $('#TransferredParty').val();
+
+
+            if (party === '' || paymentMode === '' || amountPaid === '' || cDate === ''
+            ) {
+                $('body')
+                    .toast({
+                        class: 'orange',
+                        message: '* fields are required !'
+                    })
+                ;
+                hideLoading();
+            } else {
+                data = new FormData();
+                data.append('party', party);
+                data.append('paymentMode', paymentMode);
+                data.append('amountPaid', amountPaid);
+                data.append('bank', bank);
+                data.append('detail', detail);
+                data.append('lat', lat);
+                data.append('lng', lng);
+                data.append('remark', remark);
+                data.append('ID', ID);
+                data.append('cDate', cDate);
+                data.append('chequeDate', chequeDate);
+                data.append('TransferredParty', TransferredParty);
+
+                $.ajax({
+                    type: 'post',
+                    url: '{% url 'homeApp:edit_cash_counter_collection_by_admin_api' %}',
+                    data: data,
+                    contentType: false,
+                    cache: false,
+                    processData: false,
+
+
+                    success: function (response) {
+                        if (response.message === 'success') {
+                            $('body')
+                                .toast({
+                                    class: 'success',
+                                    message: ' Collection Updated Successfully.'
+                                });
+
+                            hideLoading();
+
+                            location.href = "{% url 'homeApp:my_cash_counter_list' %}"
+
+
+                        } else {
+                            $('body')
+                                .toast({
+                                    class: 'error',
+                                    message: 'An error occurred !'
+                                })
+                            ;
+                            hideLoading();
+                        }
+
+                        return response;
+                    },
+                    error: function () {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                        hideLoading();
+                    }
+
+                });
+
+
+            }
+
+        }
+
+        var x = document.getElementById("demo");
+        var options = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else {
+                x.innerHTML = "Geolocation is not supported by this browser.";
+            }
+        }
+
+        function showPosition(position) {
+            $('#lat').val(position.coords.latitude);
+            $('#lng').val(position.coords.longitude);
+            $('#htmlLat').html(position.coords.latitude);
+            $('#htmlLong').html(position.coords.longitude);
+            console.log(position)
+
+
+        }
+
+        function showError(error) {
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    x.innerHTML = "User denied the request for Geolocation."
+                    alert("Please Allow location service request to take collections.")
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    x.innerHTML = "Location information is unavailable."
+                    break;
+                case error.TIMEOUT:
+                    x.innerHTML = "The request to get user location timed out."
+                    break;
+                case error.UNKNOWN_ERROR:
+                    x.innerHTML = "An unknown error occurred."
+                    break;
+            }
+        }
+
+        $(getLocation());
+        navigator.permissions.query({name: 'geolocation'}).then(function (result) {
+            console.log(result);
+        });
+
+        $(getCustomerList());
+
+
+        function getCustomerList() {
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:list_party_api' %}",
+
+                success: function (response) {
+
+                    $('#party').html('');
+                    $('#party').append(' <option value="">Search By Party Name</option>');
+                    $('#TransferredParty').html('');
+                    $('#TransferredParty').append(' <option value="">Search By Party Name</option>');
+
+                    var j;
+                    for (j = 0; j < response.data.length; j++) {
+
+                        $('#party').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                        $('#TransferredParty').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+
+                    }
+                    $('#party').val("{{obj.partyID.pk}}").change();
+                    $('#TransferredParty').val("{{obj.transferredPartyID.pk}}").change();
+                },
+
+                error: function () {
+                    $('body')
+                        .toast({
+                            class: 'error',
+                            message: 'An error occurred !'
+                        })
+                    ;
+                }
+            });
+
+
+        }
+
+        const toIndianCurrency = () => {
+            let num = $('#amountPaid').val();
+            const curr = num.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,")
+            $('#money').html(curr);
+        };
+    </script>
+{% endblock %}

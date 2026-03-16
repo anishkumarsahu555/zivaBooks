@@ -1,0 +1,536 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
+    <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
+    <title>Customer Dashboard</title>
+    <style>
+        :root {
+            --bg: #eef4ff;
+            --surface: #ffffff;
+            --line: #e3e8ef;
+            --text: #1f2937;
+            --muted: #6b7280;
+            --primary: #1565c0;
+            --danger: #c62828;
+            --success: #2e7d32;
+            --warning: #ef6c00;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Roboto", "Segoe UI", sans-serif;
+            background:
+                    radial-gradient(900px 340px at -10% -10%, #dbeafe 0%, transparent 60%),
+                    radial-gradient(800px 320px at 110% 0%, #fff1df 0%, transparent 58%),
+                    linear-gradient(180deg, #eef4ff 0%, #f8fbff 48%, #fffaf5 100%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container-wrap {
+            max-width: 720px;
+            margin: 16px auto;
+            padding: 0 10px;
+            width: 100%;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            box-shadow: 0 8px 18px rgba(21, 101, 192, 0.08);
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 28px rgba(59, 130, 246, 0.12);
+            border-color: #d7e4f8;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 14px 16px;
+            background: linear-gradient(115deg, rgba(219, 234, 254, .55), rgba(255, 241, 223, .45));
+        }
+
+        .title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .logout-btn {
+            text-decoration: none;
+            border: 1px solid #ef9a9a;
+            color: var(--danger);
+            border-radius: 999px;
+            padding: 7px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all .2s ease;
+        }
+
+        .logout-btn:hover {
+            background: #ffebee;
+            border-color: #ef5350;
+        }
+
+        .meta-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            padding: 14px 16px;
+        }
+
+        .label-title {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 3px;
+        }
+
+        .value {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .section-head {
+            margin: 0;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--line);
+            font-size: 15px;
+            font-weight: 600;
+            color: #374151;
+            background: #f8fbff;
+        }
+
+        .card:nth-of-type(3) .section-head {
+            color: #2e7d32;
+            background: #eefaf0;
+        }
+
+        .card:nth-of-type(4) .section-head {
+            color: #ef6c00;
+            background: #fff6eb;
+        }
+
+        .msg-list {
+            padding: 0 16px;
+        }
+
+        .msg-item {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--line);
+            transition: background-color .2s ease, transform .2s ease;
+        }
+
+        .msg-item:last-child {
+            border-bottom: none;
+        }
+
+        .msg-item:hover {
+            background: #f9fbff;
+            transform: translateX(2px);
+        }
+
+        .msg-text {
+            margin-bottom: 6px;
+            word-break: break-word;
+            font-size: 14px;
+        }
+
+        .msg-meta {
+            font-size: 12px;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 3px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            border: 1px solid transparent;
+        }
+
+        .chip.success {
+            color: var(--success);
+            background: #e6f7ea;
+            border-color: #c8e6c9;
+        }
+
+        .chip.warning {
+            color: var(--warning);
+            background: #fff1df;
+            border-color: #ffe0b2;
+        }
+
+        .empty {
+            padding: 14px 0;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        .alert {
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            border: 1px solid transparent;
+        }
+
+        .alert.success {
+            background: #e8f5e9;
+            border-color: #c8e6c9;
+            color: #1b5e20;
+        }
+
+        .alert.error {
+            background: #ffebee;
+            border-color: #ffcdd2;
+            color: #b71c1c;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+            padding: 14px 16px 16px;
+        }
+
+        .input-label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+            display: block;
+        }
+
+        .text-input {
+            width: 100%;
+            border: 1px solid #cfd8e3;
+            border-radius: 10px;
+            padding: 10px 11px;
+            font-size: 14px;
+            outline: none;
+            background: #fff;
+            transition: box-shadow .2s ease, border-color .2s ease;
+        }
+
+        .text-input:focus {
+            border-color: #90caf9;
+            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.15);
+        }
+
+        .primary-btn {
+            border: 0;
+            border-radius: 999px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            background: linear-gradient(90deg, #1976d2, #1565c0);
+            cursor: pointer;
+            justify-self: start;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(25, 118, 210, .24);
+        }
+
+        .secondary-btn {
+            border: 1px solid #90caf9;
+            border-radius: 999px;
+            padding: 8px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1565c0;
+            background: #e3f2fd;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+
+        .secondary-btn:hover {
+            background: #d9efff;
+            border-color: #64b5f6;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+            z-index: 9999;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-card {
+            width: 100%;
+            max-width: 420px;
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            box-shadow: 0 18px 34px rgba(15, 23, 42, 0.24);
+            overflow: hidden;
+            animation: modalPop .18s ease-out;
+        }
+
+        @keyframes modalPop {
+            from {opacity: .4; transform: translateY(4px) scale(.99);}
+            to {opacity: 1; transform: translateY(0) scale(1);}
+        }
+
+        .modal-head {
+            margin: 0;
+            padding: 14px 16px;
+            font-size: 15px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--line);
+            background: #f8fbff;
+            color: #374151;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            padding: 0 16px 16px;
+        }
+
+        .modal-alert {
+            margin: 12px 16px 0;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+            border: 1px solid transparent;
+        }
+
+        .modal-alert.success {
+            display: block;
+            background: #e8f5e9;
+            border-color: #c8e6c9;
+            color: #1b5e20;
+        }
+
+        .modal-alert.error {
+            display: block;
+            background: #ffebee;
+            border-color: #ffcdd2;
+            color: #b71c1c;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 13px;
+            color: #526072;
+            padding: 8px 0 4px;
+            line-height: 1.6;
+            font-weight: 700;
+        }
+
+        @media (min-width: 640px) {
+            .meta-row {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+<div style="flex: 1;">
+    <div class="container-wrap">
+        <div class="card topbar">
+            <h1 class="title">Customer Dashboard</h1>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="secondary-btn" type="button" onclick="openPasswordModal()">Change Password</button>
+                <a class="logout-btn" href="{% url 'homeApp:logout' %}">
+                    Logout
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="meta-row">
+                <div>
+                    <div class="label-title">Name</div>
+                    <div class="value">{{ party.name|default:"N/A" }}</div>
+                </div>
+                <div>
+                    <div class="label-title">Phone</div>
+                    <div class="value">{{ party.phone|default:"N/A" }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-head">Latest 10 Payment Messages</h2>
+            <div class="msg-list">
+                {% for item in collection_messages %}
+                    <div class="msg-item">
+                        <div class="msg-text">{{ item.message|default:"N/A" }}</div>
+                        <div class="msg-meta">
+                                <span class="chip success">Success</span>
+
+                            {{ item.datetime|date:"d-m-Y h:i A"|default:"N/A" }}
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty">No collection message records found.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-head">Latest 10 Purchase Messages</h2>
+            <div class="msg-list">
+                {% for msg in sales_messages %}
+                    <div class="msg-item">
+                        <div class="msg-text">{{ msg.message|default:"N/A" }}</div>
+                        <div class="msg-meta">
+                             <span class="chip success">Success</span>
+                            {{ msg.datetime|date:"d-m-Y h:i A"|default:"N/A" }}
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty">No sales message records found.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div id="passwordModal" class="modal-overlay" onclick="closePasswordModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+        <h2 class="modal-head">Change Password</h2>
+        <div id="passwordModalAlert" class="modal-alert"></div>
+        <form method="post" action="{% url 'homeApp:customer_change_password' %}" class="form-grid" id="passwordForm">
+            {% csrf_token %}
+            <div>
+                <label class="input-label">Current Password</label>
+                <input class="text-input" type="password" name="current_password" required maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric">
+            </div>
+            <div>
+                <label class="input-label">New Password (6 digits)</label>
+                <input class="text-input" type="password" name="new_password" required maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric">
+            </div>
+            <div>
+                <label class="input-label">Confirm New Password</label>
+                <input class="text-input" type="password" name="confirm_password" required maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric">
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="secondary-btn" onclick="closePasswordModal()">Cancel</button>
+                <button type="submit" class="primary-btn">Update Password</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="footer-note">
+    Developed by Ziva Infotech.<br>
+    For any related software needs, contact 7005824802.
+</div>
+<script>
+    function showPasswordModalAlert(type, text) {
+        var box = document.getElementById('passwordModalAlert');
+        box.className = 'modal-alert ' + type;
+        box.textContent = text;
+    }
+
+    function clearPasswordModalAlert() {
+        var box = document.getElementById('passwordModalAlert');
+        box.className = 'modal-alert';
+        box.textContent = '';
+    }
+
+    function openPasswordModal() {
+        clearPasswordModalAlert();
+        document.getElementById('passwordModal').classList.add('show');
+    }
+
+    function closePasswordModal(event) {
+        if (event && event.target && event.target.id !== 'passwordModal') {
+            return;
+        }
+        clearPasswordModalAlert();
+        document.getElementById('passwordModal').classList.remove('show');
+    }
+
+    document.getElementById('passwordForm').addEventListener('submit', async function (e) {
+        var current = this.current_password.value;
+        var nextPwd = this.new_password.value;
+        var confirmPwd = this.confirm_password.value;
+        var sixDigits = /^[0-9]{6}$/;
+        var form = this;
+
+        if (!sixDigits.test(current) || !sixDigits.test(nextPwd) || !sixDigits.test(confirmPwd)) {
+            e.preventDefault();
+            showPasswordModalAlert('error', 'All passwords must be exactly 6 digits.');
+            return;
+        }
+        if (nextPwd !== confirmPwd) {
+            e.preventDefault();
+            showPasswordModalAlert('error', 'New password and confirm password do not match.');
+            return;
+        }
+
+        e.preventDefault();
+
+        var csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
+        var formData = new FormData(form);
+
+        try {
+            var response = await fetch(form.action, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': csrfToken
+                },
+                body: formData
+            });
+
+            var payload = await response.json();
+            if (response.ok && payload.message === 'success') {
+                showPasswordModalAlert('success', payload.success || 'Password changed successfully.');
+                form.reset();
+                setTimeout(function () {
+                    closePasswordModal();
+                }, 900);
+                return;
+            }
+
+            showPasswordModalAlert('error', payload.error || 'Unable to update password.');
+        } catch (err) {
+            showPasswordModalAlert('error', 'Network error. Please try again.');
+        }
+    });
+</script>
+</body>
+</html>

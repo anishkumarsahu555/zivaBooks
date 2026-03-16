@@ -1,0 +1,1282 @@
+{% load static %}
+{% load pwa %}
+{% load custom_has_group_tag %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0,  user-scalable=0"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    {% block title %}
+        <title>zivaBooks</title>
+    {% endblock %}
+
+    {% progressive_web_app_meta %}
+
+    <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
+    <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css"
+          href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.js"></script>
+    <script src="{% static 'sw/app.js' %}"></script>
+
+    {% block datatables_css_extra %}{% endblock %}
+
+    {% block css %}
+
+    {% endblock %}
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+            -webkit-tap-highlight-color: rgba(0, 0, 0, 0.06);
+        }
+
+        .sidenav {
+            height: 100%;
+            width: 200px;
+            position: fixed;
+            z-index: 1;
+            top: 40px;
+            left: 0;
+            background-color: #000000;
+            overflow-x: hidden;
+            padding-top: 10px;
+        }
+
+        .sidenav a {
+            padding: 15px 12px 15px 16px;
+            text-decoration: none;
+            font-size: 18px;
+            color: #818181;
+            display: block;
+        }
+
+        .sidenav a:hover {
+            color: #f1f1f1;
+        }
+
+        .preloader {
+            align-items: center;
+            background: rgb(23, 22, 22);
+            display: flex;
+            height: 100vh;
+            justify-content: center;
+            left: 0;
+            position: fixed;
+            top: 0;
+            transition: opacity 0.3s linear;
+            width: 100%;
+            z-index: 9999;
+        }
+
+        body ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .ui.vertical.menu.sidebar-menu {
+            margin-top: 40px !important;
+            max-height: calc(100% - 40px) !important;
+            height: calc(100% - 40px) !important;
+        }
+
+        .ui.vertical.menu.sidebar-menu .item i.icon {
+            float: left;
+            margin: 0em 0.5em 0em 0em;
+        }
+
+        .main-content {
+            margin-top: 40px;
+        }
+
+        @media (min-width: 768px) {
+            .ui.vertical.menu.sidebar-menu {
+                visibility: visible;
+                -webkit-transform: translate3d(0, 0, 0);
+                transform: translate3d(0, 0, 0);
+                width: 15rem !important;
+            }
+
+            .main-content {
+                margin-left: 15rem;
+            }
+
+            .sidebar-menu-toggler {
+                display: none !important;
+            }
+        }
+
+        .custom_search {
+            width: 100%;
+            -webkit-transition: width 0.4s ease-in-out;
+            transition: width 0.4s ease-in-out;
+        }
+
+        .custom_search:focus {
+            width: 100%;
+        }
+
+        .bgColor {
+            background-color: #0e2d46 !important;
+        }
+
+        .logoImg {
+            width: 30px;
+            height: 30px;
+            margin: 5px;
+            position: relative;
+            left: 10px;
+        }
+
+        .ui.inverted.menu .active.item {
+            background: #3d3e3f;
+            color: #4cebb8 !important;
+        }
+
+        .dataTables_scroll {
+            position: inherit !important;
+        }
+    </style>
+
+</head>
+
+<body>
+<!-- sidebar -->
+<div class="ui sidebar inverted bgColor vertical menu sidebar-menu" id="sidebar">
+
+    {% comment %}
+admin and moderator side bar
+{% endcomment %}
+    {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" %}
+        <div class="item">
+            <div class="header">General</div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:admin_home' %}">
+                    <div>
+                        <i class="tachometer alternate icon"></i>
+                        Dashboard
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="header">
+                Staff
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:user_list' %}">
+                    <div><i class="user tie icon"></i>Staff List</div>
+                </a>
+
+            </div>
+        </div>
+        <div class="item">
+            <div class="header">
+                Collections
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:take_collection' %}">
+                    <div><i class="hand holding usd icon"></i>Take Collection</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:collection_list' %}">
+                    <div><i class="book icon"></i>Collection List</div>
+                </a> <a class="item" href="{% url 'homeApp:cheque_reminder_list' %}">
+                <div><i class="bell icon"></i>Cheque Reminder List</div>
+            </a>
+
+            </div>
+        </div>
+        <div class="item">
+            <div class="header">
+                Sales
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:add_sales' %}">
+                    <div><i class="shopping cart icon"></i>Add Sale</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:sales_list' %}">
+                    <div><i class="book icon"></i>Sales List</div>
+                </a>
+
+            </div>
+        </div>
+        <div class="item">
+            <div class="header">
+                Cash Counter
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:cash_counter' %}">
+                    <div><i class="calendar check icon"></i>Today's Cash Counter</div>
+                </a> <a class="item" href="{% url 'homeApp:cash_counter_collection' %}">
+                <div><i class="calendar check icon"></i>Today's Collection Counter</div>
+            </a>
+                <a class="item" href="{% url 'homeApp:my_cash_counter_list' %}">
+                    <div><i class="calendar alternate icon"></i>Cash Counter List</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="header">
+                Party
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:party_group_list' %}">
+                    <div><i class="user friends icon"></i>Party Group List</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:party_list' %}">
+                    <div><i class="address book icon"></i>Party List</div>
+                </a>
+
+            </div>
+        </div>
+        {% comment %}      <div class="item">
+            <div class="header">
+                Attendance
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:add_attendance' %}">
+                    <div><i class="calendar check icon"></i>Today's Attendance</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:attendance_report_admin' %}">
+                    <div><i class="calendar alternate icon"></i>Attendance Report</div>
+                </a>
+
+            </div>
+        </div>{% endcomment %}
+
+        <div class="item">
+            <div class="header">
+                Banks
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:bank_list' %}">
+                    <div><i class="university icon"></i>Bank List</div>
+                </a>
+
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="header">
+                Message History
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:message_list' %}">
+                    <div><i class="comment dots outline icon"></i>Message List</div>
+                </a>
+
+            </div>
+        </div>
+
+
+        <div class="item">
+            <div class="header">
+                Profile
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:my_profile' %}">
+                    <div><i class="user icon"></i>My Profile</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:logout' %}">
+                    <div><i class="sign out alternate icon"></i>Logout</div>
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+
+    {% comment %}
+Collection side bar
+{% endcomment %}
+    {% if request.user|has_group:"Collection" %}
+        <div class="item">
+            <div class="header">General</div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:collection_home' %}">
+                    <div>
+                        <i class="tachometer alternate icon"></i>
+                        Dashboard
+                    </div>
+                </a>
+            </div>
+        </div>
+        <div class="item">
+            <div class="header">
+                Collections
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:add_collection' %}">
+                    <div><i class="hand holding usd icon"></i>Take Collection</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:my_collection' %}">
+                    <div><i class="book icon"></i>Collection List</div>
+                </a>
+
+            </div>
+        </div>
+        <div class="item">
+            <div class="header">
+                Sales
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:add_sales' %}">
+                    <div><i class="shopping cart icon"></i>Add Sale</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:my_sales_list' %}">
+                    <div><i class="book icon"></i>Sales List</div>
+                </a>
+
+            </div>
+        </div>
+
+        <!--        <div class="item">-->
+        <!--            <div class="header">-->
+        <!--                Attendance-->
+        <!--            </div>-->
+        <!--            <div class="menu">-->
+        <!--                <a class="item" href="{% url 'homeApp:add_attendance' %}">-->
+        <!--                    <div><i class="calendar check icon"></i>Today's Attendance</div>-->
+        <!--                </a>-->
+        <!--                <a class="item" href="{% url 'homeApp:attendance_report' %}">-->
+        <!--                    <div><i class="calendar alternate icon"></i>Attendance Report</div>-->
+        <!--                </a>-->
+
+        <!--            </div>-->
+        <!--        </div>-->
+
+        <div class="item">
+            <div class="header">
+                Profile
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:my_profile_collection' %}">
+                    <div><i class="user icon"></i>My Profile</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:logout' %}">
+                    <div><i class="sign out alternate icon"></i>Logout</div>
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+    {% comment %}Staff item{% endcomment %}
+    {% if request.user|has_group:"NormalStaff" %}
+        <div class="item">
+            <div class="header">General</div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:staff_home' %}">
+                    <div>
+                        <i class="tachometer alternate icon"></i>
+                        Dashboard
+                    </div>
+                </a>
+            </div>
+        </div>
+        <!--        <div class="item">-->
+        <!--            <div class="header">-->
+        <!--                Attendance-->
+        <!--            </div>-->
+        <!--            <div class="menu">-->
+        <!--                <a class="item" href="{% url 'homeApp:add_attendance' %}">-->
+        <!--                    <div><i class="calendar check icon"></i>Today's Attendance</div>-->
+        <!--                </a>-->
+        <!--                <a class="item" href="{% url 'homeApp:attendance_report' %}">-->
+        <!--                    <div><i class="calendar alternate icon"></i>Attendance Report</div>-->
+        <!--                </a>-->
+
+        <!--            </div>-->
+        <!--        </div>-->
+        <div class="item">
+            <div class="header">
+                Sales
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:add_sales' %}">
+                    <div><i class="shopping cart icon"></i>Add Sale</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:my_sales_list' %}">
+                    <div><i class="book icon"></i>Sales List</div>
+                </a>
+
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="header">
+                Profile
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:my_profile_collection' %}">
+                    <div><i class="user icon"></i>My Profile</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:logout' %}">
+                    <div><i class="sign out alternate icon"></i>Logout</div>
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if request.user|has_group:"SalesAdmin" %}
+        <div class="item">
+            <div class="header">General</div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:collection_home' %}">
+                    <div>
+                        <i class="tachometer alternate icon"></i>
+                        Dashboard
+                    </div>
+                </a>
+            </div>
+        </div>
+        <div class="item">
+            <div class="header">
+                Collections
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:add_collection' %}">
+                    <div><i class="hand holding usd icon"></i>Take Collection</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:my_collection' %}">
+                    <div><i class="book icon"></i>Collection List</div>
+                </a>
+
+            </div>
+        </div>
+        <div class="item">
+            <div class="header">
+                Sales
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:add_sales' %}">
+                    <div><i class="shopping cart icon"></i>Add Sale</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:sales_list' %}">
+                    <div><i class="book icon"></i>Sales List</div>
+                </a>
+
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="header">
+                Profile
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:my_profile_collection' %}">
+                    <div><i class="user icon"></i>My Profile</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:logout' %}">
+                    <div><i class="sign out alternate icon"></i>Logout</div>
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if request.user|has_group:"CashCounter" %}
+        <div class="item">
+            <div class="header">General</div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:cash_counter_home' %}">
+                    <div>
+                        <i class="tachometer alternate icon"></i>
+                        Dashboard
+                    </div>
+                </a>
+            </div>
+        </div>
+        <div class="item">
+            <div class="header">
+                Cash Counter
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:cash_counter' %}">
+                    <div><i class="calendar check icon"></i>Today's Cash Counter</div>
+                </a> <a class="item" href="{% url 'homeApp:cash_counter_collection' %}">
+                <div><i class="calendar check icon"></i>Today's Collection Counter</div>
+            </a>
+                <a class="item" href="{% url 'homeApp:my_cash_counter_list' %}">
+                    <div><i class="calendar alternate icon"></i>Cash Counter List</div>
+                </a>
+
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="header">
+                Sales
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:add_sales' %}">
+                    <div><i class="shopping cart icon"></i>Add Sale</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:my_sales_list' %}">
+                    <div><i class="book icon"></i>Sales List</div>
+                </a>
+
+            </div>
+        </div>
+
+        <div class="item">
+            <div class="header">
+                Profile
+            </div>
+            <div class="menu">
+                <a class="item" href="{% url 'homeApp:my_profile_collection' %}">
+                    <div><i class="user icon"></i>My Profile</div>
+                </a>
+                <a class="item" href="{% url 'homeApp:logout' %}">
+                    <div><i class="sign out alternate icon"></i>Logout</div>
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="ui segment bgColor inverted">
+        <div class="ui tiny olive inverted progress">
+            <div class="bar" style="width: 54%"></div>
+            <div class="label">Developed By Ziva Infotech</div>
+        </div>
+
+        <div class="ui tiny teal inverted progress">
+            <div class="bar" style="width:78%"></div>
+            <div class="label">v 2.0.1</div>
+        </div>
+    </div>
+</div>
+
+<!-- sidebar -->
+<!-- top nav -->
+
+<nav class="ui top fixed inverted bgColor menu">
+    <div class="left menu">
+        <a href="#" class="sidebar-menu-toggler item" data-target="#sidebar">
+            <i class="sidebar icon"></i>
+        </a>
+        <img class="logo logoImg" src="{% static 'sw/images/icon-192.png' %}">
+        <a href="#" class="header item">
+
+            zivaBooks
+        </a>
+    </div>
+
+    <div class="right menu">
+        <div class="ui dropdown item">
+            <i class="user cirlce icon"></i>
+            <div class="menu">
+                <a href="{% url 'homeApp:logout' %}" class="item">
+                    <i class="sign out alternate icon"></i>
+                    Logout
+                </a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- top nav -->
+
+<div class="pusher">
+
+    <div class="main-content">
+        {% block body %}
+            <div class="ui  pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user"
+                >Dashboard
+                </div>
+
+            </div>
+            <div class="ui tab  " data-tab="user" style="padding: 5px;">
+                {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" %}
+                    {% if request.user|has_group:"Admin" %}
+                        <div class="ui error mini message">
+                            <i class="close icon"></i>
+                            <div class="header">
+                                License Reminder!
+                            </div>
+                            <p style="font-weight: bold">{{ message }}</p>
+                        </div>
+                    {% endif %}
+                    <div class="ui grid stackable padded">
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header red">
+                                        <i class="users icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui red header" id="customerCount">
+                                            0
+                                        </div>
+                                    </div>
+                                    <div class="meta">
+                                        Total Parties
+                                    </div>
+                                    <div class="description">
+                                        Total number of Parties.
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui red button" href="{% url 'homeApp:party_list' %}">More Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header green">
+                                        <i class="user tie icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui header green" id="salesCount">
+                                            0
+                                        </div>
+                                    </div>
+                                    <div class="meta">
+                                        Total Users
+                                    </div>
+                                    <div class="description">
+                                        Total number of Staff users.
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui green button" href="{% url 'homeApp:user_list' %}">More Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header teal">
+                                        <i class="map marker alternate icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui teal header" id="todayInstallmentCount">0</div>
+                                    </div>
+                                    <div class="meta">
+                                        Geolocation Service
+                                    </div>
+                                    <div class="description">
+                                        Number of location service used.
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui teal button" href="#">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header purple">
+                                        <i class="hand holding usd icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui purple header" id="collection">0</div>
+                                    </div>
+                                    <div class="meta">
+                                        Today's Collection
+                                    </div>
+                                    <div class="description">
+                                        Total amount of collections.
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui purple button" href="{% url 'homeApp:collection_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header purple">
+                                        <i class="shopping cart icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui orange header" id="sale">0</div>
+                                    </div>
+                                    <div class="meta">
+                                        Today's Sales
+                                    </div>
+                                    <div class="description">
+                                        Total amount of sales.
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui olive button" href="{% url 'homeApp:sales_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if request.user|has_group:"Collection"  or request.user|has_group:"SalesAdmin" %}
+
+                    <div class="ui grid stackable padded">
+                        <div class="five wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header red">
+                                        <i class="users icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui red header" id="customerCount">
+                                            0
+                                        </div>
+                                    </div>
+                                    <div class="meta">
+                                        Parties Assigned
+                                    </div>
+                                    <div class="description">
+                                        Total parties assigned.
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui red disabled button" href="#">More Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% comment %}  <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header green">
+                                        <i class="coins icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui header green" id="salesCount">
+                                            0
+                                        </div>
+                                    </div>
+                                    <div class="meta">
+                                        Lifetime Collections
+                                    </div>
+                                    <div class="description">
+                                        Total lifetime amount collected.
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui green disabled button" href="#">More Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>{% endcomment %}
+                        <div class="six wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header teal">
+                                        <i class="tasks icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui teal header" id="todayInstallmentCount">0</div>
+                                    </div>
+                                    <div class="meta">
+                                        Collection Count
+                                    </div>
+                                    <div class="description">
+                                        Number of today's Collections.
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui teal button" href="{% url 'homeApp:my_collection' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="five wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header purple">
+                                        <i class="hand holding usd icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui purple header" id="collection">0</div>
+                                    </div>
+                                    <div class="meta">
+                                        Today's Collection
+                                    </div>
+                                    <div class="description">
+                                        Total amount collected .
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui purple button" href="{% url 'homeApp:my_collection' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                {% endif %}
+                {% if request.user|has_group:"NormalStaff" %}
+                    <div class="ui one column blue card " style="width: 100%">
+                        <div class="content">
+                            <div class="center aligned header">Welcome, {{ obj.name }}</div>
+                            <div class="center aligned description">
+                                {% if request.user|has_group:"NormalStaff" %}
+                                    <p>zivaBooks provides staff attendance and many more.</p>
+                                {% else %}
+                                    <p>zivaBooks provides staff to manage sales and many more.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="extra content">
+                            <div class="center aligned author">
+                                <img class="ui avatar image" src="{{ obj.photo.thumbnail.url }}"> {{ obj.name }}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" or request.user|has_group:"CashCounter" %}
+
+                    <div class="ui grid stackable padded">
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header red">
+                                        <i class="rupee sign icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui red header" id="cashCount1">
+                                            0
+                                        </div>
+                                    </div>
+                                    <div class="meta">
+                                        Cash Counter
+                                    </div>
+                                    <div class="description">
+                                        {#                                        Total Cash Collected.#}
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui orange button" href="{% url 'homeApp:my_cash_counter_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header green">
+                                        <i class="rupee sign icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui header green" id="cardCount2">
+                                            0
+                                        </div>
+                                    </div>
+                                    <div class="meta">
+                                        Card Counter
+                                    </div>
+                                    <div class="description">
+                                        {#                                        Total lifetime amount collected.#}
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui blue button" href="{% url 'homeApp:my_cash_counter_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header teal">
+                                        <i class="rupee sign icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui teal header" id="creditCount3">0</div>
+                                    </div>
+                                    <div class="meta">
+                                        Credit Counter
+                                    </div>
+                                    <div class="description">
+                                        {#                                        Number of today's Collections.#}
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui yellow button" href="{% url 'homeApp:my_cash_counter_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header purple">
+                                        <i class="rupee sign icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui purple header"><span id="mixCashCount4">0</span> / <span
+                                                id="mixCardCount4">0</span></div>
+                                    </div>
+                                    <div class="meta">
+                                        (Cash/Card) Mix Counter
+                                    </div>
+                                    <div class="description">
+                                        {#                                        Total amount collected .#}
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui pink button" href="{% url 'homeApp:my_cash_counter_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header red">
+                                        <i class="rupee sign icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui red header" id="collectionCount5">
+                                            0
+                                        </div>
+                                    </div>
+                                    <div class="meta">
+                                        Collection Counter
+                                    </div>
+                                    <div class="description">
+                                        {#                                        Total parties assigned.#}
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui red button" href="{% url 'homeApp:my_cash_counter_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header green">
+                                        <i class="rupee sign icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui header green" id="returnCount6">
+                                            0
+                                        </div>
+                                    </div>
+                                    <div class="meta">
+                                        Return Counter
+                                    </div>
+                                    <div class="description">
+                                        {#                                        Total lifetime amount collected.#}
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui green button" href="{% url 'homeApp:my_cash_counter_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header teal">
+                                        <i class="rupee sign icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui teal header" id="expenseCount7">0</div>
+                                    </div>
+                                    <div class="meta">
+                                        Expense Counter
+                                    </div>
+                                    <div class="description">
+                                        {#                                        Number of today's Collections.#}
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui teal button" href="{% url 'homeApp:my_cash_counter_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
+                            <div class="ui fluid card">
+                                <div class="content">
+                                    <div class="ui right floated header purple">
+                                        <i class="rupee sign icon"></i>
+                                    </div>
+                                    <div class="header">
+                                        <div class="ui purple header" id="advanceCount8">0</div>
+                                    </div>
+                                    <div class="meta">
+                                        Advance Counter
+                                    </div>
+                                    <div class="description">
+                                        {#                                        Total amount collected .#}
+                                    </div>
+                                </div>
+                                <div class="extra content">
+                                    <div class="ui two buttons">
+                                        <a class="ui purple button" href="{% url 'homeApp:my_cash_counter_list' %}">More
+                                            Info</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                {% endif %}
+
+            </div>
+        {% endblock %}
+
+    </div>
+
+
+</div>
+<div class="preloader">
+    <div class="ui active dimmer">
+        <div class="ui medium text loader">Loading</div>
+    </div>
+</div>
+
+
+<script src="https://frontendfunn.github.io/semantic-ui-admin-dashboard-template/js/script.js"></script>
+
+<script>
+    $('.menu .item').tab();
+    $(window).on("load", function () {
+        $(".preloader").fadeOut(50);
+    });
+
+    function showLoading() {
+        $('.saveBtn').css('display', 'none');
+        $('.saveBtnLoad').css('display', '');
+
+    }
+
+    function hideLoading() {
+        $('.saveBtn').css('display', '');
+        $('.saveBtnLoad').css('display', 'none');
+
+    }
+
+    $(function () {
+        var current = location.pathname;
+        $('.sidebar  a').each(function () {
+            var $this = $(this);
+            // if the current path is like this link, make it active
+            if ($this.attr('href').indexOf(current) !== -1) {
+                $this.addClass('active');
+            }
+        })
+    })
+</script>
+{% block datatables_ext_js %}{% endblock %}
+
+<script>
+    if ($.fn.DataTable) {
+        $.fn.DataTable.ext.pager.numbers_length = 4;
+    }
+    $(document).ready(function () {
+        // initialize the form an fields
+        $('.ui.form')
+            .form({
+                fields: {
+                    fileInput: {
+                        identifier: 'name',
+                        rules: [
+                            {
+                                type: 'empty'
+                            }
+                        ]
+                    }
+                }
+            });
+    });
+
+    function myOwnReset() {
+        $('.ui.form').form('reset');
+    }
+</script>
+
+
+{% block js %}
+    <script>
+        $('.message .close')
+            .on('click', function () {
+                $(this)
+                    .closest('.message')
+                    .transition('fade')
+                ;
+            })
+        ;
+        {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" %}
+
+            $(GetDetail());
+
+            function GetDetail() {
+                $.ajax({
+                    type: 'get',
+                    url: '{% url "homeApp:get_admin_dashboard_report_api" %}',
+
+                    success: function (response) {
+                        $('#customerCount').html(response.data['partyCount']);
+                        $('#salesCount').html(response.data['staffCount']);
+                        $('#todayInstallmentCount').html(response.data['locationCount']);
+                        $('#collection').html(response.data['collection']);
+                        $('#sale').html(response.data['Sale']);
+
+
+                    },
+                    error: function () {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                    }
+                });
+            }
+        {% endif %}
+
+        {% if request.user|has_group:"Collection" or request.user|has_group:"SalesAdmin" %}
+            $(GetDetail());
+            function GetDetail() {
+                $.ajax({
+                    type: 'get',
+                    url: '{% url "homeApp:get_staff_dashboard_report_api" %}',
+
+                    success: function (response) {
+                        $('#customerCount').html(response.data['partyCount']);
+                        $('#salesCount').html(response.data['collection_total']);
+                        $('#todayInstallmentCount').html(response.data['collection_totalCount']);
+                        $('#collection').html(response.data['collection']);
+
+
+                    },
+                    error: function () {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                    }
+                });
+            }
+
+
+        {% endif %}
+
+
+        {% if request.user|has_group:"CashCounter" %}
+            $(GetDetailCashCounter());
+            function GetDetailCashCounter() {
+                $.ajax({
+                    type: 'get',
+                    url: '{% url "homeApp:get_cash_counter_dashboard_report_api" %}',
+
+                    success: function (response) {
+                        $('#cashCount1').html(response.data['cash_total']);
+                        $('#cardCount2').html(response.data['card_total']);
+                        $('#creditCount3').html(response.data['credit_total']);
+                        $('#collectionCount5').html(response.data['collection_total']);
+                        $('#expenseCount7').html(response.data['expense_total']);
+                        $('#advanceCount8').html(response.data['advance_total']);
+                        $('#returnCount6').html(response.data['return_total']);
+                        $('#mixCashCount4').html(response.data['mix_cash_total']);
+                        $('#mixCardCount4').html(response.data['mix_card_total']);
+
+
+                    },
+                    error: function () {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                    }
+                });
+            }
+
+
+        {% endif %}
+
+        {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" %}
+            $(GetDetailCashCounter());
+            function GetDetailCashCounter() {
+                $.ajax({
+                    type: 'get',
+                    url: '{% url "homeApp:get_cash_counter_dashboard_report_admin_api" %}',
+
+                    success: function (response) {
+                        $('#cashCount1').html(response.data['cash_total']);
+                        $('#cardCount2').html(response.data['card_total']);
+                        $('#creditCount3').html(response.data['credit_total']);
+                        $('#collectionCount5').html(response.data['collection_total']);
+                        $('#expenseCount7').html(response.data['expense_total']);
+                        $('#advanceCount8').html(response.data['advance_total']);
+                        $('#returnCount6').html(response.data['return_total']);
+                        $('#mixCashCount4').html(response.data['mix_cash_total']);
+                        $('#mixCardCount4').html(response.data['mix_card_total']);
+
+
+                    },
+                    error: function () {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                    }
+                });
+            }
+
+        {% endif %}
+
+    </script>
+
+{% endblock %}
+</body>
+</html>

@@ -1,0 +1,841 @@
+{% extends 'home/cashCounter/indexCashCounter.html' %}
+{% load static %}
+{% block title %}
+    <title>Edit Cash Counter</title>
+{% endblock %}
+{% block css %}
+    <style>
+        .ui.secondary.menu .active.item {
+            -webkit-box-shadow: none;
+            box-shadow: none;
+            background: #0c0202;
+            color: white;
+            border-radius: 0.28571429rem;
+        }
+
+        .ui.secondary.menu .active.item:hover {
+            -webkit-box-shadow: none;
+            box-shadow: none;
+            background: #0c0202;
+            color: #fff;
+        }
+
+        .currency {
+            padding: 4px 6px !important;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+
+    <div class="ui aligned basic  grid">
+        <div class="sixteen wide column">
+            <div class="ui  pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user"
+                >Edit Cash Counter
+                </div>
+            </div>
+            <div class="ui active tab " data-tab="user">
+
+                <div class="ui row teal stacked segment ">
+                    <div class="ui divider"></div>
+                    <div class="context">
+                        <div class="ui secondary menu" style="overflow-x: scroll">
+                            <a class="item {% if obj.mode == 'Cash' %} active {% endif %}" data-tab="cash"
+                               onclick="selectTab('Cash')">Cash</a>
+                            <a class="item {% if obj.mode == 'Credit' %} active {% endif %}" data-tab="credit"
+                               onclick="selectTab('Credit')">Credit</a>
+                            <a class="item {% if obj.mode == 'Card' %} active {% endif %}" data-tab="card"
+                               onclick="selectTab('Card')">Card</a>
+                            <a class="item {% if obj.mode == 'Mix' %} active {% endif %}" data-tab="mix"
+                               onclick="selectTab('Mix')">Mix</a>
+                            {#                            <a class="item {% if obj.mode == 'Collection' %} active {% endif %}" data-tab="collection"#}
+                            {#                               onclick="selectTab('Collection')">Collection</a>#}
+                            <a class="item {% if obj.mode == 'Return' %} active {% endif %}" data-tab="return"
+                               onclick="selectTab('Return')">Return</a>
+                            <a class="item {% if obj.mode == 'Expense' %} active {% endif %}" data-tab="expense"
+                               onclick="selectTab('Expense')">Expense</a>
+                            <a class="item {% if obj.mode == 'Advance' %} active {% endif %}" data-tab="advance"
+                               onclick="selectTab('Advance')">Advance</a>
+                        </div>
+                        <div class="ui tab segment {% if obj.mode == 'Cash' %} active {% endif %}" data-tab="cash">
+                            <div class="ui row  ">
+                                <div class="content">
+                                    <form class="ui  small form " id="addFormCash" name="addFormCash">{% csrf_token %}
+                                        <div class="two fields">
+                                            <div class="eight wide field required">
+                                                <label>Invoice Number</label>
+                                                <div class="ui left labeled  input">
+                                                    <div class="ui dropdown teal label" id="invoiceSeriesCash">
+                                                        <div class="text" id="invoiceSeriesSelectCash">BCS</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">BCS</div>
+                                                            <div class="item">BCS1</div>
+                                                            <div class="item">BSS</div>
+                                                            <div class="item">ND</div>
+                                                        </div>
+                                                    </div>
+                                                    <input type="number" placeholder="Invoice Number" id="invoiceNoCash"
+                                                           name="invoiceNoCash">
+                                                    <div class="ui dropdown blue label" id="invoiceYearCash">
+                                                        <div class="text" id="invoiceYearSelectCash">25-26</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">25-26</div>
+                                                            <div class="item">24-25</div>
+                                                            <div class="item">23-24</div>
+                                                            <div class="item">22-23</div>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+                                            <div class="eight wide field required">
+                                                <label>Amount (₹ <a class="ui violet label currency"
+                                                                    id="moneyCash">0.0</a>
+                                                    )</label>
+                                                <input type="number" name="amountCash" id="amountCash"
+                                                       placeholder="Amount"
+                                                       onkeyup="toIndianCurrency()">
+                                            </div>
+
+                                        </div>
+                                        <div class="one  fields">
+                                            <div class="sixteen wide field">
+                                                <label>Remark</label>
+                                                <textarea name="remarkCash" id="remarkCash" placeholder="Any Remark"
+                                                          rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ui tab segment{% if obj.mode == 'Credit' %} active {% endif %}" data-tab="credit">
+                            <div class="ui row  ">
+                                <div class="content">
+                                    <form class="ui  small form " id="addFormCredit"
+                                          name="addFormCredit">{% csrf_token %}
+                                        <div class="two fields">
+                                            <div class="eight wide field required">
+                                                <label>Invoice Number</label>
+                                                <div class="ui left labeled  input">
+                                                    <div class="ui dropdown teal label" id="invoiceSeriesCredit">
+                                                        <div class="text" id="invoiceSeriesSelectCredit">BCS</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">BCS</div>
+                                                            <div class="item">BCS1</div>
+                                                            <div class="item">BSS</div>
+                                                            <div class="item">ND</div>
+                                                        </div>
+                                                    </div>
+                                                    <input type="number" placeholder="Invoice Number"
+                                                           id="invoiceNoCredit"
+                                                           name="invoiceNoCredit">
+                                                    <div class="ui dropdown blue label" id="invoiceYearCredit">
+                                                        <div class="text" id="invoiceYearSelectCredit">25-26</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">25-26</div>
+                                                            <div class="item">24-25</div>
+                                                            <div class="item">23-24</div>
+                                                            <div class="item">22-23</div>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+                                            <div class="eight wide field required">
+                                                <label>Amount (₹ <a class="ui violet label currency" id="moneyCredit">0.0</a>
+                                                    )</label>
+                                                <input type="number" name="amountCredit" id="amountCredit"
+                                                       placeholder="Amount"
+                                                       onkeyup="toIndianCurrency()">
+                                            </div>
+
+                                        </div>
+                                        <div class="two  fields">
+                                            <div class="eight wide field required">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyCredit"
+                                                        name="partyCredit">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="eight wide field">
+                                                <label>Remark</label>
+                                                <textarea name="remarkCredit" id="remarkCredit" placeholder="Any Remark"
+                                                          rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ui tab segment{% if obj.mode == 'Card' %} active {% endif %}" data-tab="card">
+                            <div class="ui row  ">
+                                <div class="content">
+                                    <form class="ui  small form " id="addFormCard" name="addFormCard">{% csrf_token %}
+                                        <div class="two fields">
+                                            <div class="eight wide field required">
+                                                <label>Invoice Number</label>
+                                                <div class="ui left labeled  input">
+                                                    <div class="ui dropdown teal label" id="invoiceSeriesCard">
+                                                        <div class="text" id="invoiceSeriesSelectCard">BCS</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">BCS</div>
+                                                            <div class="item">BCS1</div>
+                                                            <div class="item">BSS</div>
+                                                            <div class="item">ND</div>
+                                                        </div>
+                                                    </div>
+                                                    <input type="number" placeholder="Invoice Number" id="invoiceNoCard"
+                                                           name="invoiceNoCard">
+                                                    <div class="ui dropdown blue label" id="invoiceYearCard">
+                                                        <div class="text" id="invoiceYearSelectCard">25-26</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">25-26</div>
+                                                            <div class="item">24-25</div>
+                                                            <div class="item">23-24</div>
+                                                            <div class="item">22-23</div>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+                                            <div class="eight wide field required">
+                                                <label>Amount (₹ <a class="ui violet label currency"
+                                                                    id="moneyCard">0.0</a>
+                                                    )</label>
+                                                <input type="number" name="amountCard" id="amountCard"
+                                                       placeholder="Amount"
+                                                       onkeyup="toIndianCurrency()">
+                                            </div>
+
+                                        </div>
+                                        <div class="two  fields">
+                                            <div class=" field required">
+                                                <label>Bank </label>
+                                                <select class="ui dropdown search fluid " id="bankCard">
+                                                    <option value="">Select Bank</option>
+                                                    {% for foo in banks %}
+                                                        <option value="{{ foo.id }}">{{ foo.name }}
+                                                            - {{ foo.accountNumber }} </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+
+                                            <div class="field">
+                                                <label>Remark</label>
+                                                <textarea name="remarkCard" id="remarkCard" placeholder="Any Remark"
+                                                          rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ui tab segment {% if obj.mode == 'Mix' %} active {% endif %}" data-tab="mix">
+                            <div class="ui row  ">
+                                <div class="content">
+                                    <form class="ui  small form " id="addFormMix" name="addFormMix">{% csrf_token %}
+                                        <div class="four fields">
+                                            <div class="five wide field required">
+                                                <label>Invoice Number</label>
+                                                <div class="ui left labeled  input">
+                                                    <div class="ui dropdown teal label" id="invoiceSeriesMix">
+                                                        <div class="text" id="invoiceSeriesSelectMix">BCS</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">BCS</div>
+                                                            <div class="item">BCS1</div>
+                                                            <div class="item">BSS</div>
+                                                            <div class="item">ND</div>
+                                                        </div>
+                                                    </div>
+                                                    <input type="number" placeholder="Invoice Number" id="invoiceNoMix"
+                                                           name="invoiceNoMix">
+                                                    <div class="ui dropdown blue label" id="invoiceYearMix">
+                                                        <div class="text" id="invoiceYearSelectMix">25-26</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">25-26</div>
+                                                            <div class="item">24-25</div>
+                                                            <div class="item">23-24</div>
+                                                            <div class="item">22-23</div>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+                                            <div class="four wide field required">
+                                                <label>Amount Cash (₹ <a class="ui violet label currency"
+                                                                         id="moneyCashMix">0.0</a>
+                                                    )</label>
+                                                <input type="number" name="amountCashMix" id="amountCashMix"
+                                                       placeholder="Amount"
+                                                       onkeyup="toIndianCurrency()">
+                                            </div>
+                                            <div class="four wide field required">
+                                                <label>Amount Card (₹ <a class="ui violet label currency"
+                                                                         id="moneyCardMix">0.0</a>
+                                                    )</label>
+                                                <input type="number" name="amountCardMix" id="amountCardMix"
+                                                       placeholder="Amount"
+                                                       onkeyup="toIndianCurrency()">
+                                            </div>
+                                            <div class=" field required">
+                                                <label>Bank </label>
+                                                <select class="ui dropdown search fluid " id="bankMix">
+                                                    <option value="">Select Bank</option>
+                                                    {% for foo in banks %}
+                                                        <option value="{{ foo.id }}">{{ foo.name }}
+                                                            - {{ foo.accountNumber }} </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+
+                                        </div>
+                                        <div class="one  fields">
+
+                                            <div class="sixteen wide field">
+                                                <label>Remark</label>
+                                                <textarea name="remarkMix" id="remarkMix" placeholder="Any Remark"
+                                                          rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ui tab segment{% if obj.mode == 'Collection' %} active {% endif %}"
+                             data-tab="collection">
+                            <div class="ui row  ">
+                                <div class="content">
+                                    <form class="ui  small form " id="addFormCollection"
+                                          name="addFormCollection">{% csrf_token %}
+                                        <div class="two fields">
+                                            <div class="eight wide field required">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyCollection"
+                                                        name="partyCollection">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="eight wide field required">
+                                                <label>Amount (₹ <a class="ui violet label currency"
+                                                                    id="moneyCollection">0.0</a>
+                                                    )</label>
+                                                <input type="number" name="amountCollection" id="amountCollection"
+                                                       placeholder="Amount"
+                                                       onkeyup="toIndianCurrency()">
+                                            </div>
+
+                                        </div>
+                                        <div class="one fields">
+
+                                            <div class="sixteen wide field">
+                                                <label>Remark</label>
+                                                <textarea name="remarkCollection" id="remarkCollection"
+                                                          placeholder="Any Remark"
+                                                          rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ui tab segment {% if obj.mode == 'Return' %} active {% endif %}" data-tab="return">
+                            <div class="ui row  ">
+                                <div class="content">
+                                    <form class="ui  small form " id="addFormReturn"
+                                          name="addFormReturn">{% csrf_token %}
+                                        <div class="two fields">
+                                            <div class="eight wide field required">
+                                                <label>Invoice Number</label>
+                                                <div class="ui left labeled  input">
+                                                    <div class="ui dropdown teal label" id="invoiceSeriesReturn">
+                                                        <div class="text" id="invoiceSeriesSelectReturn">BCS</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">BCS</div>
+                                                            <div class="item">BCS1</div>
+                                                            <div class="item">BSS</div>
+                                                            <div class="item">ND</div>
+                                                        </div>
+                                                    </div>
+                                                    <input type="number" placeholder="Invoice Number"
+                                                           id="invoiceNoReturn"
+                                                           name="invoiceNoReturn">
+                                                    <div class="ui dropdown blue label" id="invoiceYearReturn">
+                                                        <div class="text" id="invoiceYearSelectReturn">25-26</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu">
+                                                            <div class="item">25-26</div>
+                                                            <div class="item">24-25</div>
+                                                            <div class="item">23-24</div>
+                                                            <div class="item">22-23</div>
+                                                        </div>
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+                                            <div class="eight wide field required">
+                                                <label>Amount (₹ <a class="ui violet label currency" id="moneyReturn">0.0</a>
+                                                    )</label>
+                                                <input type="number" name="amountReturn" id="amountReturn"
+                                                       placeholder="Amount"
+                                                       onkeyup="toIndianCurrency()">
+                                            </div>
+
+                                        </div>
+                                        <div class="one  fields">
+                                            <div class="sixteen wide field">
+                                                <label>Remark</label>
+                                                <textarea name="remarkReturn" id="remarkReturn" placeholder="Any Remark"
+                                                          rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ui tab segment{% if obj.mode == 'Expense' %} active {% endif %}" data-tab="expense">
+                            <div class="ui row  ">
+                                <div class="content">
+                                    <form class="ui  small form " id="addFormExpense"
+                                          name="addFormExpense">{% csrf_token %}
+                                        <div class="three fields">
+                                            <div class="field required">
+                                                <label>Expense Type</label>
+                                                <select class="ui search dropdown" id="expenseTypeExpense"
+                                                        name="expenseTypeExpense">
+                                                    <option value="">Search By Expense Type</option>
+                                                    <option value="Misc expenses">Misc expenses</option>
+                                                    <option value="Goods purchased">Goods purchased</option>
+                                                    <option value="Donation">Donation</option>
+                                                    <option value="Labour charges">Labour charges</option>
+                                                    <option value="Vehicle Fuel/repair">Vehicle Fuel/repair</option>
+                                                    <option value="Goods Delivery expenses">Goods Delivery expenses
+                                                    </option>
+                                                    <option value="Staff meals">Staff meals</option>
+                                                    <option value="Staff travel allowance">Staff travel allowance
+                                                    </option>
+                                                    <option value="Staff Salary">Staff Salary</option>
+                                                    <option value="CC Payment">CC Payment</option>
+                                                    <option value="Housekeeping Expenses">Housekeeping Expenses</option>
+                                                    <option value="Others">Others</option>
+                                                </select>
+                                            </div>
+                                            <div class="eight wide field required">
+                                                <label>Remark</label>
+                                                <textarea name="remarkExpense" id="remarkExpense"
+                                                          placeholder="Any Remark"
+                                                          rows="1"></textarea>
+                                            </div>
+
+                                            <div class="eight wide field required">
+                                                <label>Amount (₹ <a class="ui violet label currency" id="moneyExpense">0.0</a>
+                                                    )</label>
+                                                <input type="number" name="amountExpense" id="amountExpense"
+                                                       placeholder="Amount"
+                                                       onkeyup="toIndianCurrency()">
+                                            </div>
+
+                                        </div>
+
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ui tab segment{% if obj.mode == 'Advance' %} active {% endif %}" data-tab="advance">
+                            <div class="ui row  ">
+                                <div class="content">
+                                    <form class="ui  small form " id="addFormAdvance"
+                                          name="addFormAdvance">{% csrf_token %}
+                                        <div class="two fields">
+                                            <div class="eight wide field required">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyAdvance"
+                                                        name="partyAdvance">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="eight wide field required">
+                                                <label>Amount (₹ <a class="ui violet label currency" id="moneyAdvance">0.0</a>
+                                                    )</label>
+                                                <input type="number" name="amountAdvance" id="amountAdvance"
+                                                       placeholder="Amount"
+                                                       onkeyup="toIndianCurrency()">
+                                            </div>
+
+                                        </div>
+                                        <div class="one fields">
+
+                                            <div class="sixteen wide field">
+                                                <label>Remark</label>
+                                                <textarea name="remarkAdvance" id="remarkAdvance"
+                                                          placeholder="Any Remark"
+                                                          rows="1"></textarea>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="editID" value="{{ obj.pk }}">
+                    </div>
+                    <div class="ui  aligned basic  grid">
+                        <div class="row" style="padding-left: 5px;padding-right: 5px">
+
+                            <div class="16 wide column center aligned">
+                                <button onclick="salesSave()" id="saveBtn" class="ui green  button saveBtn">
+                                    Update Detail
+                                </button>
+                                <button style="display: none;" class="ui teal double loading button saveBtnLoad">
+                                    Updating ....
+                                </button>
+                                {#                                <button class="ui teal double button" type="reset" onclick="resetForm()">#}
+                                {#                                    Reset#}
+                                {#                                </button>#}
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+
+
+            </div>
+        </div>
+
+
+    </div>
+
+
+{% endblock %}
+
+{% block js %}
+    <script>
+
+        var mode = "{{ obj.mode }}";
+
+        function selectTab(newMode) {
+            mode = newMode
+            resetForm()
+
+            return mode
+
+        }
+
+        $(getCustomerList());
+        $(getPartyList());
+
+
+        function getCustomerList() {
+            $('#expenseTypeExpense').val('{{ obj.expenseType }}').change();
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:list_party_api' %}",
+
+                success: function (response) {
+                    localStorage.setItem('response', JSON.stringify(response));
+
+                },
+
+                error: function () {
+                    $('body')
+                        .toast({
+                            class: 'error',
+                            message: 'An error occurred !'
+                        })
+                    ;
+                }
+            });
+
+
+        }
+
+        const toIndianCurrency = () => {
+            if (mode === 'Mix') {
+                let numCash = $('#amountCash' + mode).val();
+                let numCard = $('#amountCard' + mode).val();
+                const currCash = numCash.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,")
+                const currCard = numCard.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,")
+                $('#moneyCashMix').html(currCash);
+                $('#moneyCardMix').html(currCard);
+            } else {
+                let num = $('#amount' + mode).val();
+                const curr = num.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,")
+                $('#money' + mode).html(curr);
+            }
+
+        };
+
+        function resetForm() {
+            $('#addForm' + mode).trigger('reset');
+            toIndianCurrency();
+            $('#partyCredit').dropdown('clear');
+            $('#partyCollection').dropdown('clear');
+            $('#partyAdvance').dropdown('clear');
+        }
+
+        function getPartyList() {
+            let response = JSON.parse(localStorage.getItem('response'))
+
+            $('#partyCredit').html('');
+            $('#partyCollection').html('');
+            $('#partyAdvance').html('');
+            $('#partyCredit').append(' <option value="">Search By Party Name</option>');
+            $('#partyCollection').append(' <option value="">Search By Party Name</option>');
+            $('#partyAdvance').append(' <option value="">Search By Party Name</option>');
+            var j;
+            for (j = 0; j < response.data.length; j++) {
+                $('#partyCredit').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                $('#partyCollection').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                $('#partyAdvance').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+
+            }
+
+        }
+
+        function salesSave() {
+            showLoading();
+            let invoiceSeriesSelect = $('#invoiceSeriesSelect' + mode).html();
+            let invoiceNo = $('#invoiceNo' + mode).val();
+            let invoiceYearSelect = $('#invoiceYearSelect' + mode).html();
+            let party = $('#party' + mode).val();
+            let amount = $('#amount' + mode).val();
+            let remark = $('#remark' + mode).val();
+            let bank = $('#bank' + mode).val();
+
+            let expenseType = $('#expenseType' + mode).val();
+            let amountMixCash = $('#amountCash' + mode).val();
+            let amountMixCard = $('#amountCard' + mode).val();
+            let editID = $('#editID').val();
+            debugger;
+
+            let canSave = false;
+
+            if (mode === 'Cash') {
+                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === ''
+                ) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: '* fields are required !'
+                        })
+                    ;
+                    hideLoading();
+                    canSave = false
+                    return;
+                } else {
+                    canSave = true
+                }
+
+
+            } else if (mode === 'Card') {
+                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === '' || bank === ''
+                ) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: '* fields are required !'
+                        })
+                    ;
+                    hideLoading();
+                    canSave = false
+                    return;
+                } else {
+                    canSave = true
+                }
+            } else if (mode === 'Credit') {
+                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === '' || party === ''
+                ) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: '* fields are required !'
+                        })
+                    ;
+                    hideLoading();
+                    canSave = false
+                    return;
+                } else {
+                    canSave = true
+                }
+            } else if (mode === 'Mix') {
+                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amountMixCard === '' || amountMixCash === '' || bank === ''
+                ) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: '* fields are required !'
+                        })
+                    ;
+                    hideLoading();
+                    canSave = false
+                    return;
+                } else {
+                    canSave = true
+                }
+            } else if (mode === 'Collection') {
+                if (amount === '' || party === ''
+                ) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: '* fields are required !'
+                        })
+                    ;
+                    hideLoading();
+                    canSave = false
+                    return;
+                } else {
+                    canSave = true
+                }
+            } else if (mode === 'Return') {
+                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === ''
+                ) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: '* fields are required !'
+                        })
+                    ;
+                    hideLoading();
+                    canSave = false
+                    return;
+                } else {
+                    canSave = true
+                }
+            } else if (mode === 'Expense') {
+                if (remark === '' || amount === '' || expenseType === ''
+                ) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: '* fields are required !'
+                        })
+                    ;
+                    hideLoading();
+                    canSave = false
+                    return;
+                } else {
+                    canSave = true
+                }
+            } else if (mode === 'Advance') {
+                if (amount === '' || party === ''
+                ) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: '* fields are required !'
+                        })
+                    ;
+                    hideLoading();
+                    canSave = false
+                    return;
+                } else {
+                    canSave = true
+                }
+            }
+            if (canSave === true) {
+                data = new FormData();
+                data.append('invoiceSeriesSelect', invoiceSeriesSelect);
+                data.append('invoiceNo', invoiceNo);
+                data.append('invoiceYearSelect', invoiceYearSelect);
+                data.append('party', party);
+                data.append('amount', amount);
+                data.append('remark', remark);
+                data.append('bank', bank);
+                data.append('expenseType', expenseType);
+                data.append('amountMixCash', amountMixCash);
+                data.append('amountMixCard', amountMixCard);
+                data.append('mode', mode);
+                data.append('editID', editID);
+
+                $.ajax({
+                    type: 'post',
+                    url: '{% url 'homeApp:update_cash_counter_by_admin_api' %}',
+                    data: data,
+                    contentType: false,
+                    cache: false,
+                    processData: false,
+
+
+                    success: function (response) {
+                        if (response.message === 'success') {
+                            $('body')
+                                .toast({
+                                    class: 'success',
+                                    message: mode + ' detail updated Successfully.'
+                                });
+
+                            hideLoading();
+                            location.href = "{% url 'homeApp:my_cash_counter_list' %}"
+
+
+                        } else {
+                            $('body')
+                                .toast({
+                                    class: 'error',
+                                    message: 'An error occurred !'
+                                })
+                            ;
+                            hideLoading();
+                        }
+
+                        return response;
+                    },
+                    error: function () {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                        hideLoading();
+                    }
+
+                });
+
+
+            }
+
+        }
+
+        $(loadDetail());
+
+        function loadDetail() {
+            debugger;
+
+
+            setTimeout(function () {
+                $('#amount{{ obj.mode }}').val('{{ obj.amount }}');
+                $('#remark{{ obj.mode }}').val('{{ obj.remark }}');
+                $('#invoiceSeriesSelect{{ obj.mode }}').html('{{ series }}');
+                $('#invoiceNo{{ obj.mode }}').val('{{ number }}');
+                $('#invoiceYearSelect{{ obj.mode }}').html('{{ year }}');
+                $('#amountCash{{ obj.mode }}').val({{ obj.mixCashAmount }});
+                $('#amountCard{{ obj.mode }}').val({{ obj.mixCardAmount }});
+                $('#party{{ obj.mode }}').val("{{obj.partyID.pk}}").change();
+                $('#bank{{ obj.mode }}').val("{{obj.bankID.pk}}").change();
+
+
+            }, 2000);
+
+        }
+
+
+    </script>
+{% endblock %}

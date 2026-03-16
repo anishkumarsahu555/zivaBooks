@@ -1,0 +1,15 @@
+[project]
+name = "zivaBooks"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "django>=6.0.3",
+    "django-datatables-view>=1.20.0",
+    "django-pwa>=2.0.1",
+    "django-redis>=6.0.0",
+    "django-stdimage>=6.0.2",
+    "requests>=2.32.5",
+    "weasyprint>=68.1",
+]

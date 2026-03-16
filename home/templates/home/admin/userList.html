@@ -1,0 +1,950 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/4.1.0/css/fixedColumns.dataTables.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.1.0/js/dataTables.fixedColumns.min.js"></script>
+{% endblock %}
+
+{% block title %}
+    <title>Staff Users</title>
+{% endblock %}
+{% block css %}
+{% endblock %}
+{% block body %}
+
+    <style>
+        .avatar-upload {
+            position: relative;
+            max-width: 115px;
+            margin: 5px auto;
+        }
+
+        .avatar-upload .avatar-edit {
+            position: absolute;
+            right: 12px;
+            z-index: 1;
+            top: 10px;
+        }
+
+        .avatar-upload .avatar-edit input {
+            display: none;
+        }
+
+        .avatar-upload .avatar-edit input + label {
+            display: inline-block;
+            width: 25px;
+            height: 25px;
+            margin-bottom: 0;
+            border-radius: 100%;
+            background: #FFFFFF;
+            border: 1px solid transparent;
+            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.12);
+            cursor: pointer;
+            font-weight: normal;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .avatar-upload .avatar-edit input + label:hover {
+            background: #f1f1f1;
+            border-color: #d6d6d6;
+        }
+
+        .avatar-upload .avatar-edit input + label:after {
+            color: #757575;
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            margin: auto;
+
+        }
+
+        .avatar-upload .avatar-preview {
+            width: 100px;
+            height: 100px;
+            position: relative;
+            border-radius: 100%;
+            border: 6px solid #F8F8F8;
+            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.1);
+        }
+
+        .avatar-upload .avatar-preview > div {
+            width: 100%;
+            height: 100%;
+            border-radius: 100%;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+
+        #UserTable_length {
+            left: 20px;
+            position: absolute;
+        }
+
+        #UserTable_filter {
+            width: 50%;
+            float: right;
+        }
+
+        .dt-buttons {
+            position: absolute;
+            left: 174px;
+        }
+
+        input[type=search] {
+            width: 100px !important;
+        }
+    </style>
+
+    <div class="ui right aligned basic  grid">
+        <div class="sixteen wide column">
+            <div class="ui  pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user"
+                >Staff Users List
+                </div>
+                <div style=" position: absolute;right: 1.5rem;top: 18px;">
+                    <button class="ui green mini plus button right" onclick="showUserModal()">
+                        <i class="plus square outline icon"></i>
+                        Add User
+                    </button>
+                </div>
+            </div>
+            <div class="ui tab " data-tab="user">
+
+                <div class="row" style="padding-left: 5px; padding-right: 5px">
+                    <div class="wide">
+
+                        <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="UserTable"
+                               style="margin-top: 5px;width: 100%">
+                            <thead>
+                            <tr>
+                                <th>Photo</th>
+                                <th>Name</th>
+                                <th>Username</th>
+                                <th>Password</th>
+                                <th>Group</th>
+                                <th>PhoneNo.</th>
+                                <th>Address</th>
+                                <th>IsActive?</th>
+                                <th>Added On</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="ui modal" id="myModalUser">
+                        <i class="close icon"></i>
+                        <div class="header">
+                            Add Staff
+                        </div>
+                        <div class="content">
+
+                            <form class="ui tiny form" id="addForm">{% csrf_token %}
+                                <div class="two fields required">
+                                    <div class="eight wide field">
+                                        <label>Photo</label>
+
+                                        <div class="ui" style="width: 100%; text-align: center">
+                                            <div class="ui icon header">
+                                                <div class="inline ">
+
+                                                    <div class="avatar-upload">
+                                                        <div class="avatar-edit">
+                                                            <input type='file' id="imageUpload" name="photo"
+                                                                   accept=".png, .jpg, .jpeg"/>
+                                                            <label for="imageUpload"><i class="edit icon"
+                                                                                        style="font-size: 1rem;padding: 0.4rem"></i>
+                                                            </label>
+                                                        </div>
+                                                        <div class="avatar-preview">
+                                                            <div id="cImg"
+                                                                 style="background-image: url('https://cdn-icons.flaticon.com/png/512/4785/premium/4785452.png?token=exp=1651559899~hmac=8bd1641cd72c54268deafab8b26dd7a9');">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                    <div class="eight wide field">
+                                        <label>ID Proof</label>
+
+                                        <div class="ui" style="width: 100%; text-align: center">
+                                            <div class="ui icon header">
+                                                <div class="inline ">
+
+                                                    <div class="avatar-upload">
+                                                        <div class="avatar-edit">
+                                                            <input type='file' id="imageUploadID" name="photo"
+                                                                   accept=".png, .jpg, .jpeg"/>
+                                                            <label for="imageUploadID"><i class="edit icon"
+                                                                                          style="font-size: 1rem;padding: 0.4rem"></i>
+                                                            </label>
+                                                        </div>
+                                                        <div class="avatar-preview">
+                                                            <div id="cImgID"
+                                                                 style="background-image: url('https://cdn-icons.flaticon.com/png/512/4785/premium/4785452.png?token=exp=1651559899~hmac=8bd1641cd72c54268deafab8b26dd7a9');">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="one required fields">
+                                    <div class="sixteen wide field">
+                                        <label>Name</label>
+                                        <input type="text" name="Name" placeholder="Full Name" id="CompanyUserName">
+                                    </div>
+
+                                </div>
+
+                                <div class="two fields">
+                                    <div class="field required">
+                                        <label>Phone No.</label>
+                                        <input type="number" name="Phone" id="UserPhoneNo" placeholder="Phone Number">
+                                    </div>
+                                    <div class="field">
+                                        <label>Email</label>
+                                        <input type="text" placeholder="Email Address" name="Email" id="UserEmail">
+                                    </div>
+                                </div>
+
+                                <div class="field">
+
+                                    <div class="required fields">
+
+                                        <div class="sixteen wide field">
+                                            <label>Address</label>
+                                            <input type="text" name="shipping[address]" placeholder="Full Address"
+                                                   id="UserAddress">
+                                        </div>
+
+                                    </div>
+                                </div>
+                                <div class="two fields">
+                                    <div class="field required">
+                                        <label>Group</label>
+                                        <select class="ui fluid dropdown" id="UserGroup">
+                                            <option value="" hidden>Group</option>
+                                            {% for group in groups %}
+                                                <option value="{{ group.name }}">{{ group.name|capfirst }}</option>
+                                            {% endfor %}
+
+
+                                        </select>
+                                    </div>
+                                  {% comment %}  <div class="field required">
+                                        <label>Party Group</label>
+                                        <select class="ui fluid clearable search dropdown" id="PartyGroup">
+                                            <option value="" hidden>Party Group</option>
+                                            {% for group in party_groups %}
+                                                <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
+                                            {% endfor %}
+
+
+                                        </select>
+                                    </div>{% endcomment %}
+
+                                    <div class="field required">
+                                        <label>Is-Active</label>
+                                        <select class="ui fluid dropdown" id="UserStatus">
+                                            <option value="" hidden>Status</option>
+                                            <option value="Active" selected>Active</option>
+                                            <option value="In-Active">In-Active</option>
+
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="two fields">
+                                    <div class="field required">
+                                        <label>Password</label>
+                                        <input type="password" name="Password" id="UserPwd" placeholder="Password">
+                                    </div>
+                                    <div class="field required">
+                                        <label>Confirm Password</label>
+                                        <input type="password" name="Password" id="ConfirmPwd"
+                                               placeholder="Confirm Password">
+                                    </div>
+
+                                </div>
+
+
+                            </form>
+
+                            <div class="actions" style="padding-top: 20px; padding-bottom: 20px ;float: right">
+                                <div class="ui cancel button">Cancel</div>
+                                <button class="ui right labeled icon button green saveBtn" onclick="addUser()">
+                                    Submit
+                                    <i class="checkmark icon"></i>
+                                </button>
+                                <button style="display: none" class="ui right labeled icon button green saveBtnLoad" >
+                                    Saving ...
+                                    <i class="checkmark icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ui basic modal custom" id="deleteUser">
+                    <div class="ui icon header">
+                        <i class="archive icon"></i>
+                        User Details will be Deleted
+                    </div>
+                    <div class="content">
+                        <p style="text-align: center">The User will be deleted, are you sure to delete this User?</p>
+                    </div>
+                    <div class="actions">
+                        <div class="ui red basic cancel inverted button">
+                            <i class="remove icon"></i>
+                            No
+                        </div>
+                        <input type="hidden" id="UserID">
+                        <div class="ui green ok inverted button" onclick="deleteUser()">
+                            <i class="checkmark icon"></i>
+                            Yes
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ui modal" id="userModal">
+                    <i class="close icon"></i>
+                    <div class="header">
+                        Edit Staff Details
+                    </div>
+                    <div class="content">
+
+                        <form class="ui tiny form" id="EditForm">{% csrf_token %}
+                            <div class="two fields">
+                                <div class="field required">
+                                    <label>Photo </label>
+
+                                    <div class="ui" style="width: 100%; text-align: center">
+                                        <div class="ui icon header">
+                                            <div class="inline ">
+
+                                                <div class="avatar-upload">
+                                                    <div class="avatar-edit">
+                                                        <input type='file' id="imageUploadEdit" name="photo"
+                                                               accept=".png, .jpg, .jpeg"/>
+                                                        <label for="imageUploadEdit"><i class="edit icon"
+                                                                                    style="font-size: 1rem;padding: 0.4rem"></i>
+                                                    </label>
+                                                </div>
+                                                <div class="avatar-preview">
+                                                    <div id="cImgEdit"
+                                                         style="background-image: url('https://cdn-icons.flaticon.com/png/512/4785/premium/4785452.png?token=exp=1651559899~hmac=8bd1641cd72c54268deafab8b26dd7a9');">
+                                                    </div>
+                                                </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                                <div class="field required">
+                                    <label>ID Proof</label>
+
+                                    <div class="ui" style="width: 100%; text-align: center">
+                                        <div class="ui icon header">
+                                            <div class="inline ">
+
+                                                <div class="avatar-upload">
+                                                    <div class="avatar-edit">
+                                                        <input type='file' id="imageUploadIDEdit" name="photo"
+                                                               accept=".png, .jpg, .jpeg"/>
+                                                        <label for="imageUploadIDEdit"><i class="edit icon"
+                                                                                          style="font-size: 1rem;padding: 0.4rem"></i>
+                                                        </label>
+                                                    </div>
+                                                    <div class="avatar-preview">
+                                                        <div id="cImgIDEdit"
+                                                             style="background-image: url('https://cdn-icons.flaticon.com/png/512/4785/premium/4785452.png?token=exp=1651559899~hmac=8bd1641cd72c54268deafab8b26dd7a9');">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="one required fields">
+                                <div class="sixteen wide field">
+                                    <label>Name</label>
+                                    <input type="text" name="Name" placeholder="Full Name" id="CompanyUserNameEdit">
+                                </div>
+
+                            </div>
+
+                            <div class="two fields">
+                                <div class="field required">
+                                    <label>Phone No.</label>
+                                    <input type="number" name="Phone" id="UserPhoneNoEdit" placeholder="Phone Number">
+                                </div>
+                                <div class="field">
+                                    <label>Email</label>
+                                    <input type="text" placeholder="Email Address" name="Email" id="UserEmailEdit">
+                                </div>
+                            </div>
+
+                            <div class="field">
+
+                                <div class="required fields">
+
+                                    <div class="sixteen wide field">
+                                        <label>Address</label>
+                                        <input type="text" name="shipping[address]" placeholder="Full Address"
+                                               id="UserAddressEdit">
+                                    </div>
+
+                                </div>
+                            </div>
+                            <div class="two fields">
+                                <div class="field required">
+                                    <label>Group</label>
+                                    <select class="ui fluid dropdown" id="UserGroupEdit">
+                                        <option value="" hidden>Group</option>
+                                        {% for group in groups %}
+                                            <option value="{{ group.name }}">{{ group.name|capfirst }}</option>
+                                        {% endfor %}
+
+
+                                    </select>
+                                </div>
+                               {% comment %} <div class="field required">
+                                    <label>Party Group</label>
+                                    <select class="ui fluid dropdown" id="PartyGroupEdit">
+                                        <option value="" hidden>Party Group</option>
+                                        {% for group in party_groups %}
+                                            <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
+                                        {% endfor %}
+
+
+                                    </select>
+                                </div>{% endcomment %}
+
+                                <div class="field required">
+                                    <label>Is-Active</label>
+                                    <select class="ui fluid dropdown" id="UserStatusEdit">
+                                        <option value="" hidden>Status</option>
+                                        <option value="Active" selected>Active</option>
+                                        <option value="In-Active">In-Active</option>
+
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="two fields">
+                                <div class="field required">
+                                    <label>Password</label>
+                                    <input type="password" name="Password" id="UserPwdEdit" placeholder="Password">
+                                </div>
+                                <div class="field required">
+                                    <label>Confirm Password</label>
+                                    <input type="password" name="Password" id="ConfirmPwdEdit"
+                                           placeholder="Confirm Password">
+                                </div>
+
+                            </div>
+
+                            <input type="hidden" id="EditUserId">
+                        </form>
+
+                        <div class="actions" style="padding-top: 20px; padding-bottom: 20px ;float: right">
+                            <div class="ui cancel button">Cancel</div>
+                            <button class="ui right labeled icon button green saveBtn" onclick="editUser()">
+                                Update
+                                <i class="checkmark icon"></i>
+                            </button>
+                            <button style="display: none" class="ui right labeled icon button green saveBtnLoad" >
+                                    Saving ...
+                                    <i class="checkmark icon"></i>
+                                </button>
+                        </div>
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script>
+
+        var userTab;
+
+        function readURLPhoto(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    $('#cImg').css('background-image', 'url(' + e.target.result + ')');
+                    $('#cImg').hide();
+                    $('#cImg').fadeIn(650);
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        $("#imageUpload").change(function () {
+            readURLPhoto(this);
+        });
+
+        function readURLPhotoID(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    $('#cImgID').css('background-image', 'url(' + e.target.result + ')');
+                    $('#cImgID').hide();
+                    $('#cImgID').fadeIn(650);
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        $("#imageUploadID").change(function () {
+            readURLPhotoID(this);
+        });
+
+        function readURLPhotoEdit(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    $('#cImgEdit').css('background-image', 'url(' + e.target.result + ')');
+                    $('#cImgEdit').hide();
+                    $('#cImgEdit').fadeIn(650);
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        $("#imageUploadEdit").change(function () {
+            readURLPhotoEdit(this);
+        });
+
+        function readURLPhotoIDEdit(input) {
+            if (input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    $('#cImgIDEdit').css('background-image', 'url(' + e.target.result + ')');
+                    $('#cImgIDEdit').hide();
+                    $('#cImgIDEdit').fadeIn(650);
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        $("#imageUploadIDEdit").change(function () {
+            readURLPhotoIDEdit(this);
+        });
+
+        function showUserModal() {
+            $('#myModalUser').modal('show');
+            myOwnReset();
+        }
+
+        function EditUser() {
+            $('')
+        }
+
+        function addUser() {
+            showLoading();
+            var imageUpload = document.getElementById("imageUpload").files[0];
+            var imageUploadID = document.getElementById("imageUploadID").files[0];
+            var CompanyUserName = $('#CompanyUserName').val();
+            var UserPhoneNo = $('#UserPhoneNo').val();
+            var UserEmail = $('#UserEmail').val();
+            var UserAddress = $('#UserAddress').val();
+            var UserGroup = $('#UserGroup').val();
+            var UserStatus = $('#UserStatus').val();
+            var UserPwd = $('#UserPwd').val();
+            var ConfirmPwd = $('#ConfirmPwd').val();
+            {#var PartyGroup = $('#PartyGroup').val();#}
+
+
+            if (CompanyUserName === '' || UserPhoneNo === '' || imageUpload === undefined || imageUploadID === undefined ||
+                UserAddress === '' || UserPwd === '' || ConfirmPwd === '' || UserGroup === '' || UserStatus === '') {
+                $('body')
+                    .toast({
+                        class: 'orange',
+                        message: 'User Name, Phone Number, Photo, Address ... are required !. Also ensure that password is matched'
+                    })
+                ;
+                hideLoading();
+            } else {
+
+                var csrfmiddlewaretoken = $("input[name='csrfmiddlewaretoken']").val();
+
+                data = new FormData();
+                data.append('imageUpload', imageUpload);
+                data.append('imageUploadID', imageUploadID);
+                data.append('CompanyUserName', CompanyUserName);
+                data.append('UserPhoneNo', UserPhoneNo);
+                data.append('UserEmail', UserEmail);
+                data.append('UserAddress', UserAddress);
+                data.append('UserGroup', UserGroup);
+                data.append('UserStatus', UserStatus);
+                data.append('UserPwd', UserPwd);
+                {#data.append('PartyGroup', PartyGroup);#}
+
+
+                data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);
+
+
+                if (UserPwd !== ConfirmPwd) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: 'Password not matched!'
+                        })
+                    ;
+                    hideLoading();
+                } else {
+
+
+                    $.ajax({
+                        type: 'post',
+                        url: '{% url "homeApp:add_staff_api" %}',
+                        data: data,
+                        contentType: false,
+                        cache: false,
+                        processData: false,
+
+
+                        success: function (response) {
+                            if (response.message === 'success') {
+                                $('body')
+                                    .toast({
+                                        class: 'success',
+                                        message: 'New User Added Successfully.'
+                                    })
+                                ;
+
+
+                                userTab.ajax.reload(null, false);
+                                $('#addForm').trigger('reset');
+                                $('#myModalUser').modal('toggle');
+                                hideLoading();
+                            } else {
+                                $('body')
+                                    .toast({
+                                        class: 'error',
+                                        message: 'An error occurred !'
+                                    })
+                                ;
+                                hideLoading();
+
+                            }
+
+                            return response;
+                        },
+                        error: function () {
+                            $('body')
+                                .toast({
+                                    class: 'error',
+                                    message: 'An error occurred !'
+                                })
+                            ;
+                            hideLoading();
+                        }
+                    });
+                }
+
+            }
+
+        }
+
+
+        // user Details
+
+        userTab = $('#UserTable').DataTable({
+            dom: 'Blfrtip',
+            "scrollY": "350px",
+            "scrollX": true,
+            {#stateSave: true,#}
+            fixedColumns: {
+                left: 1,
+                right: 1
+            },
+            buttons: [{
+                extend: 'excel',
+                exportOptions: {
+                    columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                }
+            }
+                {% comment %}      , {
+                          extend: 'print',
+                          exportOptions: {
+                               columns: [1, 2, 3, 4, 5, 6, 7, 8]
+                          }
+                      }{% endcomment %}
+            ],
+            "columnDefs": [
+                {"name": "photo", "targets": 0, "orderable": false},
+                {"name": "name", "targets": 1, "orderable": true},
+                {"name": "username", "targets": 2, "orderable": true},
+                {"name": "userPassword", "targets": 3, "orderable": true},
+                {"name": "group", "targets": 4, "orderable": true},
+                {"name": "phone", "targets": 5, "orderable": true},
+                {"name": "address", "targets": 6, "orderable": true},
+                {"name": "isActive", "targets": 7, "orderable": true},
+                {"name": "datetime", "targets": 8, "orderable": true},
+                {"name": "action", "targets": 9, "orderable": false}
+            ],
+            aaSorting: [[8, 'desc']],
+            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            "pageLength": 10,
+            "processing": true,
+            "serverSide": true,
+            "ajax": "{% url 'homeApp:StaffUserListJson' %}"
+        });
+
+
+        function delUser(id) {
+            $('#deleteUser')
+                .modal('show')
+            ;
+            $('#UserID').val(id)
+        }
+
+        function deleteUser() {
+            var id = $('#UserID').val();
+            var formdata = new FormData();
+            formdata.append('userID', id);
+
+            $.ajax({
+                url: "{% url 'homeApp:delete_staff_user' %}",
+                type: "post",
+                data: formdata,
+                contentType: false,
+                cache: false,
+                processData: false,
+
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body')
+                            .toast({
+                                    class: 'success',
+                                    message: 'User Detail Deleted Successfully.'
+                                })
+                            ;
+
+
+                            userTab.ajax.reload(null, false);
+                        } else {
+                            $('body')
+                                .toast({
+                                    class: 'error',
+                                    message: 'An error occurred !'
+                                })
+                            ;
+
+                        }
+
+                        return response;
+                    },
+                    error: function () {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                    }
+            });
+
+        }
+
+        function GetUserDetails(id) {
+            myOwnReset();
+            $('#userModal').modal('show');
+            $.ajax({
+                type: 'get',
+                url: '{% url "homeApp:get_staff_user_detail"%}?id=' + id,
+
+                success: function (response) {
+                    console.log(response);
+                    $('#EditUserId').val(response.data['ID']);
+                    $('#CompanyUserNameEdit').val(response.data['UserName']);
+                    $('#UserPhoneNoEdit').val(response.data['UserPhone']);
+                    $('#UserEmailEdit').val(response.data['UserEmail']);
+                    $('#UserAddressEdit').val(response.data['UserAddress']);
+                    $('#UserGroupEdit').val(response.data['UserGroup']).change();
+                    {#$('#PartyGroupEdit').val(response.data['PartyGroup']).change();#}
+                    $('#UserStatusEdit').val(response.data['IsActive']).change();
+                    $('#cImgEdit').css('background-image', 'url(' + response.data['ImgUrl'] + ')');
+                    $('#cImgIDEdit').css('background-image', 'url(' + response.data['IDUrl'] + ')');
+                    $('#UserPwdEdit').val(response.data['UserPassword']);
+                    $('#ConfirmPwdEdit').val(response.data['UserPassword']);
+
+
+                },
+                error: function () {
+                    $('body')
+                        .toast({
+                            class: 'error',
+                            message: 'An error occurred !'
+                        })
+                    ;
+                }
+            });
+        }
+
+        function editUser() {
+           showLoading();
+            var imageUpload = document.getElementById("imageUploadEdit").files[0];
+            var imageUploadID = document.getElementById("imageUploadIDEdit").files[0];
+            var EditUserId = $('#EditUserId').val();
+            var CompanyUserName = $('#CompanyUserNameEdit').val();
+            var UserPhoneNo = $('#UserPhoneNoEdit').val();
+            var UserEmail = $('#UserEmailEdit').val();
+            var UserAddress = $('#UserAddressEdit').val();
+            var UserGroup = $('#UserGroupEdit').val();
+            {#var PartyGroup = $('#PartyGroupEdit').val();#}
+            var UserStatus = $('#UserStatusEdit').val();
+            var UserPwd = $('#UserPwdEdit').val();
+            var ConfirmPwd = $('#ConfirmPwdEdit').val();
+
+
+            if (CompanyUserName === '' || UserPhoneNo === '' ||
+                UserAddress === '' || UserPwd === '' || ConfirmPwd === '' || UserGroup === '' || UserStatus === '') {
+                $('body')
+                    .toast({
+                        class: 'orange',
+                        message: 'User Name, Phone Number, Photo, Address ... are required !. Also ensure that password is matched'
+                    })
+                ;
+                hideLoading();
+            } else {
+
+                var csrfmiddlewaretoken = $("input[name='csrfmiddlewaretoken']").val();
+
+                data = new FormData();
+                data.append('EditUserId', EditUserId);
+                data.append('CompanyUserName', CompanyUserName);
+                data.append('UserPhoneNo', UserPhoneNo);
+                data.append('UserEmail', UserEmail);
+                data.append('UserAddress', UserAddress);
+                data.append('UserGroup', UserGroup);
+                data.append('UserStatus', UserStatus);
+                data.append('UserPwd', UserPwd);
+                data.append('imageUpload', imageUpload);
+                data.append('imageUploadID', imageUploadID);
+                {#data.append('PartyGroup', PartyGroup);#}
+
+
+                data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);
+
+
+                if (UserPwd !== ConfirmPwd) {
+                    $('body')
+                        .toast({
+                            class: 'orange',
+                            message: 'Password not matched!'
+                        })
+                    ;
+                    hideLoading();
+                } else {
+
+
+                    $.ajax({
+                        type: 'post',
+                        url: '{% url "homeApp:edit_staff_api" %}',
+                        data: data,
+                        contentType: false,
+                        cache: false,
+                        processData: false,
+
+
+                        success: function (response) {
+                            if (response.message === 'success') {
+                                $('body')
+                                    .toast({
+                                        class: 'success',
+                                        message: 'User detail updated Successfully.'
+                                    })
+                                ;
+
+
+                                userTab.ajax.reload(null, false);
+                                $('#EditForm').trigger('reset');
+                                $('#userModal').modal('toggle');
+                                hideLoading();
+                            } else {
+                                $('body')
+                                    .toast({
+                                        class: 'error',
+                                        message: 'An error occurred !'
+                                    })
+                                ;
+                                hideLoading();
+
+                            }
+
+                            return response;
+                        },
+                        error: function () {
+                            $('body')
+                                .toast({
+                                    class: 'error',
+                                    message: 'An error occurred !'
+                                })
+                            ;
+                            hideLoading();
+                        }
+                    });
+                }
+
+            }
+
+        }
+
+$(document).ready(function(){
+  $('.ui.form')
+  .form({
+    fields: {
+      fileInput:{
+        identifier: 'name',
+        rules: [
+          {
+            type : 'empty'
+          }
+        ]
+      }
+    }
+  });
+});
+
+function myOwnReset(){
+  $('.ui.form').form('reset');
+}
+    </script>
+
+{% endblock %}

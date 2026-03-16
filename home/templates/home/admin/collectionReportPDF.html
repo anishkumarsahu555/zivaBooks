@@ -1,0 +1,85 @@
+{% load custom_has_group_tag %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>zivaBooks</title>
+    <style>
+        @page {
+            size: A5;
+            margin: .3cm;
+        }
+
+
+    </style>
+    <style>
+        table {
+            font-family: arial, sans-serif;
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        td, th {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 5px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #dddddd;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="row">
+        <span style="font-size: 10px;">(zivaBooks) Collection Report for Date: {{ date|date }}</span>
+    </div>
+
+
+    <table style="font-size: 10px">
+        <tr>
+            <th>CollectedBy</th>
+            <th>Cash(₹)</th>
+            <th>Cheque CC(₹)</th>
+            <th>Cheque(₹)</th>
+            <th>Online(₹)</th>
+            <th>Party(₹)</th>
+            <th>Total(₹)</th>
+        </tr>
+        <tr>
+            <td>{{ staffName }}</td>
+            <td>{{ a_total_cash|convert }}</td>
+            <td>{{ a_total_cheque_cc|convert }}</td>
+            <td>{{ a_total_cheque|convert }}</td>
+            <td>{{ a_total_online|convert }}</td>
+            <td>{{ a_total_party|convert }}</td>
+            <td>{{ total|convert }}</td>
+        </tr>
+    </table>
+    <p style="font-size: 10px; margin: 2px;padding-top: 10px">Collection Details</p>
+
+    <table style="font-size: 10px">
+        <tr>
+            <th>PaymentID</th>
+            <th>PartyName</th>
+            <th>Amount(₹)</th>
+            <th>Type</th>
+            <th>CollectedBy</th>
+        </tr>
+        {% for foo in col %}
+
+            <tr>
+                <td>{{ foo.paymentID }}</td>
+                <td>{{ foo.partyID.name }}</td>
+                <td>{{ foo.paidAmount|convert }}</td>
+                <td>{{ foo.modeOfPayment }}</td>
+                <td>{{ foo.collectedBy.name }}</td>
+            </tr>
+        {% endfor %}
+
+    </table>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,588 @@
+{% extends 'home/cashCounter/indexCashCounter.html' %}
+{% load static %}
+{% block title %}
+    <title>Take Collection</title>
+{% endblock %}
+{% block css %}
+    <style>
+        .avatar-upload {
+            position: relative;
+            max-width: 115px;
+            margin: 5px auto;
+        }
+
+        .avatar-upload .avatar-edit {
+            position: absolute;
+            right: 12px;
+            z-index: 1;
+            top: 10px;
+        }
+
+        .avatar-upload .avatar-edit input {
+            display: none;
+        }
+
+        .avatar-upload .avatar-edit input + label {
+            display: inline-block;
+            width: 25px;
+            height: 25px;
+            margin-bottom: 0;
+            border-radius: 100%;
+            background: #FFFFFF;
+            border: 1px solid transparent;
+            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.12);
+            cursor: pointer;
+            font-weight: normal;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .avatar-upload .avatar-edit input + label:hover {
+            background: #f1f1f1;
+            border-color: #d6d6d6;
+        }
+
+        .avatar-upload .avatar-edit input + label:after {
+            color: #757575;
+            position: absolute;
+            top: 10px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            margin: auto;
+
+        }
+
+        .avatar-upload .avatar-preview {
+            width: 100px;
+            height: 100px;
+            position: relative;
+            border-radius: 100%;
+            border: 6px solid #F8F8F8;
+            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.1);
+        }
+
+        .avatar-upload .avatar-preview > div {
+            width: 100%;
+            height: 100%;
+            border-radius: 100%;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+    </style>
+{% endblock %}
+{% block body %}
+
+    <div class="ui aligned basic  grid">
+        <div class="sixteen wide column">
+            <div class="ui  pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user"
+                >Take New Cash Counter Collection
+                </div>
+                <div style=" position: absolute;right: 1.5rem;top: 18px;">
+                    <a href="{% url 'homeApp:cash_counter' %}" class="ui green mini plus button right">
+                        <i class="plus square outline icon"></i>
+                        Go To Cash Counter
+                    </a>
+                </div>
+            </div>
+            <div class="ui tab " data-tab="user">
+
+                <div class="ui row teal stacked segment padded">
+                    <div class="content">
+
+                        <form class="ui  small form " id="addForm">{% csrf_token %}
+                            <div class="one fields">
+                                <div class="sixteen wide field required">
+                                    <label>Filter Parties By</label>
+                                    <select class="ui search dropdown" id="partyAssign" onchange="partyAssignType()">
+                                        <option value="All">All</option>
+                                        <option value="Executive">Executive</option>
+                                        <option value="Station">Station</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="one fields" id="ExecutiveList" style="display: none">
+                                <div class="sixteen wide field required">
+                                    <label>Select Executive</label>
+                                    <select class="ui clearable search dropdown" id="executive" onchange="getPartyListByStationOrStaff('e')">
+                                        <option value="">Search By Executive</option>
+                                        {% for obj in staffs %}
+                                            <option value="{{ obj.pk }}">{{ obj.name|capfirst }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                            </div>
+                           <div class="one fields" id="StationList" style="display: none">
+                                <div class="sixteen wide field required">
+                                    <label>Select Station</label>
+                                    <select class="ui clearable search dropdown" id="station" onchange="getPartyListByStationOrStaff('s')">
+                                        <option value="">Search By Station</option>
+                                        {% for obj in p_groups %}
+                                            <option value="{{ obj.pk }}">{{ obj.name|capfirst }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                            </div>
+                            <div class="one fields" id="partyAll" >
+                                <div class="sixteen wide field required">
+                                    <label>Party Name</label>
+                                    <select class="ui clearable search dropdown" id="partyAllAll">
+                                        <option value="">Search By Party Name</option>
+                                    </select>
+                                </div>
+
+                            </div>
+                         <div class="one fields" id="partyFilter" style="display: none;">
+                                <div class="sixteen wide field required">
+                                    <label>Party Name</label>
+                                    <select class="ui clearable search dropdown" id="partyAllFilter">
+                                        <option value="">Search By Party Name</option>
+                                    </select>
+                                </div>
+
+                            </div>
+                            <div class="two required fields ">
+                                <div class=" field required">
+                                    <label>Mode Of Payment</label>
+                                    <select class="ui dropdown search fluid " id="paymentMode" onchange="isCash()">
+                                        <option value="">Select Mode Of Payment</option>
+                                        <option value="Cash">Cash</option>
+                                       <option value="Cheque CC">Cheque CC</option>
+                                        <option value="Cheque">Cheque</option>
+                                        <option value="Online">Online</option>
+                                        <option value="Party">Party</option>
+                                    </select>
+                                </div>
+
+                                <div class="eight wide field required">
+                                    <label>Amount Paid (₹ <a class="ui violet label" id="money">0.0</a> )</label>
+                                    <input type="number" name="amountPaid" id="amountPaid" placeholder="Amount Paid" onkeyup="toIndianCurrency()">
+                                </div>
+
+
+                            </div>
+                                 <div class="one fields" id="partyDiv" style="display: None">
+                                <div class="sixteen wide field required">
+                                    <label>Transferred Party Name</label>
+                                    <select class="ui clearable search dropdown" id="TransferredParty">
+                                        <option value="">Search By Party Name</option>
+                                    </select>
+                                </div>
+
+                            </div>
+                            <div class="two required fields ">
+                                <div class=" field required" id="bankDiv" style="display: none">
+                                    <label>Bank </label>
+                                    <select class="ui dropdown search fluid " id="bank">
+                                        <option value="">Select Bank</option>
+                                        {% for foo in instance %}
+                                            <option value="{{ foo.id }}">{{ foo.name }}
+                                                - {{ foo.accountNumber }} </option>
+                                        {% endfor %}
+
+
+                                    </select>
+                                </div>
+
+
+                                <div class="eight wide field required" id="detailDiv" style="display: none">
+                                    <label>Detail</label>
+                                    <input type="text" name="detail" id="detail" placeholder="Detail">
+
+                                </div>
+                                     <div class="eight wide field required" id="chequeDatelDiv" style="display: none">
+                                    <label>Cheque Date</label>
+                                     <div class="ui calendar" id="cheqDate">
+                                    <input type="text" name="chequeDate" id="chequeDate" placeholder="chequeDate">
+                                     </div>
+                                </div>
+
+
+
+                            </div>
+                            <div class="one  fields ">
+
+                                <div class="sixteen wide  field ">
+                                    <label>Remark</label>
+                                    <textarea name="" id="remark" placeholder="Any Remark" rows="3"></textarea>
+                                </div>
+
+
+                            </div>
+
+                            <div class="ui label teal" data-variation="mini" data-inverted="" data-tooltip="Location"
+                                 data-position="bottom center">
+                                <i class="map marked alternate icon"></i>
+
+                                <a class="detail"><span id="htmlLat">0.0</span>,<span id="htmlLong">0.0</span> </a>
+                            </div>
+
+                        </form>
+                    </div>
+                    <div class="ui  aligned basic  grid">
+                        <div class="row" style="padding-left: 5px;padding-right: 5px">
+                            <div class="16 wide column center aligned">
+                                <button onclick="salesSave()" id="" class="ui green  button saveBtn">
+                                    Submit Detail
+                                </button>
+                                <button id="" style="display: none;" class="ui teal double loading button saveBtnLoad">
+                                    Saving ....
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+
+                </div>
+
+
+            </div>
+        </div>
+
+
+    </div>
+
+    <input type="hidden" id="lat" value="24.809611">
+    <input type="hidden" id="lng" value="93.935577">
+    <input type="hidden" id="loc" value="N/A">
+
+    <p id="demo"></p>
+
+
+{% endblock %}
+
+{% block js %}
+    <script type="text/javascript">
+        $('.ui.dropdown').dropdown({fullTextSearch: true});
+    </script>
+
+    <script>
+           var today = new Date();
+        $('#cheqDate')
+            .calendar({
+                    initialDate: today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear(),
+                    monthFirst: false,
+                    type: 'date',
+                    formatter: {
+                        date: function (date, settings) {
+
+                            if (!date) return '';
+                            var day = String(date.getDate());
+                            var month = String(date.getMonth() + 1);
+                            var year = date.getFullYear();
+{#                            return '{{ sale.invoiceDate|date:'d/m/Y' }}';#}
+                            return day + '/' + month + '/' + year;
+                        }
+                    }
+                }
+            );
+
+        function partyAssignType() {
+            var partyAssign = $('#partyAssign').val();
+            if (partyAssign === 'All') {
+                $('#partyAll').css('display', "");
+                $('#ExecutiveList').css('display', "none");
+                $('#StationList').css('display', "none");
+                $('#partyFilter').css('display', "none");
+            } else if (partyAssign === 'Executive') {
+                $('#partyAll').css('display', "none");
+                $('#ExecutiveList').css('display', "");
+                $('#StationList').css('display', "none");
+                 $('#partyFilter').css('display', "");
+            }else if (partyAssign === 'Station') {
+                $('#partyAll').css('display', "none");
+                $('#ExecutiveList').css('display', "none");
+                $('#StationList').css('display', "");
+                 $('#partyFilter').css('display', "");
+            }
+
+
+        }
+
+       function isCash() {
+            var mode = $('#paymentMode').val();
+            console.log(mode);
+            if (mode === 'Cash' || mode === 'Cheque CC') {
+                $('#bankDiv').css('display', "none");
+                $('#detailDiv').css('display', "none");
+                $('#chequeDatelDiv').css('display', "none");
+                $('#partyDiv').css('display', "none");
+            } else if (mode === 'Cheque') {
+                $('#bankDiv').css('display', "none");
+                $('#detailDiv').css('display', "");
+                $('#chequeDatelDiv').css('display', "");
+                $('#partyDiv').css('display', "none");
+            }else if (mode === 'Party') {
+                $('#bankDiv').css('display', "none");
+                $('#detailDiv').css('display', "none");
+                $('#chequeDatelDiv').css('display', "none");
+                $('#partyDiv').css('display', "");
+            } else {
+                $('#bankDiv').css('display', "");
+                $('#detailDiv').css('display', "");
+                $('#chequeDatelDiv').css('display', "None");
+                $('#partyDiv').css('display', "none");
+            }
+        }
+
+        function salesSave() {
+            showLoading();
+            var TransferredParty = $('#TransferredParty').val();
+
+            var paymentMode = $('#paymentMode').val();
+            var amountPaid = $('#amountPaid').val();
+            var bank = $('#bank').val();
+            var detail = $('#detail').val();
+            var remark = $('#remark').val();
+            var lat = $('#lat').val();
+            var lng = $('#lng').val();
+            var chequeDate = $('#chequeDate').val();
+            var partyAssign = $('#partyAssign').val();
+            if (partyAssign === 'All') {
+                var party = $('#partyAllAll').val();
+            } else {
+                var party = $('#partyAllFilter').val();
+            }
+
+            if (party === '' || paymentMode === '' || amountPaid === ''
+            ) {
+                $('body')
+                    .toast({
+                        class: 'orange',
+                        message: '* fields are required !'
+                    })
+                ;
+                hideLoading();
+            } else {
+                data = new FormData();
+                data.append('party', party);
+                data.append('paymentMode', paymentMode);
+                data.append('amountPaid', amountPaid);
+                data.append('bank', bank);
+                data.append('detail', detail);
+                data.append('lat', lat);
+                data.append('lng', lng);
+                data.append('remark', remark);
+               data.append('chequeDate', chequeDate);
+                   data.append('TransferredParty', TransferredParty);
+
+                $.ajax({
+                    type: 'post',
+                    url: '{% url 'homeApp:add_collection_from_cash_counter_api' %}',
+                    data: data,
+                    contentType: false,
+                    cache: false,
+                    processData: false,
+
+
+                    success: function (response) {
+                        if (response.message === 'success') {
+                            $('body')
+                                .toast({
+                                    class: 'success',
+                                    message: 'New Collection added Successfully.'
+                                });
+
+                            hideLoading();
+
+                            {#location.href = "{% url 'homeApp:my_collection' %}"#}
+                            location.reload();
+
+                        } else {
+                            $('body')
+                                .toast({
+                                    class: 'error',
+                                    message: 'An error occurred !'
+                                })
+                            ;
+                            hideLoading();
+                        }
+
+                        return response;
+                    },
+                    error: function () {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                        hideLoading();
+                    }
+
+                });
+
+
+            }
+
+        }
+
+        var x = document.getElementById("demo");
+        var options = {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        };
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showPosition, showError);
+            } else {
+                x.innerHTML = "Geolocation is not supported by this browser.";
+            }
+        }
+
+        function showPosition(position) {
+            $('#lat').val(position.coords.latitude);
+            $('#lng').val(position.coords.longitude);
+            $('#htmlLat').html(position.coords.latitude);
+            $('#htmlLong').html(position.coords.longitude);
+            console.log(position)
+
+        }
+
+        function showError(error) {
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    x.innerHTML = "User denied the request for Geolocation."
+                    alert("Please Allow location service request to take collections.")
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    x.innerHTML = "Location information is unavailable."
+                    break;
+                case error.TIMEOUT:
+                    x.innerHTML = "The request to get user location timed out."
+                    break;
+                case error.UNKNOWN_ERROR:
+                    x.innerHTML = "An unknown error occurred."
+                    break;
+            }
+        }
+
+        $(getLocation());
+        navigator.permissions.query({name: 'geolocation'}).then(function (result) {
+            console.log(result);
+         {% comment %}   if (result.state === 'granted') {
+                $('#saveBtn').prop('disabled', false);
+            } else {
+                $('#saveBtn').prop('disabled', true);
+            }{% endcomment %}
+            // Don't do anything if the permission was denied.
+        });
+
+        $(getCustomerList());
+
+
+        function getCustomerList() {
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:list_party_api' %}",
+
+                success: function (response) {
+
+                    $('#partyAllAll').html('');
+                    $('#partyAllAll').append(' <option value="">Search By Party Name</option>');
+                     $('#TransferredParty').html('');
+                    $('#TransferredParty').append(' <option value="">Search By Party Name</option>');
+                   var j;
+                    for (j = 0; j < response.data.length; j++) {
+
+                        $('#partyAllAll').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                        $('#TransferredParty').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+
+                    }
+
+                },
+
+                error: function () {
+                    $('body')
+                        .toast({
+                            class: 'error',
+                            message: 'An error occurred !'
+                        })
+                    ;
+                }
+            });
+
+
+        }
+
+
+        function getPartyListByStationOrStaff(ch) {
+            if(ch === 'e'){
+              var executive = $('#executive').val();
+              var station = 'All'
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:list_party_by_executive_or_station_api' %}?executive=" + executive + "&station=" + station,
+                success: function (response) {
+
+                    $('#partyAllFilter').html('');
+                    $('#partyAllFilter').append(' <option value="">Search By Party Name</option>');
+                    var j;
+                    for (j = 0; j < response.data.length; j++) {
+
+                        $('#partyAllFilter').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+
+                    }
+
+                },
+
+                error: function () {
+                    $('body')
+                        .toast({
+                            class: 'error',
+                            message: 'An error occurred !'
+                        })
+                    ;
+                }
+            });
+
+
+
+            }
+            if(ch === 's'){
+              var executive = 'All'
+              var station = $('#station').val();
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:list_party_by_executive_or_station_api' %}?executive=" + executive + "&station=" + station,
+                success: function (response) {
+
+                    $('#partyAllFilter').html('');
+                    $('#partyAllFilter').append(' <option value="">Search By Party Name</option>');
+                    var j;
+                    for (j = 0; j < response.data.length; j++) {
+
+                        $('#partyAllFilter').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+
+                    }
+
+                },
+
+                error: function () {
+                    $('body')
+                        .toast({
+                            class: 'error',
+                            message: 'An error occurred !'
+                        })
+                    ;
+                }
+            });
+
+
+
+            }
+
+        }
+                const toIndianCurrency = () => {
+            let  num = $('#amountPaid').val();
+   const curr = num.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,")
+$('#money').html(curr);
+};
+    </script>
+{% endblock %}

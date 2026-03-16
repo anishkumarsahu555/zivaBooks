@@ -1,0 +1,203 @@
+{% extends 'home/cashCounter/indexCashCounter.html' %}
+{% load static %}
+
+{% block title %}
+    <title>My Profile</title>
+{% endblock %}
+{% block css %}
+
+{% endblock %}
+{% block body %}
+    <div class="ui right aligned basic  grid">
+        <div class="sixteen wide column">
+            <div class="ui  pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user"
+                >My Profile
+                </div>
+            </div>
+
+            <div class="ui tab " data-tab="user">
+        <div style=" position: absolute;right: 1.5rem;top: 18px;">
+                    <button class="ui green mini plus button right" onclick="showUserModal()">
+                        <i class="plus square outline icon"></i>
+                        Change Password
+                    </button>
+                </div>
+                <div class="row" style="padding-left: 5px; padding-right: 5px">
+                    <div class="ui placeholder segment" style="width: 100%;">
+                        {% comment %}
+            <a href="/ecom/editAccount/" class="editbtn"><i class="edit icon"></i></a>
+{% endcomment %}
+                        <div class="ui icon header">
+                            <div class="inline ">
+                                <img class="ui medium circular image tiny centered" id="cImg"
+                                     src="{{ instance.photo.medium.url }}">
+                            </div>
+                            <span id="Name">{{ instance.name|capfirst }} </span>
+                        </div>
+                        <div class="inline">
+                            <span id="username" class="ui text medium grey">{{ instance.username }}</span>
+                        </div>
+                        <div class="inline">
+                            <span id="Phone">{{ instance.phone }}</span>
+                        </div>
+                        <div class="inline">
+                            <span id="address" class="ui text large grey">{{ instance.address|capfirst }} </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+                    <div class="ui tiny modal" id="myModalUser">
+                        <i class="close icon"></i>
+                        <div class="header">
+                            Change Password
+                        </div>
+                        <div class="content">
+
+                            <form class="ui tiny form" id="addForm">{% csrf_token %}
+
+                                  <div class="one required fields">
+                                    <div class="sixteen wide field">
+                                        <label>New Password</label>
+                                        <input type="password" name="NewPassword" placeholder="New Password" id="newPassword">
+                                    </div>
+
+                                </div>
+                                 <div class="one required fields">
+                                    <div class="sixteen wide field">
+                                        <label>Confirm Password</label>
+                                        <input type="password" name="confirmPassword" placeholder="Confirm Password" id="confirmPassword">
+                                    </div>
+
+                                </div>
+
+                            </form>
+
+                            <div class="actions" style="padding-top: 20px; padding-bottom: 20px ;float: right">
+                                <div class="ui cancel button">Cancel</div>
+                                <button class="ui right labeled icon button green saveBtn" onclick="changePassword()">
+                                    Submit
+                                    <i class="checkmark icon"></i>
+                                </button>
+                                <button style="display: none" class="ui right labeled icon button green saveBtnLoad" >
+                                    Saving ...
+                                    <i class="checkmark icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+{% endblock %}
+
+
+{% block js %}
+    <script>
+
+        function showUserModal() {
+            $('#myModalUser').modal('show');
+        }
+             function changePassword() {
+            showLoading();
+            var pass = $('#newPassword').val();
+            var passc = $('#confirmPassword').val();
+
+
+            if (pass === '' || passc === "") {
+                 $('body')
+                    .toast({
+                        class: 'orange',
+                        message: '* fields are required.'
+                    })
+                ;
+                 hideLoading();
+
+            }
+
+            else {
+                if (pass !== passc) {
+                      $('body')
+                    .toast({
+                        class: 'orange',
+                        message: 'Password not matched.'
+                    })
+                ;
+                      hideLoading();
+                }
+                else if (pass.length < 8) {
+                      $('body')
+                    .toast({
+                        class: 'orange',
+                        message: 'Password should be at least 8 characters long.'
+                    })
+                ;
+                      hideLoading();
+
+                }
+                else {
+                     var csrfmiddlewaretoken = $("input[name='csrfmiddlewaretoken']").val();
+
+                data = new FormData();
+                data.append('password', pass);
+
+
+                data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);
+
+
+                $.ajax({
+                    type: 'post',
+                    url: '{% url "homeApp:change_password_api" %}',
+                    data: data,
+                    contentType: false,
+                    cache: false,
+                    processData: false,
+
+
+                    success: function (response) {
+                        if (response.message === 'success') {
+                            $('body')
+                                .toast({
+                                    class: 'success',
+                                    message: 'Password changed Successfully.'
+                                })
+                            ;
+
+
+                            $('#addForm').trigger('reset');
+                            $('#myModalUser').modal('toggle');
+                            hideLoading();
+                        } else {
+                            $('body')
+                                .toast({
+                                    class: 'error',
+                                    message: 'An error occurred !'
+                                })
+                            ;
+                            hideLoading();
+
+                        }
+
+                        return response;
+                    },
+                    error: function () {
+                        $('body')
+                            .toast({
+                                class: 'error',
+                                message: 'An error occurred !'
+                            })
+                        ;
+                        hideLoading();
+
+
+            }
+           });
+            }
+            }
+             }
+
+
+
+    </script>
+{% endblock %}
