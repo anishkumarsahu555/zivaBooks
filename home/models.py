@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth.models import Group
 from django.db import models
 from django.contrib.contenttypes.fields import GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -119,11 +120,17 @@ class AuditLog(TimeStampedModel):
             models.Index(fields=['actor', '-datetime'], name='auditlog_actor_dt_idx'),
             models.Index(fields=['action', '-datetime'], name='auditlog_action_dt_idx'),
         ]
+        permissions = [
+            ('can_view_audit_logs', 'Can view audit logs'),
+            ('can_export_audit_logs', 'Can export audit logs'),
+        ]
 
 
 class StaffGroup(TenantOwnedModel):
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='staff_groups')
     name = models.CharField(max_length=200, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    djangoGroup = models.OneToOneField(Group, blank=True, null=True, on_delete=models.SET_NULL, related_name='staff_group_profile')
 
     def __str__(self):
         return self.name
@@ -132,6 +139,10 @@ class StaffGroup(TenantOwnedModel):
         verbose_name_plural = 'a) User Group List'
         indexes = [
             models.Index(fields=['tenant', 'isDeleted', 'name'], name='staffgroup_tenant_del_name_idx'),
+        ]
+        permissions = [
+            ('can_manage_staff_groups', 'Can manage staff groups'),
+            ('can_view_staff_group_permissions', 'Can view staff group permissions'),
         ]
 
 
@@ -169,6 +180,7 @@ class StaffUser(TenantOwnedModel):
     username = models.CharField(max_length=200, blank=True, null=True, help_text='Legacy field. Use linked Django auth user for login.')
     userPassword = models.CharField(max_length=200, blank=True, null=True, help_text='Legacy field retained for compatibility. Use Django auth password hashing instead.')
     group = models.CharField(max_length=200, blank=True, null=True)
+    staffGroup = models.ForeignKey(StaffGroup, blank=True, null=True, on_delete=models.SET_NULL, related_name='staff_members')
     partyGroupID = models.ForeignKey(PartyGroup, blank=True, null=True, on_delete=models.SET_NULL)
     user_ID = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -187,6 +199,11 @@ class StaffUser(TenantOwnedModel):
         indexes = [
             models.Index(fields=['tenant', 'isDeleted', 'name'], name='staffuser_tenant_del_name_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'group'], name='staffuser_tenant_del_group_idx'),
+        ]
+        permissions = [
+            ('can_manage_staff', 'Can manage staff'),
+            ('can_reset_staff_password', 'Can reset staff password'),
+            ('can_assign_staff_groups', 'Can assign staff groups'),
         ]
 
 
@@ -235,6 +252,10 @@ class Party(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'partyGroupID'], name='party_tenant_del_group_idx'),
             models.Index(fields=['tenant', 'openingBalance'], name='party_tenant_openbal_idx'),
         ]
+        permissions = [
+            ('can_manage_parties', 'Can manage parties'),
+            ('can_view_party_credentials', 'Can view party credentials'),
+        ]
 
 
 class Collection(TenantOwnedModel):
@@ -272,6 +293,11 @@ class Collection(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'collectedBy'], name='collect_tenant_staff_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'isApproved'], name='collection_tenant_del_appr_idx'),
             models.Index(fields=['tenant', 'paymentID'], name='collection_tenant_payid_idx'),
+        ]
+        permissions = [
+            ('can_approve_collection', 'Can approve collection'),
+            ('can_tally_collection', 'Can tally collection'),
+            ('can_view_collection_reports', 'Can view collection reports'),
         ]
 
 
@@ -335,6 +361,10 @@ class Attendance(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'staffID', 'datetime'], name='attendance_tenant_staff_dt_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'loginDateTime'], name='attendance_tenant_login_idx'),
         ]
+        permissions = [
+            ('can_view_all_attendance', 'Can view all attendance'),
+            ('can_view_attendance_reports', 'Can view attendance reports'),
+        ]
 
 
 class WhatsappMessageStatus(TenantOwnedModel):
@@ -380,6 +410,11 @@ class Sales(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'createdBy'], name='sales_tenant_del_staff_idx'),
             models.Index(fields=['tenant', 'paymentID'], name='sales_tenant_payid_idx'),
         ]
+        permissions = [
+            ('can_approve_sales', 'Can approve sales'),
+            ('can_manage_sales', 'Can manage sales'),
+            ('can_view_sales_reports', 'Can view sales reports'),
+        ]
 
 
 class CashCounter(TenantOwnedModel):
@@ -407,6 +442,10 @@ class CashCounter(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'entryDate'], name='cashcounter_tenant_entry_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'createdBy'], name='cashcounter_tenant_staff_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'mode'], name='cashcounter_tenant_mode_idx'),
+        ]
+        permissions = [
+            ('can_manage_cash_counter', 'Can manage cash counter'),
+            ('can_view_cash_counter_reports', 'Can view cash counter reports'),
         ]
 
 

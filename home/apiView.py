@@ -1,17 +1,20 @@
 import threading
+from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 import requests
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q, Sum, Count
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils.crypto import get_random_string
 from django.utils.html import escape
 from django.views.decorators.cache import cache_page
@@ -20,12 +23,72 @@ from django_datatables_view.base_datatable_view import BaseDatatableView
 from weasyprint import CSS, HTML
 
 from home.models import *
+from home.authz import legacy_group_names, legacy_permission_names
 from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_qs
 
 User = get_user_model()
 
 BASE_URL_WHATSAPP = "https://bot.betablaster.in/api/"
 DEFAULT_AVATAR_URL = "/static/images/default-avatar.svg"
+DEFAULT_GROUP_PERMISSION_MAP = {
+    'Owner': '__all__',
+    'Admin': '__all__',
+    'Moderator': [
+        'home.can_manage_parties',
+        'home.can_manage_sales',
+        'home.can_approve_sales',
+        'home.can_approve_collection',
+        'home.can_tally_collection',
+        'home.can_view_collection_reports',
+        'home.can_view_sales_reports',
+        'home.can_view_cash_counter_reports',
+        'home.can_view_audit_logs',
+    ],
+    'Collection': [
+        'home.add_collection',
+        'home.change_collection',
+        'home.view_collection',
+        'home.view_party',
+        'home.view_attendance',
+    ],
+    'SalesAdmin': [
+        'home.add_sales',
+        'home.change_sales',
+        'home.view_sales',
+        'home.can_manage_sales',
+        'home.can_view_sales_reports',
+        'home.view_party',
+    ],
+    'CashCounter': [
+        'home.add_cashcounter',
+        'home.change_cashcounter',
+        'home.view_cashcounter',
+        'home.add_collectioncashcounter',
+        'home.change_collectioncashcounter',
+        'home.view_collectioncashcounter',
+        'home.can_manage_cash_counter',
+        'home.can_view_cash_counter_reports',
+    ],
+    'NormalStaff': [
+        'home.view_attendance',
+        'home.add_attendance',
+        'home.change_attendance',
+    ],
+    'Customer': [
+        'home.view_party',
+    ],
+    'Viewer': [
+        'home.view_party',
+        'home.view_collection',
+        'home.view_sales',
+        'home.view_cashcounter',
+        'home.view_attendance',
+        'home.can_view_collection_reports',
+        'home.can_view_sales_reports',
+        'home.can_view_cash_counter_reports',
+        'home.can_view_audit_logs',
+    ],
+}
 
 
 class LocationThread(threading.Thread):
@@ -134,6 +197,70 @@ def _decimal_from_request(value, default='0'):
         return Decimal(default)
 
 
+def _permission_catalog():
+    permission_groups = defaultdict(list)
+    for permission in Permission.objects.select_related('content_type').exclude(
+        content_type__app_label__in=['admin', 'auth', 'contenttypes', 'sessions']
+    ).order_by('content_type__app_label', 'content_type__model', 'name'):
+        module = permission.content_type.model.replace('_', ' ').title()
+        if permission.codename.startswith('can_'):
+            module = 'Custom ' + module
+        permission_groups[module].append(permission)
+    return dict(permission_groups)
+
+
+def _tenant_group_name(request_or_tenant, base_name):
+    tenant = get_current_tenant(request_or_tenant) if not hasattr(request_or_tenant, 'slug') else request_or_tenant
+    tenant_slug = getattr(tenant, 'slug', 'tenant')
+    return f'{tenant_slug}:{base_name}'
+
+
+def _get_or_create_tenant_django_group(request_or_tenant, base_name, existing_group=None):
+    django_group_name = _tenant_group_name(request_or_tenant, base_name)
+    if existing_group is not None:
+        existing_group.name = django_group_name
+        existing_group.save(update_fields=['name'])
+        return existing_group
+    django_group, _ = Group.objects.get_or_create(name=django_group_name)
+    return django_group
+
+
+def _sync_staff_group_permissions(staff_group, permission_ids):
+    django_group = staff_group.djangoGroup
+    if django_group is None:
+        django_group, _ = Group.objects.get_or_create(name=staff_group.name)
+        staff_group.djangoGroup = django_group
+        staff_group.save(update_fields=['djangoGroup', 'lastUpdatedOn'])
+    permissions = Permission.objects.filter(id__in=permission_ids)
+    django_group.permissions.set(permissions)
+    return django_group
+
+
+def _sync_staff_user_group_membership(staff_user):
+    if not staff_user.user_ID_id:
+        return
+    user = staff_user.user_ID
+    user.groups.clear()
+    if staff_user.staffGroup and staff_user.staffGroup.djangoGroup:
+        user.groups.add(staff_user.staffGroup.djangoGroup)
+
+
+def seed_default_groups():
+    all_permissions = Permission.objects.exclude(content_type__app_label__in=['admin', 'contenttypes', 'sessions'])
+    for group_name, permission_codenames in DEFAULT_GROUP_PERMISSION_MAP.items():
+        group, _ = Group.objects.get_or_create(name=group_name)
+        if permission_codenames == '__all__':
+            group.permissions.set(all_permissions)
+        else:
+            perms = []
+            for perm_name in permission_codenames:
+                app_label, codename = perm_name.split('.', 1)
+                perm = Permission.objects.filter(content_type__app_label=app_label, codename=codename).first()
+                if perm:
+                    perms.append(perm)
+            group.permissions.set(perms)
+
+
 def _image_url(image_field, variation=None):
     if not image_field:
         return DEFAULT_AVATAR_URL
@@ -189,8 +316,21 @@ def _cash_counter_collection_list_base_qs(request_or_user):
 
 def _request_group_names(request):
     if not hasattr(request, "_group_name_cache"):
-        request._group_name_cache = set(request.user.groups.values_list('name', flat=True))
+        request._group_name_cache = legacy_group_names(request.user)
     return request._group_name_cache
+
+
+def _staff_queryset_for_legacy_group(request, group_name):
+    queryset = tenant_qs(request, StaffUser).filter(isDeleted__exact=False)
+    permission_names = legacy_permission_names(group_name)
+    role_filter = Q(staffGroup__name__iexact=group_name) | Q(group__iexact=group_name)
+    if permission_names:
+        codenames = [perm_name.split('.', 1)[1] for perm_name in permission_names if '.' in perm_name]
+        role_filter |= Q(
+            staffGroup__djangoGroup__permissions__content_type__app_label='home',
+            staffGroup__djangoGroup__permissions__codename__in=codenames,
+        )
+    return queryset.filter(role_filter).distinct()
 
 
 def _get_party_cache_version():
@@ -231,6 +371,160 @@ def send_whatsapp_message(number, message):
         msg.save()
 
 
+@transaction.atomic
+@csrf_exempt
+def add_staff_group_api(request):
+    if request.method == 'POST':
+        try:
+            name = request.POST.get("groupName")
+            description = request.POST.get("description")
+            permission_ids = request.POST.getlist("permission_ids[]") or request.POST.getlist("permission_ids")
+            if not name:
+                return JsonResponse({'message': 'error', 'error': 'Group name is required.'}, safe=False)
+            obj = StaffGroup()
+            assign_tenant(obj, request)
+            obj.name = name
+            obj.description = description
+            obj.save()
+            django_group = _get_or_create_tenant_django_group(request, name)
+            obj.djangoGroup = django_group
+            obj.save(update_fields=['djangoGroup'])
+            _sync_staff_group_permissions(obj, permission_ids)
+            return JsonResponse({'message': 'success', 'group_id': obj.pk}, safe=False)
+        except Exception as exc:
+            return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+class StaffGroupListJson(BaseDatatableView):
+    order_columns = ['name', 'description', 'datetime']
+
+    def get_initial_queryset(self):
+        qs = tenant_qs(self.request, StaffGroup).filter(isDeleted__exact=False)
+        start_date = self.request.GET.get('startDate')
+        end_date = self.request.GET.get('endDate')
+        if start_date and end_date:
+            try:
+                s_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+                e_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+                qs = qs.filter(datetime__date__range=[s_date, e_date])
+            except ValueError:
+                pass
+        return qs.only('id', 'name', 'description', 'datetime')
+
+    def filter_queryset(self, qs):
+        search = self.request.GET.get('search[value]', None)
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(description__icontains=search))
+        return qs
+
+    def prepare_results(self, qs):
+        json_data = []
+        for item in qs:
+            perm_count = item.djangoGroup.permissions.count() if item.djangoGroup_id else 0
+            detail_url = reverse('homeApp:staff_group_detail', args=[item.pk])
+            edit_url = reverse('homeApp:staff_group_edit', args=[item.pk])
+            action = '''<a data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" href="{}" class="ui circular teal icon button">
+                    <i class="eye icon"></i>
+                  </a>
+                  <a data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" href="{}" class="ui circular facebook icon button green">
+                    <i class="pen icon"></i>
+                  </a>
+                  <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button">
+                    <i class="trash alternate icon"></i>
+                  </button>'''.format(detail_url, edit_url, item.pk)
+            json_data.append([
+                escape(item.name),
+                escape(item.description or '-'),
+                perm_count,
+                escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
+                action,
+            ])
+        return json_data
+
+
+def get_staff_group_detail(request):
+    group_id = request.GET.get('id')
+    instance = get_object_or_404(tenant_qs(request, StaffGroup), id=group_id)
+    permissions = list(
+        instance.djangoGroup.permissions.select_related('content_type').order_by('content_type__model', 'name')
+    ) if instance.djangoGroup_id else []
+    permission_ids = [permission.id for permission in permissions]
+    permission_details = [
+        {
+            'id': permission.id,
+            'name': permission.name,
+            'codename': permission.codename,
+            'module': permission.content_type.model.replace('_', ' ').title(),
+        }
+        for permission in permissions
+    ]
+    members = list(
+        tenant_qs(request, StaffUser)
+        .filter(staffGroup=instance, isDeleted=False)
+        .order_by('name')
+        .values('id', 'name', 'phone', 'email')
+    )
+    data = {
+        'ID': instance.pk,
+        'Name': instance.name,
+        'Description': instance.description,
+        'DjangoGroup': instance.djangoGroup.name if instance.djangoGroup_id else '',
+        'PermissionIDs': permission_ids,
+        'Permissions': permission_details,
+        'PermissionCount': len(permission_details),
+        'Members': members,
+        'MemberCount': len(members),
+        'CreatedOn': instance.datetime.strftime('%d-%m-%Y %I:%M %p'),
+        'UpdatedOn': instance.lastUpdatedOn.strftime('%d-%m-%Y %I:%M %p'),
+    }
+    return JsonResponse({'data': data, 'permission_catalog': {
+        module: [{'id': perm.id, 'name': perm.name, 'codename': perm.codename} for perm in perms]
+        for module, perms in _permission_catalog().items()
+    }}, safe=False)
+
+
+@transaction.atomic
+@csrf_exempt
+def edit_staff_group_api(request):
+    if request.method == 'POST':
+        try:
+            group_id = request.POST.get("EditId")
+            name = request.POST.get("groupName")
+            description = request.POST.get("description")
+            permission_ids = request.POST.getlist("permission_ids[]") or request.POST.getlist("permission_ids")
+            if not name:
+                return JsonResponse({'message': 'error', 'error': 'Group name is required.'}, safe=False)
+            obj = tenant_qs(request, StaffGroup).get(id=int(group_id))
+            obj.name = name
+            obj.description = description
+            obj.djangoGroup = _get_or_create_tenant_django_group(request, name, existing_group=obj.djangoGroup)
+            obj.save()
+            _sync_staff_group_permissions(obj, permission_ids)
+            StaffUser.objects.filter(staffGroup=obj).update(group=obj.name)
+            for staff in StaffUser.objects.filter(staffGroup=obj, user_ID__isnull=False).select_related('user_ID', 'staffGroup__djangoGroup'):
+                _sync_staff_user_group_membership(staff)
+            return JsonResponse({'message': 'success', 'group_id': obj.pk}, safe=False)
+        except Exception as exc:
+            return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+@csrf_exempt
+def delete_staff_group_api(request):
+    if request.method == 'POST':
+        try:
+            group_id = request.POST.get("userID")
+            obj = tenant_qs(request, StaffGroup).get(pk=int(group_id))
+            obj.isDeleted = True
+            obj.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+            if obj.djangoGroup_id:
+                obj.djangoGroup.user_set.clear()
+            StaffUser.objects.filter(staffGroup=obj).update(staffGroup=None, group='')
+            return JsonResponse({'message': 'success'}, safe=False)
+        except Exception:
+            return JsonResponse({'message': 'error'}, safe=False)
+
+
 #
 @transaction.atomic
 @csrf_exempt
@@ -256,7 +550,9 @@ def add_staff_api(request):
             staff.phone = UserPhoneNo
             staff.email = UserEmail
             staff.address = UserAddress
-            staff.group = UserGroup
+            selected_group = tenant_qs(request, StaffGroup).get(pk=int(UserGroup))
+            staff.staffGroup = selected_group
+            staff.group = selected_group.name
             staff.isActive = UserStatus
             staff.userPassword = UserPwd
             # try:
@@ -278,20 +574,9 @@ def add_staff_api(request):
 
                 staff.save()
                 ensure_membership(new_user, staff.tenant, TenantMembership.Role.STAFF)
-
-                try:
-                    g = Group.objects.get(name=UserGroup)
-                    g.user_set.add(new_user.pk)
-                    g.save()
-
-                except:
-                    g = Group()
-                    g.name = UserGroup
-                    g.save()
-                    g.user_set.add(new_user.pk)
-                    g.save()
+                _sync_staff_user_group_membership(staff)
             return JsonResponse({'message': 'success'}, safe=False)
-        except:
+        except Exception:
             return JsonResponse({'message': 'error'}, safe=False)
 
 
@@ -301,9 +586,9 @@ class StaffUserListJson(BaseDatatableView):
                      'isActive', 'datetime']
 
     def get_initial_queryset(self):
-        return tenant_qs(self.request, StaffUser).filter(isDeleted__exact=False).only(
+        return tenant_qs(self.request, StaffUser).select_related('staffGroup').filter(isDeleted__exact=False).only(
             'id', 'photo', 'name', 'username', 'userPassword', 'group', 'phone',
-            'address', 'isActive', 'datetime'
+            'address', 'isActive', 'datetime', 'staffGroup__name'
         )
 
     def filter_queryset(self, qs):
@@ -312,7 +597,7 @@ class StaffUserListJson(BaseDatatableView):
         if search:
             qs = qs.filter(
                 Q(name__icontains=search) | Q(username__icontains=search)
-                | Q(group__icontains=search) | Q(phone__icontains=search)
+                | Q(group__icontains=search) | Q(staffGroup__name__icontains=search) | Q(phone__icontains=search)
                 | Q(address__icontains=search) | Q(isActive__icontains=search)
                 | Q(datetime__icontains=search)
             )
@@ -340,13 +625,14 @@ class StaffUserListJson(BaseDatatableView):
                 </div>'''
                 username = "*********"
                 password = "*********"
+            group_name = item.staffGroup.name if item.staffGroup_id else item.group
 
             json_data.append([
                 images,  # escape HTML for security reasons
                 escape(item.name),
                 username,
                 password,
-                escape(item.group),
+                escape(group_name),
                 escape(item.phone),
                 escape(item.address),
                 escape(item.isActive),
@@ -391,7 +677,7 @@ def get_staff_user_detail(request):
         'UserAddress': C_User.address,
         'UserEmail': C_User.email,
         'UserPassword': C_User.userPassword,
-        'UserGroup': C_User.group,
+        'UserGroup': C_User.staffGroup_id,
         'PartyGroup': party,
         'IsActive': C_User.isActive,
         'ImgUrl': _image_url(C_User.photo, 'medium'),
@@ -431,7 +717,9 @@ def edit_staff_api(request):
             staff.phone = UserPhoneNo
             staff.email = UserEmail
             staff.address = UserAddress
-            staff.group = UserGroup
+            selected_group = tenant_qs(request, StaffGroup).get(pk=int(UserGroup))
+            staff.staffGroup = selected_group
+            staff.group = selected_group.name
             # try:
             #     staff.partyGroupID_id = int
             #     (PartyGroup)
@@ -449,20 +737,9 @@ def edit_staff_api(request):
                 new_user.is_active = False
             new_user.save()
             ensure_membership(new_user, staff.tenant, TenantMembership.Role.STAFF)
-            new_user.groups.clear()
-            try:
-                g = Group.objects.get(name=UserGroup)
-                g.user_set.add(new_user.pk)
-                g.save()
-
-            except:
-                g = Group()
-                g.name = UserGroup
-                g.save()
-                g.user_set.add(new_user.pk)
-                g.save()
+            _sync_staff_user_group_membership(staff)
             return JsonResponse({'message': 'success'}, safe=False)
-        except:
+        except Exception:
             return JsonResponse({'message': 'error'}, safe=False)
 
 

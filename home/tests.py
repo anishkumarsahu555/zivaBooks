@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 
-from home.models import AuditLog, Collection, Party, Tenant, TenantMembership
+from home.models import AuditLog, Collection, Party, StaffGroup, StaffUser, Tenant, TenantMembership
 
 
 User = get_user_model()
@@ -21,6 +21,17 @@ class SeedMockDataCommandTests(TestCase):
         self.assertGreaterEqual(TenantMembership.objects.count(), 4)
         self.assertEqual(Party.objects.count(), 2)
         self.assertEqual(Collection.objects.count(), 2)
+        self.assertGreaterEqual(StaffGroup.objects.count(), 16)
+        owner = User.objects.get(username="alpha.owner")
+        collector = User.objects.get(username="alphatraders.collector")
+        owner_staff = StaffUser.objects.get(user_ID=owner)
+        collector_staff = StaffUser.objects.get(user_ID=collector)
+        self.assertEqual(owner_staff.staffGroup.name, "Owner")
+        self.assertEqual(collector_staff.staffGroup.name, "Collection")
+        self.assertTrue(owner.groups.filter(name="alpha-traders:Owner").exists())
+        self.assertTrue(collector.groups.filter(name="alpha-traders:Collection").exists())
+        self.assertTrue(owner.has_perm("home.can_manage_staff"))
+        self.assertTrue(owner.has_perm("home.can_manage_staff_groups"))
 
     def test_seed_mock_data_is_rerunnable(self):
         call_command("seed_mock_data")

@@ -67,7 +67,7 @@
 
 
                     <div class="">
-                           {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" %}
+                           {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
                             <div class="ui form">
                                 <form class="ui tiny form">
                                     <div class="fields">

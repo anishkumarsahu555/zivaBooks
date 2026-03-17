@@ -4,7 +4,9 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 from django.contrib.auth import logout, authenticate, login, update_session_auth_hash
+from django.contrib.auth.models import Permission
 from django.core.cache import cache
+from django.db.models import Q
 from django.db.models.functions import Length
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -14,8 +16,21 @@ from django.views.decorators.csrf import csrf_exempt
 # import xlwt
 from activation.models import *
 from activation.views import is_activated
+from .authz import legacy_group_names, legacy_permission_names
 from .models import *
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_qs
+
+
+PERMISSION_LANDING_PAGES = [
+    ('home.can_manage_staff_groups', '/staff_group_list/'),
+    ('home.can_manage_staff', '/user_list/'),
+    ('home.can_approve_collection', '/collection_list/'),
+    ('home.add_collection', '/add_collection/'),
+    ('home.can_manage_sales', '/sales_list/'),
+    ('home.can_manage_cash_counter', '/cash_counter/'),
+    ('home.view_party', '/party_list/'),
+    ('home.view_attendance', '/attendance_report/'),
+]
 
 
 # def login_or_logout(request, type):
@@ -32,8 +47,50 @@ from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_reque
 
 def _request_group_names(request):
     if not hasattr(request, "_group_name_cache"):
-        request._group_name_cache = set(request.user.groups.values_list('name', flat=True))
+        request._group_name_cache = legacy_group_names(request.user)
     return request._group_name_cache
+
+
+def _staff_users_for_legacy_group(request, group_name):
+    queryset = tenant_qs(request, StaffUser).filter(isDeleted__exact=False)
+    permission_names = legacy_permission_names(group_name)
+    role_filter = Q(staffGroup__name__iexact=group_name) | Q(group__iexact=group_name)
+    if permission_names:
+        codenames = [perm_name.split('.', 1)[1] for perm_name in permission_names if '.' in perm_name]
+        role_filter |= Q(
+            staffGroup__djangoGroup__permissions__content_type__app_label='home',
+            staffGroup__djangoGroup__permissions__codename__in=codenames,
+        )
+    return queryset.filter(role_filter).distinct().order_by('name')
+
+
+def _has_any_permission(user, perm_names):
+    return any(user.has_perm(perm_name) for perm_name in perm_names)
+
+
+def _permission_catalog():
+    catalog = {}
+    for permission in Permission.objects.select_related('content_type').exclude(
+        content_type__app_label__in=['admin', 'auth', 'contenttypes', 'sessions']
+    ).order_by('content_type__app_label', 'content_type__model', 'name'):
+        module = permission.content_type.model.replace('_', ' ').title()
+        if permission.codename.startswith('can_'):
+            module = 'Custom ' + module
+        catalog.setdefault(module, []).append(permission)
+    return catalog
+
+
+def permission_required_any(*perm_names):
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if request.user.is_authenticated and _has_any_permission(request.user, perm_names):
+                return view_func(request, *args, **kwargs)
+            return redirect('/')
+
+        return wrapper
+
+    return decorator
 
 
 def check_group(*group_names):
@@ -91,7 +148,7 @@ def loginPage(request):
     #     return redirect('/admin_home/')
 
 
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_view_party_credentials', 'home.can_manage_staff')
 def admin_home(request):
     try:
         val = tenant_qs(request, Validity).last()
@@ -105,12 +162,12 @@ def admin_home(request):
     return render(request, 'home/admin/index.html', context)
 
 
-@check_two_group('Collection', 'SalesAdmin')
+@permission_required_any('home.add_collection', 'home.can_manage_sales')
 def collection_home(request):
     return render(request, 'home/collection/indexCollection.html')
 
 
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_manage_staff')
 @is_activated()
 def user_list(request):
     groups = tenant_qs(request, StaffGroup).filter(isDeleted__exact=False).order_by('name')
@@ -120,6 +177,79 @@ def user_list(request):
         'party_groups': party_groups
     }
     return render(request, 'home/admin/userList.html', context)
+
+
+@permission_required_any('home.can_manage_staff_groups')
+@is_activated()
+def staff_group_list(request):
+    context = {
+        'permission_catalog': _permission_catalog(),
+    }
+    return render(request, 'home/admin/staffGroupList.html', context)
+
+
+@permission_required_any('home.can_manage_staff_groups')
+@is_activated()
+def staff_group_create(request):
+    context = {
+        'page_mode': 'create',
+        'page_title': 'Create Staff Group',
+        'submit_label': 'Create Group',
+        'group_obj': None,
+        'permission_catalog': _permission_catalog(),
+        'selected_permission_ids': [],
+    }
+    return render(request, 'home/admin/staffGroupForm.html', context)
+
+
+@permission_required_any('home.can_manage_staff_groups')
+@is_activated()
+def staff_group_edit(request, id):
+    group = get_object_or_404(
+        tenant_qs(request, StaffGroup).select_related('djangoGroup').filter(isDeleted=False),
+        pk=id,
+    )
+    selected_permission_ids = list(group.djangoGroup.permissions.values_list('id', flat=True)) if group.djangoGroup_id else []
+    context = {
+        'page_mode': 'edit',
+        'page_title': 'Edit Staff Group',
+        'submit_label': 'Update Group',
+        'group_obj': group,
+        'permission_catalog': _permission_catalog(),
+        'selected_permission_ids': selected_permission_ids,
+    }
+    return render(request, 'home/admin/staffGroupForm.html', context)
+
+
+@permission_required_any('home.can_manage_staff_groups')
+@is_activated()
+def staff_group_detail(request, id):
+    group = get_object_or_404(
+        tenant_qs(request, StaffGroup).select_related('djangoGroup').filter(isDeleted=False),
+        pk=id,
+    )
+    assigned_permissions = list(
+        group.djangoGroup.permissions.select_related('content_type').order_by('content_type__model', 'name')
+    ) if group.djangoGroup_id else []
+    permission_modules = {}
+    for permission in assigned_permissions:
+        module = permission.content_type.model.replace('_', ' ').title()
+        if permission.codename.startswith('can_'):
+            module = 'Custom ' + module
+        permission_modules.setdefault(module, []).append(permission)
+    staff_members = list(
+        tenant_qs(request, StaffUser)
+        .filter(staffGroup=group, isDeleted=False)
+        .order_by('name')
+    )
+    context = {
+        'group': group,
+        'permission_modules': permission_modules,
+        'staff_members': staff_members,
+        'member_count': len(staff_members),
+        'permission_count': len(assigned_permissions),
+    }
+    return render(request, 'home/admin/staffGroupDetail.html', context)
 
 
 @check_two_group('Admin', 'Moderator')
@@ -179,8 +309,8 @@ def postLogin(request):
         if user is not None:
             login(request, user)
             user_groups = _request_group_names(request)
-            allowed_groups = ['Admin', 'Moderator', 'Collection', 'NormalStaff', 'CashCounter', 'SalesAdmin',
-                              'Customer']
+            allowed_groups = ['Owner', 'Admin', 'Moderator', 'Collection', 'NormalStaff', 'CashCounter',
+                              'SalesAdmin', 'Customer', 'Viewer']
             if any(group in user_groups for group in allowed_groups):
                 return JsonResponse({'message': 'success', 'data': '/home/'}, safe=False)
         return JsonResponse({'message': 'fail'}, safe=False)
@@ -190,21 +320,20 @@ def postLogin(request):
 #
 def homepage(request):
     if request.user.is_authenticated:
-        user_groups = _request_group_names(request)
-        if 'Admin' in user_groups or 'Moderator' in user_groups:
+        if request.user.has_perm('home.can_view_party_credentials'):
             return redirect('/admin_home/')
-        elif 'Collection' in user_groups:
+        elif request.user.has_perm('home.add_collection'):
             return redirect('/collection_home/')
-        elif 'NormalStaff' in user_groups:
-            return redirect('/staff_home/')
-        elif 'CashCounter' in user_groups:
+        elif request.user.has_perm('home.can_manage_cash_counter'):
             return redirect('/cash_counter_home/')
-        elif 'SalesAdmin' in user_groups:
-            return redirect('/collection_home/')
-        elif 'Customer' in user_groups:
+        elif request.user.has_perm('home.view_attendance'):
+            return redirect('/staff_home/')
+        elif request.user.has_perm('home.view_party'):
             return redirect('/customer_home/')
-        else:
-            return render(request, 'home/login.html')
+        for perm_name, path in PERMISSION_LANDING_PAGES:
+            if request.user.has_perm(perm_name):
+                return redirect(path)
+        return render(request, 'home/login.html')
     else:
         return render(request, 'home/login.html')
 
@@ -288,7 +417,7 @@ def customer_change_password(request):
 
 def add_collection(request):
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
-    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False, group__iexact='Collection').order_by('name')
+    staffs = _staff_users_for_legacy_group(request, 'Collection')
     p_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
     context = {
         'instance': instance,
@@ -529,7 +658,7 @@ def edit_cash_counter(request, id=None):
 @check_group('CashCounter', 'Admin', 'Moderator')
 def cash_counter_collection(request):
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
-    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False, group__iexact='Collection').order_by('name')
+    staffs = _staff_users_for_legacy_group(request, 'Collection')
     p_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
     context = {
         'instance': instance,

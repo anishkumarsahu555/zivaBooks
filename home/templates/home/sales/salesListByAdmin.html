@@ -114,7 +114,7 @@
                                             <i class="funnel dollar icon"></i>
                                             Search
                                         </button>
-                                        {% if not request.user|has_group:"SalesAdmin" %}
+                                        {% if perms.home.can_approve_sales or perms.home.can_view_party_credentials or perms.home.can_view_audit_logs %}
 
                                             <a id="reportUrl"
                                                href="{% url 'homeApp:generate_sales_report' %}"

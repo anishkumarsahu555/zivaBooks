@@ -1,0 +1,421 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block title %}
+    <title>{{ group.name }} | Staff Group</title>
+{% endblock %}
+
+{% block css %}
+    <style>
+        .group-shell {
+            padding: 12px;
+        }
+
+        .group-hero {
+            background:
+                radial-gradient(circle at top right, rgba(33, 186, 69, 0.18), transparent 32%),
+                linear-gradient(135deg, #0f172a, #12324a 55%, #165f4a);
+            border-radius: 18px;
+            color: #f8fafc;
+            overflow: hidden;
+            padding: 18px 20px;
+            position: relative;
+        }
+
+        .group-hero::after {
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), transparent);
+            content: "";
+            inset: 0;
+            pointer-events: none;
+            position: absolute;
+        }
+
+        .group-kicker {
+            color: rgba(248, 250, 252, 0.72);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .group-title {
+            font-size: clamp(1.45rem, 3vw, 2rem);
+            font-weight: 700;
+            line-height: 1.05;
+            margin: 0 0 6px;
+        }
+
+        .group-subtitle {
+            color: rgba(248, 250, 252, 0.84);
+            font-size: 0.92rem;
+            line-height: 1.45;
+            margin: 0;
+            max-width: 620px;
+        }
+
+        .group-stats {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            margin-top: 14px;
+        }
+
+        .group-stat {
+            backdrop-filter: blur(4px);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .group-stat-label {
+            color: rgba(248, 250, 252, 0.72);
+            font-size: 0.7rem;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .group-stat-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+
+        .group-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: 1.15fr 0.85fr;
+            margin-top: 14px;
+        }
+
+        .detail-card {
+            background: #ffffff;
+            border: 1px solid #dce7f3;
+            border-radius: 16px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+        }
+
+        .detail-card-header {
+            align-items: center;
+            background: linear-gradient(180deg, #f8fbff, #eef6fb);
+            border-bottom: 1px solid #dce7f3;
+            display: flex;
+            justify-content: space-between;
+            padding: 14px 16px;
+        }
+
+        .detail-card-title {
+            color: #0f172a;
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .detail-card-body {
+            padding: 14px 16px 16px;
+        }
+
+        .meta-grid {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        }
+
+        .meta-item {
+            background: #f8fbfd;
+            border: 1px solid #e4eef5;
+            border-radius: 10px;
+            padding: 8px 10px;
+        }
+
+        .meta-label {
+            color: #4b5563;
+            font-size: 0.66rem;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+        }
+
+        .meta-value {
+            color: #0f172a;
+            font-size: 0.86rem;
+            font-weight: 600;
+            line-height: 1.25;
+            word-break: break-word;
+        }
+
+        .member-list,
+        .permission-stack {
+            display: grid;
+            gap: 10px;
+        }
+
+        .member-table {
+            border: 1px solid #e2ebf3;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .member-table-row {
+            align-items: center;
+            background: #fbfdff;
+            border-bottom: 1px solid #e2ebf3;
+            display: grid;
+            gap: 10px;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr);
+            padding: 10px 12px;
+        }
+
+        .member-table-row:last-child {
+            border-bottom: 0;
+        }
+
+        .member-table-head {
+            background: #f1f7fb;
+            color: #475569;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .member-cell {
+            color: #0f172a;
+            font-size: 0.84rem;
+            line-height: 1.3;
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .module-block {
+            background: #fcfeff;
+            border: 1px solid #e4eef5;
+            border-radius: 12px;
+            padding: 10px 12px;
+        }
+
+        .module-meta {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .module-title {
+            color: #0f172a;
+            font-size: 0.84rem;
+            font-weight: 700;
+            line-height: 1.25;
+            margin: 0;
+        }
+
+        .module-count {
+            background: #d9e8ff;
+            border-radius: 999px;
+            color: #1d4ed8;
+            display: inline-block;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 3px 8px;
+        }
+
+        .permission-inline-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .permission-chip {
+            background: #f1f5f9;
+            border: 1px solid #dbe5f0;
+            border-radius: 999px;
+            color: #334155;
+            display: inline-flex;
+            font-size: 0.74rem;
+            font-weight: 500;
+            line-height: 1.2;
+            padding: 5px 9px;
+        }
+
+        .empty-state {
+            background: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 14px;
+            color: #475569;
+            padding: 14px;
+            text-align: center;
+        }
+
+        .group-topbar {
+            margin-bottom: 10px !important;
+        }
+
+        @media (max-width: 991px) {
+            .group-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .group-shell {
+                padding: 8px;
+            }
+
+            .group-hero,
+            .detail-card-body,
+            .detail-card-header {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            .member-row {
+                grid-template-columns: 1fr;
+            }
+
+            .member-table-row {
+                gap: 4px;
+                grid-template-columns: 1fr;
+            }
+
+            .member-table-head {
+                display: none;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="group-shell">
+        <div class="ui secondary pointing menu group-topbar">
+            <a class="item" href="{% url 'homeApp:staff_group_list' %}">
+                <i class="arrow left icon"></i>
+                Staff Group List
+            </a>
+            <div class="right menu">
+                <div class="item">
+                    <a class="ui teal button" href="{% url 'homeApp:staff_group_list' %}">
+                        Back To Groups
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <section class="group-hero">
+            <div class="group-kicker">Role Detail</div>
+            <h1 class="group-title">{{ group.name }}</h1>
+            <p class="group-subtitle">
+                {% if group.description %}
+                    {{ group.description }}
+                {% else %}
+                    This staff group does not have a description yet.
+                {% endif %}
+            </p>
+
+            <div class="group-stats">
+                <div class="group-stat">
+                    <div class="group-stat-label">Assigned Staff</div>
+                    <div class="group-stat-value">{{ member_count }}</div>
+                </div>
+                <div class="group-stat">
+                    <div class="group-stat-label">Permissions</div>
+                    <div class="group-stat-value">{{ permission_count }}</div>
+                </div>
+                <div class="group-stat">
+                    <div class="group-stat-label">Linked Django Group</div>
+                    <div class="group-stat-value">
+                        {% if group.djangoGroup %}{{ group.djangoGroup.name|truncatechars:20 }}{% else %}-{% endif %}
+                    </div>
+                </div>
+                <div class="group-stat">
+                    <div class="group-stat-label">Created</div>
+                    <div class="group-stat-value">{{ group.datetime|date:"d M Y" }}</div>
+                </div>
+            </div>
+        </section>
+
+        <div class="group-grid">
+            <div class="detail-card">
+                <div class="detail-card-header">
+                    <h3 class="detail-card-title">Permissions By Module</h3>
+                </div>
+                <div class="detail-card-body">
+                    {% if permission_modules %}
+                        <div class="permission-stack">
+                            {% for module, permissions in permission_modules.items %}
+                                <div class="module-block">
+                                    <div class="module-meta">
+                                        <h4 class="module-title">{{ module }}</h4>
+                                        <span class="module-count">{{ permissions|length }} permission{{ permissions|length|pluralize }}</span>
+                                    </div>
+                                    <div class="permission-inline-list">
+                                        {% for permission in permissions %}
+                                            <span class="permission-chip">{{ permission.name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="empty-state">No permissions are assigned to this group.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div style="display:grid; gap:12px;">
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Overview</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        <div class="meta-grid">
+                            <div class="meta-item">
+                                <div class="meta-label">Tenant</div>
+                                <div class="meta-value">{{ group.tenant.name }}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-label">Updated On</div>
+                                <div class="meta-value">{{ group.lastUpdatedOn|date:"d M Y, h:i A" }}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-label">Staff Group Id</div>
+                                <div class="meta-value">#{{ group.id }}</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="meta-label">Status</div>
+                                <div class="meta-value">{% if group.isDeleted %}Deleted{% else %}Active{% endif %}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="detail-card">
+                    <div class="detail-card-header">
+                        <h3 class="detail-card-title">Assigned Staff</h3>
+                    </div>
+                    <div class="detail-card-body">
+                        {% if staff_members %}
+                            <div class="member-table">
+                                <div class="member-table-row member-table-head">
+                                    <div>Name</div>
+                                    <div>Phone</div>
+                                    <div>Email</div>
+                                </div>
+                                {% for member in staff_members %}
+                                    <div class="member-table-row">
+                                        <div class="member-cell">{{ member.name|default:"Unnamed Staff" }}</div>
+                                        <div class="member-cell">{% if member.phone %}{{ member.phone }}{% else %}-{% endif %}</div>
+                                        <div class="member-cell">{% if member.email %}{{ member.email }}{% else %}No email{% endif %}</div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="empty-state">No staff users are assigned to this group yet.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

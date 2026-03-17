@@ -1,11 +1,12 @@
 from django import template
+from home.authz import legacy_group_matches
 
 register = template.Library()
 
 
 @register.filter(name='has_group')
 def has_group(user, group_name):
-    return user.groups.filter(name=group_name).exists()
+    return legacy_group_matches(user, group_name)
 
 @register.filter(name='convert')
 def formatINR(number):

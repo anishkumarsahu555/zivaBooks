@@ -23,6 +23,10 @@ urlpatterns = [
     # # admin
     path('my_profile/', my_profile, name='my_profile'),
     path('admin_home/', admin_home, name='admin_home'),
+    path('staff_group_list/', staff_group_list, name='staff_group_list'),
+    path('staff_group_create/', staff_group_create, name='staff_group_create'),
+    path('staff_group_edit/<int:id>/', staff_group_edit, name='staff_group_edit'),
+    path('staff_group_list/<int:id>/', staff_group_detail, name='staff_group_detail'),
     path('user_list/', user_list, name='user_list'),
     path('party_group_list/', party_group_list, name='party_group_list'),
     path('party_list/', party_list, name='party_list'),
@@ -45,6 +49,11 @@ urlpatterns = [
     path('api/get_staff_user_detail/', get_staff_user_detail, name='get_staff_user_detail'),
     path('api/edit_staff_api/', edit_staff_api, name='edit_staff_api'),
     path('api/StaffUserListJson/', StaffUserListJson.as_view(), name='StaffUserListJson'),
+    path('api/add_staff_group_api/', add_staff_group_api, name='add_staff_group_api'),
+    path('api/edit_staff_group_api/', edit_staff_group_api, name='edit_staff_group_api'),
+    path('api/delete_staff_group_api/', delete_staff_group_api, name='delete_staff_group_api'),
+    path('api/get_staff_group_detail/', get_staff_group_detail, name='get_staff_group_detail'),
+    path('api/StaffGroupListJson/', StaffGroupListJson.as_view(), name='StaffGroupListJson'),
 
     # # api party group
     path('api/add_party_group_api/', add_party_group_api, name='add_party_group_api'),

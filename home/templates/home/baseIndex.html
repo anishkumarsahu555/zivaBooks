@@ -151,10 +151,8 @@
 <!-- sidebar -->
 <div class="ui sidebar inverted bgColor vertical menu sidebar-menu" id="sidebar">
 
-    {% comment %}
-admin and moderator side bar
-{% endcomment %}
-    {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" %}
+
+    {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
         <div class="item">
             <div class="header">General</div>
             <div class="menu">
@@ -172,9 +170,16 @@ admin and moderator side bar
                 Staff
             </div>
             <div class="menu">
+                {% if perms.home.can_manage_staff_groups %}
+                <a class="item" href="{% url 'homeApp:staff_group_list' %}">
+                    <div><i class="users cog icon"></i>Staff Groups</div>
+                </a>
+                {% endif %}
+                {% if perms.home.can_manage_staff %}
                 <a class="item" href="{% url 'homeApp:user_list' %}">
                     <div><i class="user tie icon"></i>Staff List</div>
                 </a>
+                {% endif %}
 
             </div>
         </div>
@@ -183,14 +188,18 @@ admin and moderator side bar
                 Collections
             </div>
             <div class="menu">
+                {% if perms.home.add_collection %}
                 <a class="item" href="{% url 'homeApp:take_collection' %}">
                     <div><i class="hand holding usd icon"></i>Take Collection</div>
                 </a>
+                {% endif %}
+                {% if perms.home.view_collection %}
                 <a class="item" href="{% url 'homeApp:collection_list' %}">
                     <div><i class="book icon"></i>Collection List</div>
                 </a> <a class="item" href="{% url 'homeApp:cheque_reminder_list' %}">
                 <div><i class="bell icon"></i>Cheque Reminder List</div>
             </a>
+                {% endif %}
 
             </div>
         </div>
@@ -199,12 +208,16 @@ admin and moderator side bar
                 Sales
             </div>
             <div class="menu">
+                {% if perms.home.add_sales %}
                 <a class="item" href="{% url 'homeApp:add_sales' %}">
                     <div><i class="shopping cart icon"></i>Add Sale</div>
                 </a>
+                {% endif %}
+                {% if perms.home.view_sales %}
                 <a class="item" href="{% url 'homeApp:sales_list' %}">
                     <div><i class="book icon"></i>Sales List</div>
                 </a>
+                {% endif %}
 
             </div>
         </div>
@@ -213,6 +226,7 @@ admin and moderator side bar
                 Cash Counter
             </div>
             <div class="menu">
+                {% if perms.home.can_manage_cash_counter %}
                 <a class="item" href="{% url 'homeApp:cash_counter' %}">
                     <div><i class="calendar check icon"></i>Today's Cash Counter</div>
                 </a> <a class="item" href="{% url 'homeApp:cash_counter_collection' %}">
@@ -221,6 +235,7 @@ admin and moderator side bar
                 <a class="item" href="{% url 'homeApp:my_cash_counter_list' %}">
                     <div><i class="calendar alternate icon"></i>Cash Counter List</div>
                 </a>
+                {% endif %}
             </div>
         </div>
 
@@ -229,16 +244,18 @@ admin and moderator side bar
                 Party
             </div>
             <div class="menu">
+                {% if perms.home.can_manage_parties %}
                 <a class="item" href="{% url 'homeApp:party_group_list' %}">
                     <div><i class="user friends icon"></i>Party Group List</div>
                 </a>
                 <a class="item" href="{% url 'homeApp:party_list' %}">
                     <div><i class="address book icon"></i>Party List</div>
                 </a>
+                {% endif %}
 
             </div>
         </div>
-        {% comment %}      <div class="item">
+         <div class="item">
             <div class="header">
                 Attendance
             </div>
@@ -251,7 +268,7 @@ admin and moderator side bar
                 </a>
 
             </div>
-        </div>{% endcomment %}
+        </div>
 
         <div class="item">
             <div class="header">
@@ -297,7 +314,7 @@ admin and moderator side bar
     {% comment %}
 Collection side bar
 {% endcomment %}
-    {% if request.user|has_group:"Collection" %}
+    {% if perms.home.add_collection and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs %}
         <div class="item">
             <div class="header">General</div>
             <div class="menu">
@@ -369,7 +386,7 @@ Collection side bar
     {% endif %}
 
     {% comment %}Staff item{% endcomment %}
-    {% if request.user|has_group:"NormalStaff" %}
+    {% if perms.home.view_attendance and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs and not perms.home.can_manage_sales and not perms.home.can_manage_cash_counter and not perms.home.add_collection %}
         <div class="item">
             <div class="header">General</div>
             <div class="menu">
@@ -425,7 +442,7 @@ Collection side bar
         </div>
     {% endif %}
 
-    {% if request.user|has_group:"SalesAdmin" %}
+    {% if perms.home.can_manage_sales and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs %}
         <div class="item">
             <div class="header">General</div>
             <div class="menu">
@@ -481,7 +498,7 @@ Collection side bar
         </div>
     {% endif %}
 
-    {% if request.user|has_group:"CashCounter" %}
+    {% if perms.home.can_manage_cash_counter and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs %}
         <div class="item">
             <div class="header">General</div>
             <div class="menu">
@@ -594,8 +611,8 @@ Collection side bar
 
             </div>
             <div class="ui tab  " data-tab="user" style="padding: 5px;">
-                {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" %}
-                    {% if request.user|has_group:"Admin" %}
+                {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
+                    {% if perms.home.can_manage_staff or perms.home.can_view_party_credentials %}
                         <div class="ui error mini message">
                             <i class="close icon"></i>
                             <div class="header">
@@ -731,7 +748,7 @@ Collection side bar
                     </div>
                 {% endif %}
 
-                {% if request.user|has_group:"Collection"  or request.user|has_group:"SalesAdmin" %}
+                {% if perms.home.add_collection or perms.home.can_manage_sales %}
 
                     <div class="ui grid stackable padded">
                         <div class="five wide computer eight wide tablet sixteen wide mobile column">
@@ -835,12 +852,12 @@ Collection side bar
                     </div>
 
                 {% endif %}
-                {% if request.user|has_group:"NormalStaff" %}
+                {% if perms.home.view_attendance and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs and not perms.home.can_manage_sales and not perms.home.can_manage_cash_counter and not perms.home.add_collection %}
                     <div class="ui one column blue card " style="width: 100%">
                         <div class="content">
                             <div class="center aligned header">Welcome, {{ obj.name }}</div>
                             <div class="center aligned description">
-                                {% if request.user|has_group:"NormalStaff" %}
+                                {% if perms.home.view_attendance and not perms.home.can_manage_sales %}
                                     <p>zivaBooks provides staff attendance and many more.</p>
                                 {% else %}
                                     <p>zivaBooks provides staff to manage sales and many more.</p>
@@ -860,7 +877,7 @@ Collection side bar
                     </div>
                 {% endif %}
 
-                {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" or request.user|has_group:"CashCounter" %}
+                {% if perms.home.can_manage_cash_counter or perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
 
                     <div class="ui grid stackable padded">
                         <div class="four wide computer eight wide tablet sixteen wide mobile column">
@@ -1153,7 +1170,7 @@ Collection side bar
                 ;
             })
         ;
-        {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" %}
+        {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
 
             $(GetDetail());
 
@@ -1183,7 +1200,7 @@ Collection side bar
             }
         {% endif %}
 
-        {% if request.user|has_group:"Collection" or request.user|has_group:"SalesAdmin" %}
+        {% if perms.home.add_collection or perms.home.can_manage_sales %}
             $(GetDetail());
             function GetDetail() {
                 $.ajax({
@@ -1213,7 +1230,7 @@ Collection side bar
         {% endif %}
 
 
-        {% if request.user|has_group:"CashCounter" %}
+        {% if perms.home.can_manage_cash_counter and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs %}
             $(GetDetailCashCounter());
             function GetDetailCashCounter() {
                 $.ajax({
@@ -1247,7 +1264,7 @@ Collection side bar
 
         {% endif %}
 
-        {% if request.user|has_group:"Admin" or request.user|has_group:"Moderator" %}
+        {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
             $(GetDetailCashCounter());
             function GetDetailCashCounter() {
                 $.ajax({

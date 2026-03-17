@@ -1,0 +1,671 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block title %}
+    <title>{{ page_title }}</title>
+{% endblock %}
+
+{% block css %}
+    <style>
+        .group-form-shell {
+            padding: 12px;
+        }
+
+        .group-form-shell[data-page-mode="edit"] .group-form-hero {
+            background:
+                radial-gradient(circle at top right, rgba(251, 191, 36, 0.18), transparent 35%),
+                linear-gradient(135deg, #172033, #4a2d14 54%, #7c3f00);
+        }
+
+        .group-form-hero {
+            background:
+                radial-gradient(circle at top right, rgba(59, 130, 246, 0.18), transparent 35%),
+                linear-gradient(135deg, #0f172a, #183b5b 54%, #115e59);
+            border-radius: 18px;
+            color: #f8fafc;
+            margin-bottom: 14px;
+            padding: 18px 20px;
+        }
+
+        .group-form-kicker {
+            color: rgba(248, 250, 252, 0.72);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        .group-form-title {
+            font-size: clamp(1.45rem, 3vw, 2rem);
+            font-weight: 700;
+            line-height: 1.05;
+            margin: 0 0 6px;
+        }
+
+        .group-form-subtitle {
+            color: rgba(248, 250, 252, 0.84);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .group-form-copy {
+            color: rgba(248, 250, 252, 0.82);
+            font-size: 0.92rem;
+            line-height: 1.45;
+            margin: 0;
+            max-width: 760px;
+        }
+
+        .group-form-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+        }
+
+        .group-form-card {
+            background: #ffffff;
+            border: 1px solid #dce7f3;
+            border-radius: 18px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+            overflow: hidden;
+        }
+
+        .group-form-card-header {
+            background: linear-gradient(180deg, #f8fbff, #eef6fb);
+            border-bottom: 1px solid #dce7f3;
+            padding: 14px 16px;
+        }
+
+        .group-form-card-title {
+            color: #0f172a;
+            font-size: 0.98rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .group-form-card-body {
+            padding: 16px;
+        }
+
+        .permission-toolbar {
+            align-items: center;
+            display: flex;
+            gap: 8px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .permission-search {
+            width: 100%;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .toolbar-btn {
+            align-items: center;
+            background: #f8fbff;
+            border: 1px solid #d7e5f2;
+            border-radius: 12px;
+            color: #1e3a5f;
+            cursor: pointer;
+            display: inline-flex;
+            font-size: 0.78rem;
+            font-weight: 700;
+            gap: 6px;
+            padding: 9px 12px;
+            transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+        }
+
+        .toolbar-btn:hover {
+            background: #eef6ff;
+            border-color: #bfd5ea;
+            transform: translateY(-1px);
+        }
+
+        .permission-modules {
+            display: grid;
+            gap: 10px;
+        }
+
+        .permission-module {
+            border: 1px solid #e2ebf3;
+            border-radius: 14px;
+            overflow: hidden;
+            transition: border-color 0.16s ease, box-shadow 0.16s ease;
+        }
+
+        .permission-module.is-selected {
+            border-color: #8ec5b7;
+            box-shadow: 0 10px 20px rgba(15, 118, 110, 0.08);
+        }
+
+        .permission-module-header {
+            align-items: center;
+            background: #f8fbfd;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 12px;
+        }
+
+        .permission-module.is-selected .permission-module-header {
+            background: linear-gradient(180deg, #f3fbf8, #edf8f4);
+        }
+
+        .permission-module-main {
+            align-items: center;
+            display: flex;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .permission-module-name {
+            color: #0f172a;
+            font-size: 0.86rem;
+            font-weight: 700;
+        }
+
+        .permission-module-selected-count {
+            background: #dcfce7;
+            border-radius: 999px;
+            color: #166534;
+            display: none;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            white-space: nowrap;
+        }
+
+        .permission-module.is-selected .permission-module-selected-count {
+            display: inline-block;
+        }
+
+        .permission-module-actions {
+            align-items: center;
+            display: flex;
+            gap: 8px;
+        }
+
+        .permission-module-count {
+            background: #dbeafe;
+            border-radius: 999px;
+            color: #1d4ed8;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 3px 8px;
+        }
+
+        .permission-module-chevron {
+            color: #64748b;
+            font-size: 0.9rem;
+            transition: transform 0.16s ease;
+        }
+
+        .permission-module.is-open .permission-module-chevron {
+            transform: rotate(180deg);
+        }
+
+        .permission-module-body {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            padding: 12px;
+        }
+
+        .permission-option {
+            align-items: flex-start;
+            background: #fbfdff;
+            border: 1px solid #e2ebf3;
+            border-radius: 12px;
+            display: flex;
+            gap: 10px;
+            min-width: 0;
+            padding: 10px;
+            transition: border-color 0.16s ease, background 0.16s ease;
+        }
+
+        .permission-option input {
+            margin-top: 3px;
+        }
+
+        .permission-option.is-checked {
+            background: #f0fdf9;
+            border-color: #99f6e4;
+        }
+
+        .permission-option-label {
+            color: #0f172a;
+            font-size: 0.82rem;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .permission-option-code {
+            color: #64748b;
+            font-size: 0.72rem;
+            margin-top: 2px;
+            word-break: break-word;
+        }
+
+        .summary-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .edit-ribbon {
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 999px;
+            color: #fff7ed;
+            display: inline-flex;
+            font-size: 0.72rem;
+            font-weight: 700;
+            gap: 6px;
+            margin-top: 8px;
+            padding: 6px 10px;
+        }
+
+        .summary-box {
+            background: #f8fbfd;
+            border: 1px solid #e2ebf3;
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .summary-label {
+            color: #64748b;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .summary-value {
+            color: #0f172a;
+            font-size: 0.95rem;
+            font-weight: 700;
+        }
+
+        .selected-permissions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .selected-chip {
+            background: #e6fffa;
+            border: 1px solid #99f6e4;
+            border-radius: 999px;
+            color: #115e59;
+            font-size: 0.72rem;
+            line-height: 1.25;
+            max-width: 100%;
+            overflow-wrap: anywhere;
+            padding: 5px 8px;
+        }
+
+        .group-form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 14px;
+        }
+
+        .page-btn {
+            align-items: center;
+            border-radius: 14px;
+            cursor: pointer;
+            display: inline-flex;
+            font-size: 0.86rem;
+            font-weight: 700;
+            gap: 8px;
+            justify-content: center;
+            min-height: 46px;
+            padding: 0 18px;
+            text-decoration: none;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+
+        .page-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .page-btn-secondary {
+            background: #f8fbfd;
+            border: 1px solid #d9e6f0;
+            color: #334155;
+        }
+
+        .page-btn-secondary:hover {
+            background: #f1f6fa;
+            color: #0f172a;
+        }
+
+        .page-btn-primary {
+            background: linear-gradient(135deg, #0f766e, #0f9a8f);
+            border: 1px solid #0f8b80;
+            box-shadow: 0 12px 24px rgba(15, 118, 110, 0.18);
+            color: #ffffff;
+        }
+
+        .page-btn-primary:hover {
+            box-shadow: 0 16px 28px rgba(15, 118, 110, 0.24);
+            color: #ffffff;
+        }
+
+        @media (max-width: 980px) {
+            .group-form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .permission-module-body {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .group-form-shell {
+                padding: 8px;
+            }
+
+            .ui.secondary.pointing.menu {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .group-form-card-body,
+            .group-form-card-header,
+            .group-form-hero {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+
+            .permission-toolbar,
+            .group-form-actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .toolbar-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .toolbar-btn,
+            .page-btn {
+                width: 100%;
+            }
+
+            .permission-module-main,
+            .permission-module-actions {
+                min-width: 0;
+            }
+
+            .permission-module-header {
+                align-items: flex-start;
+                gap: 8px;
+                flex-direction: column;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="group-form-shell" data-page-mode="{{ page_mode }}">
+        <div class="ui secondary pointing menu">
+            <a class="item" href="{% url 'homeApp:staff_group_list' %}">
+                <i class="arrow left icon"></i>
+                Staff Group List
+            </a>
+            {% if group_obj %}
+                <a class="item" href="{% url 'homeApp:staff_group_detail' group_obj.id %}">
+                    <i class="eye icon"></i>
+                    View Detail
+                </a>
+            {% endif %}
+        </div>
+
+        <section class="group-form-hero">
+            <div class="group-form-kicker">Staff Group</div>
+            <h1 class="group-form-title">{{ page_title }}</h1>
+            {% if page_mode == 'edit' %}
+                <div class="group-form-subtitle">Review existing permissions, adjust only what changed, and keep selected modules visible while editing.</div>
+                <div class="edit-ribbon">
+                    <i class="pen square icon"></i>
+                    Editing Existing Group
+                </div>
+            {% else %}
+                <div class="group-form-subtitle">Create a new reusable permission bundle and define exactly what this group can access.</div>
+            {% endif %}
+        </section>
+
+        <form class="ui form" id="staffGroupForm">
+            {% csrf_token %}
+            <input type="hidden" id="EditId" value="{% if group_obj %}{{ group_obj.id }}{% endif %}">
+
+            <div class="group-form-grid">
+                <div class="group-form-card">
+                    <div class="group-form-card-header">
+                        <h3 class="group-form-card-title">Group Details</h3>
+                    </div>
+                    <div class="group-form-card-body">
+                        <div class="field required">
+                            <label>Group Name</label>
+                            <input type="text" id="groupName" value="{% if group_obj %}{{ group_obj.name }}{% endif %}" placeholder="Group Name">
+                        </div>
+                        <div class="field">
+                            <label>Description</label>
+                            <textarea id="description" rows="4" placeholder="Describe how this group is used">{% if group_obj and group_obj.description %}{{ group_obj.description }}{% endif %}</textarea>
+                        </div>
+
+                        <div class="summary-grid" style="margin-top: 14px;">
+                            <div class="summary-box">
+                                <div class="summary-label">Linked Group</div>
+                                <div class="summary-value">{% if group_obj and group_obj.djangoGroup %}{{ group_obj.djangoGroup.name }}{% else %}Will be created automatically{% endif %}</div>
+                            </div>
+                            <div class="summary-box">
+                                <div class="summary-label">Selected Permissions</div>
+                                <div class="summary-value"><span id="selectedCount">{{ selected_permission_ids|length }}</span></div>
+                            </div>
+                            <div class="summary-box">
+                                <div class="summary-label">Selection Preview</div>
+                                <div class="selected-permissions" id="selectedPermissionPreview">
+                                    {% if group_obj %}
+                                        {% for module, permissions in permission_catalog.items %}
+                                            {% for permission in permissions %}
+                                                {% if permission.id in selected_permission_ids %}
+                                                    <span class="selected-chip" data-permission-chip="{{ permission.id }}">{{ permission.name }}</span>
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="selected-chip">No permissions selected</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="group-form-card">
+                    <div class="group-form-card-header">
+                        <h3 class="group-form-card-title">Permission Assignment</h3>
+                    </div>
+                    <div class="group-form-card-body">
+                        <div class="permission-toolbar">
+                            <input class="permission-search" type="text" id="permissionSearch" placeholder="Search permissions">
+                            <div class="toolbar-actions">
+                                <button class="toolbar-btn" type="button" onclick="toggleAllPermissions(true)">
+                                    <i class="check square outline icon"></i>
+                                    Select All
+                                </button>
+                                <button class="toolbar-btn" type="button" onclick="toggleAllPermissions(false)">
+                                    <i class="eraser icon"></i>
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="permission-modules">
+                            {% for module, permissions in permission_catalog.items %}
+                                <div class="permission-module">
+                                    <div class="permission-module-header" onclick="togglePermissionBody(this)">
+                                        <div class="permission-module-main">
+                                            <div class="permission-module-name">{{ module }}</div>
+                                            <div class="permission-module-selected-count">0 selected</div>
+                                        </div>
+                                        <div class="permission-module-actions">
+                                            <div class="permission-module-count">{{ permissions|length }}</div>
+                                            <i class="chevron down icon permission-module-chevron"></i>
+                                        </div>
+                                    </div>
+                                    <div class="permission-module-body">
+                                        {% for permission in permissions %}
+                                            <label class="permission-option" data-permission-option data-search-text="{{ permission.name|lower }} {{ permission.codename|lower }} {{ module|lower }}">
+                                                <input
+                                                    type="checkbox"
+                                                    class="permission-check"
+                                                    value="{{ permission.id }}"
+                                                    data-permission-name="{{ permission.name }}"
+                                                    {% if permission.id in selected_permission_ids %}checked{% endif %}
+                                                >
+                                                <span>
+                                                    <div class="permission-option-label">{{ permission.name }}</div>
+                                                    <div class="permission-option-code">{{ permission.codename }}</div>
+                                                </span>
+                                            </label>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="group-form-actions">
+                <a class="page-btn page-btn-secondary" href="{% if group_obj %}{% url 'homeApp:staff_group_detail' group_obj.id %}{% else %}{% url 'homeApp:staff_group_list' %}{% endif %}">
+                    <i class="arrow left icon"></i>
+                    Cancel
+                </a>
+                <button class="page-btn page-btn-primary" type="button" onclick="submitStaffGroupForm()">
+                    <i class="check circle icon"></i>
+                    {{ submit_label }}
+                </button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script>
+        function togglePermissionBody(header) {
+            var module = $(header).closest('.permission-module');
+            module.toggleClass('is-open');
+            $(header).next('.permission-module-body').slideToggle(120);
+        }
+
+        function selectedPermissionIds() {
+            return $('.permission-check:checked').map(function () { return $(this).val(); }).get();
+        }
+
+        function refreshSelectedPreview() {
+            var checked = $('.permission-check:checked');
+            $('#selectedCount').text(checked.length);
+            var preview = $('#selectedPermissionPreview');
+            if (!checked.length) {
+                preview.html('<span class="selected-chip">No permissions selected</span>');
+                return;
+            }
+            preview.html(
+                checked.slice(0, 10).map(function () {
+                    return '<span class="selected-chip">' + $(this).data('permission-name') + '</span>';
+                }).get().join('')
+            );
+            if (checked.length > 10) {
+                preview.append('<span class="selected-chip">+' + (checked.length - 10) + ' more</span>');
+            }
+            refreshPermissionModuleState();
+        }
+
+        function refreshPermissionModuleState() {
+            $('.permission-module').each(function () {
+                var module = $(this);
+                var checked = module.find('.permission-check:checked');
+                var selectedCount = checked.length;
+                module.toggleClass('is-selected', selectedCount > 0);
+                module.find('.permission-module-selected-count').text(selectedCount + ' selected');
+            });
+        }
+
+        function openRelevantModules() {
+            $('.permission-module').each(function (index) {
+                var module = $(this);
+                var hasChecked = module.find('.permission-check:checked').length > 0;
+                var shouldOpen = '{{ page_mode }}' === 'edit' ? hasChecked : true;
+                module.toggleClass('is-open', shouldOpen);
+                module.find('.permission-module-body').toggle(shouldOpen);
+            });
+        }
+
+        function toggleAllPermissions(state) {
+            $('.permission-check:visible').prop('checked', state);
+            refreshSelectedPreview();
+        }
+
+        function submitStaffGroupForm() {
+            var data = new FormData();
+            var pageMode = '{{ page_mode }}';
+            var url = pageMode === 'edit' ? '{% url "homeApp:edit_staff_group_api" %}' : '{% url "homeApp:add_staff_group_api" %}';
+            if (pageMode === 'edit') {
+                data.append('EditId', $('#EditId').val());
+            }
+            data.append('groupName', $('#groupName').val());
+            data.append('description', $('#description').val());
+            selectedPermissionIds().forEach(function (id) { data.append('permission_ids', id); });
+            data.append('csrfmiddlewaretoken', $("input[name='csrfmiddlewaretoken']").val());
+            $.ajax({
+                type: 'post',
+                url: url,
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        window.location.href = '/staff_group_list/' + response.group_id + '/';
+                    } else {
+                        $('body').toast({class: 'error', message: response.error || 'Unable to save staff group.'});
+                    }
+                },
+                error: function () {
+                    $('body').toast({class: 'error', message: 'Unable to save staff group.'});
+                }
+            });
+        }
+
+        $('#permissionSearch').on('input', function () {
+            var query = ($(this).val() || '').toLowerCase().trim();
+            $('[data-permission-option]').each(function () {
+                var searchText = $(this).data('search-text');
+                $(this).toggle(!query || searchText.indexOf(query) !== -1);
+            });
+        });
+
+        $(document).on('change', '.permission-check', function () {
+            $(this).closest('.permission-option').toggleClass('is-checked', this.checked);
+            refreshSelectedPreview();
+        });
+        $('.permission-check').each(function () {
+            $(this).closest('.permission-option').toggleClass('is-checked', this.checked);
+        });
+        $('.permission-module-body').hide();
+        openRelevantModules();
+        refreshSelectedPreview();
+    </script>
+{% endblock %}

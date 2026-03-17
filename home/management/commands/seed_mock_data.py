@@ -2,12 +2,13 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Permission
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.text import slugify
 
 from activation.models import EcomValidity, Validity
+from home.apiView import seed_default_groups
 from home.models import (
     Attendance,
     Bank,
@@ -28,6 +29,16 @@ from home.models import (
 
 
 User = get_user_model()
+DEFAULT_STAFF_GROUPS = [
+    "Owner",
+    "Admin",
+    "Moderator",
+    "Collection",
+    "SalesAdmin",
+    "CashCounter",
+    "NormalStaff",
+    "Viewer",
+]
 
 
 class Command(BaseCommand):
@@ -35,6 +46,7 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        seed_default_groups()
         seeded = [
             self._seed_tenant(
                 tenant_name="Alpha Traders",
@@ -83,6 +95,11 @@ class Command(BaseCommand):
             tenant.isActive = True
             tenant.save(update_fields=["name", "isActive", "lastUpdatedOn"])
 
+        staff_groups = {
+            group_name: self._ensure_staff_group(tenant, group_name)
+            for group_name in DEFAULT_STAFF_GROUPS
+        }
+
         owner, created = User.objects.get_or_create(
             username=owner_username,
             defaults={"email": owner_email, "is_active": True},
@@ -92,11 +109,7 @@ class Command(BaseCommand):
             owner.email = owner_email
             owner.is_active = True
             owner.save()
-
-        for group_name in ["Admin", "Collection", "SalesAdmin", "CashCounter", "Customer"]:
-            group, _ = Group.objects.get_or_create(name=group_name)
-            if group_name == "Admin":
-                group.user_set.add(owner)
+        self._grant_all_permissions(owner)
 
         TenantMembership.objects.update_or_create(
             tenant=tenant,
@@ -104,11 +117,6 @@ class Command(BaseCommand):
             defaults={"role": TenantMembership.Role.OWNER, "isDefault": True},
         )
 
-        staff_group, _ = StaffGroup.objects.get_or_create(
-            tenant=tenant,
-            name="Operations",
-            defaults={"isDeleted": False},
-        )
         party_group, _ = PartyGroup.objects.get_or_create(
             tenant=tenant,
             name=station_name,
@@ -136,57 +144,96 @@ class Command(BaseCommand):
             },
         )
 
-        staff_user, _ = StaffUser.objects.get_or_create(
+        staff_user = self._ensure_staff_user(
             tenant=tenant,
-            user_ID=owner,
-            defaults={
-                "name": f"{tenant_name} Owner",
-                "phone": "9000000001",
-                "email": owner_email,
-                "address": f"HQ - {tenant_name}",
-                "username": owner_username,
-                "group": "Admin",
-                "partyGroupID": party_group,
-                "isActive": "Active",
-                "isDeleted": False,
-            },
+            user=owner,
+            role_name="Owner",
+            membership_role=TenantMembership.Role.OWNER,
+            name=f"{tenant_name} Owner",
+            phone="9000000001",
+            email=owner_email,
+            address=f"HQ - {tenant_name}",
+            party_group=party_group,
+            staff_group=staff_groups["Owner"],
         )
 
-        collector_user, _ = User.objects.get_or_create(
-            username=f"{slugify(tenant_name).replace('-', '')}.collector",
-            defaults={"email": f"collector@{slugify(tenant_name)}.example.com", "is_active": True},
+        admin_user = self._ensure_auth_user(
+            username=f"{slugify(tenant_name).replace('-', '')}.admin",
+            email=f"admin@{slugify(tenant_name)}.example.com",
+            password="admin123",
         )
-        collector_user.set_password("collect123")
-        collector_user.save()
-        Group.objects.get(name="Collection").user_set.add(collector_user)
-        TenantMembership.objects.update_or_create(
+        admin_staff = self._ensure_staff_user(
+            tenant=tenant,
+            user=admin_user,
+            role_name="Admin",
+            membership_role=TenantMembership.Role.ADMIN,
+            name=f"{tenant_name} Admin",
+            phone="9000000009",
+            email=admin_user.email,
+            address=f"Admin Office - {tenant_name}",
+            party_group=party_group,
+            staff_group=staff_groups["Admin"],
+        )
+
+        collector_user = self._ensure_auth_user(
+            username=f"{slugify(tenant_name).replace('-', '')}.collector",
+            email=f"collector@{slugify(tenant_name)}.example.com",
+            password="collect123",
+        )
+        collector = self._ensure_staff_user(
             tenant=tenant,
             user=collector_user,
-            defaults={"role": TenantMembership.Role.STAFF, "isDefault": False},
-        )
-        collector, _ = StaffUser.objects.get_or_create(
-            tenant=tenant,
-            user_ID=collector_user,
-            defaults={
-                "name": f"{tenant_name} Collector",
-                "phone": "9000000002",
-                "email": f"collector@{slugify(tenant_name)}.example.com",
-                "address": f"Field Office - {tenant_name}",
-                "username": collector_user.username,
-                "group": "Collection",
-                "partyGroupID": party_group,
-                "isActive": "Active",
-                "isDeleted": False,
-            },
+            role_name="Collection",
+            membership_role=TenantMembership.Role.STAFF,
+            name=f"{tenant_name} Collector",
+            phone="9000000002",
+            email=collector_user.email,
+            address=f"Field Office - {tenant_name}",
+            party_group=party_group,
+            staff_group=staff_groups["Collection"],
         )
 
-        party_login, _ = User.objects.get_or_create(
-            username=f"{slugify(tenant_name).replace('-', '')}.customer",
-            defaults={"email": f"customer@{slugify(tenant_name)}.example.com", "is_active": True},
+        sales_user = self._ensure_auth_user(
+            username=f"{slugify(tenant_name).replace('-', '')}.sales",
+            email=f"sales@{slugify(tenant_name)}.example.com",
+            password="sales123",
         )
-        party_login.set_password("customer123")
-        party_login.save()
-        Group.objects.get(name="Customer").user_set.add(party_login)
+        sales_staff = self._ensure_staff_user(
+            tenant=tenant,
+            user=sales_user,
+            role_name="SalesAdmin",
+            membership_role=TenantMembership.Role.STAFF,
+            name=f"{tenant_name} Sales",
+            phone="9000000003",
+            email=sales_user.email,
+            address=f"Sales Desk - {tenant_name}",
+            party_group=party_group,
+            staff_group=staff_groups["SalesAdmin"],
+        )
+
+        cash_user = self._ensure_auth_user(
+            username=f"{slugify(tenant_name).replace('-', '')}.cash",
+            email=f"cash@{slugify(tenant_name)}.example.com",
+            password="cash123",
+        )
+        cash_staff = self._ensure_staff_user(
+            tenant=tenant,
+            user=cash_user,
+            role_name="CashCounter",
+            membership_role=TenantMembership.Role.STAFF,
+            name=f"{tenant_name} Cash Counter",
+            phone="9000000004",
+            email=cash_user.email,
+            address=f"Cash Desk - {tenant_name}",
+            party_group=party_group,
+            staff_group=staff_groups["CashCounter"],
+        )
+
+        party_login = self._ensure_auth_user(
+            username=f"{slugify(tenant_name).replace('-', '')}.customer",
+            email=f"customer@{slugify(tenant_name)}.example.com",
+            password="customer123",
+        )
         TenantMembership.objects.update_or_create(
             tenant=tenant,
             user=party_login,
@@ -199,6 +246,7 @@ class Command(BaseCommand):
                 "name": f"{tenant_name} Main Customer",
                 "phone": "9876543210",
                 "address": f"Market Area - {tenant_name}",
+                "openingBalance": Decimal("5000.00"),
                 "username": party_login.username,
                 "password": "customer123",
                 "partyGroupID": party_group,
@@ -236,11 +284,11 @@ class Command(BaseCommand):
                 "invoiceNumber": f"INV/1/{today.year}",
                 "amount": float(Decimal("3500.00")),
                 "remark": "Mock sale",
-                "createdBy": staff_user,
+                "createdBy": sales_staff,
                 "buildDate": today,
                 "approvedOn": datetime.now(),
                 "isApproved": True,
-                "approvedBy": staff_user,
+                "approvedBy": admin_staff,
                 "isDeleted": False,
             },
         )
@@ -253,7 +301,7 @@ class Command(BaseCommand):
                 "mode": "Cash",
                 "amount": float(Decimal("1800.00")),
                 "remark": "Mock counter entry",
-                "createdBy": staff_user,
+                "createdBy": cash_staff,
                 "entryDate": datetime.now(),
                 "isDeleted": False,
             },
@@ -273,7 +321,7 @@ class Command(BaseCommand):
                 "approvedOn": datetime.now(),
                 "isApproved": True,
                 "isTallied": True,
-                "approvedBy": staff_user,
+                "approvedBy": admin_staff,
                 "collectionDateTime": datetime.now(),
                 "isDeleted": False,
             },
@@ -325,15 +373,131 @@ class Command(BaseCommand):
         return {
             "tenant": tenant,
             "owner": owner,
-            "staff_group": staff_group,
+            "staff_groups": staff_groups,
             "party_group": party_group,
             "bank": bank,
             "location_pack": location_pack,
             "whatsapp_pack": whatsapp_pack,
             "staff_user": staff_user,
+            "admin_staff": admin_staff,
             "collector": collector,
+            "sales_staff": sales_staff,
+            "cash_staff": cash_staff,
             "party": party,
             "collection": collection,
             "sales": sales,
             "cash_counter": cash_counter,
         }
+
+    def _ensure_auth_user(self, *, username, email, password):
+        user, created = User.objects.get_or_create(
+            username=username,
+            defaults={"email": email, "is_active": True},
+        )
+        if created or not user.check_password(password) or user.email != email or not user.is_active:
+            user.set_password(password)
+            user.email = email
+            user.is_active = True
+            user.save()
+        return user
+
+    def _ensure_staff_group(self, tenant, group_name):
+        from django.contrib.auth.models import Group
+
+        base_group = Group.objects.filter(name=group_name).first()
+        tenant_group_name = f"{tenant.slug}:{group_name}"
+        django_group, _ = Group.objects.get_or_create(name=tenant_group_name)
+        if base_group is not None:
+            django_group.permissions.set(base_group.permissions.all())
+        staff_group, created = StaffGroup.objects.get_or_create(
+            tenant=tenant,
+            name=group_name,
+            defaults={
+                "description": f"{group_name} role for {tenant.name}",
+                "djangoGroup": django_group,
+                "isDeleted": False,
+            },
+        )
+        update_fields = []
+        if staff_group.isDeleted:
+            staff_group.isDeleted = False
+            update_fields.append("isDeleted")
+        if staff_group.djangoGroup_id != getattr(django_group, "id", None):
+            staff_group.djangoGroup = django_group
+            update_fields.append("djangoGroup")
+        if not staff_group.description:
+            staff_group.description = f"{group_name} role for {tenant.name}"
+            update_fields.append("description")
+        if update_fields:
+            update_fields.append("lastUpdatedOn")
+            staff_group.save(update_fields=update_fields)
+        return staff_group
+
+    def _ensure_staff_user(
+        self,
+        *,
+        tenant,
+        user,
+        role_name,
+        membership_role,
+        name,
+        phone,
+        email,
+        address,
+        party_group,
+        staff_group,
+    ):
+        TenantMembership.objects.update_or_create(
+            tenant=tenant,
+            user=user,
+            defaults={"role": membership_role, "isDefault": membership_role == TenantMembership.Role.OWNER},
+        )
+        staff_user, created = StaffUser.objects.get_or_create(
+            tenant=tenant,
+            user_ID=user,
+            defaults={
+                "name": name,
+                "phone": phone,
+                "email": email,
+                "address": address,
+                "username": user.username,
+                "group": role_name,
+                "staffGroup": staff_group,
+                "partyGroupID": party_group,
+                "isActive": "Active",
+                "isDeleted": False,
+            },
+        )
+        update_fields = []
+        desired_values = {
+            "name": name,
+            "phone": phone,
+            "email": email,
+            "address": address,
+            "username": user.username,
+            "group": role_name,
+            "staffGroup": staff_group,
+            "partyGroupID": party_group,
+            "isActive": "Active",
+            "isDeleted": False,
+        }
+        for field_name, expected_value in desired_values.items():
+            current_value = getattr(staff_user, field_name)
+            if current_value != expected_value:
+                setattr(staff_user, field_name, expected_value)
+                update_fields.append(field_name)
+        if created:
+            user.groups.clear()
+        linked_group = staff_group.djangoGroup
+        if linked_group is not None:
+            user.groups.set([linked_group])
+        if update_fields:
+            update_fields.append("lastUpdatedOn")
+            staff_user.save(update_fields=update_fields)
+        return staff_user
+
+    def _grant_all_permissions(self, user):
+        all_permissions = Permission.objects.exclude(
+            content_type__app_label__in=["admin", "contenttypes", "sessions"]
+        )
+        user.user_permissions.set(all_permissions)

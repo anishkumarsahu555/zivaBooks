@@ -248,11 +248,11 @@
                                 </div>
                                 <div class="two fields">
                                     <div class="field required">
-                                        <label>Group</label>
+                                        <label>Staff Group</label>
                                         <select class="ui fluid dropdown" id="UserGroup">
                                             <option value="" hidden>Group</option>
                                             {% for group in groups %}
-                                                <option value="{{ group.name }}">{{ group.name|capfirst }}</option>
+                                                <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
                                             {% endfor %}
 
 
@@ -428,11 +428,11 @@
                             </div>
                             <div class="two fields">
                                 <div class="field required">
-                                    <label>Group</label>
+                                    <label>Staff Group</label>
                                     <select class="ui fluid dropdown" id="UserGroupEdit">
                                         <option value="" hidden>Group</option>
                                         {% for group in groups %}
-                                            <option value="{{ group.name }}">{{ group.name|capfirst }}</option>
+                                            <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
                                         {% endfor %}
 
 
