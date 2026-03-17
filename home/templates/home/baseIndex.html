@@ -849,7 +849,12 @@ Collection side bar
                         </div>
                         <div class="extra content">
                             <div class="center aligned author">
-                                <img class="ui avatar image" src="{{ obj.photo.thumbnail.url }}"> {{ obj.name }}
+                                {% if obj.photo %}
+                                    <img class="ui avatar image" src="{{ obj.photo.url }}">
+                                {% else %}
+                                    <img class="ui avatar image" src="/static/images/default-avatar.svg">
+                                {% endif %}
+                                {{ obj.name }}
                             </div>
                         </div>
                     </div>

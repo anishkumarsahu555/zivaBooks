@@ -15,6 +15,7 @@ from django.views.decorators.csrf import csrf_exempt
 from activation.models import *
 from activation.views import is_activated
 from .models import *
+from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_qs
 
 
 # def login_or_logout(request, type):
@@ -93,7 +94,7 @@ def loginPage(request):
 @check_two_group('Admin', 'Moderator')
 def admin_home(request):
     try:
-        val = Validity.objects.last()
+        val = tenant_qs(request, Validity).last()
         message = "Your App License is Valid till {}".format(val.expiryDate.strftime('%d-%m-%Y'))
     except:
         message = "You are using a trial version."
@@ -112,8 +113,8 @@ def collection_home(request):
 @check_two_group('Admin', 'Moderator')
 @is_activated()
 def user_list(request):
-    groups = StaffGroup.objects.filter(isDeleted__exact=False).order_by('name')
-    party_groups = PartyGroup.objects.filter(isDeleted__exact=False).order_by('name')
+    groups = tenant_qs(request, StaffGroup).filter(isDeleted__exact=False).order_by('name')
+    party_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
     context = {
         'groups': groups,
         'party_groups': party_groups
@@ -136,8 +137,8 @@ def bank_list(request):
 @check_two_group('Admin', 'Moderator')
 @is_activated()
 def party_list(request):
-    party_groups = PartyGroup.objects.filter(isDeleted__exact=False).order_by('name')
-    staffs = StaffUser.objects.filter(isDeleted__exact=False).order_by('name')
+    party_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
+    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
     context = {
         'party_groups': party_groups,
         'staffs': staffs
@@ -152,7 +153,7 @@ def user_logout(request):
 
 
 def my_profile(request):
-    instance = get_object_or_404(StaffUser, user_ID_id=request.user.pk)
+    instance = get_object_or_404(tenant_qs(request, StaffUser), user_ID_id=request.user.pk)
     context = {
         'instance': instance
     }
@@ -160,7 +161,7 @@ def my_profile(request):
 
 
 def my_profile_collection(request):
-    instance = get_object_or_404(StaffUser, user_ID_id=request.user.pk)
+    instance = get_object_or_404(tenant_qs(request, StaffUser), user_ID_id=request.user.pk)
     context = {
         'instance': instance
     }
@@ -210,7 +211,7 @@ def homepage(request):
 
 @check_group('Customer')
 def customer_home(request):
-    party = Party.objects.filter(userID_id=request.user.pk, isDeleted=False).only(
+    party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only(
         'id', 'name', 'phone', 'address', 'username', 'password'
     ).order_by('-id').first()
     if not party:
@@ -219,7 +220,7 @@ def customer_home(request):
     msg_cache_key = f'customer_home_messages:{request.user.pk}:{party.phone}:{party.name or ""}'
     cached_messages = cache.get(msg_cache_key)
     if cached_messages is None:
-        base_messages = WhatsappMessageStatus.objects.filter(
+        base_messages = tenant_qs(request, WhatsappMessageStatus).filter(
             isDeleted=False,
             phone=party.phone
         ).only('id', 'message', 'messageTo', 'phone', 'status', 'datetime').order_by('-datetime')
@@ -277,7 +278,7 @@ def customer_change_password(request):
     request.user.save(update_fields=['password'])
     update_session_auth_hash(request, request.user)
 
-    party = Party.objects.filter(userID_id=request.user.pk, isDeleted=False).last()
+    party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).last()
     if party:
         party.password = new_password
         party.save(update_fields=['password'])
@@ -286,9 +287,9 @@ def customer_change_password(request):
 
 
 def add_collection(request):
-    instance = Bank.objects.filter(isDeleted__exact=False).order_by('name')
-    staffs = StaffUser.objects.filter(isDeleted__exact=False, group__iexact='Collection').order_by('name')
-    p_groups = PartyGroup.objects.filter(isDeleted__exact=False).order_by('name')
+    instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
+    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False, group__iexact='Collection').order_by('name')
+    p_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
     context = {
         'instance': instance,
         'staffs': staffs,
@@ -307,7 +308,7 @@ def my_collection(request):
 @is_activated()
 @check_two_group('Admin', 'Moderator')
 def collection_list(request):
-    staffs = StaffUser.objects.filter(isDeleted__exact=False).order_by('name')
+    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
     context = {
         'staffs': staffs
     }
@@ -317,7 +318,7 @@ def collection_list(request):
 @is_activated()
 @check_two_group('Admin', 'Moderator')
 def cheque_reminder_list(request):
-    staffs = StaffUser.objects.filter(isDeleted__exact=False).order_by('name')
+    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
     context = {
         'staffs': staffs
     }
@@ -326,7 +327,7 @@ def cheque_reminder_list(request):
 
 @check_two_group('Admin', 'Moderator')
 def take_collection(request):
-    instance = Bank.objects.filter(isDeleted__exact=False).order_by('name')
+    instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
     context = {
         'instance': instance
     }
@@ -334,8 +335,8 @@ def take_collection(request):
 
 
 def edit_collection(request, id=None):
-    obj = get_object_or_404(Collection, pk=id)
-    instance = Bank.objects.filter(isDeleted__exact=False).order_by('name')
+    obj = get_object_or_404(tenant_qs(request, Collection), pk=id)
+    instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
     context = {
         'instance': instance,
         'obj': obj
@@ -352,17 +353,18 @@ def get_party_data(request):
         # displaying the contents of the CSV file
         for lines in csvFile:
             try:
-                partyGroup = PartyGroup.objects.get(name__iexact=lines[2])
+                partyGroup = tenant_qs(request, PartyGroup).get(name__iexact=lines[2])
                 party = partyGroup.pk
             except:
                 party = None
 
             try:
-                user = StaffUser.objects.get(name__iexact=lines[3])
+                user = tenant_qs(request, StaffUser).get(name__iexact=lines[3])
                 usr = user.pk
             except:
                 usr = None
             p = Party()
+            assign_tenant(p, request)
             p.name = lines[0]
             p.phone = lines[1]
             p.partyGroupID_id = party
@@ -372,7 +374,7 @@ def get_party_data(request):
 
 
 def generate_collection_date(request):
-    col = Collection.objects.all()
+    col = tenant_qs(request, Collection).all()
     for c in col:
         c.collectionDateTime = c.datetime
         c.save()
@@ -383,7 +385,7 @@ def generate_collection_date(request):
 
 @check_group('NormalStaff', 'SalesAdmin')
 def staff_home(request):
-    obj = StaffUser.objects.get(user_ID__pk=request.user.pk)
+    obj = get_object_or_404(tenant_qs(request, StaffUser), user_ID__pk=request.user.pk)
     context = {
         'obj': obj
     }
@@ -396,11 +398,14 @@ def staff_home(request):
 def add_attendance(request):
     if request.user.is_authenticated:
         try:
-            instance = Attendance.objects.get(datetime__icontains=datetime.today().date(),
-                                              staffID__user_ID__id=request.user.pk)
+            instance = tenant_qs(request, Attendance).get(
+                datetime__icontains=datetime.today().date(),
+                staffID__user_ID__id=request.user.pk,
+            )
         except:
             instance = Attendance()
-            staff = StaffUser.objects.get(user_ID__id=request.user.pk)
+            assign_tenant(instance, request)
+            staff = get_object_or_404(tenant_qs(request, StaffUser), user_ID__id=request.user.pk)
             instance.staffID_id = staff.pk
             instance.save()
         context = {
@@ -423,7 +428,7 @@ def attendance_report(request):
 @check_two_group('Admin', 'Moderator')
 def attendance_report_admin(request):
     if request.user.is_authenticated:
-        staffs = StaffUser.objects.filter(isDeleted__exact=False).order_by('name')
+        staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
         context = {
             'staffs': staffs
         }
@@ -440,7 +445,7 @@ def add_sales(request):
 @is_activated()
 @check_two_group('Admin', 'Moderator', 'SalesAdmin')
 def sales_list(request):
-    staffs = StaffUser.objects.filter(isDeleted__exact=False).order_by('name')
+    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
     context = {
         'staffs': staffs
     }
@@ -454,7 +459,7 @@ def my_sales_list(request):
 
 
 def edit_sales(request, id=None):
-    obj = get_object_or_404(Sales, pk=id)
+    obj = get_object_or_404(tenant_qs(request, Sales), pk=id)
     invoice = obj.invoiceNumber
     splitVoice = invoice.split('/')
 
@@ -481,7 +486,7 @@ def cash_counter_home(request):
 
 @check_group('CashCounter', 'Admin', 'Moderator')
 def cash_counter(request):
-    banks = Bank.objects.filter(isDeleted__exact=False).order_by('name')
+    banks = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
     context = {
         'banks': banks
     }
@@ -495,8 +500,8 @@ def my_cash_counter_list(request):
 
 @check_group('CashCounter', 'Admin', 'Moderator')
 def edit_cash_counter(request, id=None):
-    obj = get_object_or_404(CashCounter, pk=id)
-    banks = Bank.objects.filter(isDeleted__exact=False).order_by('name')
+    obj = get_object_or_404(tenant_qs(request, CashCounter), pk=id)
+    banks = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
 
     invoice = obj.invoiceNumber
     try:
@@ -523,9 +528,9 @@ def edit_cash_counter(request, id=None):
 
 @check_group('CashCounter', 'Admin', 'Moderator')
 def cash_counter_collection(request):
-    instance = Bank.objects.filter(isDeleted__exact=False).order_by('name')
-    staffs = StaffUser.objects.filter(isDeleted__exact=False, group__iexact='Collection').order_by('name')
-    p_groups = PartyGroup.objects.filter(isDeleted__exact=False).order_by('name')
+    instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
+    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False, group__iexact='Collection').order_by('name')
+    p_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
     context = {
         'instance': instance,
         'staffs': staffs,
@@ -535,8 +540,8 @@ def cash_counter_collection(request):
 
 
 def edit_cash_counter_collection(request, id=None):
-    obj = get_object_or_404(CollectionCashCounter, pk=id)
-    instance = Bank.objects.filter(isDeleted__exact=False).order_by('name')
+    obj = get_object_or_404(tenant_qs(request, CollectionCashCounter), pk=id)
+    instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
     context = {
         'instance': instance,
         'obj': obj
@@ -546,7 +551,7 @@ def edit_cash_counter_collection(request, id=None):
 
 def get_all_unsent_messages(request):
     msgs = (
-        WhatsappMessageStatus.objects
+        tenant_qs(request, WhatsappMessageStatus)
         .annotate(phone_length=Length('phone'))
         .filter(
             isDeleted=False,
@@ -574,7 +579,7 @@ def get_all_unsent_messages(request):
 def update_sent_msg_status(request):
     if request.method == 'POST':
         id = request.POST.get("id")
-        obj = WhatsappMessageStatus.objects.get(pk=int(id))
+        obj = get_object_or_404(tenant_qs(request, WhatsappMessageStatus), pk=int(id))
         obj.status = 'Success'
         obj.save()
         return JsonResponse({'message': 'success'}, safe=False)

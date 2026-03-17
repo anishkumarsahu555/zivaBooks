@@ -1,8 +1,10 @@
 import threading
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 
 import requests
 from django.contrib.auth import authenticate, login
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.db import transaction
@@ -18,8 +20,12 @@ from django_datatables_view.base_datatable_view import BaseDatatableView
 from weasyprint import CSS, HTML
 
 from home.models import *
+from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_qs
+
+User = get_user_model()
 
 BASE_URL_WHATSAPP = "https://bot.betablaster.in/api/"
+DEFAULT_AVATAR_URL = "/static/images/default-avatar.svg"
 
 
 class LocationThread(threading.Thread):
@@ -31,7 +37,7 @@ class LocationThread(threading.Thread):
 
     def run(self):
         while (self._is_running):
-            location = GeolocationPackage.objects.filter(isDeleted__exact=False).last()
+            location = tenant_qs(get_current_tenant(None), GeolocationPackage).filter(isDeleted__exact=False).last()
             if location.used < location.balance:
 
                 r = requests.get(
@@ -63,7 +69,7 @@ class MessageThread(threading.Thread):
 
     def run(self):
         while (self._is_running):
-            msg = WhatsappMessage.objects.filter(isDeleted__exact=False).last()
+            msg = tenant_qs(get_current_tenant(None), WhatsappMessage).filter(isDeleted__exact=False).last()
             if msg.used < msg.balance:
                 try:
 
@@ -72,6 +78,7 @@ class MessageThread(threading.Thread):
                     #     verify=False)
                     # data = r.json()
                     obj = WhatsappMessageStatus()
+                    assign_tenant(obj, get_current_tenant(None))
                     obj.phone = self.number
                     obj.message = self.message
                     obj.messageTo = self.partyName
@@ -88,6 +95,7 @@ class MessageThread(threading.Thread):
                     msg.save()
                 except:
                     obj = WhatsappMessageStatus()
+                    assign_tenant(obj, get_current_tenant(None))
                     obj.phone = self.number
                     obj.message = self.message
                     obj.messageTo = self.partyName
@@ -96,6 +104,7 @@ class MessageThread(threading.Thread):
 
             else:
                 obj = WhatsappMessageStatus()
+                assign_tenant(obj, get_current_tenant(None))
                 obj.phone = self.number
                 obj.message = self.message
                 obj.messageTo = self.partyName
@@ -118,8 +127,25 @@ def formatINR(number):
     return "".join([r] + d)
 
 
-def _collection_list_base_qs():
-    return Collection.objects.select_related(
+def _decimal_from_request(value, default='0'):
+    try:
+        return Decimal(str(value).strip())
+    except (InvalidOperation, AttributeError):
+        return Decimal(default)
+
+
+def _image_url(image_field, variation=None):
+    if not image_field:
+        return DEFAULT_AVATAR_URL
+    if variation:
+        candidate = getattr(image_field, variation, None)
+        if candidate and getattr(candidate, 'url', None):
+            return candidate.url
+    return getattr(image_field, 'url', '') or DEFAULT_AVATAR_URL
+
+
+def _collection_list_base_qs(request_or_user):
+    return tenant_qs(request_or_user, Collection).select_related(
         'partyID', 'transferredPartyID', 'bankID', 'collectedBy', 'approvedBy'
     ).only(
         'id', 'paymentID', 'paidAmount', 'modeOfPayment', 'detail', 'remark', 'collectionAddress',
@@ -129,30 +155,30 @@ def _collection_list_base_qs():
     )
 
 
-def _sales_list_base_qs():
-    return Sales.objects.select_related('partyID', 'createdBy', 'approvedBy').only(
+def _sales_list_base_qs(request_or_user):
+    return tenant_qs(request_or_user, Sales).select_related('partyID', 'createdBy', 'approvedBy').only(
         'id', 'paymentID', 'invoiceNumber', 'amount', 'buildDate', 'datetime', 'remark', 'isApproved',
         'partyID__name', 'createdBy__name', 'approvedBy__name'
     )
 
 
-def _attendance_list_base_qs():
-    return Attendance.objects.select_related('staffID').only(
+def _attendance_list_base_qs(request_or_user):
+    return tenant_qs(request_or_user, Attendance).select_related('staffID').only(
         'id', 'datetime', 'isLogIn', 'isLogOut', 'loginDateTime', 'logoutDateTime',
         'login_remark', 'logout_remark', 'login_location', 'logout_location', 'staffID__name'
     )
 
 
-def _cash_counter_list_base_qs():
-    return CashCounter.objects.select_related('partyID', 'bankID', 'createdBy').only(
+def _cash_counter_list_base_qs(request_or_user):
+    return tenant_qs(request_or_user, CashCounter).select_related('partyID', 'bankID', 'createdBy').only(
         'id', 'counterID', 'invoiceNumber', 'amount', 'mixCashAmount', 'mixCardAmount', 'mode',
         'expenseType', 'remark', 'datetime', 'partyID__name', 'bankID__name',
         'bankID__accountNumber', 'createdBy__name'
     )
 
 
-def _cash_counter_collection_list_base_qs():
-    return CollectionCashCounter.objects.select_related(
+def _cash_counter_collection_list_base_qs(request_or_user):
+    return tenant_qs(request_or_user, CollectionCashCounter).select_related(
         'partyID', 'transferredPartyID', 'bankID', 'collectedBy', 'approvedBy'
     ).only(
         'id', 'paymentID', 'paidAmount', 'modeOfPayment', 'detail', 'remark', 'collectionAddress',
@@ -181,7 +207,7 @@ def _bump_party_cache_version():
 
 
 def deduct_location_balance(lat, lng):
-    location = GeolocationPackage.objects.filter(isDeleted__exact=False).last()
+    location = tenant_qs(get_current_tenant(None), GeolocationPackage).filter(isDeleted__exact=False).last()
     if location.used < location.balance:
 
         r = requests.get(
@@ -195,7 +221,7 @@ def deduct_location_balance(lat, lng):
 
 
 def send_whatsapp_message(number, message):
-    msg = WhatsappMessage.objects.filter(isDeleted__exact=False).last()
+    msg = tenant_qs(get_current_tenant(None), WhatsappMessage).filter(isDeleted__exact=False).last()
     if msg.used < msg.balance:
         # r = requests.get(
         #     msg.name + "send?number=91" + number + "&type=text&message=" + message + "&instance_id=" + msg.instanceID + "&access_token=" + msg.apiKey,
@@ -223,6 +249,7 @@ def add_staff_api(request):
             imageUploadID = request.FILES["imageUploadID"]
 
             staff = StaffUser()
+            assign_tenant(staff, request)
             staff.photo = imageUpload
             staff.idProof = imageUploadID
             staff.name = CompanyUserName
@@ -250,6 +277,7 @@ def add_staff_api(request):
                 staff.user_ID_id = new_user.pk
 
                 staff.save()
+                ensure_membership(new_user, staff.tenant, TenantMembership.Role.STAFF)
 
                 try:
                     g = Group.objects.get(name=UserGroup)
@@ -273,8 +301,7 @@ class StaffUserListJson(BaseDatatableView):
                      'isActive', 'datetime']
 
     def get_initial_queryset(self):
-        # if 'Admin' in group_names:
-        return StaffUser.objects.filter(isDeleted__exact=False).only(
+        return tenant_qs(self.request, StaffUser).filter(isDeleted__exact=False).only(
             'id', 'photo', 'name', 'username', 'userPassword', 'group', 'phone',
             'address', 'isActive', 'datetime'
         )
@@ -296,7 +323,8 @@ class StaffUserListJson(BaseDatatableView):
         json_data = []
         group_names = _request_group_names(self.request)
         for item in qs:
-            images = '<img class="ui avatar image" src="{}">'.format(item.photo.thumbnail.url)
+            photo_url = _image_url(item.photo, 'thumbnail')
+            images = '<img class="ui avatar image" src="{}">'.format(photo_url)
             if 'Admin' in group_names:
                 action = '''<button data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick = "GetUserDetails('{}')" class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
@@ -336,7 +364,7 @@ def delete_staff_user(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("userID")
-            staff = StaffUser.objects.select_related().get(pk=int(id))
+            staff = tenant_qs(request, StaffUser).select_related().get(pk=int(id))
             staff.isDeleted = True
             staff.save()
             new_user = User.objects.select_related().get(pk=staff.user_ID_id)
@@ -350,7 +378,7 @@ def delete_staff_user(request):
 
 def get_staff_user_detail(request):
     id = request.GET.get('id')
-    C_User = get_object_or_404(StaffUser, id=id)
+    C_User = get_object_or_404(tenant_qs(request, StaffUser), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
     try:
         party = C_User.partyGroupID.id
@@ -366,8 +394,8 @@ def get_staff_user_detail(request):
         'UserGroup': C_User.group,
         'PartyGroup': party,
         'IsActive': C_User.isActive,
-        'ImgUrl': C_User.photo.medium.url,
-        'IDUrl': C_User.idProof.medium.url
+        'ImgUrl': _image_url(C_User.photo, 'medium'),
+        'IDUrl': _image_url(C_User.idProof, 'medium')
 
     }
     return JsonResponse({'data': data}, safe=False)
@@ -388,7 +416,7 @@ def edit_staff_api(request):
             UserPwd = request.POST.get("UserPwd")
             # PartyGroup = request.POST.get("PartyGroup")
 
-            staff = StaffUser.objects.select_related().get(pk=int(EditUserId))
+            staff = tenant_qs(request, StaffUser).select_related().get(pk=int(EditUserId))
             try:
                 imageUpload = request.FILES["imageUpload"]
                 staff.photo = imageUpload
@@ -420,6 +448,7 @@ def edit_staff_api(request):
             else:
                 new_user.is_active = False
             new_user.save()
+            ensure_membership(new_user, staff.tenant, TenantMembership.Role.STAFF)
             new_user.groups.clear()
             try:
                 g = Group.objects.get(name=UserGroup)
@@ -449,6 +478,7 @@ def add_party_group_api(request):
             description = request.POST.get("description")
 
             obj = PartyGroup()
+            assign_tenant(obj, request)
             obj.name = groupName
             obj.description = description
             obj.save()
@@ -465,7 +495,7 @@ def delete_part_group(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("userID")
-            obj = PartyGroup.objects.select_related().get(pk=int(id))
+            obj = tenant_qs(request, PartyGroup).select_related().get(pk=int(id))
             obj.isDeleted = True
             obj.save()
             return JsonResponse({'message': 'success'}, safe=False)
@@ -478,7 +508,7 @@ class PartyGroupListJson(BaseDatatableView):
 
     def get_initial_queryset(self):
         # if 'Admin' in group_names:
-        return PartyGroup.objects.filter(isDeleted__exact=False).only(
+        return tenant_qs(self.request, PartyGroup).filter(isDeleted__exact=False).only(
             'id', 'name', 'description', 'datetime'
         )
 
@@ -521,7 +551,7 @@ class PartyGroupListJson(BaseDatatableView):
 
 def get_party_group_detail(request):
     id = request.GET.get('id')
-    instance = get_object_or_404(PartyGroup, id=id)
+    instance = get_object_or_404(tenant_qs(request, PartyGroup), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
 
     data = {
@@ -541,7 +571,7 @@ def edit_part_group_api(request):
             Id = request.POST.get("EditId")
             name = request.POST.get("groupName")
             description = request.POST.get("description")
-            obj = PartyGroup.objects.select_related().get(id=int(Id))
+            obj = tenant_qs(request, PartyGroup).select_related().get(id=int(Id))
             obj.name = name
             obj.description = description
 
@@ -563,6 +593,7 @@ def add_bank_api(request):
             description = request.POST.get("description")
 
             obj = Bank()
+            assign_tenant(obj, request)
             obj.name = bankName
             obj.accountNumber = accountNumber
             obj.description = description
@@ -578,7 +609,7 @@ class BankListJson(BaseDatatableView):
 
     def get_initial_queryset(self):
         # if 'Admin' in group_names:
-        return Bank.objects.filter(isDeleted__exact=False).only(
+        return tenant_qs(self.request, Bank).filter(isDeleted__exact=False).only(
             'id', 'name', 'accountNumber', 'description', 'datetime'
         )
 
@@ -623,7 +654,7 @@ class BankListJson(BaseDatatableView):
 
 def get_bank_detail(request):
     id = request.GET.get('id')
-    instance = get_object_or_404(Bank, id=id)
+    instance = get_object_or_404(tenant_qs(request, Bank), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
 
     data = {
@@ -644,7 +675,7 @@ def edit_bank_api(request):
             name = request.POST.get("bankName")
             accountNumber = request.POST.get("accountNumber")
             description = request.POST.get("description")
-            obj = Bank.objects.select_related().get(id=int(Id))
+            obj = tenant_qs(request, Bank).select_related().get(id=int(Id))
             obj.name = name
             obj.accountNumber = accountNumber
             obj.description = description
@@ -662,7 +693,7 @@ def delete_bank(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("userID")
-            obj = Bank.objects.select_related().get(pk=int(id))
+            obj = tenant_qs(request, Bank).select_related().get(pk=int(id))
             obj.isDeleted = True
             obj.save()
             return JsonResponse({'message': 'success'}, safe=False)
@@ -678,15 +709,18 @@ def add_party_api(request):
         try:
             partyName = request.POST.get("partyName")
             phoneNumber = request.POST.get("phoneNumber")
+            openingBalance = request.POST.get("openingBalance")
             partyGroup = request.POST.get("partyGroup")
             # address = request.POST.get("address")
             staffID = request.POST.get("staffID")
 
             obj = Party()
+            assign_tenant(obj, request)
             obj.name = partyName
             obj.phone = phoneNumber
+            obj.openingBalance = _decimal_from_request(openingBalance)
             try:
-                obj.assignTo_id = int(staffID)
+                obj.assignTo = tenant_qs(request, StaffUser).get(pk=int(staffID))
             except:
                 pass
             # obj.address = address
@@ -713,6 +747,7 @@ def add_party_api(request):
             obj.password = password
             obj.userID_id = new_user.pk
             obj.save()
+            ensure_membership(new_user, obj.tenant, TenantMembership.Role.PARTY)
             _bump_party_cache_version()
             return JsonResponse({'message': 'success'}, safe=False)
         except:
@@ -734,7 +769,7 @@ def generate_party_users_api(request):
             created = 0
             skipped = 0
 
-            parties = Party.objects.filter(isDeleted__exact=False).order_by('id')
+            parties = tenant_qs(request, Party).filter(isDeleted__exact=False).order_by('id')
             for party in parties:
                 if party.userID_id:
                     skipped = skipped + 1
@@ -756,6 +791,7 @@ def generate_party_users_api(request):
                 party.password = password
                 party.userID_id = new_user.pk
                 party.save(update_fields=['username', 'password', 'userID'])
+                ensure_membership(new_user, party.tenant, TenantMembership.Role.PARTY)
                 created = created + 1
             if created > 0:
                 _bump_party_cache_version()
@@ -770,12 +806,11 @@ def generate_party_users_api(request):
 
 
 class PartyListJson(BaseDatatableView):
-    order_columns = ['name', 'phone', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
+    order_columns = ['name', 'phone', 'openingBalance', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
 
     def get_initial_queryset(self):
-        # if 'Admin' in group_names:
-        return Party.objects.select_related('partyGroupID', 'assignTo').filter(isDeleted__exact=False).only(
-            'id', 'name', 'phone', 'username', 'password', 'address', 'datetime',
+        return tenant_qs(self.request, Party).select_related('partyGroupID', 'assignTo').filter(isDeleted__exact=False).only(
+            'id', 'name', 'phone', 'openingBalance', 'username', 'password', 'address', 'datetime',
             'partyGroupID__name', 'assignTo__name'
         )
 
@@ -785,7 +820,7 @@ class PartyListJson(BaseDatatableView):
         if search:
             qs = qs.filter(
                 Q(name__icontains=search) | Q(phone__icontains=search) | Q(username__icontains=search)
-                | Q(password__icontains=search) | Q(address__icontains=search)
+                | Q(password__icontains=search) | Q(address__icontains=search) | Q(openingBalance__icontains=search)
                 | Q(partyGroupID__name__icontains=search) | Q(assignTo__name__icontains=search) | Q(
                     datetime__icontains=search)
             )
@@ -836,6 +871,7 @@ class PartyListJson(BaseDatatableView):
             json_data.append([
                 escape(item.name),
                 escape(item.phone),
+                formatINR(format(item.openingBalance, '.2f')),
                 username,
                 password,
                 party,
@@ -850,7 +886,7 @@ class PartyListJson(BaseDatatableView):
 
 def get_party_detail(request):
     id = request.GET.get('id')
-    instance = get_object_or_404(Party, id=id)
+    instance = get_object_or_404(tenant_qs(request, Party), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
 
     try:
@@ -866,6 +902,7 @@ def get_party_detail(request):
         'ID': instance.pk,
         'Name': instance.name,
         'PhoneNumber': instance.phone,
+        'OpeningBalance': str(instance.openingBalance),
         'Address': instance.address,
         'PartyGroup': party,
         'AssignTo': usr,
@@ -881,12 +918,14 @@ def edit_party_api(request):
             Id = request.POST.get("EditId")
             name = request.POST.get("partyName")
             phoneNumber = request.POST.get("phoneNumber")
+            openingBalance = request.POST.get("openingBalance")
             # address = request.POST.get("address")
             partyGroup = request.POST.get("partyGroup")
             staffID = request.POST.get("staffID")
-            obj = Party.objects.select_related().get(id=int(Id))
+            obj = tenant_qs(request, Party).select_related().get(id=int(Id))
             obj.name = name
             obj.phone = phoneNumber
+            obj.openingBalance = _decimal_from_request(openingBalance)
             # obj.address = address
             try:
                 obj.partyGroupID_id = int(partyGroup)
@@ -909,7 +948,7 @@ def delete_party(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("userID")
-            obj = Party.objects.select_related().get(pk=int(id))
+            obj = tenant_qs(request, Party).select_related().get(pk=int(id))
             obj.isDeleted = True
             obj.save()
             _bump_party_cache_version()
@@ -925,7 +964,7 @@ def list_party_api(request):
         o_list = cache.get(cache_key)
         if o_list is None:
             o_list = []
-            obj_list = Party.objects.select_related('partyGroupID').filter(isDeleted__exact=False).only(
+            obj_list = tenant_qs(request, Party).select_related('partyGroupID').filter(isDeleted__exact=False).only(
                 'id', 'name', 'phone', 'partyGroupID__name'
             ).order_by('name')
 
@@ -958,7 +997,7 @@ def list_party_by_executive_or_station_api(request):
         if cached is not None:
             return JsonResponse({'message': 'success', 'data': cached}, safe=False)
 
-        obj_list = Party.objects.select_related('partyGroupID').filter(
+        obj_list = tenant_qs(request, Party).select_related('partyGroupID').filter(
             isDeleted__exact=False
         ).only(
             'id', 'name', 'phone', 'partyGroupID__name'
@@ -1011,8 +1050,9 @@ def add_collection_by_staff_api(request):
             lng = request.POST.get("lng")
             chequeDate = request.POST.get("chequeDate")
             c = str(party).split('@')
-            cus = Party.objects.select_related().get(pk=int(c[1]))
+            cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
             obj = Collection()
+            assign_tenant(obj, request)
             obj.isTallied = False
             obj.partyID_id = cus.pk
             obj.modeOfPayment = paymentMode
@@ -1026,7 +1066,7 @@ def add_collection_by_staff_api(request):
             if paymentMode == 'Party':
                 try:
                     p = str(transferredParty).split('@')
-                    tParty = Party.objects.select_related().get(pk=int(p[1]))
+                    tParty = tenant_qs(request, Party).select_related().get(pk=int(p[1]))
                     obj.transferredPartyID_id = int(tParty.pk)
                 except:
                     pass
@@ -1035,7 +1075,7 @@ def add_collection_by_staff_api(request):
             obj.remark = remark
             obj.latitude = lat
             obj.longitude = lng
-            user = StaffUser.objects.get(user_ID_id=request.user.pk)
+            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.collectedBy_id = user.pk
             try:
                 # obj.collectionAddress = deduct_location_balance(lat, lng)
@@ -1070,8 +1110,9 @@ def add_collection_by_admin_api(request):
             chequeDate = request.POST.get("chequeDate")
             collectDate = request.POST.get("collectDate")
             c = str(party).split('@')
-            cus = Party.objects.select_related().get(pk=int(c[1]))
+            cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
             obj = Collection()
+            assign_tenant(obj, request)
             obj.partyID_id = cus.pk
             obj.isTallied = False
             obj.modeOfPayment = paymentMode
@@ -1085,7 +1126,7 @@ def add_collection_by_admin_api(request):
             if paymentMode == 'Party':
                 try:
                     p = str(transferredParty).split('@')
-                    tParty = Party.objects.select_related().get(pk=int(p[1]))
+                    tParty = tenant_qs(request, Party).select_related().get(pk=int(p[1]))
                     obj.transferredPartyID_id = int(tParty.pk)
                 except:
                     pass
@@ -1095,7 +1136,7 @@ def add_collection_by_admin_api(request):
             obj.remark = remark
             obj.latitude = lat
             obj.longitude = lng
-            user = StaffUser.objects.get(user_ID_id=request.user.pk)
+            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.collectedBy_id = user.pk
 
             obj.collectionAddress = "From Shop."
@@ -1148,9 +1189,9 @@ def edit_collection_by_admin_api(request):
             # c = str(party).split('@')
             chequeDate = request.POST.get("chequeDate")
             # cus = Party.objects.select_related().get(pk=int(c[1]))
-            cus = Party.objects.select_related().get(pk=int(party))
+            cus = tenant_qs(request, Party).select_related().get(pk=int(party))
 
-            obj = Collection.objects.get(pk=int(ID))
+            obj = tenant_qs(request, Collection).get(pk=int(ID))
             request_groups = _request_group_names(request)
             if 'Admin' in request_groups or 'Moderator' in request_groups:
                 obj.partyID_id = cus.pk
@@ -1168,7 +1209,7 @@ def edit_collection_by_admin_api(request):
                     obj.chequeDate = datetime.strptime(chequeDate, '%d/%m/%Y')
                 if paymentMode == 'Party':
                     try:
-                        tparty = Party.objects.select_related().get(pk=int(transferredParty))
+                        tparty = tenant_qs(request, Party).select_related().get(pk=int(transferredParty))
                         obj.transferredPartyID_id = tparty.pk
                     except:
                         pass
@@ -1199,7 +1240,7 @@ class CollectionByStaffListJson(BaseDatatableView):
     def get_initial_queryset(self):
         # user = StaffUser.objects.get(user_ID__id = self.request.pk)
         # if 'Admin' in group_names:
-        return _collection_list_base_qs().filter(
+        return _collection_list_base_qs(self.request).filter(
             isDeleted__exact=False,
             collectionDateTime__date=datetime.today().date(),
             collectedBy__user_ID_id=self.request.user.pk
@@ -1278,18 +1319,18 @@ class CollectionByAdminListJson(BaseDatatableView):
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
             if staffID == 'All':
-                return _collection_list_base_qs().filter(
+                return _collection_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     collectionDateTime__date__range=[sDate.date(), eDate.date()]
                 )
             else:
-                return _collection_list_base_qs().filter(
+                return _collection_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     collectionDateTime__date__range=[sDate.date(), eDate.date()],
                     collectedBy_id=int(staffID)
                 )
         except:
-            return _collection_list_base_qs().filter(
+            return _collection_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 collectionDateTime__date=datetime.today().date()
             )
@@ -1411,20 +1452,20 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
             if staffID == 'All':
-                return _collection_list_base_qs().filter(
+                return _collection_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     chequeDate__range=[sDate.date(), eDate.date()],
                     modeOfPayment__exact='Cheque'
                 )
             else:
-                return _collection_list_base_qs().filter(
+                return _collection_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     chequeDate__range=[sDate.date(), eDate.date()],
                     collectedBy_id=int(staffID),
                     modeOfPayment__exact='Cheque'
                 )
         except:
-            return _collection_list_base_qs().filter(
+            return _collection_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 chequeDate__exact=datetime.today().date(),
                 modeOfPayment__exact='Cheque'
@@ -1522,7 +1563,7 @@ def delete_collection(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("userID")
-            obj = Collection.objects.select_related().get(pk=int(id))
+            obj = tenant_qs(request, Collection).select_related().get(pk=int(id))
             obj.isDeleted = True
             obj.save()
             return JsonResponse({'message': 'success'}, safe=False)
@@ -1536,8 +1577,8 @@ def approve_collection(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("userID")
-            obj = Collection.objects.select_related().get(pk=int(id))
-            user = StaffUser.objects.get(user_ID__id=request.user.pk)
+            obj = tenant_qs(request, Collection).select_related().get(pk=int(id))
+            user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
             obj.isApproved = True
             obj.approvedBy_id = user.pk
             obj.save()
@@ -1565,7 +1606,7 @@ def change_password_api(request):
     if request.method == 'POST':
         try:
             password = request.POST.get('password')
-            data = StaffUser.objects.select_related().get(user_ID_id=request.user.pk)
+            data = tenant_qs(request, StaffUser).select_related().get(user_ID_id=request.user.pk)
             data.userPassword = password
             data.save()
             user = User.objects.select_related().get(pk=request.user.pk)
@@ -1585,14 +1626,14 @@ def change_password_api(request):
 @cache_page(60 * 5)
 def get_admin_dashboard_report_api(request):
     today = datetime.today().date()
-    party_count = Party.objects.filter(isDeleted=False).count()
-    staff_count = StaffUser.objects.filter(isDeleted=False).count()
-    location = GeolocationPackage.objects.filter(isDeleted=False).only('used', 'balance').order_by('-id').first()
-    collection_total = Collection.objects.filter(
+    party_count = tenant_qs(request, Party).filter(isDeleted=False).count()
+    staff_count = tenant_qs(request, StaffUser).filter(isDeleted=False).count()
+    location = tenant_qs(request, GeolocationPackage).filter(isDeleted=False).only('used', 'balance').order_by('-id').first()
+    collection_total = tenant_qs(request, Collection).filter(
         isDeleted=False,
         collectionDateTime__date=today
     ).aggregate(total=Sum('paidAmount'))['total'] or 0.0
-    sales_total = Sales.objects.filter(
+    sales_total = tenant_qs(request, Sales).filter(
         isDeleted=False,
         buildDate__exact=today
     ).aggregate(total=Sum('amount'))['total'] or 0.0
@@ -1610,19 +1651,19 @@ def get_admin_dashboard_report_api(request):
 @cache_page(60 * 5)
 def get_staff_dashboard_report_api(request):
     today = datetime.today().date()
-    user_party_group_id = StaffUser.objects.filter(
+    user_party_group_id = tenant_qs(request, StaffUser).filter(
         user_ID_id=request.user.pk,
         isDeleted=False
     ).values_list('partyGroupID_id', flat=True).first()
 
     party_count = 0
     if user_party_group_id:
-        party_count = Party.objects.filter(
+        party_count = tenant_qs(request, Party).filter(
             isDeleted=False,
             partyGroupID_id=user_party_group_id
         ).count()
 
-    collection_stats = Collection.objects.filter(
+    collection_stats = tenant_qs(request, Collection).filter(
         isDeleted=False,
         collectedBy__user_ID_id=request.user.pk
     ).aggregate(
@@ -1650,21 +1691,21 @@ def generate_collection_report(request):
     a_total_cheque_cc = 0.0
     a_total_party = 0.0
     if staffID == 'All':
-        col = Collection.objects.select_related().filter(
+        col = tenant_qs(request, Collection).select_related().filter(
             collectionDateTime__date=colDate.date(),
             isApproved__exact=True,
             isDeleted__exact=False
         ).order_by('collectedBy__name')
         staffName = 'All'
     else:
-        col = Collection.objects.select_related().filter(
+        col = tenant_qs(request, Collection).select_related().filter(
             collectionDateTime__date=colDate.date(),
             isApproved__exact=True,
             isDeleted__exact=False,
             collectedBy_id=int(staffID)
         ).order_by(
             'collectedBy__name')
-        user = StaffUser.objects.get(pk=int(staffID))
+        user = tenant_qs(request, StaffUser).get(pk=int(staffID))
         staffName = user.name + ' - ' + user.partyGroupID.name
 
     for a in col:
@@ -1708,7 +1749,7 @@ def add_attendance_api(request):
             stat = request.POST.get("stat")
             lat = request.POST.get("lat")
             lng = request.POST.get("lng")
-            obj = Attendance.objects.get(datetime__date=datetime.today().date(),
+            obj = tenant_qs(request, Attendance).get(datetime__date=datetime.today().date(),
                                          staffID__user_ID__id=request.user.pk)
 
             if stat == 'Login':
@@ -1750,13 +1791,13 @@ class StaffAttendanceListJson(BaseDatatableView):
             sDate = datetime.strptime(startDateV, '%d/%m/%Y')
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-            return _attendance_list_base_qs().filter(
+            return _attendance_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 datetime__range=(sDate.date(), eDate.date() + timedelta(days=1)),
                 staffID__user_ID__id=self.request.user.pk
             )
         except:
-            return _attendance_list_base_qs().filter(
+            return _attendance_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 datetime__date=datetime.today().date(),
                 staffID__user_ID__id=self.request.user.pk
@@ -1824,21 +1865,21 @@ class AdminAttendanceListJson(BaseDatatableView):
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
             if staffID == 'All':
 
-                return _attendance_list_base_qs().filter(
+                return _attendance_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     datetime__range=(sDate.date(), eDate.date() + timedelta(days=1))
                 )
 
             else:
 
-                return _attendance_list_base_qs().filter(
+                return _attendance_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     datetime__range=(sDate.date(), eDate.date() + timedelta(days=1)),
                     staffID_id=int(staffID)
                 )
 
         except:
-            return _attendance_list_base_qs().filter(
+            return _attendance_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 datetime__date=datetime.today().date()
             )
@@ -1899,11 +1940,11 @@ def generate_attendance_pdf_staff_report(request):
     startDate = datetime.strptime(cDate, '%d/%m/%Y')
     endDate = datetime.strptime(eDate, '%d/%m/%Y')
 
-    col = Attendance.objects.select_related().filter(datetime__range=(
+    col = tenant_qs(request, Attendance).select_related().filter(datetime__range=(
         startDate.date(), endDate.date() + timedelta(days=1)),
         isDeleted__exact=False, staffID__user_ID_id__exact=request.user.pk).order_by(
         'datetime')
-    user = StaffUser.objects.get(user_ID__id=request.user.pk)
+    user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
 
     context = {
         'startDate': startDate,
@@ -1927,16 +1968,16 @@ def generate_attendance_pdf_admin_report(request):
     startDate = datetime.strptime(cDate, '%d/%m/%Y')
     endDate = datetime.strptime(eDate, '%d/%m/%Y')
     if staffID == 'All':
-        col = Attendance.objects.select_related().filter(datetime__range=(
+        col = tenant_qs(request, Attendance).select_related().filter(datetime__range=(
             startDate.date(), endDate.date() + timedelta(days=1)),
             isDeleted__exact=False).order_by('staffID__name')
         staffName = "All"
     else:
-        col = Attendance.objects.select_related().filter(datetime__range=(
+        col = tenant_qs(request, Attendance).select_related().filter(datetime__range=(
             startDate.date(), endDate.date() + timedelta(days=1)),
             isDeleted__exact=False, staffID_id=int(staffID)).order_by('datetime')
 
-        user = StaffUser.objects.get(id=int(staffID))
+        user = tenant_qs(request, StaffUser).get(id=int(staffID))
         staffName = user.name
 
     context = {
@@ -1960,7 +2001,7 @@ class MessageListJson(BaseDatatableView):
 
     def get_initial_queryset(self):
         # if 'Admin' in group_names:
-        return WhatsappMessageStatus.objects.filter(isDeleted__exact=False).only(
+        return tenant_qs(self.request, WhatsappMessageStatus).filter(isDeleted__exact=False).only(
             'id', 'messageTo', 'phone', 'message', 'datetime', 'status'
         )
 
@@ -2016,14 +2057,15 @@ def add_sales_by_admin_api(request):
             amount = request.POST.get("amount")
             remark = request.POST.get("remark")
             c = str(party).split('@')
-            cus = Party.objects.select_related().get(pk=int(c[1]))
+            cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
             obj = Sales()
+            assign_tenant(obj, request)
             obj.partyID_id = cus.pk
             obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
             obj.amount = float(amount)
             obj.remark = remark
             obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y')
-            user = StaffUser.objects.get(user_ID_id=request.user.pk)
+            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.createdBy_id = user.pk
             obj.save()
             obj.paymentID = 'S' + str(obj.pk).zfill(8)
@@ -2058,18 +2100,18 @@ class SalesByAdminListJson(BaseDatatableView):
             sDate = datetime.strptime(startDateV, '%d/%m/%Y')
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
             if staffID == 'All':
-                return _sales_list_base_qs().filter(
+                return _sales_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     buildDate__range=[sDate.date(), eDate.date()]
                 )
             else:
-                return _sales_list_base_qs().filter(
+                return _sales_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     buildDate__range=[sDate.date(), eDate.date()],
                     createdBy_id=int(staffID)
                 )
         except:
-            return _sales_list_base_qs().filter(
+            return _sales_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 buildDate__exact=datetime.today().date()
             )
@@ -2164,24 +2206,24 @@ class SalesByStaffListJson(BaseDatatableView):
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
                 if staffID == 'All':
-                    return _sales_list_base_qs().filter(
+                    return _sales_list_base_qs(self.request).filter(
                         isDeleted__exact=False,
                         buildDate__range=[sDate.date(), eDate.date()]
                     )
                 else:
-                    return _sales_list_base_qs().filter(
+                    return _sales_list_base_qs(self.request).filter(
                         isDeleted__exact=False,
                         buildDate__range=[sDate.date(), eDate.date()],
                         createdBy_id=int(staffID)
                     )
             except:
-                return _sales_list_base_qs().filter(
+                return _sales_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     buildDate__exact=datetime.today().date()
                 )
 
         else:
-            return _sales_list_base_qs().filter(
+            return _sales_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 buildDate__exact=datetime.today().date()
             )
@@ -2253,19 +2295,19 @@ def generate_sales_report(request):
     colDate = datetime.strptime(cDate, '%d/%m/%Y')
     a_total = 0.0
     if staffID == 'All':
-        col = Sales.objects.select_related().filter(
+        col = tenant_qs(request, Sales).select_related().filter(
             buildDate__exact=colDate.date(),
             isDeleted__exact=False
         ).order_by('createdBy__name')
         staffName = 'All'
     else:
-        col = Sales.objects.select_related().filter(
+        col = tenant_qs(request, Sales).select_related().filter(
             buildDate__exact=colDate.date(),
             isDeleted__exact=False,
             createdBy_id=int(staffID)
         ).order_by(
             'createdBy__name')
-        user = StaffUser.objects.get(pk=int(staffID))
+        user = tenant_qs(request, StaffUser).get(pk=int(staffID))
         staffName = user.name + ' - ' + user.partyGroupID.name
 
     for a in col:
@@ -2293,7 +2335,7 @@ def delete_sales(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("userID")
-            obj = Sales.objects.select_related().get(pk=int(id))
+            obj = tenant_qs(request, Sales).select_related().get(pk=int(id))
             obj.isDeleted = True
             obj.save()
             return JsonResponse({'message': 'success'}, safe=False)
@@ -2316,14 +2358,14 @@ def update_sales_by_admin_api(request):
             ID = request.POST.get("ID")
             # c = str(party).split('@')
             # cus = Party.objects.select_related().get(pk=int(c[1]))
-            cus = Party.objects.select_related().get(pk=int(party))
-            obj = Sales.objects.get(pk=int(ID))
+            cus = tenant_qs(request, Party).select_related().get(pk=int(party))
+            obj = tenant_qs(request, Sales).get(pk=int(ID))
             obj.partyID_id = cus.pk
             obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
             obj.amount = float(amount)
             obj.remark = remark
             obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y')
-            user = StaffUser.objects.get(user_ID_id=request.user.pk)
+            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.createdBy_id = user.pk
             obj.save()
 
@@ -2338,8 +2380,8 @@ def send_message_sales(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("userID")
-            obj = Sales.objects.select_related().get(pk=int(id))
-            user = StaffUser.objects.get(user_ID__id=request.user.pk)
+            obj = tenant_qs(request, Sales).select_related().get(pk=int(id))
+            user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
             obj.isApproved = True
             obj.approvedBy_id = user.pk
             obj.save()
@@ -2368,9 +2410,9 @@ def re_send_message_sales(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("userID")
-            obj = WhatsappMessageStatus.objects.select_related().get(pk=int(id))
+            obj = tenant_qs(request, WhatsappMessageStatus).select_related().get(pk=int(id))
             try:
-                msg = WhatsappMessage.objects.filter(isDeleted__exact=False).last()
+                msg = tenant_qs(request, WhatsappMessage).filter(isDeleted__exact=False).last()
                 if msg.used < msg.balance:
                     try:
                         # r = requests.get(
@@ -2406,7 +2448,7 @@ def enable_tally_post_api(request):
     if request.method == 'POST':
         try:
             id = request.POST.get("tallyColID")
-            obj = Collection.objects.get(pk=int(id), isApproved__exact=True)
+            obj = tenant_qs(request, Collection).get(pk=int(id), isApproved__exact=True)
             try:
                 obj.isTallied = True
                 obj.save()
@@ -2435,9 +2477,10 @@ def add_cash_counter_entry_api(request):
             bank = request.POST.get("bank")
             mode = request.POST.get("mode")
             obj = CashCounter()
+            assign_tenant(obj, request)
             if mode == "Credit" or mode == "Collection" or mode == "Advance":
                 c = str(party).split('@')
-                cus = Party.objects.select_related().get(pk=int(c[1]))
+                cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
                 obj.partyID_id = cus.pk
             if mode == "Cash" or mode == "Mix" or mode == "Card" or mode == "Credit" or mode == "Return":
                 obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
@@ -2453,7 +2496,7 @@ def add_cash_counter_entry_api(request):
             obj.mode = mode
             obj.remark = remark
             obj.entryDate = datetime.now()
-            user = StaffUser.objects.get(user_ID_id=request.user.pk)
+            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.createdBy_id = user.pk
             obj.save()
             obj.counterID = 'CC' + str(obj.pk).zfill(8)
@@ -2479,17 +2522,17 @@ class CashCounterByStaffListJson(BaseDatatableView):
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Cash")
 
             except:
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
                                                                    mode__iexact="Cash")
         else:
-            return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+            return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                datetime__date=datetime.today().date(),
                                                                createdBy__user_ID_id=self.request.user.pk,
                                                                mode__iexact="Cash")
@@ -2560,18 +2603,18 @@ class CardCounterByStaffListJson(BaseDatatableView):
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Card")
 
             except:
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
                                                                    mode__iexact="Card")
 
         else:
-            return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+            return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Card",
                                                                createdBy__user_ID_id=self.request.user.pk)
@@ -2647,17 +2690,17 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Return")
 
             except:
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
                                                                    mode__iexact="Return")
         else:
-            return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+            return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Return",
                                                                createdBy__user_ID_id=self.request.user.pk)
@@ -2728,17 +2771,17 @@ class CreditCounterByStaffListJson(BaseDatatableView):
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Credit")
 
             except:
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
                                                                    mode__iexact="Credit")
         else:
-            return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+            return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Credit",
                                                                createdBy__user_ID_id=self.request.user.pk)
@@ -2815,18 +2858,18 @@ class MixCounterByStaffListJson(BaseDatatableView):
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Mix")
 
             except:
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
                                                                    mode__iexact="Mix",
                                                                    createdBy__user_ID_id=self.request.user.pk)
         else:
-            return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+            return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                datetime__date=datetime.today().date(),
                                                                createdBy__user_ID_id=self.request.user.pk,
                                                                mode__iexact="Mix")
@@ -2903,17 +2946,17 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Collection")
 
             except:
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
                                                                    mode__iexact="Collection")
         else:
-            return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+            return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Collection",
                                                                createdBy__user_ID_id=self.request.user.pk)
@@ -2988,17 +3031,17 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Advance")
 
             except:
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
                                                                    mode__iexact="Advance")
         else:
-            return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+            return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Advance",
                                                                createdBy__user_ID_id=self.request.user.pk)
@@ -3140,7 +3183,7 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
 @cache_page(60 * 30)
 def get_cash_counter_dashboard_report_api(request):
     today = datetime.today().date()
-    base_qs = CashCounter.objects.filter(
+    base_qs = tenant_qs(request, CashCounter).filter(
         isDeleted=False,
         datetime__date=today,
         createdBy__user_ID=request.user.pk
@@ -3173,7 +3216,7 @@ def get_cash_counter_dashboard_report_api(request):
 @cache_page(60 * 30)
 def get_cash_counter_dashboard_report_admin_api(request):
     today = datetime.today().date()
-    totals = CashCounter.objects.filter(
+    totals = tenant_qs(request, CashCounter).filter(
         isDeleted=False,
         datetime__date=today
     ).aggregate(
@@ -3209,10 +3252,10 @@ def delete_cash_counter(request):
             id = request.POST.get("userID")
             if 'c' in id:
                 id = id.split("c")[1]
-                obj = CollectionCashCounter.objects.get(pk=int(id))
+                obj = tenant_qs(request, CollectionCashCounter).get(pk=int(id))
             else:
                 id = id
-                obj = CashCounter.objects.get(pk=int(id))
+                obj = tenant_qs(request, CashCounter).get(pk=int(id))
             # Output: 56
 
             obj.isDeleted = True
@@ -3239,9 +3282,9 @@ def update_cash_counter_by_admin_api(request):
             mode = request.POST.get("mode")
             editID = request.POST.get("editID")
             bank = request.POST.get("bank")
-            obj = CashCounter.objects.get(pk=int(editID))
+            obj = tenant_qs(request, CashCounter).get(pk=int(editID))
             if mode == "Credit" or mode == "Collection" or mode == "Advance":
-                cus = Party.objects.select_related().get(pk=int(party))
+                cus = tenant_qs(request, Party).select_related().get(pk=int(party))
                 obj.partyID_id = cus.pk
             if mode == "Cash" or mode == "Mix" or mode == "Card" or mode == "Credit" or mode == "Return":
                 obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
@@ -3258,7 +3301,7 @@ def update_cash_counter_by_admin_api(request):
             obj.mode = mode
             obj.remark = remark
             obj.entryDate = datetime.now()
-            user = StaffUser.objects.get(user_ID_id=request.user.pk)
+            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.createdBy_id = user.pk
             obj.save()
             return JsonResponse({'message': 'success'}, safe=False)
@@ -3275,7 +3318,7 @@ def generate_cash_counter_report(request):
     a_total_online = 0.0
     a_total_cheque_cc = 0.0
     a_total_party = 0.0
-    ccol = _cash_counter_collection_list_base_qs().filter(
+    ccol = _cash_counter_collection_list_base_qs(request).filter(
         collectionDateTime__date=colDate.date(),
         isDeleted__exact=False
     ).order_by('collectedBy__name')
@@ -3304,7 +3347,7 @@ def generate_cash_counter_report(request):
     mix_card_total = 0.0
     collection_total = 0.0
 
-    col = _cash_counter_list_base_qs().filter(
+    col = _cash_counter_list_base_qs(request).filter(
         datetime__date=colDate.date(),
         isDeleted__exact=False
     ).order_by(
@@ -3376,8 +3419,9 @@ def add_collection_from_cash_counter_api(request):
             lng = request.POST.get("lng")
             chequeDate = request.POST.get("chequeDate")
             c = str(party).split('@')
-            cus = Party.objects.select_related().get(pk=int(c[1]))
+            cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
             obj = CollectionCashCounter()
+            assign_tenant(obj, request)
             obj.isTallied = False
             obj.partyID_id = cus.pk
             obj.modeOfPayment = paymentMode
@@ -3391,7 +3435,7 @@ def add_collection_from_cash_counter_api(request):
             if paymentMode == 'Party':
                 try:
                     p = str(transferredParty).split('@')
-                    tParty = Party.objects.select_related().get(pk=int(p[1]))
+                    tParty = tenant_qs(request, Party).select_related().get(pk=int(p[1]))
                     obj.transferredPartyID_id = int(tParty.pk)
                 except:
                     pass
@@ -3400,7 +3444,7 @@ def add_collection_from_cash_counter_api(request):
             obj.remark = remark
             obj.latitude = lat
             obj.longitude = lng
-            user = StaffUser.objects.get(user_ID_id=request.user.pk)
+            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.collectedBy_id = user.pk
             try:
                 # obj.collectionAddress = deduct_location_balance(lat, lng)
@@ -3436,16 +3480,16 @@ class CashCounterCollectionListJson(BaseDatatableView):
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-                return _cash_counter_collection_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_collection_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                              collectionDateTime__date__range=[
                                                                                  sDate.date(),
                                                                                  eDate.date()])
 
             except:
-                return _cash_counter_collection_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_collection_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                              datetime__date=datetime.today().date())
         else:
-            return _cash_counter_collection_list_base_qs().filter(isDeleted__exact=False,
+            return _cash_counter_collection_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                          datetime__date=datetime.today().date(),
 
                                                                          collectedBy__user_ID_id=self.request.user.pk)
@@ -3542,9 +3586,9 @@ def edit_cash_counter_collection_by_admin_api(request):
             # c = str(party).split('@')
             chequeDate = request.POST.get("chequeDate")
             # cus = Party.objects.select_related().get(pk=int(c[1]))
-            cus = Party.objects.select_related().get(pk=int(party))
+            cus = tenant_qs(request, Party).select_related().get(pk=int(party))
 
-            obj = CollectionCashCounter.objects.get(pk=int(ID))
+            obj = tenant_qs(request, CollectionCashCounter).get(pk=int(ID))
             request_groups = _request_group_names(request)
             if 'Admin' in request_groups or 'Moderator' in request_groups:
                 obj.partyID_id = cus.pk
@@ -3562,7 +3606,7 @@ def edit_cash_counter_collection_by_admin_api(request):
                     obj.chequeDate = datetime.strptime(chequeDate, '%d/%m/%Y')
                 if paymentMode == 'Party':
                     try:
-                        tparty = Party.objects.select_related().get(pk=int(transferredParty))
+                        tparty = tenant_qs(request, Party).select_related().get(pk=int(transferredParty))
                         obj.transferredPartyID_id = tparty.pk
                     except:
                         pass

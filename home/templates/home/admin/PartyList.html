@@ -73,6 +73,7 @@
                             <tr>
                                 <th>Name</th>
                                 <th>PhoneNumber</th>
+                                <th>Opening Balance</th>
                                 <th>Username</th>
                                 <th>Password</th>
                                 <th>PartyGroup/Station</th>
@@ -94,7 +95,7 @@
                         <div class="content">
 
                             <form class="ui tiny form" id="addForm">{% csrf_token %}
-                                <div class="two required fields">
+                                <div class="three required fields">
                                     <div class=" field">
                                         <label>Party Name</label>
                                         <input type="text" name="partyName" placeholder="Party Name" id="partyName">
@@ -103,6 +104,11 @@
                                         <label>Phone Number</label>
                                         <input type="number" name="phoneNumber" placeholder="Phone Number"
                                                id="phoneNumber">
+                                    </div>
+                                    <div class=" field">
+                                        <label>Opening Balance</label>
+                                        <input type="number" step="0.01" name="openingBalance" placeholder="Opening Balance"
+                                               id="openingBalance" value="0">
                                     </div>
 
 
@@ -187,7 +193,7 @@
                     <div class="content">
 
                         <form class="ui tiny form" id="EditForm">{% csrf_token %}
-                            <div class="two required fields">
+                            <div class="three required fields">
                                 <div class=" field">
                                     <label>Party Name</label>
                                     <input type="text" name="partyNameEdit" placeholder="Party Name" id="partyNameEdit">
@@ -196,6 +202,10 @@
                                     <label>Phone Number</label>
                                     <input type="number" name="phoneNumberEdit" placeholder="Phone Number"
                                            id="phoneNumberEdit">
+                                </div>
+                                <div class=" field">
+                                    <label>Opening Balance</label>
+                                    <input type="number" step="0.01" name="openingBalanceEdit" placeholder="Opening Balance" id="openingBalanceEdit" value="0">
                                 </div>
                                 {% comment %}   <div class="field required">
                                     <label>Party Group</label>
@@ -285,6 +295,7 @@
             showLoading();
             var partyName = $('#partyName').val();
             var phoneNumber = $('#phoneNumber').val();
+            var openingBalance = $('#openingBalance').val();
             var partyGroup = $('#partyGroup').val();
             var staffID = $('#staffID').val();
             {#var address = $('#address').val();#}
@@ -305,6 +316,7 @@
                 data = new FormData();
                 data.append('partyName', partyName);
                 data.append('phoneNumber', phoneNumber);
+                data.append('openingBalance', openingBalance);
                 data.append('partyGroup', partyGroup);
                 data.append('staffID', staffID);
                 {#data.append('address', address);#}
@@ -380,7 +392,7 @@
             buttons: [{
                 extend: 'excel',
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7]
                 }
             }
                 {% comment %}      , {
@@ -393,12 +405,13 @@
             "columnDefs": [
                 {"name": "name", "targets": 0, "orderable": true},
                 {"name": "phone", "targets": 1, "orderable": true},
-                {"name": "username", "targets": 2, "orderable": true},
-                {"name": "password", "targets": 3, "orderable": true},
-                {"name": "partyGroupID.name", "targets": 4, "orderable": true},
-                {"name": "assignTo.name", "targets": 5, "orderable": true},
-                {"name": "datetime", "targets": 6, "orderable": true},
-                {"name": "action", "targets": 7, "orderable": false}
+                {"name": "openingBalance", "targets": 2, "orderable": true},
+                {"name": "username", "targets": 3, "orderable": true},
+                {"name": "password", "targets": 4, "orderable": true},
+                {"name": "partyGroupID.name", "targets": 5, "orderable": true},
+                {"name": "assignTo.name", "targets": 6, "orderable": true},
+                {"name": "datetime", "targets": 7, "orderable": true},
+                {"name": "action", "targets": 8, "orderable": false}
 
             ],
             aaSorting: [[0, 'asc']],
@@ -520,6 +533,7 @@
                     $('#EditId').val(response.data['ID']);
                     $('#partyNameEdit').val(response.data['Name']);
                     $('#phoneNumberEdit').val(response.data['PhoneNumber']);
+                    $('#openingBalanceEdit').val(response.data['OpeningBalance']);
                     $('#addressEdit').val(response.data['Address']);
                     $('#partyGroupEdit').val(response.data['PartyGroup']).change();
                     $('#staffIDEdit').val(response.data['AssignTo']).change();
@@ -542,6 +556,7 @@
             var EditId = $('#EditId').val();
             var partyName = $('#partyNameEdit').val();
             var phoneNumber = $('#phoneNumberEdit').val();
+            var openingBalance = $('#openingBalanceEdit').val();
             {#var address = $('#addressEdit').val();#}
             var partyGroup = $('#partyGroupEdit').val();
             var staffID = $('#staffIDEdit').val();
@@ -564,6 +579,7 @@
                 {#data.append('address', address);#}
                 data.append('phoneNumber', phoneNumber);
                 data.append('partyName', partyName);
+                data.append('openingBalance', openingBalance);
                 data.append('staffID', staffID);
                 data.append('EditId', EditId);
                 data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);

@@ -30,8 +30,13 @@
 {% endcomment %}
                         <div class="ui icon header">
                             <div class="inline ">
-                                <img class="ui medium circular image tiny centered" id="cImg"
-                                     src="{{ instance.photo.medium.url }}">
+                                {% if instance.photo %}
+                                    <img class="ui medium circular image tiny centered" id="cImg"
+                                         src="{{ instance.photo.url }}">
+                                {% else %}
+                                    <img class="ui medium circular image tiny centered" id="cImg"
+                                         src="/static/images/default-avatar.svg">
+                                {% endif %}
                             </div>
                             <span id="Name">{{ instance.name|capfirst }} </span>
                         </div>
