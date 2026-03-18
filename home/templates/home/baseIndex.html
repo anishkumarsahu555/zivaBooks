@@ -97,6 +97,32 @@
             to { transform: rotate(360deg); }
         }
 
+        /* Waves ripple */
+        .waves-ripple {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.35);
+            transform: scale(0);
+            animation: waves-ripple 0.62s ease-out;
+            mix-blend-mode: overlay;
+        }
+
+        .ui.button .waves-ripple {
+            background: rgba(255, 255, 255, 0.42);
+        }
+
+        #sidebar .item .waves-ripple {
+            background: rgba(45, 212, 191, 0.26);
+        }
+
+        @keyframes waves-ripple {
+            to {
+                transform: scale(1);
+                opacity: 0;
+            }
+        }
+
         .preloader {
             align-items: center;
             background: rgb(23, 22, 22);
@@ -124,6 +150,39 @@
         .ui.vertical.menu.sidebar-menu .item i.icon {
             float: left;
             margin: 0em 0.5em 0em 0em;
+        }
+
+        /* Sidebar: modern hover/active feel */
+        .ui.vertical.menu.sidebar-menu {
+            padding: 8px 8px 12px;
+        }
+
+        .ui.vertical.menu.sidebar-menu .item {
+            border-radius: 12px !important;
+            margin: 2px 0;
+            transition: background 0.14s ease-out, color 0.14s ease-out, transform 0.14s ease-out;
+        }
+
+        .ui.vertical.menu.sidebar-menu .item:hover {
+            background: rgba(255, 255, 255, 0.08) !important;
+            transform: translateX(1px);
+        }
+
+        .ui.vertical.menu.sidebar-menu .active.item {
+            position: relative;
+            background: rgba(45, 212, 191, 0.16) !important;
+            color: #ccfbf1 !important;
+        }
+
+        .ui.vertical.menu.sidebar-menu .active.item::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 10px;
+            bottom: 10px;
+            width: 3px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, rgba(45, 212, 191, 0.95), rgba(56, 189, 248, 0.95));
         }
 
         .main-content {
@@ -566,6 +625,20 @@
                 $this.addClass('active');
             }
         })
+
+        // Auto-scroll sidebar to the active item (useful on long menus).
+        setTimeout(function () {
+            var sidebar = document.getElementById('sidebar');
+            if (!sidebar) return;
+            var active = sidebar.querySelector('a.item.active');
+            if (!active) return;
+            var sidebarRect = sidebar.getBoundingClientRect();
+            var activeRect = active.getBoundingClientRect();
+            var activeTop = (activeRect.top - sidebarRect.top) + sidebar.scrollTop;
+            var target = activeTop - (sidebar.clientHeight / 2) + (activeRect.height / 2);
+            var maxScroll = Math.max(0, sidebar.scrollHeight - sidebar.clientHeight);
+            sidebar.scrollTop = Math.min(maxScroll, Math.max(0, target));
+        }, 0);
     })
 </script>
 {% block datatables_ext_js %}{% endblock %}
@@ -652,5 +725,6 @@
 {% endblock %}
 
 <script src="{% static 'js/pullToRefresh.js' %}"></script>
+<script src="{% static 'js/waves.js' %}"></script>
 </body>
 </html>
