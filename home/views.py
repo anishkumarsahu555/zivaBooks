@@ -6,7 +6,7 @@ from functools import wraps
 from django.contrib.auth import logout, authenticate, login, update_session_auth_hash
 from django.contrib.auth.models import Permission
 from django.core.cache import cache
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.db.models.functions import Length
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -18,6 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from activation.models import *
 from activation.views import is_activated
 from .models import *
+from .books import ensure_books_for_tenant
 from .navigation import build_sidebar_sections
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_qs
 
@@ -694,6 +695,7 @@ def bank_list(request):
             'can_edit': request.user.has_perm('home.change_bank') or can_view_credentials,
             'can_delete': request.user.has_perm('home.delete_bank') or can_view_credentials,
         },
+        'can_view_bank_balances': can_view_credentials,
     }
     return render(request, 'home/admin/BankList.html', context)
 
@@ -1256,3 +1258,153 @@ def update_sent_msg_status(request):
         obj.save()
         return JsonResponse({'message': 'success'}, safe=False)
     return JsonResponse({'message': 'error'}, safe=False)
+
+
+def _parse_ddmmyyyy(value, default=None):
+    if not value:
+        return default
+    try:
+        return datetime.strptime(value, '%d/%m/%Y').date()
+    except Exception:
+        return default
+
+
+@permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter', 'home.can_view_party_credentials')
+def cashbook(request):
+    tenant = get_current_tenant(request)
+    if tenant:
+        ensure_books_for_tenant(tenant)
+    accounts = tenant_qs(request, BookAccount).filter(isDeleted=False, type=BookAccount.Type.CASH).order_by('-isDefault', 'name')
+    account_id = request.GET.get('account')
+    account = accounts.filter(pk=int(account_id)).first() if account_id and account_id.isdigit() else accounts.first()
+    if account is None:
+        return render(request, 'home/books/cashbook.html', {'accounts': [], 'entries': [], 'account': None})
+
+    today = datetime.today().date()
+    start_date = _parse_ddmmyyyy(request.GET.get('startDate'), today)
+    end_date = _parse_ddmmyyyy(request.GET.get('endDate'), today)
+    if end_date and start_date and end_date < start_date:
+        start_date, end_date = end_date, start_date
+
+    base_qs = tenant_qs(request, BookTransaction).filter(isDeleted=False, account=account)
+    prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+        in_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.IN)),
+        out_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.OUT)),
+    )
+    opening = (account.openingBalance or 0.0) + float(prior['in_total'] or 0.0) - float(prior['out_total'] or 0.0)
+
+    qs = (
+        base_qs
+        .filter(txDateTime__date__range=[start_date, end_date])
+        .select_related('party', 'account', 'account__bank')
+        .order_by('txDateTime', 'id')
+    )
+    balance = opening
+    entries = []
+    range_in = 0.0
+    range_out = 0.0
+    for tx in qs:
+        amount = float(tx.amount or 0.0)
+        in_amt = amount if tx.direction == BookTransaction.Direction.IN else 0.0
+        out_amt = amount if tx.direction == BookTransaction.Direction.OUT else 0.0
+        balance += in_amt - out_amt
+        range_in += in_amt
+        range_out += out_amt
+        entries.append({
+            'tx': tx,
+            'in': in_amt,
+            'out': out_amt,
+            'balance': balance,
+        })
+
+    can_view_credentials = request.user.has_perm('home.can_view_party_credentials')
+    can_manage_cash_entries = request.user.has_perm('home.can_manage_cash_counter') or can_view_credentials or request.user.has_perm('home.can_manage_books')
+    can_transfer = can_view_credentials or request.user.has_perm('home.can_manage_books')
+    banks = tenant_qs(request, Bank).filter(isDeleted=False).order_by('name') if can_transfer else tenant_qs(request, Bank).none()
+
+    context = {
+        'accounts': accounts,
+        'account': account,
+        'startDate': start_date.strftime('%d/%m/%Y'),
+        'endDate': end_date.strftime('%d/%m/%Y'),
+        'opening': opening,
+        'range_in': range_in,
+        'range_out': range_out,
+        'closing': balance,
+        'entries': entries,
+        'can_manage_books': can_manage_cash_entries,
+        'can_transfer_books': can_transfer,
+        'banks': banks,
+    }
+    return render(request, 'home/books/cashbook.html', context)
+
+
+@permission_required_any('home.can_view_party_credentials')
+def bankbook(request):
+    tenant = get_current_tenant(request)
+    if tenant:
+        ensure_books_for_tenant(tenant)
+    banks = tenant_qs(request, Bank).filter(isDeleted=False).order_by('name')
+    accounts = tenant_qs(request, BookAccount).filter(isDeleted=False, type=BookAccount.Type.BANK).select_related('bank').order_by('name')
+    transfer_accounts = tenant_qs(request, BookAccount).filter(isDeleted=False).select_related('bank').order_by('type', 'name')
+
+    bank_id = request.GET.get('bank')
+    selected_bank = banks.filter(pk=int(bank_id)).first() if bank_id and bank_id.isdigit() else banks.first()
+    account = accounts.filter(bank=selected_bank).first() if selected_bank else accounts.first()
+
+    today = datetime.today().date()
+    start_date = _parse_ddmmyyyy(request.GET.get('startDate'), today)
+    end_date = _parse_ddmmyyyy(request.GET.get('endDate'), today)
+    if end_date and start_date and end_date < start_date:
+        start_date, end_date = end_date, start_date
+
+    entries = []
+    opening = 0.0
+    range_in = 0.0
+    range_out = 0.0
+    closing = 0.0
+    if account:
+        base_qs = tenant_qs(request, BookTransaction).filter(isDeleted=False, account=account)
+        prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+            in_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.IN)),
+            out_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.OUT)),
+        )
+        opening = (account.openingBalance or 0.0) + float(prior['in_total'] or 0.0) - float(prior['out_total'] or 0.0)
+        qs = (
+            base_qs
+            .filter(txDateTime__date__range=[start_date, end_date])
+            .select_related('party', 'account', 'account__bank')
+            .order_by('txDateTime', 'id')
+        )
+        balance = opening
+        for tx in qs:
+            amount = float(tx.amount or 0.0)
+            in_amt = amount if tx.direction == BookTransaction.Direction.IN else 0.0
+            out_amt = amount if tx.direction == BookTransaction.Direction.OUT else 0.0
+            balance += in_amt - out_amt
+            range_in += in_amt
+            range_out += out_amt
+            entries.append({
+                'tx': tx,
+                'in': in_amt,
+                'out': out_amt,
+                'balance': balance,
+            })
+        closing = balance
+
+    context = {
+        'banks': banks,
+        'accounts': accounts,
+        'transfer_accounts': transfer_accounts,
+        'bank': selected_bank,
+        'account': account,
+        'startDate': start_date.strftime('%d/%m/%Y'),
+        'endDate': end_date.strftime('%d/%m/%Y'),
+        'opening': opening,
+        'range_in': range_in,
+        'range_out': range_out,
+        'closing': closing,
+        'entries': entries,
+        'can_manage_books': request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_manage_books'),
+    }
+    return render(request, 'home/books/bankbook.html', context)

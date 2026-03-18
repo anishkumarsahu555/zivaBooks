@@ -1,0 +1,667 @@
+{% extends 'home/baseIndex.html' %}
+{% load static %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/4.1.0/css/fixedColumns.dataTables.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.1.0/js/dataTables.fixedColumns.min.js"></script>
+{% endblock %}
+
+{% block title %}
+    <title>Bankbook</title>
+{% endblock %}
+
+{% block css %}
+    <style>
+        .books-shell {
+            padding: 0;
+        }
+
+        .books-content {
+            padding-left: 5px;
+            padding-right: 5px;
+        }
+
+        .books-header {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .books-header-title {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .books-header-title h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+        }
+
+        .books-header-sub {
+            color: rgba(0, 0, 0, 0.58);
+            font-size: 0.85rem;
+        }
+
+        .books-pill {
+            background: rgba(29, 78, 216, 0.1);
+            border: 1px solid rgba(29, 78, 216, 0.22);
+            border-radius: 999px;
+            color: #1d4ed8;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 6px 10px;
+            white-space: nowrap;
+        }
+
+        .books-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin: 12px 0 14px;
+        }
+
+        @media (max-width: 980px) {
+            .books-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 520px) {
+            .books-kpis { grid-template-columns: 1fr; }
+        }
+
+        .books-kpi {
+            border-radius: 16px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            padding: 12px 12px 10px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95));
+        }
+
+        .books-kpi::after {
+            content: "";
+            position: absolute;
+            right: -28px;
+            top: -28px;
+            width: 120px;
+            height: 120px;
+            border-radius: 999px;
+            opacity: 0.55;
+            background: radial-gradient(circle at center, rgba(29, 78, 216, 0.18), transparent 60%);
+        }
+
+        .books-kpi-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .books-kpi-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #0f172a;
+            background: rgba(15, 23, 42, 0.06);
+        }
+
+        .books-kpi-label {
+            color: rgba(2, 6, 23, 0.64);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-top: 6px;
+        }
+
+        .books-kpi-value {
+            font-size: 1.1rem;
+            font-weight: 900;
+            margin-top: 6px;
+            line-height: 1.1;
+        }
+
+        .books-kpi-opening .books-kpi-icon { background: rgba(100, 116, 139, 0.12); color: #334155; }
+        .books-kpi-in .books-kpi-icon { background: rgba(34, 197, 94, 0.12); color: #166534; }
+        .books-kpi-out .books-kpi-icon { background: rgba(244, 63, 94, 0.12); color: #9f1239; }
+        .books-kpi-closing .books-kpi-icon { background: rgba(59, 130, 246, 0.12); color: #1d4ed8; }
+
+        /* Mobile compact layout */
+        @media (max-width: 520px) {
+            .books-content { padding-left: 5px; padding-right: 5px; }
+            .ui.pointing.secondary.menu { margin-bottom: 6px !important; }
+            .ui.segment { padding: 10px !important; }
+            .books-header { margin-bottom: 6px; gap: 6px; }
+            .books-header-title h2 { font-size: 1.05rem; }
+            .books-header-sub { display: none; }
+            .books-pill { padding: 5px 9px; font-size: 0.78rem; width: 100%; text-align: center; }
+
+            .books-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0 10px; }
+            .books-kpi { padding: 10px 10px 8px; border-radius: 14px; }
+            .books-kpi-icon { width: 34px; height: 34px; border-radius: 11px; }
+            .books-kpi-label { font-size: 0.72rem; margin-top: 2px; }
+            .books-kpi-value { font-size: 1.0rem; margin-top: 4px; }
+
+            /* Make filters more compact */
+            .ui.tiny.form .fields { margin-bottom: 6px !important; }
+            .ui.tiny.form .field { margin-bottom: 6px !important; }
+            .ui.tiny.form label { font-size: 0.78rem !important; }
+            .ui.tiny.form .button { padding: 0.6em 0.9em !important; }
+            .books-date-row { gap: 8px; }
+            .books-date-row label { font-size: 0.74rem !important; }
+
+            /* Table spacing */
+            .ui.small.table { font-size: 0.85rem; }
+            .ui.table td, .ui.table th { padding: 0.45em 0.55em !important; }
+
+            /* Hide low-value columns on very small screens */
+            .books-ledger-table th:nth-child(3),
+            .books-ledger-table td:nth-child(3),
+            .books-ledger-table th:nth-child(7),
+            .books-ledger-table td:nth-child(7),
+            .books-ledger-table th:nth-child(8),
+            .books-ledger-table td:nth-child(8) { display: none; }
+        }
+
+        .books-date-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .books-date-row .field {
+            flex: 1;
+            margin: 0 !important;
+        }
+
+        /* Match DataTables layout from other pages */
+        #UserTable_length {
+            left: 20px;
+            position: absolute;
+        }
+
+        #UserTable_filter {
+            float: right;
+        }
+
+        .dt-buttons {
+            position: absolute;
+            left: 174px;
+        }
+
+        input[type=search] {
+            width: 100px !important;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="ui basic grid books-shell" style="padding-top: 8px">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div class="item active">Bankbook</div>
+            </div>
+
+            <div class="books-content">
+                <div class="ui segment">
+                    <form class="ui tiny form" method="get" action="{% url 'homeApp:bankbook' %}">
+                        <div class="fields">
+                            <div class="four wide field">
+                                <label>Bank</label>
+                                <select class="ui dropdown" name="bank">
+                                    {% for b in banks %}
+                                        <option value="{{ b.id }}" {% if bank and b.id == bank.id %}selected{% endif %}>
+                                            {{ b.name }}{% if b.accountNumber %} - {{ b.accountNumber }}{% endif %}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="six wide field">
+                                <div class="books-date-row">
+                                    <div class="field">
+                                        <label>Start</label>
+                                        <div class="ui calendar" id="startDateCal">
+                                            <div class="ui input">
+                                                <input type="text" name="startDate" id="startDate" value="{{ startDate }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="field">
+                                        <label>End</label>
+                                        <div class="ui calendar" id="endDateCal">
+                                            <div class="ui input">
+                                                <input type="text" name="endDate" id="endDate" value="{{ endDate }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="six wide field">
+                                <label>Action</label>
+                                <button class="ui tiny teal button" type="submit">
+                                    <i class="search icon"></i> View
+                                </button>
+                                {% if can_manage_books and account %}
+                                    <button class="ui tiny green button" type="button" onclick="$('#manualModal').modal('show')">
+                                        <i class="plus icon"></i> Add Entry
+                                    </button>
+                                    <button class="ui tiny blue button" type="button" onclick="$('#transferModal').modal('show')">
+                                        <i class="exchange icon"></i> Transfer
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                {% if account %}
+                    <div class="books-header">
+                        <div class="books-header-title">
+                            <h2>{% if bank %}{{ bank.name }}{% else %}Bankbook{% endif %}</h2>
+                            <div class="books-header-sub">Bank ledger with running balance.</div>
+                        </div>
+                        <div class="books-pill">
+                            {{ startDate }} → {{ endDate }}
+                        </div>
+                    </div>
+
+                    <div class="books-kpis">
+                        <div class="books-kpi books-kpi-opening">
+                            <div class="books-kpi-row">
+                                <div>
+                                    <div class="books-kpi-label">Opening</div>
+                                    <div class="books-kpi-value">₹ {{ opening|money }}</div>
+                                </div>
+                                <div class="books-kpi-icon"><i class="flag outline icon"></i></div>
+                            </div>
+                        </div>
+                        <div class="books-kpi books-kpi-in">
+                            <div class="books-kpi-row">
+                                <div>
+                                    <div class="books-kpi-label">Total In</div>
+                                    <div class="books-kpi-value">₹ {{ range_in|money }}</div>
+                                </div>
+                                <div class="books-kpi-icon"><i class="arrow down icon"></i></div>
+                            </div>
+                        </div>
+                        <div class="books-kpi books-kpi-out">
+                            <div class="books-kpi-row">
+                                <div>
+                                    <div class="books-kpi-label">Total Out</div>
+                                    <div class="books-kpi-value">₹ {{ range_out|money }}</div>
+                                </div>
+                                <div class="books-kpi-icon"><i class="arrow up icon"></i></div>
+                            </div>
+                        </div>
+                        <div class="books-kpi books-kpi-closing">
+                            <div class="books-kpi-row">
+                                <div>
+                                    <div class="books-kpi-label">Closing</div>
+                                    <div class="books-kpi-value">₹ {{ closing|money }}</div>
+                                </div>
+                                <div class="books-kpi-icon"><i class="balance scale icon"></i></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <table class="ui unstackable tiny sortable celled very nowrap very compact table books-ledger-table" id="UserTable"
+                           style="margin-top: 5px;width: 100%">
+                        <thead>
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>Particulars</th>
+                            <th>Party</th>
+                            <th class="right aligned">In</th>
+                            <th class="right aligned">Out</th>
+                            <th class="right aligned">Balance</th>
+                            <th>Source</th>
+                            <th>Action</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if can_manage_books and account %}
+        <div class="ui modal" id="manualModal">
+            <i class="close icon"></i>
+            <div class="header">Add Bankbook Entry</div>
+            <div class="content">
+                <form class="ui tiny form" id="manualForm">{% csrf_token %}
+                    <input type="hidden" id="manualAccountId" value="{{ account.id }}">
+                    <div class="three fields">
+                        <div class="field required">
+                            <label>Type</label>
+                            <select class="ui dropdown" id="manualDirection">
+                                <option value="in">Deposit / Receipt (In)</option>
+                                <option value="out">Payment (Out)</option>
+                            </select>
+                        </div>
+                        <div class="field required">
+                            <label>Amount</label>
+                            <input type="number" id="manualAmount" placeholder="Amount">
+                        </div>
+                        <div class="field">
+                            <label>Date</label>
+                            <div class="ui calendar" id="manualDateCal">
+                                <div class="ui input">
+                                    <input type="text" id="manualDate" value="{{ endDate }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Narration</label>
+                        <input type="text" id="manualNarration" placeholder="Narration">
+                    </div>
+                </form>
+            </div>
+            <div class="actions">
+                <div class="ui cancel button">Cancel</div>
+                <button class="ui green button" type="button" onclick="saveManual()">Save</button>
+            </div>
+        </div>
+
+        <div class="ui modal" id="editModal">
+            <i class="close icon"></i>
+            <div class="header">Edit Entry</div>
+            <div class="content">
+                <form class="ui tiny form" id="editForm">{% csrf_token %}
+                    <input type="hidden" id="editId">
+                    <div class="three fields">
+                        <div class="field required">
+                            <label>Type</label>
+                            <select class="ui dropdown" id="editDirection">
+                                <option value="in">Deposit / Receipt (In)</option>
+                                <option value="out">Payment (Out)</option>
+                            </select>
+                        </div>
+                        <div class="field required">
+                            <label>Amount</label>
+                            <input type="number" id="editAmount" placeholder="Amount">
+                        </div>
+                        <div class="field">
+                            <label>Date</label>
+                            <div class="ui calendar" id="editDateCal">
+                                <div class="ui input">
+                                    <input type="text" id="editDate" value="{{ endDate }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Narration</label>
+                        <input type="text" id="editNarration" placeholder="Narration">
+                    </div>
+                </form>
+            </div>
+            <div class="actions">
+                <div class="ui cancel button">Cancel</div>
+                <button class="ui green button" type="button" onclick="saveEdit()">Save</button>
+            </div>
+        </div>
+
+        <div class="ui modal" id="transferModal">
+            <i class="close icon"></i>
+            <div class="header">Transfer (Bank ↔ Cash / Bank)</div>
+            <div class="content">
+                <form class="ui tiny form" id="transferForm">{% csrf_token %}
+                    <input type="hidden" id="fromAccountId" value="{{ account.id }}">
+                    <div class="three fields">
+                        <div class="field required">
+                            <label>To</label>
+                            <select class="ui dropdown" id="toAccountId">
+                                <option value="">Select Account</option>
+                                {% for acc in transfer_accounts %}
+                                    <option value="{{ acc.id }}">
+                                        {% if acc.type == 'cash' %}Cash: {% else %}Bank: {% endif %}{{ acc.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="field required">
+                            <label>Amount</label>
+                            <input type="number" id="transferAmount" placeholder="Amount">
+                        </div>
+                        <div class="field">
+                            <label>Date</label>
+                            <div class="ui calendar" id="transferDateCal">
+                                <div class="ui input">
+                                    <input type="text" id="transferDate" value="{{ endDate }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Note</label>
+                        <input type="text" id="transferNote" placeholder="Note">
+                    </div>
+                </form>
+            </div>
+            <div class="actions">
+                <div class="ui cancel button">Cancel</div>
+                <button class="ui blue button" type="button" onclick="saveTransfer()">Transfer</button>
+            </div>
+        </div>
+    {% endif %}
+
+{% endblock %}
+
+{% block js %}
+    <script>
+        $('.ui.dropdown').dropdown({fullTextSearch: true});
+
+        function initCalendar(selector) {
+            $(selector).calendar({
+                monthFirst: false,
+                type: 'date',
+                formatter: {
+                    date: function (date) {
+                        if (!date) return '';
+                        var day = String(date.getDate());
+                        var month = String(date.getMonth() + 1);
+                        var year = date.getFullYear();
+                        return day + '/' + month + '/' + year;
+                    }
+                }
+            });
+        }
+
+        initCalendar('#startDateCal');
+        initCalendar('#endDateCal');
+        initCalendar('#manualDateCal');
+        initCalendar('#editDateCal');
+        initCalendar('#transferDateCal');
+
+        function saveManual() {
+            var accountId = $('#manualAccountId').val();
+            var direction = $('#manualDirection').val();
+            var amount = $('#manualAmount').val();
+            var date = $('#manualDate').val();
+            var narration = $('#manualNarration').val();
+            if (amount === '') {
+                $('body').toast({class: 'orange', message: 'Amount is required.'});
+                return;
+            }
+            var data = new FormData();
+            data.append('accountId', accountId);
+            data.append('direction', direction);
+            data.append('amount', amount);
+            data.append('date', date);
+            data.append('narration', narration);
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:add_book_manual_tx_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        location.reload();
+                    } else {
+                        $('body').toast({class: 'error', message: response.message || 'Error'});
+                    }
+                }
+            });
+        }
+
+        function saveTransfer() {
+            var fromAccountId = $('#fromAccountId').val();
+            var toAccountId = $('#toAccountId').val();
+            var amount = $('#transferAmount').val();
+            var date = $('#transferDate').val();
+            var note = $('#transferNote').val();
+            if (toAccountId === '' || amount === '') {
+                $('body').toast({class: 'orange', message: 'To account and amount are required.'});
+                return;
+            }
+            var data = new FormData();
+            data.append('fromAccountId', fromAccountId);
+            data.append('toAccountId', toAccountId);
+            data.append('amount', amount);
+            data.append('date', date);
+            data.append('note', note);
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:transfer_books_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        location.reload();
+                    } else {
+                        $('body').toast({class: 'error', message: response.message || 'Error'});
+                    }
+                }
+            });
+        }
+
+        function openEditTx(id) {
+            $.ajax({
+                type: 'get',
+                url: '{% url "homeApp:get_book_tx_detail_api" %}?id=' + id,
+                success: function (response) {
+                    if (response.message !== 'success') {
+                        $('body').toast({class: 'error', message: response.message || 'Error'});
+                        return;
+                    }
+                    if (response.data.source !== 'manual') {
+                        $('body').toast({class: 'orange', message: 'Only manual entries can be edited.'});
+                        return;
+                    }
+                    $('#editId').val(response.data.id);
+                    $('#editDirection').val(response.data.direction).change();
+                    $('#editAmount').val(response.data.amount);
+                    $('#editDate').val(response.data.date);
+                    $('#editNarration').val(response.data.narration);
+                    $('#editModal').modal('show');
+                }
+            });
+        }
+
+        function saveEdit() {
+            var id = $('#editId').val();
+            var direction = $('#editDirection').val();
+            var amount = $('#editAmount').val();
+            var date = $('#editDate').val();
+            var narration = $('#editNarration').val();
+            if (amount === '') {
+                $('body').toast({class: 'orange', message: 'Amount is required.'});
+                return;
+            }
+            var data = new FormData();
+            data.append('id', id);
+            data.append('direction', direction);
+            data.append('amount', amount);
+            data.append('date', date);
+            data.append('narration', narration);
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:edit_book_tx_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        location.reload();
+                    } else {
+                        $('body').toast({class: 'error', message: response.message || 'Error'});
+                    }
+                }
+            });
+        }
+
+        function deleteTx(id) {
+            if (!confirm('Delete this entry?')) {
+                return;
+            }
+            var data = new FormData();
+            data.append('id', id);
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:delete_book_tx_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        location.reload();
+                    } else {
+                        $('body').toast({class: 'error', message: response.message || 'Error'});
+                    }
+                }
+            });
+        }
+
+        {% if account %}
+        userTab = $('#UserTable').DataTable({
+            "scrollY": "350px",
+            scrollX: true,
+            fixedColumns: {
+                right: 1
+            },
+            aaSorting: [],
+            "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            "pageLength": 10,
+            processing: true,
+            serverSide: true,
+            columnDefs: [
+                {"name": "txDateTime", "targets": 0, "orderable": false},
+                {"name": "narration", "targets": 1, "orderable": false},
+                {"name": "party", "targets": 2, "orderable": false},
+                {"name": "in", "targets": 3, "orderable": false},
+                {"name": "out", "targets": 4, "orderable": false},
+                {"name": "balance", "targets": 5, "orderable": false},
+                {"name": "source", "targets": 6, "orderable": false},
+                {"name": "action", "targets": 7, "orderable": false}
+            ],
+            ajax: "{% url 'homeApp:BookTransactionListJson' %}?accountId={{ account.id }}&startDate={{ startDate }}&endDate={{ endDate }}"
+        });
+        {% endif %}
+    </script>
+{% endblock %}

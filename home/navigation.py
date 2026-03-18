@@ -431,6 +431,12 @@ def build_sidebar_sections(user):
                     'home.view_cashcounter',
                     'home.view_collectioncashcounter',
                 )),
+                _nav_item('Cashbook', 'homeApp:cashbook', 'book', (
+                    'home.can_manage_cash_counter',
+                    'home.view_cashcounter',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Bankbook', 'homeApp:bankbook', 'university', 'home.can_view_party_credentials'),
             ]),
         },
         {

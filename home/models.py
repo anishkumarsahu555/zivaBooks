@@ -2,8 +2,10 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import models
 from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from stdimage import StdImageField
+from django.db.models import Q
 
 
 # Create your models here.
@@ -553,4 +555,94 @@ class CollectionCashCounter(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'datetime'], name='ccollection_tenant_dt_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'collectedBy'], name='ccollection_tenant_staff_idx'),
             models.Index(fields=['tenant', 'paymentID'], name='ccollection_tenant_payid_idx'),
+        ]
+
+
+class BookAccount(TenantOwnedModel):
+    class Type(models.TextChoices):
+        CASH = 'cash', 'Cash'
+        BANK = 'bank', 'Bank'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='book_accounts')
+    type = models.CharField(max_length=10, choices=Type.choices)
+    name = models.CharField(max_length=200)
+    bank = models.ForeignKey(Bank, blank=True, null=True, on_delete=models.SET_NULL, related_name='book_accounts')
+    openingBalance = models.FloatField(default=0.0)
+    openingDate = models.DateField(blank=True, null=True)
+    isDefault = models.BooleanField(default=False)
+
+    def __str__(self):
+        if self.type == self.Type.BANK and self.bank_id:
+            return f'{self.name} ({self.bank.name})'
+        return self.name
+
+    class Meta:
+        verbose_name_plural = 'Books: Accounts'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'type'], name='bookacct_tenant_del_type_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'bank'], name='bookacct_tenant_del_bank_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'type', 'bank'],
+                condition=Q(isDeleted=False, type='bank'),
+                name='uniq_active_bank_book_account_per_bank',
+            ),
+            models.UniqueConstraint(
+                fields=['tenant', 'type'],
+                condition=Q(isDeleted=False, type='cash', isDefault=True),
+                name='uniq_active_default_cash_book_account',
+            ),
+        ]
+        permissions = [
+            ('can_view_bank_books', 'Can view bank books'),
+            ('can_manage_books', 'Can manage cashbook/bankbook'),
+        ]
+
+
+class BookTransaction(TenantOwnedModel):
+    class Direction(models.TextChoices):
+        IN = 'in', 'In'
+        OUT = 'out', 'Out'
+
+    class Source(models.TextChoices):
+        MANUAL = 'manual', 'Manual'
+        COLLECTION = 'collection', 'Collection'
+        CASH_COUNTER = 'cash_counter', 'Cash Counter'
+        COUNTER_COLLECTION = 'counter_collection', 'Counter Collection'
+        TRANSFER = 'transfer', 'Transfer'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='book_transactions')
+    account = models.ForeignKey(BookAccount, on_delete=models.CASCADE, related_name='transactions')
+    direction = models.CharField(max_length=10, choices=Direction.choices)
+    amount = models.FloatField(default=0.0)
+    txDateTime = models.DateTimeField()
+    narration = models.CharField(max_length=500, blank=True, null=True)
+    party = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL, related_name='book_transactions')
+    createdBy = models.ForeignKey(StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='book_transactions_created')
+    source = models.CharField(max_length=30, choices=Source.choices, default=Source.MANUAL)
+    component = models.CharField(max_length=30, blank=True, null=True, help_text='Disambiguates multi-part postings (e.g., Mix cash vs bank).')
+    transferId = models.CharField(max_length=50, blank=True, null=True)
+
+    source_content_type = models.ForeignKey(ContentType, blank=True, null=True, on_delete=models.SET_NULL, related_name='book_transactions')
+    source_object_id = models.PositiveBigIntegerField(blank=True, null=True)
+    source_object = GenericForeignKey('source_content_type', 'source_object_id')
+
+    def __str__(self):
+        return f'{self.account} {self.direction} {self.amount}'
+
+    class Meta:
+        verbose_name_plural = 'Books: Transactions'
+        ordering = ['txDateTime', 'id']
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'account', 'txDateTime'], name='booktx_tenant_del_acct_dt_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'source', 'txDateTime'], name='booktx_tenant_del_src_dt_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'transferId'], name='booktx_tenant_del_transfer_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'account', 'source_content_type', 'source_object_id', 'component'],
+                condition=Q(isDeleted=False),
+                name='uniq_active_booktx_per_source_component',
+            ),
         ]

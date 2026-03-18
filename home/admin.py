@@ -135,3 +135,19 @@ admin.site.register(AuditLog, AuditLogAdmin)
 
 
 admin.site.register(CashCounter, CashCounterAdmin)
+
+
+class BookAccountAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'type', 'name', 'bank', 'openingBalance', 'openingDate', 'isDefault', 'datetime', 'isDeleted']
+    list_filter = ['type', 'isDefault', 'isDeleted']
+    search_fields = ['name', 'bank__name', 'bank__accountNumber']
+
+
+class BookTransactionAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'account', 'direction', 'amount', 'txDateTime', 'source', 'component', 'party', 'transferId', 'isDeleted']
+    list_filter = ['source', 'direction', 'isDeleted']
+    search_fields = ['narration', 'transferId', 'party__name', 'account__name']
+
+
+admin.site.register(BookAccount, BookAccountAdmin)
+admin.site.register(BookTransaction, BookTransactionAdmin)

@@ -305,27 +305,20 @@
 
        function isCash() {
             var mode = $('#paymentMode').val();
-            console.log(mode);
-            if (mode === 'Cash' || mode === 'Cheque CC') {
-                $('#bankDiv').css('display', "none");
-                $('#detailDiv').css('display', "none");
-                $('#chequeDatelDiv').css('display', "none");
-                $('#partyDiv').css('display', "none");
-            } else if (mode === 'Cheque') {
-                $('#bankDiv').css('display', "none");
-                $('#detailDiv').css('display', "");
-                $('#chequeDatelDiv').css('display', "");
-                $('#partyDiv').css('display', "none");
-            }else if (mode === 'Party') {
-                $('#bankDiv').css('display', "none");
-                $('#detailDiv').css('display', "none");
-                $('#chequeDatelDiv').css('display', "none");
-                $('#partyDiv').css('display', "");
-            } else {
-                $('#bankDiv').css('display', "");
-                $('#detailDiv').css('display', "");
-                $('#chequeDatelDiv').css('display', "None");
-                $('#partyDiv').css('display', "none");
+            var needsBank = (mode === 'Online' || mode === 'Cheque' || mode === 'Cheque CC');
+            var needsChequeDate = (mode === 'Cheque' || mode === 'Cheque CC');
+            var isParty = (mode === 'Party');
+
+            $('#bankDiv').css('display', needsBank ? "" : "none");
+            $('#detailDiv').css('display', needsBank ? "" : "none");
+            $('#chequeDatelDiv').css('display', needsChequeDate ? "" : "none");
+            $('#partyDiv').css('display', isParty ? "" : "none");
+
+            if (!needsBank) {
+                try { $('#bank').dropdown('clear'); } catch (err) { $('#bank').val(''); }
+            }
+            if (!needsChequeDate) {
+                $('#chequeDate').val('');
             }
         }
 
@@ -348,8 +341,7 @@
                 var party = $('#partyAllFilter').val();
             }
 
-            if (party === '' || paymentMode === '' || amountPaid === ''
-            ) {
+            if (party === '' || paymentMode === '' || amountPaid === '') {
                 $('body')
                     .toast({
                         class: 'orange',
@@ -357,6 +349,29 @@
                     })
                 ;
                 hideLoading();
+                return;
+            }
+
+            if ((paymentMode === 'Online' || paymentMode === 'Cheque' || paymentMode === 'Cheque CC') && bank === '') {
+                $('body')
+                    .toast({
+                        class: 'orange',
+                        message: 'Please select a bank for Online/Cheque payments.'
+                    })
+                ;
+                hideLoading();
+                return;
+            }
+
+            if ((paymentMode === 'Cheque' || paymentMode === 'Cheque CC') && chequeDate === '') {
+                $('body')
+                    .toast({
+                        class: 'orange',
+                        message: 'Cheque date is required for cheque payments.'
+                    })
+                ;
+                hideLoading();
+                return;
             } else {
                 data = new FormData();
                 data.append('party', party);
@@ -392,6 +407,22 @@
                             {#location.href = "{% url 'homeApp:my_collection' %}"#}
                             location.reload();
 
+                        } else if (response.message === 'bank_required') {
+                            $('body')
+                                .toast({
+                                    class: 'orange',
+                                    message: 'Please select a bank for Online/Cheque payments.'
+                                })
+                            ;
+                            hideLoading();
+                        } else if (response.message === 'cheque_date_required') {
+                            $('body')
+                                .toast({
+                                    class: 'orange',
+                                    message: 'Cheque date is required for cheque payments.'
+                                })
+                            ;
+                            hideLoading();
                         } else {
                             $('body')
                                 .toast({

@@ -93,6 +93,14 @@ urlpatterns = [
     path('api/get_staff_dashboard_report_api/', get_staff_dashboard_report_api, name='get_staff_dashboard_report_api'),
     path('api/get_party_dashboard_report_api/', get_party_dashboard_report_api, name='get_party_dashboard_report_api'),
     path('api/get_bank_dashboard_report_api/', get_bank_dashboard_report_api, name='get_bank_dashboard_report_api'),
+    path('api/get_bank_balances_api/', get_bank_balances_api, name='get_bank_balances_api'),
+    path('api/add_book_manual_tx_api/', add_book_manual_tx_api, name='add_book_manual_tx_api'),
+    path('api/transfer_books_api/', transfer_books_api, name='transfer_books_api'),
+    path('api/transfer_cash_to_bank_api/', transfer_cash_to_bank_api, name='transfer_cash_to_bank_api'),
+    path('api/get_book_tx_detail_api/', get_book_tx_detail_api, name='get_book_tx_detail_api'),
+    path('api/edit_book_tx_api/', edit_book_tx_api, name='edit_book_tx_api'),
+    path('api/delete_book_tx_api/', delete_book_tx_api, name='delete_book_tx_api'),
+    path('api/BookTransactionListJson/', BookTransactionListJson.as_view(), name='BookTransactionListJson'),
     path('api/get_sales_dashboard_report_api/', get_sales_dashboard_report_api, name='get_sales_dashboard_report_api'),
     path('api/get_orders_dashboard_report_api/', get_orders_dashboard_report_api, name='get_orders_dashboard_report_api'),
     path('api/get_attendance_dashboard_report_api/', get_attendance_dashboard_report_api, name='get_attendance_dashboard_report_api'),
@@ -190,5 +198,9 @@ urlpatterns = [
          name='CashCounterCollectionListJson'),
     path('api/get_all_unsent_messages/', get_all_unsent_messages, name='get_all_unsent_messages'),
     path('api/update_sent_msg_status/', update_sent_msg_status, name='update_sent_msg_status'),
+
+    # Books
+    path('cashbook/', cashbook, name='cashbook'),
+    path('bankbook/', bankbook, name='bankbook'),
 
 ]

@@ -57,8 +57,28 @@ def _format_inr(value):
     return f"{sign}{grouped}"
 
 
+def _format_money(value, places=2):
+    if value is None:
+        return "0"
+    try:
+        dec = value if isinstance(value, Decimal) else Decimal(str(value).strip())
+    except (InvalidOperation, ValueError, TypeError, AttributeError):
+        return _format_inr(value)
+
+    if dec == dec.to_integral():
+        return _format_inr(str(dec.to_integral()))
+
+    quant = Decimal('1').scaleb(-places)
+    return _format_inr(format(dec.quantize(quant), 'f'))
+
+
 @register.filter(name="convert")
 def convert(value):
     """Backward-compatible alias used in existing templates."""
     return _format_inr(value)
 
+
+@register.filter(name="money")
+def money(value):
+    """Formats money in INR style, trimming trailing .0 and keeping 2dp when needed."""
+    return _format_money(value, places=2)
