@@ -646,3 +646,62 @@ class BookTransaction(TenantOwnedModel):
                 name='uniq_active_booktx_per_source_component',
             ),
         ]
+
+
+class PartyLedgerEntry(TenantOwnedModel):
+    """
+    Party-centric ledger line (single-sided view).
+
+    Convention:
+    - `debit`  increases party balance (party owes more)
+    - `credit` decreases party balance (party has paid / settlement)
+    """
+
+    class Source(models.TextChoices):
+        MANUAL = 'manual', 'Manual'
+        COLLECTION = 'collection', 'Collection'
+        COUNTER_COLLECTION = 'counter_collection', 'Counter Collection'
+        SALES = 'sales', 'Sales'
+        CASH_COUNTER = 'cash_counter', 'Cash Counter'
+        TRANSFER = 'transfer', 'Transfer'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='party_ledger_entries')
+    party = models.ForeignKey(Party, on_delete=models.CASCADE, related_name='ledger_entries')
+    txDateTime = models.DateTimeField()
+    particulars = models.CharField(max_length=500)
+    debit = models.FloatField(default=0.0)
+    credit = models.FloatField(default=0.0)
+    createdBy = models.ForeignKey(
+        StaffUser,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='party_ledger_entries_created',
+    )
+    source = models.CharField(max_length=30, choices=Source.choices, default=Source.MANUAL)
+    reference = models.CharField(max_length=200, blank=True, null=True)
+    component = models.CharField(max_length=30, blank=True, null=True)
+    transferId = models.CharField(max_length=50, blank=True, null=True)
+
+    source_content_type = models.ForeignKey(ContentType, blank=True, null=True, on_delete=models.SET_NULL, related_name='party_ledger_entries')
+    source_object_id = models.PositiveBigIntegerField(blank=True, null=True)
+    source_object = GenericForeignKey('source_content_type', 'source_object_id')
+
+    def __str__(self):
+        return f'{self.party} D{self.debit} C{self.credit}'
+
+    class Meta:
+        verbose_name_plural = 'Party Ledger: Entries'
+        ordering = ['txDateTime', 'id']
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'party', 'txDateTime'], name='pldg_t_party_dt_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'source', 'txDateTime'], name='pldg_t_src_dt_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'transferId'], name='pldg_t_xfer_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'party', 'source_content_type', 'source_object_id', 'component'],
+                condition=Q(isDeleted=False),
+                name='uniq_active_party_ledger_per_source_component',
+            ),
+        ]

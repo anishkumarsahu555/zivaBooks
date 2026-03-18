@@ -1408,3 +1408,52 @@ def bankbook(request):
         'can_manage_books': request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_manage_books'),
     }
     return render(request, 'home/books/bankbook.html', context)
+
+
+@permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials', 'home.view_party')
+def party_ledger(request, party_id):
+    """
+    Party ledger view (staff/admin can view any party; party user can view own).
+    """
+    is_party_user = request.user.has_perm('home.view_party') and not request.user.has_perm('home.can_manage_parties')
+    if is_party_user:
+        party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only(
+            'id', 'name', 'openingBalance'
+        ).order_by('-id').first()
+        if not party:
+            return redirect('/')
+    else:
+        party = get_object_or_404(tenant_qs(request, Party), pk=party_id, isDeleted=False)
+
+    today = datetime.today().date()
+    start_date = _parse_ddmmyyyy(request.GET.get('startDate'), today)
+    end_date = _parse_ddmmyyyy(request.GET.get('endDate'), today)
+    if end_date and start_date and end_date < start_date:
+        start_date, end_date = end_date, start_date
+
+    base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
+    prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+        debit_total=Sum('debit'),
+        credit_total=Sum('credit'),
+    )
+    opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
+
+    range_totals = base_qs.filter(txDateTime__date__range=[start_date, end_date]).aggregate(
+        debit_total=Sum('debit'),
+        credit_total=Sum('credit'),
+    )
+    range_debit = float(range_totals['debit_total'] or 0.0)
+    range_credit = float(range_totals['credit_total'] or 0.0)
+    closing = opening + range_debit - range_credit
+
+    context = {
+        'party': party,
+        'startDate': start_date.strftime('%d/%m/%Y'),
+        'endDate': end_date.strftime('%d/%m/%Y'),
+        'opening': opening,
+        'range_debit': range_debit,
+        'range_credit': range_credit,
+        'closing': closing,
+        'is_party_user': is_party_user,
+    }
+    return render(request, 'home/party/partyLedger.html', context)

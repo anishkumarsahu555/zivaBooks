@@ -24,6 +24,7 @@ from weasyprint import CSS, HTML
 
 from home.models import *
 from home.books import sync_book_transactions
+from home.party_ledger import sync_party_ledger_entries_for_object
 from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_qs
 
 User = get_user_model()
@@ -1385,6 +1386,11 @@ class PartyListJson(BaseDatatableView):
                     <i class="eye icon"></i>
                   </button>'''.format(item.pk)
 
+            ledger_url = reverse('homeApp:party_ledger', args=[item.pk])
+            action = action + ''' <a data-inverted="" data-tooltip="Ledger" data-position="left center" data-variation="mini" style="font-size:10px;" href="{}" class="ui circular blue icon button">
+                    <i class="book icon"></i>
+                  </a>'''.format(ledger_url)
+
             if can_delete:
                 action = action + ''' <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
                     <i class="trash alternate icon"></i>
@@ -1650,6 +1656,7 @@ def add_collection_by_staff_api(request):
             obj.collectionDateTime = obj.datetime
             obj.save()
             sync_book_transactions(obj)
+            sync_party_ledger_entries_for_object(obj)
 
             return JsonResponse({'message': 'success'}, safe=False)
         except:
@@ -1714,6 +1721,7 @@ def add_collection_by_admin_api(request):
             # obj.collectionDateTime = obj.datetime
             obj.save()
             sync_book_transactions(obj)
+            sync_party_ledger_entries_for_object(obj)
             if _can_auto_approve_collections(request.user):
                 try:
                     obj.isApproved = True
@@ -1790,6 +1798,7 @@ def edit_collection_by_admin_api(request):
                         pass
                 obj.save()
                 sync_book_transactions(obj)
+                sync_party_ledger_entries_for_object(obj)
             # if 'Moderator' in request.user.groups.values_list('name', flat=True):
             #     if paymentMode == 'Cheque':
             #         obj.chequeDate = datetime.strptime(chequeDate, '%d/%m/%Y')
@@ -2148,6 +2157,7 @@ def delete_collection(request):
             obj.isDeleted = True
             obj.save()
             sync_book_transactions(obj)
+            sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -2847,6 +2857,103 @@ class BookTransactionListJson(BaseDatatableView):
                 f'₹ {_format_money_compact(item.balance)}',
                 escape(item.get_source_display()),
                 action,
+            ])
+        return json_data
+
+
+def _parse_ddmmyyyy_api(value, default=None):
+    if not value:
+        return default
+    try:
+        return datetime.strptime(value, '%d/%m/%Y').date()
+    except Exception:
+        return default
+
+
+class PartyLedgerListJson(BaseDatatableView):
+    order_columns = ['txDateTime', 'particulars', 'txDateTime', 'txDateTime']
+
+    def _resolve_party(self):
+        party_id = self.request.GET.get('partyId')
+        if not party_id or not str(party_id).isdigit():
+            return None
+
+        if self.request.user.has_perm('home.can_manage_parties') or self.request.user.has_perm('home.can_view_party_credentials'):
+            return tenant_qs(self.request, Party).filter(isDeleted=False, pk=int(party_id)).only('id', 'openingBalance', 'name').first()
+
+        # Party portal user can only view own ledger.
+        return tenant_qs(self.request, Party).filter(isDeleted=False, userID_id=self.request.user.pk).only('id', 'openingBalance', 'name').first()
+
+    def get_initial_queryset(self):
+        party = self._resolve_party()
+        if not party:
+            return tenant_qs(self.request, PartyLedgerEntry).none()
+
+        today = datetime.today().date()
+        start_date = _parse_ddmmyyyy_api(self.request.GET.get('startDate'), today)
+        end_date = _parse_ddmmyyyy_api(self.request.GET.get('endDate'), today)
+        if end_date and start_date and end_date < start_date:
+            start_date, end_date = end_date, start_date
+
+        base_qs = tenant_qs(self.request, PartyLedgerEntry).filter(isDeleted=False, party=party)
+        prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+            debit_total=Sum('debit'),
+            credit_total=Sum('credit'),
+        )
+        opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
+        self._opening_balance = opening
+
+        qs = base_qs.filter(txDateTime__date__range=[start_date, end_date]).order_by('txDateTime', 'id')
+        signed = ExpressionWrapper(F('debit') - F('credit'), output_field=FloatField())
+        return qs.annotate(
+            signed_amount=signed,
+            running_total=Window(
+                expression=Sum('signed_amount'),
+                order_by=[F('txDateTime').asc(), F('id').asc()],
+            ),
+        )
+
+    def filter_queryset(self, qs):
+        search = self.request.GET.get('search[value]', None)
+        if search:
+            qs = qs.filter(
+                Q(particulars__icontains=search) |
+                Q(reference__icontains=search) |
+                Q(source__icontains=search)
+            )
+        return qs
+
+    def ordering(self, qs):
+        return qs
+
+    def prepare_results(self, qs):
+        json_data = []
+        opening = float(getattr(self, '_opening_balance', 0.0) or 0.0)
+        for item in qs:
+            running = float(item.running_total or 0.0)
+            balance = opening + running
+            debit = float(item.debit or 0.0)
+            credit = float(item.credit or 0.0)
+            signed = debit - credit
+
+            date_html = '<div class="pl-date">{}</div><div class="pl-time">{}</div>'.format(
+                escape(item.txDateTime.strftime('%d-%m-%Y')),
+                escape(item.txDateTime.strftime('%I:%M %p')),
+            )
+            part_html = '<div class="pl-part">{}</div>'.format(escape(item.particulars or ''))
+
+            if abs(signed) < 1e-9:
+                amt_html = '-'
+            elif signed > 0:
+                amt_html = '<span class="pl-amt pl-amt-in">+ ₹ {}</span>'.format(formatINR(format(abs(signed), '.2f')))
+            else:
+                amt_html = '<span class="pl-amt pl-amt-out">- ₹ {}</span>'.format(formatINR(format(abs(signed), '.2f')))
+
+            json_data.append([
+                date_html,
+                part_html,
+                amt_html,
+                formatINR(format(balance, '.2f')),
             ])
         return json_data
 
@@ -3681,6 +3788,7 @@ def add_sales_by_admin_api(request):
             obj.save()
             obj.paymentID = 'S' + str(obj.pk).zfill(8)
             obj.save()
+            sync_party_ledger_entries_for_object(obj)
             # try:
             #     msg = "Your order has been dispatched Ag. Bill No. {} Dt. {} Amt. Rs. {}, Please confirm received the material. If you have any queries about your order, Please feel free contact on this no 7005607770. Thanks, BSS".format(obj.invoiceNumber, obj.buildDate.strftime('%d-%m-%Y'), obj.amount)
             #     try:
@@ -3914,6 +4022,7 @@ def delete_sales(request):
             obj = tenant_qs(request, Sales).select_related().get(pk=int(id))
             obj.isDeleted = True
             obj.save()
+            sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -3948,6 +4057,7 @@ def update_sales_by_admin_api(request):
             obj.remark = remark
             obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y')
             obj.save()
+            sync_party_ledger_entries_for_object(obj)
 
             return JsonResponse({'message': 'success'}, safe=False)
         except:
@@ -3969,6 +4079,7 @@ def send_message_sales(request):
             obj.isApproved = True
             obj.approvedBy_id = user.pk
             obj.save()
+            sync_party_ledger_entries_for_object(obj)
             try:
                 msg = "Your order has been dispatched Ag. Bill No. {} Dt. {} Amt. Rs. {}, Please confirm received the material. If you have any queries about your order, Please feel free contact on this no 7005607770. Thanks, BSS".format(
                     obj.invoiceNumber, obj.buildDate.strftime('%d-%m-%Y'), obj.amount)
@@ -4086,6 +4197,7 @@ def add_cash_counter_entry_api(request):
             obj.counterID = 'CC' + str(obj.pk).zfill(8)
             obj.save()
             sync_book_transactions(obj)
+            sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -4821,6 +4933,7 @@ def delete_cash_counter(request):
             obj.isDeleted = True
             obj.save()
             sync_book_transactions(obj)
+            sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -4866,6 +4979,7 @@ def update_cash_counter_by_admin_api(request):
             obj.createdBy_id = user.pk
             obj.save()
             sync_book_transactions(obj)
+            sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -5033,6 +5147,7 @@ def add_collection_from_cash_counter_api(request):
             obj.collectionDateTime = obj.datetime
             obj.save()
             sync_book_transactions(obj)
+            sync_party_ledger_entries_for_object(obj)
 
             return JsonResponse({'message': 'success'}, safe=False)
         except:
@@ -5192,6 +5307,7 @@ def edit_cash_counter_collection_by_admin_api(request):
                         pass
                 obj.save()
                 sync_book_transactions(obj)
+                sync_party_ledger_entries_for_object(obj)
             # if 'Moderator' in request.user.groups.values_list('name', flat=True):
             #     if paymentMode == 'Cheque':
             #         obj.chequeDate = datetime.strptime(chequeDate, '%d/%m/%Y')

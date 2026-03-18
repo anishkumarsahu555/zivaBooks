@@ -1,0 +1,246 @@
+{% extends 'home/baseIndex.html' %}
+{% load static %}
+{% load formatting %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/4.1.0/css/fixedColumns.dataTables.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.1.0/js/dataTables.fixedColumns.min.js"></script>
+{% endblock %}
+
+{% block title %}
+    <title>Party Ledger</title>
+{% endblock %}
+
+{% block css %}
+    <style>
+        .books-shell { padding-top: 8px; }
+
+        .books-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin: 10px 0 12px;
+        }
+        @media (max-width: 820px) { .books-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 520px) { .books-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
+        @media (max-width: 360px) { .books-kpis { grid-template-columns: 1fr; } }
+
+        .books-kpi {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 16px;
+            padding: 12px 12px 10px;
+            background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.95));
+            position: relative;
+            overflow: hidden;
+        }
+        @media (max-width: 520px) { .books-kpi { padding: 10px 10px 8px; border-radius: 14px; } }
+        .books-kpi::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at top right, rgba(255,255,255,0.75), rgba(255,255,255,0) 55%);
+            pointer-events: none;
+        }
+        .books-kpi-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: relative; z-index: 1; }
+        .books-kpi-icon { width: 40px; height: 40px; border-radius: 14px; display:flex; align-items:center; justify-content:center; font-size: 1.1rem; }
+        .books-kpi-label { font-size: 0.78rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(2, 6, 23, 0.6); }
+        .books-kpi-value { font-size: 1.15rem; font-weight: 900; margin-top: 5px; }
+        .books-kpi-opening .books-kpi-icon { background: rgba(100, 116, 139, 0.12); color: #334155; }
+        .books-kpi-in .books-kpi-icon { background: rgba(59, 130, 246, 0.12); color: #1d4ed8; }
+        .books-kpi-out .books-kpi-icon { background: rgba(16, 185, 129, 0.12); color: #065f46; }
+        .books-kpi-closing .books-kpi-icon { background: rgba(245, 158, 11, 0.14); color: #92400e; }
+
+        .books-date-row { display: flex; gap: 10px; align-items: flex-end; }
+        .books-date-row .field { flex: 1; margin: 0 !important; }
+
+
+
+        .pl-date { font-weight: 800; }
+        .pl-time { color: rgba(2, 6, 23, 0.55); font-size: 0.78rem; margin-top: 2px; }
+        .pl-part { line-height: 1.2; }
+        .pl-amt { font-weight: 900; white-space: nowrap; }
+        .pl-amt-in { color: rgba(5, 150, 105, 0.95); }
+        .pl-amt-out { color: rgba(225, 29, 72, 0.95); }
+
+        @media (max-width: 520px) {
+            .party-ledger-table td, .party-ledger-table th { padding: 0.45em 0.5em !important; }
+            .pl-part { max-width: 52vw; }
+        }
+
+        #UserTable_length {
+            left: 20px;
+            position: absolute;
+        }
+
+        #UserTable_filter {
+            width: 50%;
+            float: right;
+        }
+
+        .dt-buttons {
+            position: absolute;
+            left: 174px;
+        }
+
+        input[type=search] {
+            width: 100px !important;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="ui left aligned basic grid books-shell">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div class="item active">{{ party.name|capfirst }} Ledger</div>
+                <div class="right menu">
+                    {% if not is_party_user %}
+                        <a class="item" href="{% url 'homeApp:party_list' %}"><i class="arrow left icon"></i> Party List</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="ui segment">
+
+
+                <form class="ui tiny form" method="get">
+                    <div class="fields">
+                        <div class="ten wide field">
+                            <div class="books-date-row">
+                                <div class="field">
+                                    <label>Start Date</label>
+                                    <div class="ui calendar" id="startDateCal">
+                                        <div class="ui input">
+                                            <input type="text" name="startDate" id="startDate" value="{{ startDate }}">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label>End Date</label>
+                                    <div class="ui calendar" id="endDateCal">
+                                        <div class="ui input">
+                                            <input type="text" name="endDate" id="endDate" value="{{ endDate }}">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="six wide field" >
+                              <label>Action</label>
+                            <button class="ui blue tiny button" type="submit"><i class="filter icon"></i> Apply</button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="books-kpis">
+                    <div class="books-kpi books-kpi-opening">
+                        <div class="books-kpi-row">
+                            <div>
+                                <div class="books-kpi-label">Opening</div>
+                                <div class="books-kpi-value">₹ {{ opening|money }}</div>
+                            </div>
+                            <div class="books-kpi-icon"><i class="flag outline icon"></i></div>
+                        </div>
+                    </div>
+                    <div class="books-kpi books-kpi-in">
+                        <div class="books-kpi-row">
+                            <div>
+                                <div class="books-kpi-label">Debit</div>
+                                <div class="books-kpi-value">₹ {{ range_debit|money }}</div>
+                            </div>
+                            <div class="books-kpi-icon"><i class="arrow up icon"></i></div>
+                        </div>
+                    </div>
+                    <div class="books-kpi books-kpi-out">
+                        <div class="books-kpi-row">
+                            <div>
+                                <div class="books-kpi-label">Credit</div>
+                                <div class="books-kpi-value">₹ {{ range_credit|money }}</div>
+                            </div>
+                            <div class="books-kpi-icon"><i class="arrow down icon"></i></div>
+                        </div>
+                    </div>
+                    <div class="books-kpi books-kpi-closing">
+                        <div class="books-kpi-row">
+                            <div>
+                                <div class="books-kpi-label">Closing</div>
+                                <div class="books-kpi-value">₹ {{ closing|money }}</div>
+                            </div>
+                            <div class="books-kpi-icon"><i class="balance scale icon"></i></div>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="ui unstackable tiny sortable celled very compact table party-ledger-table" id="UserTable" style="width: 100%">
+                    <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Particulars</th>
+                        <th class="right aligned">Amount</th>
+                        <th class="right aligned">Balance</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script>
+        function initCalendar(selector) {
+            $(selector).calendar({
+                monthFirst: false,
+                type: 'date',
+                formatter: {
+                    date: function (date) {
+                        if (!date) return '';
+                        var day = String(date.getDate());
+                        var month = String(date.getMonth() + 1);
+                        var year = date.getFullYear();
+                        return day + '/' + month + '/' + year;
+                    }
+                }
+            });
+        }
+        initCalendar('#startDateCal');
+        initCalendar('#endDateCal');
+
+        var isMobileLedger = window.matchMedia && window.matchMedia("(max-width: 520px)").matches;
+
+        $('#UserTable').DataTable({
+
+             "scrollX": true,
+            fixedColumns: isMobileLedger ? false : { left: 1, right: 1 },
+
+            columnDefs: [
+                { name: "txDateTime", targets: 0, orderable: false },
+                { name: "particulars", targets: 1, orderable: false },
+                { name: "amount", targets: 2, orderable: false },
+                { name: "balance", targets: 3, orderable: false }
+            ],
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+            pageLength: 10,
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: "{% url 'homeApp:PartyLedgerListJson' %}",
+                data: function (d) {
+                    d.partyId = "{{ party.id }}";
+                    d.startDate = $('#startDate').val();
+                    d.endDate = $('#endDate').val();
+                }
+            }
+        });
+    </script>
+{% endblock %}
