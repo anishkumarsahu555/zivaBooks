@@ -1,0 +1,99 @@
+{% load static %}
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: sans-serif; font-size: 12px; color: #111; }
+        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .title { font-size: 18px; font-weight: 700; }
+        .meta { font-size: 11px; color: #444; }
+        .box { border: 1px solid #ddd; padding: 10px; border-radius: 6px; margin-bottom: 10px; }
+        .row { display: flex; gap: 12px; }
+        .col { flex: 1; }
+        .label { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: #666; margin-bottom: 4px; }
+        .value { font-size: 12px; }
+        .status { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid #ddd; font-size: 11px; }
+        .status.approved { border-color: #2e7d32; color: #2e7d32; }
+        .status.pending { border-color: #ef6c00; color: #ef6c00; }
+        .text { white-space: pre-wrap; line-height: 1.35; }
+        .images { display: flex; flex-wrap: wrap; gap: 8px; }
+        .img { width: 48%; border: 1px solid #eee; border-radius: 6px; overflow: hidden; }
+        .img img { width: 100%; height: auto; display: block; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <div class="title">Order {{ order.orderNumber|default:order.pk }}</div>
+            <div class="meta">Generated: {{ order.lastUpdatedOn|date:"d-m-Y H:i" }}</div>
+        </div>
+        <div>
+            {% if order.status == "approved" %}
+                <span class="status approved">Approved</span>
+            {% else %}
+                <span class="status pending">{{ order.get_status_display }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="box">
+        <div class="row">
+            <div class="col">
+                <div class="label">Party</div>
+                <div class="value">{{ order.partyID.name|default:"-" }}</div>
+            </div>
+            <div class="col">
+                <div class="label">Order Date</div>
+                <div class="value">{% if order.buildDate %}{{ order.buildDate|date:"d-m-Y" }}{% else %}-{% endif %}</div>
+            </div>
+            <div class="col">
+                <div class="label">Created By</div>
+                <div class="value">{{ order.createdBy.name|default:"-" }}</div>
+            </div>
+        </div>
+        <div style="margin-top:10px;" class="row">
+            <div class="col">
+                <div class="label">Created At</div>
+                <div class="value">{{ order.datetime|date:"d-m-Y H:i" }}</div>
+            </div>
+            <div class="col">
+                <div class="label">Updated At</div>
+                <div class="value">{{ order.lastUpdatedOn|date:"d-m-Y H:i" }}</div>
+            </div>
+            <div class="col">
+                <div class="label">Location</div>
+                <div class="value">{{ location|default:"-" }}</div>
+            </div>
+        </div>
+    </div>
+
+    {% if order.remark %}
+        <div class="box">
+            <div class="label">Remark</div>
+            <div class="value">{{ order.remark }}</div>
+        </div>
+    {% endif %}
+
+    <div class="box">
+        <div class="label">Order Text</div>
+        <div class="text">{{ order.orderText|default:"" }}</div>
+    </div>
+
+    {% if attachments %}
+        <div class="box">
+            <div class="label">Images</div>
+            <div class="images">
+                {% for att in attachments %}
+                    {% if att.image and att.image.url %}
+                        <div class="img">
+                            <img src="{{ att.image.url }}">
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+</body>
+</html>
+

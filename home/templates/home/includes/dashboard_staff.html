@@ -1,0 +1,18 @@
+<div class="ui one column blue card" style="width: 100%">
+    <div class="content">
+        <div class="center aligned header">Welcome, {{ obj.name }}</div>
+        <div class="center aligned description">
+            <p>zivaBooks provides staff attendance and many more.</p>
+        </div>
+    </div>
+    <div class="extra content">
+        <div class="center aligned author">
+            {% if obj.photo %}
+                <img class="ui avatar image" src="{{ obj.photo.url }}">
+            {% else %}
+                <img class="ui avatar image" src="/static/images/default-avatar.svg">
+            {% endif %}
+            {{ obj.name }}
+        </div>
+    </div>
+</div>

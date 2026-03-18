@@ -56,10 +56,12 @@
                 >Party Group List
                 </div>
                 <div style=" position: absolute;right: 1.5rem;top: 18px;">
-                    <button class="ui green mini plus button right" onclick="showUserModal()">
-                        <i class="plus square outline icon"></i>
-                        Add Party Group
-                    </button>
+                    {% if party_group_capabilities.can_add %}
+                        <button class="ui green mini plus button right" onclick="showUserModal()">
+                            <i class="plus square outline icon"></i>
+                            Add Party Group
+                        </button>
+                    {% endif %}
                 </div>
             </div>
             <div class="ui tab " data-tab="user">
@@ -180,6 +182,10 @@
                             <button class="ui right labeled icon button green saveBtn" onclick="editUser()">
                                 Update
                                 <i class="checkmark icon"></i>
+                            </button>
+                            <button class="ui right labeled icon button teal js-view-close-btn" type="button" style="display: none" onclick="$('#userModal').modal('hide')">
+                                Close
+                                <i class="check icon"></i>
                             </button>
                             <button style="display: none" class="ui right labeled icon button teal saveBtnLoad">
                                 Saving ....
@@ -383,8 +389,15 @@
 
         }
 
-        function GetUserDetails(id) {
+        function GetUserDetails(id, mode) {
+            mode = mode || 'edit';
+            var viewOnly = mode === 'view';
             $('#userModal').modal('show');
+            $('#groupNameEdit, #descriptionEdit').prop('disabled', viewOnly);
+            // Toggle action buttons for view-only mode.
+            $('#userModal .saveBtn').toggle(!viewOnly);
+            $('#userModal .saveBtnLoad').hide();
+            $('#userModal .js-view-close-btn').toggle(viewOnly);
             $.ajax({
                 type: 'get',
                 url: '{% url "homeApp:get_party_group_detail"%}?id=' + id,

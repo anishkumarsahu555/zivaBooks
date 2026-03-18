@@ -51,9 +51,12 @@
     <div class="ui right aligned basic  grid">
         <div class="sixteen wide column">
                 <div class="ui pointing secondary menu" >
-                    <div style="cursor: pointer;" class="item active" data-tab="user">
+                <div style="cursor: pointer;" class="item active" data-tab="user">
                         Staff Group List
                     </div>
+                    <a class="item" href="{% url 'homeApp:permission_reference' %}">
+                        Permission Reference
+                    </a>
                      <div style=" position: absolute;right: 1.5rem;top: 18px;">
                     <a href="{% url 'homeApp:staff_group_create' %}" class="ui green mini plus button right">
                         <i class="plus square outline icon"></i>

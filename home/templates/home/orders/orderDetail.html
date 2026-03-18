@@ -1,0 +1,254 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block title %}
+    <title>Order {{ obj.orderNumber|default:obj.pk }}</title>
+{% endblock %}
+
+{% block body %}
+    <style>
+        .meta-card {
+            border-radius: 14px;
+            border: 1px solid rgba(34,36,38,.10);
+            background: #fff;
+            padding: 12px;
+        }
+        .meta-k { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: rgba(0,0,0,.55); margin-bottom: 4px; }
+        .meta-v { font-size: 14px; font-weight: 600; color: rgba(0,0,0,.85); }
+        .order-text { white-space: pre-wrap; line-height: 1.4; }
+        .att-img { width: 100%; height: 140px; object-fit: cover; display: block; }
+    </style>
+
+    <div class="ui basic grid">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div class="item active">Order {{ obj.orderNumber|default:obj.pk }}</div>
+                <div style="position:absolute;right:1.5rem;top:18px;">
+                    <a class="ui teal mini button" href="{{ order_return_url }}">
+                        <i class="arrow left icon"></i>
+                        Back
+                    </a>
+                </div>
+            </div>
+
+            <div class="ui row teal stacked segment padded">
+                <div class="content">
+                    <div class="ui grid">
+                        <div class="ten wide column">
+                            {% if obj.status == "approved" %}
+                                <div class="ui tiny green label">Approved</div>
+                            {% else %}
+                                <div class="ui tiny orange label">{{ obj.get_status_display }}</div>
+                            {% endif %}
+                            {% if obj.partyID %}
+                                <div class="ui tiny basic label"><i class="user icon"></i> {{ obj.partyID.name }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="six wide column right aligned">
+                            <div class="ui mini buttons">
+                                <button class="ui blue button" type="button" onclick="downloadOrderPdf('{{ obj.id }}')">
+                                    <i class="file pdf outline icon"></i>
+                                    PDF
+                                </button>
+                                {% if can_edit_order %}
+                                    <a class="ui green button" href="{% url 'homeApp:edit_order' obj.id %}">
+                                        <i class="pen icon"></i>
+                                        Edit
+                                    </a>
+                                {% endif %}
+                                {% if can_approve_order %}
+                                    <button class="ui purple button" type="button" onclick="showApproveOrderModal('{{ obj.id }}')">
+                                        <i class="check icon"></i>
+                                        Approve
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ui divider"></div>
+
+                    <div class="ui stackable grid">
+                        <div class="four wide column">
+                            <div class="meta-card">
+                                <div class="meta-k">Order Date</div>
+                                <div class="meta-v">{% if obj.buildDate %}{{ obj.buildDate|date:"d-m-Y" }}{% else %}-{% endif %}</div>
+                            </div>
+                        </div>
+                        <div class="four wide column">
+                            <div class="meta-card">
+                                <div class="meta-k">Created</div>
+                                <div class="meta-v">{{ obj.datetime|date:"d-m-Y h:i A" }}</div>
+                            </div>
+                        </div>
+                        <div class="four wide column">
+                            <div class="meta-card">
+                                <div class="meta-k">Updated</div>
+                                <div class="meta-v">{{ obj.lastUpdatedOn|date:"d-m-Y h:i A" }}</div>
+                            </div>
+                        </div>
+                        <div class="four wide column">
+                            <div class="meta-card">
+                                <div class="meta-k">Created By</div>
+                                <div class="meta-v">{{ obj.createdBy.name|default:"-" }}</div>
+                            </div>
+                        </div>
+                        <div class="four wide column">
+                            <div class="meta-card">
+                                <div class="meta-k">Approved By</div>
+                                <div class="meta-v">{{ obj.approvedBy.name|default:"-" }}</div>
+                            </div>
+                        </div>
+                        <div class="four wide column">
+                            <div class="meta-card">
+                                <div class="meta-k">Approved On</div>
+                                <div class="meta-v">{% if obj.approvedOn %}{{ obj.approvedOn|date:"d-m-Y h:i A" }}{% else %}-{% endif %}</div>
+                            </div>
+                        </div>
+                        <div class="four wide column">
+                            <div class="meta-card">
+                                <div class="meta-k">Location</div>
+                                <div class="meta-v">{{ obj.location|default:"-" }}</div>
+                            </div>
+                        </div>
+                        <div class="four wide column">
+                            <div class="meta-card">
+                                <div class="meta-k">Lat/Lng</div>
+                                <div class="meta-v">{{ obj.latitude|default:"0.0" }}, {{ obj.longitude|default:"0.0" }}</div>
+                            </div>
+                        </div>
+                        <div class="eight wide column">
+                            <div class="meta-card">
+                                <div class="meta-k">Remark</div>
+                                <div class="meta-v">{{ obj.remark|default:"-" }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ui divider"></div>
+
+                    <div class="ui segment" style="border-radius:14px;">
+                        <div class="ui tiny header">Order Text</div>
+                        <div class="order-text">{{ obj.orderText|default:"" }}</div>
+                    </div>
+
+                    <div class="ui segment" style="border-radius:14px;">
+                        <div class="ui tiny header">Attachments</div>
+                        {% if attachments %}
+                            <div class="ui four stackable cards">
+                                {% for att in attachments %}
+                                    <div class="card" style="cursor:pointer" onclick="showAttachment('{{ att.image.url }}')">
+                                        <div class="image">
+                                            <img class="att-img" src="{{ att.image.thumbnail.url }}" alt="attachment">
+                                        </div>
+                                        <div class="content">
+                                            <div class="description">{{ att.label|default:"Image" }}</div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="ui tiny grey label">No images uploaded.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui mini modal" id="downloadOrderPdfModal">
+                <i class="close icon"></i>
+                <div class="header">Download PDF</div>
+                <div class="content"><p>Download this order as PDF?</p></div>
+                <div class="actions">
+                    <div class="ui cancel button">Cancel</div>
+                    <input type="hidden" id="DownloadOrderID" value="{{ obj.id }}">
+                    <div class="ui blue ok button" onclick="confirmDownloadOrderPdf()">Download</div>
+                </div>
+            </div>
+
+            <div class="ui mini modal" id="approveOrderModal">
+                <i class="close icon"></i>
+                <div class="header">Approve Order</div>
+                <div class="content">
+                    <p>Are you sure you want to approve this order?</p>
+                    <div class="ui tiny grey label">After approval, staff edits will be locked.</div>
+                </div>
+                <div class="actions">
+                    <div class="ui red cancel button">No</div>
+                    <input type="hidden" id="ApproveOrderID" value="{{ obj.id }}">
+                    <div class="ui green ok button" onclick="confirmApproveOrder()">
+                        Yes <i class="check icon"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui modal" id="attachmentModal">
+                <i class="close icon"></i>
+                <div class="header">Attachment</div>
+                <div class="content" style="text-align:center;">
+                    <img id="attachmentModalImg" src="" style="max-width:100%;height:auto;border-radius:12px;">
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script>
+        function downloadOrderPdf(id) {
+            $('#DownloadOrderID').val('' + id);
+            $('#downloadOrderPdfModal').modal('show');
+        }
+        function confirmDownloadOrderPdf() {
+            var id = $('#DownloadOrderID').val();
+            $('#downloadOrderPdfModal').modal('hide');
+            startDownloadOrderPdf(id);
+        }
+        function startDownloadOrderPdf(id) {
+            var baseUrl = "{% url 'homeApp:generate_order_pdf' %}";
+            var a = document.createElement('a');
+            a.href = baseUrl + '?id=' + encodeURIComponent(id);
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { document.body.removeChild(a); }, 1000);
+        }
+
+        function showApproveOrderModal(id) {
+            $('#ApproveOrderID').val('' + id);
+            $('#approveOrderModal').modal('show');
+        }
+        function confirmApproveOrder() {
+            showLoading();
+            var id = $('#ApproveOrderID').val();
+            $('#approveOrderModal').modal('hide');
+            var formdata = new FormData();
+            formdata.append('userID', id);
+            $.ajax({
+                url: "{% url 'homeApp:approve_order' %}",
+                type: "post",
+                data: formdata,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: 'Order Approved.'});
+                        location.reload();
+                    } else {
+                        $('body').toast({class: 'error', message: 'An error occurred !'});
+                    }
+                    hideLoading();
+                },
+                error: function () {
+                    $('body').toast({class: 'error', message: 'An error occurred !'});
+                    hideLoading();
+                }
+            });
+        }
+
+        function showAttachment(url) {
+            $('#attachmentModalImg').attr('src', url);
+            $('#attachmentModal').modal('show');
+        }
+    </script>
+{% endblock %}

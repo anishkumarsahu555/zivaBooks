@@ -23,7 +23,6 @@ from django_datatables_view.base_datatable_view import BaseDatatableView
 from weasyprint import CSS, HTML
 
 from home.models import *
-from home.authz import legacy_group_names, legacy_permission_names
 from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_qs
 
 User = get_user_model()
@@ -89,6 +88,15 @@ DEFAULT_GROUP_PERMISSION_MAP = {
         'home.can_view_audit_logs',
     ],
 }
+
+ADMIN_LIKE_PERMS = (
+    'home.can_manage_staff',
+    'home.can_manage_staff_groups',
+    'home.can_manage_parties',
+    'home.can_view_party_credentials',
+    'home.can_approve_collection',
+    'home.can_view_audit_logs',
+)
 
 
 class LocationThread(threading.Thread):
@@ -198,15 +206,220 @@ def _decimal_from_request(value, default='0'):
 
 
 def _permission_catalog():
+    hidden_content_types = {
+        ('activation', 'ecomvalidity'),
+        ('activation', 'validity'),
+        ('home', 'auditlog'),
+        ('home', 'geolocationpackage'),
+        ('home', 'tenant'),
+        ('home', 'tenantmembership'),
+        ('home', 'whatsappmessage'),
+        ('home', 'whatsappmessagestatus'),
+    }
     permission_groups = defaultdict(list)
     for permission in Permission.objects.select_related('content_type').exclude(
         content_type__app_label__in=['admin', 'auth', 'contenttypes', 'sessions']
     ).order_by('content_type__app_label', 'content_type__model', 'name'):
+        if (permission.content_type.app_label, permission.content_type.model) in hidden_content_types:
+            continue
         module = permission.content_type.model.replace('_', ' ').title()
         if permission.codename.startswith('can_'):
             module = 'Custom ' + module
         permission_groups[module].append(permission)
     return dict(permission_groups)
+
+
+def _has_any_permission(user, *perm_names):
+    if len(perm_names) == 1 and isinstance(perm_names[0], (list, tuple, set)):
+        perm_names = tuple(perm_names[0])
+    return any(user.has_perm(perm_name) for perm_name in perm_names)
+
+
+def _is_admin_like(user):
+    return _has_any_permission(user, ADMIN_LIKE_PERMS)
+
+
+def _can_manage_staff(user):
+    return user.has_perm('home.can_manage_staff')
+
+
+def _can_manage_party_records(user):
+    return _has_any_permission(user, 'home.can_manage_parties', 'home.can_view_party_credentials')
+
+
+def _can_view_party_credentials(user):
+    return user.has_perm('home.can_view_party_credentials')
+
+
+def _can_add_party(user):
+    return user.has_perm('home.add_party') or _can_view_party_credentials(user)
+
+
+def _can_edit_party(user):
+    return user.has_perm('home.change_party') or _can_view_party_credentials(user)
+
+
+def _can_delete_party(user):
+    return user.has_perm('home.delete_party') or _can_view_party_credentials(user)
+
+
+def _can_add_party_group(user):
+    return user.has_perm('home.add_partygroup') or _can_view_party_credentials(user)
+
+
+def _can_edit_party_group(user):
+    return user.has_perm('home.change_partygroup') or _can_view_party_credentials(user)
+
+
+def _can_delete_party_group(user):
+    return user.has_perm('home.delete_partygroup') or _can_view_party_credentials(user)
+
+
+def _can_add_bank(user):
+    return user.has_perm('home.add_bank') or _can_view_party_credentials(user)
+
+
+def _can_edit_bank(user):
+    return user.has_perm('home.change_bank') or _can_view_party_credentials(user)
+
+
+def _can_delete_bank(user):
+    return user.has_perm('home.delete_bank') or _can_view_party_credentials(user)
+
+
+def _can_review_collections(user):
+    return _has_any_permission(user, 'home.can_approve_collection', 'home.can_view_party_credentials')
+
+
+def _can_auto_approve_collections(user):
+    return user.has_perm('home.can_view_party_credentials')
+
+
+def _can_manage_sales(user):
+    return _has_any_permission(user, 'home.can_manage_sales', 'home.can_approve_sales')
+
+
+def _has_sales_access(user):
+    return _has_any_permission(user, 'home.can_manage_sales', 'home.can_approve_sales', 'home.view_sales', 'home.add_sales', 'home.change_sales')
+
+
+def _can_manage_cash_counter_records(user):
+    return user.has_perm('home.can_view_party_credentials')
+
+
+def _can_filter_all_collections(user):
+    return _can_review_collections(user)
+
+
+def _can_filter_all_cash_counter(user):
+    return _has_any_permission(
+        user,
+        'home.can_manage_cash_counter',
+        'home.can_view_party_credentials',
+        'home.can_approve_collection',
+    )
+
+
+def _can_filter_all_sales(user):
+    return _is_admin_like(user) or _can_manage_sales(user)
+
+
+def _can_edit_sales(user):
+    return user.has_perm('home.change_sales') or _can_manage_sales(user) or user.has_perm('home.can_view_party_credentials')
+
+
+def _can_delete_sales(user):
+    return user.has_perm('home.can_view_party_credentials')
+
+
+def _can_manage_orders(user):
+    return _has_any_permission(user, 'home.can_manage_orders', 'home.can_approve_orders')
+
+
+def _can_filter_all_orders(user):
+    return _is_admin_like(user) or _can_manage_orders(user) or user.has_perm('home.can_view_party_credentials')
+
+
+def _can_add_order(user):
+    return user.has_perm('home.add_order')
+
+
+def _can_edit_order(user):
+    return user.has_perm('home.change_order') or _can_manage_orders(user) or user.has_perm('home.can_view_party_credentials')
+
+
+def _can_delete_order(user):
+    return user.has_perm('home.delete_order') or user.has_perm('home.can_view_party_credentials')
+
+
+def _can_approve_orders(user):
+    return user.has_perm('home.can_approve_orders') or user.has_perm('home.can_manage_orders') or user.has_perm('home.can_view_party_credentials')
+
+
+def _can_set_order_date(user):
+    return user.has_perm('home.can_manage_orders') or user.has_perm('home.can_approve_orders') or user.has_perm('home.can_view_party_credentials')
+
+
+def _format_order_number(pk):
+    return 'O' + str(int(pk)).zfill(8)
+
+
+def _can_edit_order_record(user, order_obj):
+    if not user.is_authenticated or order_obj is None:
+        return False
+    if not _can_edit_order(user):
+        return False
+    admin_like = _can_filter_all_orders(user)
+    if str(order_obj.status) == Order.Status.APPROVED and not admin_like:
+        return False
+    if admin_like:
+        return True
+    staff = tenant_qs(user, StaffUser).filter(user_ID_id=user.pk, isDeleted=False).only('id').first()
+    if not staff:
+        return False
+    return order_obj.createdBy_id == staff.pk
+
+
+def _can_delete_order_record(user, order_obj):
+    if not user.is_authenticated or order_obj is None:
+        return False
+    if not _can_delete_order(user):
+        return False
+    admin_like = _can_filter_all_orders(user)
+    if str(order_obj.status) == Order.Status.APPROVED and not admin_like:
+        return False
+    if admin_like:
+        return True
+    staff = tenant_qs(user, StaffUser).filter(user_ID_id=user.pk, isDeleted=False).only('id').first()
+    if not staff:
+        return False
+    return order_obj.createdBy_id == staff.pk
+
+
+def _can_edit_sales_record(user, sale_obj):
+    """
+    Staff can edit only their own Sales records and only before approval.
+    Admin-like users (manage/approve sales or view party credentials) can edit anytime.
+    """
+    if not user.is_authenticated:
+        return False
+    if not _can_edit_sales(user):
+        return False
+    if sale_obj is None:
+        return False
+
+    admin_like = _can_manage_sales(user) or user.has_perm('home.can_view_party_credentials')
+    if sale_obj.isApproved and not admin_like:
+        return False
+
+    if admin_like:
+        return True
+
+    # MyList scope: createdBy must be this staff user.
+    staff = tenant_qs(user, StaffUser).filter(user_ID_id=user.pk, isDeleted=False).only('id').first()
+    if not staff:
+        return False
+    return sale_obj.createdBy_id == staff.pk
 
 
 def _tenant_group_name(request_or_tenant, base_name):
@@ -289,6 +502,14 @@ def _sales_list_base_qs(request_or_user):
     )
 
 
+def _orders_list_base_qs(request_or_user):
+    return tenant_qs(request_or_user, Order).select_related('partyID', 'createdBy', 'approvedBy').only(
+        'id', 'orderNumber', 'buildDate', 'datetime', 'lastUpdatedOn', 'remark', 'approvedOn',
+        'status', 'latitude', 'longitude', 'location',
+        'partyID__name', 'createdBy__name', 'approvedBy__name'
+    )
+
+
 def _attendance_list_base_qs(request_or_user):
     return tenant_qs(request_or_user, Attendance).select_related('staffID').only(
         'id', 'datetime', 'isLogIn', 'isLogOut', 'loginDateTime', 'logoutDateTime',
@@ -312,25 +533,6 @@ def _cash_counter_collection_list_base_qs(request_or_user):
         'collectionDateTime', 'datetime', 'isApproved', 'chequeDate',
         'partyID__name', 'transferredPartyID__name', 'bankID__name', 'collectedBy__name', 'approvedBy__name'
     )
-
-
-def _request_group_names(request):
-    if not hasattr(request, "_group_name_cache"):
-        request._group_name_cache = legacy_group_names(request.user)
-    return request._group_name_cache
-
-
-def _staff_queryset_for_legacy_group(request, group_name):
-    queryset = tenant_qs(request, StaffUser).filter(isDeleted__exact=False)
-    permission_names = legacy_permission_names(group_name)
-    role_filter = Q(staffGroup__name__iexact=group_name) | Q(group__iexact=group_name)
-    if permission_names:
-        codenames = [perm_name.split('.', 1)[1] for perm_name in permission_names if '.' in perm_name]
-        role_filter |= Q(
-            staffGroup__djangoGroup__permissions__content_type__app_label='home',
-            staffGroup__djangoGroup__permissions__codename__in=codenames,
-        )
-    return queryset.filter(role_filter).distinct()
 
 
 def _get_party_cache_version():
@@ -445,9 +647,23 @@ class StaffGroupListJson(BaseDatatableView):
 def get_staff_group_detail(request):
     group_id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, StaffGroup), id=group_id)
+    hidden_content_types = {
+        ('activation', 'ecomvalidity'),
+        ('activation', 'validity'),
+        ('home', 'auditlog'),
+        ('home', 'geolocationpackage'),
+        ('home', 'tenant'),
+        ('home', 'tenantmembership'),
+        ('home', 'whatsappmessage'),
+        ('home', 'whatsappmessagestatus'),
+    }
     permissions = list(
         instance.djangoGroup.permissions.select_related('content_type').order_by('content_type__model', 'name')
     ) if instance.djangoGroup_id else []
+    permissions = [
+        permission for permission in permissions
+        if (permission.content_type.app_label, permission.content_type.model) not in hidden_content_types
+    ]
     permission_ids = [permission.id for permission in permissions]
     permission_details = [
         {
@@ -606,11 +822,10 @@ class StaffUserListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
             photo_url = _image_url(item.photo, 'thumbnail')
             images = '<img class="ui avatar image" src="{}">'.format(photo_url)
-            if 'Admin' in group_names:
+            if _can_manage_staff(self.request.user):
                 action = '''<button data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick = "GetUserDetails('{}')" class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
                   </button>
@@ -750,6 +965,10 @@ def edit_staff_api(request):
 @csrf_exempt
 def add_party_group_api(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_add_party_group(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             groupName = request.POST.get("groupName")
             description = request.POST.get("description")
@@ -770,6 +989,10 @@ def add_party_group_api(request):
 @csrf_exempt
 def delete_part_group(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_delete_party_group(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             id = request.POST.get("userID")
             obj = tenant_qs(request, PartyGroup).select_related().get(pk=int(id))
@@ -785,6 +1008,10 @@ class PartyGroupListJson(BaseDatatableView):
 
     def get_initial_queryset(self):
         # if 'Admin' in group_names:
+        if not getattr(self.request, 'user', None) or not self.request.user.is_authenticated:
+            return PartyGroup.objects.none()
+        if not _has_any_permission(self.request.user, 'home.can_manage_parties', 'home.can_view_party_credentials', 'home.view_partygroup'):
+            return PartyGroup.objects.none()
         return tenant_qs(self.request, PartyGroup).filter(isDeleted__exact=False).only(
             'id', 'name', 'description', 'datetime'
         )
@@ -802,19 +1029,22 @@ class PartyGroupListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
-                action = '''<button  data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "GetUserDetails('{}')" class="ui circular facebook icon button green">
+            can_edit = _can_edit_party_group(self.request.user)
+            can_delete = _can_delete_party_group(self.request.user)
+            if can_edit:
+                action = '''<button data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','edit')" class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
-                  </button>
-                  <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                    <i class="trash alternate icon"></i>
-                  </button></td>'''.format(item.pk, item.pk),
+                  </button>'''.format(item.pk)
             else:
-                action = '''<div class="ui tiny label">
-                  Denied
-                </div>'''
+                action = '''<button data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','view')" class="ui circular teal icon button">
+                    <i class="eye icon"></i>
+                  </button>'''.format(item.pk)
+
+            if can_delete:
+                action = action + ''' <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
+                    <i class="trash alternate icon"></i>
+                  </button>'''.format(item.pk)
             json_data.append([
                 escape(item.name),
                 escape(item.description),
@@ -827,6 +1057,10 @@ class PartyGroupListJson(BaseDatatableView):
 
 
 def get_party_group_detail(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.can_manage_parties', 'home.can_view_party_credentials', 'home.view_partygroup'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
     id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, PartyGroup), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
@@ -844,6 +1078,10 @@ def get_party_group_detail(request):
 @csrf_exempt
 def edit_part_group_api(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_edit_party_group(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             Id = request.POST.get("EditId")
             name = request.POST.get("groupName")
@@ -864,6 +1102,10 @@ def edit_part_group_api(request):
 @csrf_exempt
 def add_bank_api(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_add_bank(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             bankName = request.POST.get("bankName")
             accountNumber = request.POST.get("accountNumber")
@@ -886,6 +1128,10 @@ class BankListJson(BaseDatatableView):
 
     def get_initial_queryset(self):
         # if 'Admin' in group_names:
+        if not getattr(self.request, 'user', None) or not self.request.user.is_authenticated:
+            return Bank.objects.none()
+        if not _has_any_permission(self.request.user, 'home.can_manage_parties', 'home.can_view_party_credentials', 'home.view_bank'):
+            return Bank.objects.none()
         return tenant_qs(self.request, Bank).filter(isDeleted__exact=False).only(
             'id', 'name', 'accountNumber', 'description', 'datetime'
         )
@@ -903,20 +1149,22 @@ class BankListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
-
-                action = '''<button  data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "GetUserDetails('{}')" class="ui circular facebook icon button green">
+            can_edit = _can_edit_bank(self.request.user)
+            can_delete = _can_delete_bank(self.request.user)
+            if can_edit:
+                action = '''<button data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','edit')" class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
-                  </button>
-                  <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                    <i class="trash alternate icon"></i>
-                  </button></td>'''.format(item.pk, item.pk),
+                  </button>'''.format(item.pk)
             else:
-                action = '''<div class="ui tiny label">
-                  Denied
-                </div>'''
+                action = '''<button data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','view')" class="ui circular teal icon button">
+                    <i class="eye icon"></i>
+                  </button>'''.format(item.pk)
+
+            if can_delete:
+                action = action + ''' <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
+                    <i class="trash alternate icon"></i>
+                  </button>'''.format(item.pk)
             json_data.append([
                 escape(item.name),
                 escape(item.accountNumber),
@@ -930,6 +1178,10 @@ class BankListJson(BaseDatatableView):
 
 
 def get_bank_detail(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.can_manage_parties', 'home.can_view_party_credentials', 'home.view_bank'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
     id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, Bank), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
@@ -947,6 +1199,10 @@ def get_bank_detail(request):
 @csrf_exempt
 def edit_bank_api(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_edit_bank(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             Id = request.POST.get("EditId")
             name = request.POST.get("bankName")
@@ -968,6 +1224,10 @@ def edit_bank_api(request):
 @csrf_exempt
 def delete_bank(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_delete_bank(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             id = request.POST.get("userID")
             obj = tenant_qs(request, Bank).select_related().get(pk=int(id))
@@ -983,6 +1243,10 @@ def delete_bank(request):
 @csrf_exempt
 def add_party_api(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_add_party(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             partyName = request.POST.get("partyName")
             phoneNumber = request.POST.get("phoneNumber")
@@ -1038,7 +1302,7 @@ def generate_party_users_api(request):
         if not request.user.is_authenticated:
             return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
 
-        if not _request_group_names(request).intersection({'Admin', 'Moderator'}):
+        if not _can_manage_party_records(request.user):
             return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
 
         try:
@@ -1106,20 +1370,23 @@ class PartyListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            can_view_credentials = _can_view_party_credentials(self.request.user)
+            can_edit = _can_edit_party(self.request.user)
+            can_delete = _can_delete_party(self.request.user)
 
-                action = '''<button  data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "GetUserDetails('{}')" class="ui circular facebook icon button green">
+            if can_edit:
+                action = '''<button data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','edit')" class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
-                  </button>
-                  <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                    <i class="trash alternate icon"></i>
-                  </button></td>'''.format(item.pk, item.pk),
-
+                  </button>'''.format(item.pk)
             else:
-                action = '''<button  data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "GetUserDetails('{}')" class="ui circular facebook icon button green">
-                    <i class="pen icon"></i>
+                action = '''<button data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','view')" class="ui circular teal icon button">
+                    <i class="eye icon"></i>
+                  </button>'''.format(item.pk)
+
+            if can_delete:
+                action = action + ''' <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
+                    <i class="trash alternate icon"></i>
                   </button>'''.format(item.pk)
             try:
                 party = item.partyGroupID.name
@@ -1130,21 +1397,25 @@ class PartyListJson(BaseDatatableView):
             except:
                 usr = 'N/A'
 
-            if item.username:
+            if can_view_credentials and item.username:
                 username = '''{} <button data-copy="{}" class="ui mini icon button copy-btn" type="button" title="Copy Username"><i class="copy outline icon"></i></button>'''.format(
                     escape(item.username),
                     escape(item.username)
                 )
-            else:
+            elif can_view_credentials:
                 username = 'N/A'
+            else:
+                username = '<div class="ui tiny label">Hidden</div>'
 
-            if item.password:
+            if can_view_credentials and item.password:
                 password = '''{} <button data-copy="{}" class="ui mini icon button copy-btn" type="button" title="Copy Password"><i class="copy outline icon"></i></button>'''.format(
                     escape(item.password),
                     escape(item.password)
                 )
-            else:
+            elif can_view_credentials:
                 password = 'N/A'
+            else:
+                password = '<div class="ui tiny label">Hidden</div>'
             json_data.append([
                 escape(item.name),
                 escape(item.phone),
@@ -1191,6 +1462,10 @@ def get_party_detail(request):
 @csrf_exempt
 def edit_party_api(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_edit_party(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             Id = request.POST.get("EditId")
             name = request.POST.get("partyName")
@@ -1223,6 +1498,10 @@ def edit_party_api(request):
 @csrf_exempt
 def delete_party(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_delete_party(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             id = request.POST.get("userID")
             obj = tenant_qs(request, Party).select_related().get(pk=int(id))
@@ -1422,7 +1701,7 @@ def add_collection_by_admin_api(request):
             obj.paymentID = str(obj.pk).zfill(8)
             # obj.collectionDateTime = obj.datetime
             obj.save()
-            if 'Admin' in _request_group_names(request):
+            if _can_auto_approve_collections(request.user):
                 try:
                     obj.isApproved = True
                     obj.approvedBy_id = user.pk
@@ -1469,8 +1748,7 @@ def edit_collection_by_admin_api(request):
             cus = tenant_qs(request, Party).select_related().get(pk=int(party))
 
             obj = tenant_qs(request, Collection).get(pk=int(ID))
-            request_groups = _request_group_names(request)
-            if 'Admin' in request_groups or 'Moderator' in request_groups:
+            if _can_review_collections(request.user):
                 obj.partyID_id = cus.pk
                 obj.modeOfPayment = paymentMode
                 obj.paidAmount = float(amountPaid)
@@ -1541,7 +1819,6 @@ class CollectionByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
             # action = '''<button  data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "GetUserDetails('{}')" class="ui circular facebook icon button green">
             #         <i class="pen icon"></i>
@@ -1594,23 +1871,23 @@ class CollectionByAdminListJson(BaseDatatableView):
             staffID = self.request.GET.get("staffID")
             sDate = datetime.strptime(startDateV, '%d/%m/%Y')
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
-            if staffID == 'All':
-                return _collection_list_base_qs(self.request).filter(
-                    isDeleted__exact=False,
-                    collectionDateTime__date__range=[sDate.date(), eDate.date()]
-                )
-            else:
-                return _collection_list_base_qs(self.request).filter(
-                    isDeleted__exact=False,
-                    collectionDateTime__date__range=[sDate.date(), eDate.date()],
-                    collectedBy_id=int(staffID)
-                )
+            queryset = _collection_list_base_qs(self.request).filter(
+                isDeleted__exact=False,
+                collectionDateTime__date__range=[sDate.date(), eDate.date()]
+            )
+            if not _can_filter_all_collections(self.request.user):
+                return queryset.filter(collectedBy__user_ID_id=self.request.user.pk)
+            if staffID and staffID != 'All':
+                return queryset.filter(collectedBy_id=int(staffID))
+            return queryset
         except:
-            return _collection_list_base_qs(self.request).filter(
+            queryset = _collection_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 collectionDateTime__date=datetime.today().date()
             )
+            if not _can_filter_all_collections(self.request.user):
+                return queryset.filter(collectedBy__user_ID_id=self.request.user.pk)
+            return queryset
 
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
@@ -1632,9 +1909,8 @@ class CollectionByAdminListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_auto_approve_collections(self.request.user):
 
                 action = '''<button  data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "showConfirmationModal('{}')" class="ui circular facebook icon button purple">
                    <i class="whatsapp icon"></i>
@@ -1645,10 +1921,14 @@ class CollectionByAdminListJson(BaseDatatableView):
                   <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
                     <i class="trash alternate icon"></i>
                   </button>'''.format(item.pk, item.pk, item.pk),
-            else:
+            elif _can_review_collections(self.request.user):
                 action = ''' <a href="/edit_collection/{}/" data-inverted="" data-tooltip="Edit Cheque Date Only" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
                   </a>'''.format(item.pk)
+            else:
+                action = '''<div class="ui tiny label">
+  Denied
+</div>'''
             if item.modeOfPayment == 'Cheque':
                 try:
                     chequeDate = item.chequeDate.strftime('%d-%m-%Y')
@@ -1728,25 +2008,25 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
             sDate = datetime.strptime(startDateV, '%d/%m/%Y')
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-            if staffID == 'All':
-                return _collection_list_base_qs(self.request).filter(
-                    isDeleted__exact=False,
-                    chequeDate__range=[sDate.date(), eDate.date()],
-                    modeOfPayment__exact='Cheque'
-                )
-            else:
-                return _collection_list_base_qs(self.request).filter(
-                    isDeleted__exact=False,
-                    chequeDate__range=[sDate.date(), eDate.date()],
-                    collectedBy_id=int(staffID),
-                    modeOfPayment__exact='Cheque'
-                )
+            queryset = _collection_list_base_qs(self.request).filter(
+                isDeleted__exact=False,
+                chequeDate__range=[sDate.date(), eDate.date()],
+                modeOfPayment__exact='Cheque'
+            )
+            if not _can_filter_all_collections(self.request.user):
+                return queryset.filter(collectedBy__user_ID_id=self.request.user.pk)
+            if staffID and staffID != 'All':
+                return queryset.filter(collectedBy_id=int(staffID))
+            return queryset
         except:
-            return _collection_list_base_qs(self.request).filter(
+            queryset = _collection_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 chequeDate__exact=datetime.today().date(),
                 modeOfPayment__exact='Cheque'
             )
+            if not _can_filter_all_collections(self.request.user):
+                return queryset.filter(collectedBy__user_ID_id=self.request.user.pk)
+            return queryset
 
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
@@ -1767,9 +2047,8 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_auto_approve_collections(self.request.user):
 
                 action = '''<button  data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "showConfirmationModal('{}')" class="ui circular facebook icon button purple">
                    <i class="whatsapp icon"></i>
@@ -1780,10 +2059,14 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
                   <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
                     <i class="trash alternate icon"></i>
                   </button>'''.format(item.pk, item.pk, item.pk),
-            else:
+            elif _can_review_collections(self.request.user):
                 action = ''' <a href="/edit_collection/{}/" data-inverted="" data-tooltip="Edit Cheque Date Only" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                         <i class="pen icon"></i>
                       </a>'''.format(item.pk)
+            else:
+                action = '''<div class="ui tiny label">
+  Denied
+</div>'''
             if item.modeOfPayment == 'Cheque':
                 try:
                     chequeDate = item.chequeDate.strftime('%d-%m-%Y')
@@ -1957,6 +2240,131 @@ def get_staff_dashboard_report_api(request):
     }
     return JsonResponse({'data': data}, safe=False)
 
+@cache_page(60 * 5)
+def get_party_dashboard_report_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    if not _has_any_permission(request.user, 'home.can_manage_parties', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+
+    today = datetime.today().date()
+    thirty_days_ago = today - timedelta(days=30)
+    parties = tenant_qs(request, Party).filter(isDeleted=False)
+    party_groups = tenant_qs(request, PartyGroup).filter(isDeleted=False)
+    staff_qs = tenant_qs(request, StaffUser).filter(isDeleted=False, user_ID_id=request.user.pk)
+    staff = staff_qs.first()
+
+    total_parties = parties.count()
+    assigned_parties = parties.filter(assignTo__isnull=False).count()
+    unassigned_parties = parties.filter(assignTo__isnull=True).count()
+    recent_parties = parties.filter(datetime__date__gte=thirty_days_ago).count()
+    my_assigned_parties = parties.filter(assignTo=staff).count() if staff else 0
+
+    data = {
+        'party_total_count': total_parties,
+        'party_group_count': party_groups.count(),
+        'party_assigned_count': assigned_parties,
+        'party_unassigned_count': unassigned_parties,
+        'party_recent_count': recent_parties,
+        'party_my_assigned_count': my_assigned_parties,
+    }
+    return JsonResponse({'data': data}, safe=False)
+
+
+@cache_page(60 * 5)
+def get_bank_dashboard_report_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    if not _has_any_permission(request.user, 'home.can_manage_parties', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+
+    banks = tenant_qs(request, Bank).filter(isDeleted=False)
+    total_banks = banks.count()
+    banks_with_account = banks.exclude(accountNumber__isnull=True).exclude(accountNumber__exact='').count()
+    banks_missing_account = total_banks - banks_with_account
+    banks_used = tenant_qs(request, Collection).filter(isDeleted=False, bankID__isnull=False).values('bankID').distinct().count()
+
+    data = {
+        'bank_total_count': total_banks,
+        'bank_used_count': banks_used,
+        'bank_with_account_count': banks_with_account,
+        'bank_missing_account_count': banks_missing_account,
+    }
+    return JsonResponse({'data': data}, safe=False)
+
+
+@cache_page(60 * 5)
+def get_sales_dashboard_report_api(request):
+    today = datetime.today().date()
+    queryset = tenant_qs(request, Sales).filter(isDeleted=False)
+    if not _can_filter_all_sales(request.user):
+        queryset = queryset.filter(createdBy__user_ID_id=request.user.pk)
+
+    today_qs = queryset.filter(buildDate=today)
+    data = {
+        'sales_today_total': formatINR(today_qs.aggregate(total=Sum('amount'))['total'] or 0.0),
+        'sales_today_count': today_qs.count(),
+        'sales_lifetime_total': formatINR(queryset.aggregate(total=Sum('amount'))['total'] or 0.0),
+        'sales_record_count': queryset.count(),
+    }
+    return JsonResponse({'data': data}, safe=False)
+
+
+@cache_page(60 * 5)
+def get_orders_dashboard_report_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'forbidden'}, status=403)
+
+    today = datetime.today().date()
+    queryset = tenant_qs(request, Order).filter(isDeleted=False)
+    if not _can_filter_all_orders(request.user):
+        queryset = queryset.filter(createdBy__user_ID_id=request.user.pk)
+
+    today_qs = queryset.filter(buildDate=today)
+    data = {
+        'orders_today_count': today_qs.count(),
+        'orders_pending_count': queryset.filter(status=Order.Status.SUBMITTED).count(),
+        'orders_approved_today_count': queryset.filter(status=Order.Status.APPROVED, approvedOn__date=today).count(),
+        'orders_record_count': queryset.count(),
+    }
+    return JsonResponse({'data': data}, safe=False)
+
+
+@cache_page(60 * 5)
+def get_attendance_dashboard_report_api(request):
+    today = datetime.today().date()
+    monthly_start = today.replace(day=1)
+    today_record = tenant_qs(request, Attendance).filter(
+        isDeleted=False,
+        staffID__user_ID_id=request.user.pk,
+        datetime__date=today,
+    ).order_by('-datetime').first()
+    monthly_qs = tenant_qs(request, Attendance).filter(
+        isDeleted=False,
+        staffID__user_ID_id=request.user.pk,
+        datetime__date__range=[monthly_start, today],
+    )
+    if today_record:
+        if getattr(today_record, 'isLogOut', False):
+            today_status = 'Logged Out'
+        elif getattr(today_record, 'isLogIn', False):
+            today_status = 'Logged In'
+        else:
+            today_status = 'Pending'
+        login_time = today_record.loginDateTime.strftime('%I:%M %p') if today_record.loginDateTime else '--'
+        logout_time = today_record.logoutDateTime.strftime('%I:%M %p') if today_record.logoutDateTime else '--'
+    else:
+        today_status = 'Not Marked'
+        login_time = '--'
+        logout_time = '--'
+    data = {
+        'attendance_today_status': today_status,
+        'attendance_login_time': login_time,
+        'attendance_logout_time': logout_time,
+        'attendance_monthly_count': monthly_qs.count(),
+    }
+    return JsonResponse({'data': data}, safe=False)
+
 
 def generate_collection_report(request):
     cDate = request.GET.get('cDate')
@@ -1967,23 +2375,23 @@ def generate_collection_report(request):
     a_total_online = 0.0
     a_total_cheque_cc = 0.0
     a_total_party = 0.0
-    if staffID == 'All':
-        col = tenant_qs(request, Collection).select_related().filter(
-            collectionDateTime__date=colDate.date(),
-            isApproved__exact=True,
-            isDeleted__exact=False
-        ).order_by('collectedBy__name')
-        staffName = 'All'
+    base_qs = tenant_qs(request, Collection).select_related().filter(
+        collectionDateTime__date=colDate.date(),
+        isApproved__exact=True,
+        isDeleted__exact=False
+    )
+    if _can_filter_all_collections(request.user):
+        if staffID and staffID != 'All':
+            col = base_qs.filter(collectedBy_id=int(staffID)).order_by('collectedBy__name')
+            user = tenant_qs(request, StaffUser).get(pk=int(staffID))
+            staffName = user.name + ' - ' + user.partyGroupID.name
+        else:
+            col = base_qs.order_by('collectedBy__name')
+            staffName = 'All'
     else:
-        col = tenant_qs(request, Collection).select_related().filter(
-            collectionDateTime__date=colDate.date(),
-            isApproved__exact=True,
-            isDeleted__exact=False,
-            collectedBy_id=int(staffID)
-        ).order_by(
-            'collectedBy__name')
-        user = tenant_qs(request, StaffUser).get(pk=int(staffID))
-        staffName = user.name + ' - ' + user.partyGroupID.name
+        col = base_qs.filter(collectedBy__user_ID_id=request.user.pk).order_by('collectedBy__name')
+        staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk).first()
+        staffName = staff.name if staff else 'MyList'
 
     for a in col:
         if a.modeOfPayment == 'Cash':
@@ -2094,7 +2502,6 @@ class StaffAttendanceListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
             if item.isLogIn == True:
                 login_time = item.loginDateTime.strftime('%I:%M %p')
@@ -2175,7 +2582,6 @@ class AdminAttendanceListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
             if item.isLogIn == True:
                 login_time = item.loginDateTime.strftime('%I:%M %p')
@@ -2295,7 +2701,6 @@ class MessageListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
             if item.status == 'Success':
                 status = '''<div class="ui tiny green label">
@@ -2316,6 +2721,377 @@ class MessageListJson(BaseDatatableView):
             ])
 
         return json_data
+
+
+# ----------------------Orders-----------------
+
+
+@transaction.atomic
+@csrf_exempt
+def add_order_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_add_order(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        build_date = request.POST.get('buildDate')
+        party_id = request.POST.get('party')
+        order_text = request.POST.get('orderText')
+        remark = request.POST.get('remark')
+        lat = request.POST.get('lat')
+        lng = request.POST.get('lng')
+        loc = request.POST.get('loc')
+
+        obj = Order()
+        assign_tenant(obj, request)
+        obj.orderText = order_text
+        obj.remark = remark
+        if _can_set_order_date(request.user) and build_date:
+            obj.buildDate = datetime.strptime(build_date, '%d/%m/%Y').date()
+        else:
+            obj.buildDate = datetime.today().date()
+        if party_id:
+            obj.partyID_id = int(party_id)
+        if lat:
+            obj.latitude = lat
+        if lng:
+            obj.longitude = lng
+        if loc and loc != 'N/A':
+            obj.location = loc
+
+        staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk, isDeleted=False).only('id').first()
+        if staff:
+            obj.createdBy_id = staff.pk
+        # If staff enters text, consider it submitted; otherwise draft.
+        obj.status = Order.Status.SUBMITTED if (order_text or '').strip() else Order.Status.DRAFT
+        obj.save()
+        # Auto-generate order number like Sales.paymentID.
+        obj.orderNumber = _format_order_number(obj.pk)
+        obj.save(update_fields=['orderNumber', 'lastUpdatedOn'])
+
+        for f in request.FILES.getlist('images'):
+            att = OrderAttachment(order=obj)
+            assign_tenant(att, request)
+            att.image = f
+            att.save()
+
+        return JsonResponse({'message': 'success', 'order_id': obj.pk}, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error'}, safe=False)
+
+
+@transaction.atomic
+@csrf_exempt
+def update_order_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        order_id = request.POST.get('ID')
+        obj = tenant_qs(request, Order).select_related('createdBy').get(pk=int(order_id))
+        if not _can_edit_order_record(request.user, obj):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+        build_date = request.POST.get('buildDate')
+        party_id = request.POST.get('party')
+        order_text = request.POST.get('orderText')
+        remark = request.POST.get('remark')
+        status = request.POST.get('status')
+        lat = request.POST.get('lat')
+        lng = request.POST.get('lng')
+        loc = request.POST.get('loc')
+
+        if order_text is not None:
+            obj.orderText = order_text
+        if remark is not None:
+            obj.remark = remark
+        if _can_set_order_date(request.user) and build_date:
+            obj.buildDate = datetime.strptime(build_date, '%d/%m/%Y').date()
+        if party_id:
+            obj.partyID_id = int(party_id)
+        if status in dict(Order.Status.choices):
+            obj.status = status
+        if lat:
+            obj.latitude = lat
+        if lng:
+            obj.longitude = lng
+        if loc is not None and loc != 'N/A':
+            obj.location = loc
+        obj.save()
+
+        for f in request.FILES.getlist('images'):
+            att = OrderAttachment(order=obj)
+            assign_tenant(att, request)
+            att.image = f
+            att.save()
+
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error'}, safe=False)
+
+
+@transaction.atomic
+@csrf_exempt
+def delete_order(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        order_id = request.POST.get('userID')
+        obj = tenant_qs(request, Order).get(pk=int(order_id))
+        if not _can_delete_order_record(request.user, obj):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+        obj.isDeleted = True
+        obj.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error'}, safe=False)
+
+
+@transaction.atomic
+@csrf_exempt
+def approve_order(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_approve_orders(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        order_id = request.POST.get('userID')
+        obj = tenant_qs(request, Order).get(pk=int(order_id))
+        staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk, isDeleted=False).only('id').first()
+        obj.status = Order.Status.APPROVED
+        obj.approvedOn = datetime.now()
+        if staff:
+            obj.approvedBy_id = staff.pk
+        obj.save(update_fields=['status', 'approvedOn', 'approvedBy', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error'}, safe=False)
+
+
+@transaction.atomic
+@csrf_exempt
+def delete_order_attachment(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        att_id = request.POST.get('userID')
+        att = tenant_qs(request, OrderAttachment).select_related('order').get(pk=int(att_id))
+        if not _can_edit_order_record(request.user, att.order):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+        att.isDeleted = True
+        att.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error'}, safe=False)
+
+
+class OrdersByAdminListJson(BaseDatatableView):
+    # Must match the number of columns returned in prepare_results.
+    order_columns = [
+        'orderNumber', 'partyID__name', 'buildDate', 'status',
+        'approvedBy__name', 'approvedOn',
+        'createdBy__name', 'lastUpdatedOn', 'datetime',
+        'id', 'id'
+    ]
+
+    def get_initial_queryset(self):
+        queryset = _orders_list_base_qs(self.request).filter(isDeleted=False)
+        if not _can_filter_all_orders(self.request.user):
+            queryset = queryset.filter(createdBy__user_ID_id=self.request.user.pk)
+        try:
+            startDateV = self.request.GET.get("startDate")
+            endDateV = self.request.GET.get("endDate")
+            staffID = self.request.GET.get("staffID")
+            if startDateV and endDateV:
+                sDate = datetime.strptime(startDateV, '%d/%m/%Y').date()
+                eDate = datetime.strptime(endDateV, '%d/%m/%Y').date()
+                queryset = queryset.filter(buildDate__range=[sDate, eDate])
+            if _can_filter_all_orders(self.request.user) and staffID and staffID != 'All':
+                queryset = queryset.filter(createdBy_id=int(staffID))
+            return queryset
+        except Exception:
+            return queryset
+
+    def filter_queryset(self, qs):
+        search = self.request.GET.get('search[value]', None)
+        if search:
+            qs = qs.filter(
+                Q(orderNumber__icontains=search)
+                | Q(partyID__name__icontains=search)
+                | Q(status__icontains=search)
+                | Q(remark__icontains=search)
+            )
+        return qs
+
+    def prepare_results(self, qs):
+        json_data = []
+        can_approve = _can_approve_orders(self.request.user)
+        can_edit = _can_edit_order(self.request.user)
+        for item in qs:
+            approved = str(item.status) == Order.Status.APPROVED
+            action_parts = []
+            if can_approve and not approved:
+                action_parts.append(
+                    '''<button data-inverted="" data-tooltip="Approve" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showApproveOrderModal('{}')" class="ui circular purple icon button"><i class="check icon"></i></button>'''.format(item.pk)
+                )
+            # Always provide a detail page.
+            action_parts.append(
+                '''<a href="/order_detail/{}/" data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular teal icon button"><i class="eye icon"></i></a>'''.format(item.pk)
+            )
+            # Allow editing for users with edit capability.
+            if can_edit:
+                action_parts.append(
+                    '''<a href="/edit_order/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular green icon button"><i class="pen icon"></i></a>'''.format(item.pk)
+                )
+            action_parts.append(
+                '''<button data-inverted="" data-tooltip="Download PDF" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="downloadOrderPdf('{}')" class="ui circular blue icon button"><i class="file pdf outline icon"></i></button>'''.format(item.pk)
+            )
+            if _can_delete_order_record(self.request.user, item):
+                action_parts.append(
+                    '''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk)
+                )
+            action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
+
+            party = item.partyID.name if getattr(item, 'partyID', None) else '-'
+            created_by = item.createdBy.name if getattr(item, 'createdBy', None) else '-'
+            approved_by = item.approvedBy.name if getattr(item, 'approvedBy', None) else '-'
+            approved_on = item.approvedOn.strftime('%d-%m-%Y %I:%M %p') if getattr(item, 'approvedOn', None) else '-'
+            status_label = '<div class="ui tiny green label">Approved</div>' if approved else '<div class="ui tiny orange label">Pending</div>'
+            att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
+
+            json_data.append([
+                escape(item.orderNumber or str(item.pk)),
+                escape(party),
+                escape(item.buildDate.strftime('%d-%m-%Y') if item.buildDate else '-'),
+                status_label,
+                escape(approved_by),
+                escape(approved_on),
+                escape(created_by),
+                escape(item.lastUpdatedOn.strftime('%d-%m-%Y %I:%M %p')),
+                escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
+                escape(str(att_count)),
+                action,
+            ])
+        return json_data
+
+
+class OrdersByStaffListJson(BaseDatatableView):
+    # Must match the number of columns returned in prepare_results.
+    order_columns = [
+        'orderNumber', 'partyID__name', 'buildDate', 'status',
+        'lastUpdatedOn', 'datetime', 'id', 'id'
+    ]
+
+    def get_initial_queryset(self):
+        queryset = _orders_list_base_qs(self.request).filter(isDeleted=False)
+        if not _can_filter_all_orders(self.request.user):
+            queryset = queryset.filter(createdBy__user_ID_id=self.request.user.pk)
+        try:
+            startDateV = self.request.GET.get("startDate")
+            endDateV = self.request.GET.get("endDate")
+            if startDateV and endDateV:
+                sDate = datetime.strptime(startDateV, '%d/%m/%Y').date()
+                eDate = datetime.strptime(endDateV, '%d/%m/%Y').date()
+                queryset = queryset.filter(buildDate__range=[sDate, eDate])
+            return queryset
+        except Exception:
+            return queryset
+
+    def filter_queryset(self, qs):
+        search = self.request.GET.get('search[value]', None)
+        if search:
+            qs = qs.filter(
+                Q(orderNumber__icontains=search)
+                | Q(partyID__name__icontains=search)
+                | Q(status__icontains=search)
+                | Q(remark__icontains=search)
+            )
+        return qs
+
+    def prepare_results(self, qs):
+        json_data = []
+        can_edit = _can_edit_order(self.request.user)
+        for item in qs:
+            approved = str(item.status) == Order.Status.APPROVED
+            action_parts = []
+            action_parts.append(
+                '''<a href="/order_detail/{}/" data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular teal icon button"><i class="eye icon"></i></a>'''.format(item.pk)
+            )
+            # Staff can edit only before approval; the edit page locks after approval anyway.
+            if can_edit and not approved:
+                action_parts.append(
+                    '''<a href="/edit_order/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular green icon button"><i class="pen icon"></i></a>'''.format(item.pk)
+                )
+            action_parts.append(
+                '''<button data-inverted="" data-tooltip="Download PDF" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="downloadOrderPdf('{}')" class="ui circular blue icon button"><i class="file pdf outline icon"></i></button>'''.format(item.pk)
+            )
+            if _can_delete_order_record(self.request.user, item):
+                action_parts.append(
+                    '''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk)
+                )
+            action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
+
+            party = item.partyID.name if getattr(item, 'partyID', None) else '-'
+            status_label = '<div class="ui tiny green label">Approved</div>' if approved else '<div class="ui tiny orange label">Pending</div>'
+            att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
+
+            json_data.append([
+                escape(item.orderNumber or str(item.pk)),
+                escape(party),
+                escape(item.buildDate.strftime('%d-%m-%Y') if item.buildDate else '-'),
+                status_label,
+                escape(item.lastUpdatedOn.strftime('%d-%m-%Y %I:%M %p')),
+                escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
+                escape(str(att_count)),
+                action,
+            ])
+        return json_data
+
+
+def generate_order_pdf(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.view_order', 'home.can_manage_orders', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+    order_id = request.GET.get('id')
+    if not order_id:
+        return JsonResponse({'message': 'error'}, status=400, safe=False)
+
+    order = get_object_or_404(
+        tenant_qs(request, Order).select_related('partyID', 'createdBy', 'approvedBy'),
+        pk=int(order_id),
+    )
+    # Staff can only export their own orders unless admin-like.
+    if not _can_filter_all_orders(request.user):
+        if getattr(order.createdBy, 'user_ID_id', None) != request.user.pk:
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+    attachments = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order=order).order_by('id')
+    location = order.location or ('{},{}'.format(order.latitude, order.longitude) if order.latitude and order.longitude else '-')
+    context = {
+        'order': order,
+        'attachments': attachments,
+        'location': location,
+    }
+
+    response = HttpResponse(content_type="application/pdf")
+    response['Content-Disposition'] = f"attachment; filename=order-{order.orderNumber or order.pk}.pdf"
+    html = render_to_string("home/orders/orderPDF.html", context)
+
+    # base_url allows WeasyPrint to resolve media/static URLs.
+    base_url = request.build_absolute_uri('/')
+    HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 1cm; }')])
+    return response
 
 
 # ----------------------Sales-----------------
@@ -2370,28 +3146,21 @@ class SalesByAdminListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
+        queryset = _sales_list_base_qs(self.request).filter(isDeleted__exact=False)
+        if not _can_filter_all_sales(self.request.user):
+            queryset = queryset.filter(createdBy__user_ID_id=self.request.user.pk)
         try:
             startDateV = self.request.GET.get("startDate")
             endDateV = self.request.GET.get("endDate")
             staffID = self.request.GET.get("staffID")
             sDate = datetime.strptime(startDateV, '%d/%m/%Y')
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-            if staffID == 'All':
-                return _sales_list_base_qs(self.request).filter(
-                    isDeleted__exact=False,
-                    buildDate__range=[sDate.date(), eDate.date()]
-                )
-            else:
-                return _sales_list_base_qs(self.request).filter(
-                    isDeleted__exact=False,
-                    buildDate__range=[sDate.date(), eDate.date()],
-                    createdBy_id=int(staffID)
-                )
+            queryset = queryset.filter(buildDate__range=[sDate.date(), eDate.date()])
+            if _can_filter_all_sales(self.request.user) and staffID and staffID != 'All':
+                queryset = queryset.filter(createdBy_id=int(staffID))
+            return queryset
         except:
-            return _sales_list_base_qs(self.request).filter(
-                isDeleted__exact=False,
-                buildDate__exact=datetime.today().date()
-            )
+            return queryset.filter(buildDate__exact=datetime.today().date())
 
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
@@ -2409,29 +3178,15 @@ class SalesByAdminListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in self.request.user.groups.values_list('name',
-                                                               flat=True) or 'Moderator' in self.request.user.groups.values_list(
-                'name', flat=True):
-
-                action = '''<button  data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "showConfirmationModal('{}')" class="ui circular facebook icon button purple">
-               <i class="whatsapp icon"></i>
-              </button>
-              <a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
-                <i class="pen icon"></i>
-              </a>
-              <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                <i class="trash alternate icon"></i>
-              </button>'''.format(item.pk, item.pk, item.pk),
-            elif 'SalesAdmin' in group_names:
-                action = '''<button  data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "showConfirmationModal('{}')" class="ui circular facebook icon button purple">
-                               <i class="whatsapp icon"></i>
-                              </button>'''.format(item.pk)
-            else:
-                action = '''<div class="ui tiny label">
-              Denied
-            </div>'''
+            action_parts = []
+            if _can_manage_sales(self.request.user):
+                action_parts.append('''<button data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConfirmationModal('{}')" class="ui circular facebook icon button purple"><i class="whatsapp icon"></i></button>'''.format(item.pk))
+            if _can_edit_sales(self.request.user):
+                action_parts.append('''<a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
+            if _can_delete_sales(self.request.user):
+                action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
+            action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
 
             try:
                 createdBy = item.createdBy.name
@@ -2475,35 +3230,21 @@ class SalesByStaffListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-        if self.request.user.username == 'USER376':
-            try:
-                startDateV = self.request.GET.get("startDate")
-                endDateV = self.request.GET.get("endDate")
-                staffID = self.request.GET.get("staffID")
-                sDate = datetime.strptime(startDateV, '%d/%m/%Y')
-                eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-                if staffID == 'All':
-                    return _sales_list_base_qs(self.request).filter(
-                        isDeleted__exact=False,
-                        buildDate__range=[sDate.date(), eDate.date()]
-                    )
-                else:
-                    return _sales_list_base_qs(self.request).filter(
-                        isDeleted__exact=False,
-                        buildDate__range=[sDate.date(), eDate.date()],
-                        createdBy_id=int(staffID)
-                    )
-            except:
-                return _sales_list_base_qs(self.request).filter(
-                    isDeleted__exact=False,
-                    buildDate__exact=datetime.today().date()
-                )
-
-        else:
-            return _sales_list_base_qs(self.request).filter(
-                isDeleted__exact=False,
-                buildDate__exact=datetime.today().date()
-            )
+        queryset = _sales_list_base_qs(self.request).filter(isDeleted__exact=False)
+        if not _can_filter_all_sales(self.request.user):
+            queryset = queryset.filter(createdBy__user_ID_id=self.request.user.pk)
+        try:
+            startDateV = self.request.GET.get("startDate")
+            endDateV = self.request.GET.get("endDate")
+            staffID = self.request.GET.get("staffID")
+            sDate = datetime.strptime(startDateV, '%d/%m/%Y')
+            eDate = datetime.strptime(endDateV, '%d/%m/%Y')
+            queryset = queryset.filter(buildDate__range=[sDate.date(), eDate.date()])
+            if _can_filter_all_sales(self.request.user) and staffID and staffID != 'All':
+                queryset = queryset.filter(createdBy_id=int(staffID))
+            return queryset
+        except:
+            return queryset.filter(buildDate__exact=datetime.today().date())
 
     #
     # else:
@@ -2527,23 +3268,19 @@ class SalesByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
-
-                action = '''<button  data-inverted="" data-tooltip="Send Message" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "showConfirmationModal('{}')" class="ui circular facebook icon button purple">
-               <i class="whatsapp icon"></i>
-              </button>
-              <a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
-                <i class="pen icon"></i>
-              </a>
-              <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                <i class="trash alternate icon"></i>
-              </button>'''.format(item.pk, item.pk, item.pk),
-            else:
-                action = '''<div class="ui tiny label">
-              Denied
-            </div>'''
+            action_parts = []
+            if _can_manage_sales(self.request.user):
+                action_parts.append('''<button data-inverted="" data-tooltip="Send Message" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConfirmationModal('{}')" class="ui circular facebook icon button purple"><i class="whatsapp icon"></i></button>'''.format(item.pk))
+            # Staff can only update sales before approval; after approval the edit page becomes read-only.
+            if _can_edit_sales(self.request.user):
+                if item.isApproved and not (_can_manage_sales(self.request.user) or self.request.user.has_perm('home.can_view_party_credentials')):
+                    action_parts.append('<div class="ui tiny orange label">Approved</div>')
+                else:
+                    action_parts.append('''<a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
+            if _can_delete_sales(self.request.user):
+                action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
+            action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
 
             try:
                 createdBy = item.createdBy.name
@@ -2610,6 +3347,10 @@ def generate_sales_report(request):
 @csrf_exempt
 def delete_sales(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_delete_sales(request.user):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             id = request.POST.get("userID")
             obj = tenant_qs(request, Sales).select_related().get(pk=int(id))
@@ -2624,6 +3365,8 @@ def delete_sales(request):
 @csrf_exempt
 def update_sales_by_admin_api(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
         try:
             invoiceSeriesSelect = request.POST.get("invoiceSeriesSelect")
             invoiceNo = request.POST.get("invoiceNo")
@@ -2637,13 +3380,15 @@ def update_sales_by_admin_api(request):
             # cus = Party.objects.select_related().get(pk=int(c[1]))
             cus = tenant_qs(request, Party).select_related().get(pk=int(party))
             obj = tenant_qs(request, Sales).get(pk=int(ID))
+
+            if not _can_edit_sales_record(request.user, obj):
+                return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
             obj.partyID_id = cus.pk
             obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
             obj.amount = float(amount)
             obj.remark = remark
             obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y')
-            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
-            obj.createdBy_id = user.pk
             obj.save()
 
             return JsonResponse({'message': 'success'}, safe=False)
@@ -2655,6 +3400,10 @@ def update_sales_by_admin_api(request):
 @csrf_exempt
 def send_message_sales(request):
     if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+        if not _can_manage_sales(request.user) and not request.user.has_perm('home.can_view_party_credentials'):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             id = request.POST.get("userID")
             obj = tenant_qs(request, Sales).select_related().get(pk=int(id))
@@ -2789,10 +3538,7 @@ class CashCounterByStaffListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-
-        if 'Admin' in self.request.user.groups.values_list('name',
-                                                           flat=True) or 'Moderator' in self.request.user.groups.values_list(
-            'name', flat=True):
+        if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
                 endDateV = self.request.GET.get("endDate")
@@ -2830,9 +3576,8 @@ class CashCounterByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_manage_cash_counter_records(self.request.user):
 
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
@@ -2871,9 +3616,7 @@ class CardCounterByStaffListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-        if 'Admin' in self.request.user.groups.values_list('name',
-                                                           flat=True) or 'Moderator' in self.request.user.groups.values_list(
-            'name', flat=True):
+        if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
                 endDateV = self.request.GET.get("endDate")
@@ -2912,9 +3655,8 @@ class CardCounterByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_manage_cash_counter_records(self.request.user):
 
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
@@ -2958,9 +3700,7 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-        if 'Admin' in self.request.user.groups.values_list('name',
-                                                           flat=True) or 'Moderator' in self.request.user.groups.values_list(
-            'name', flat=True):
+        if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
                 endDateV = self.request.GET.get("endDate")
@@ -2998,9 +3738,8 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_manage_cash_counter_records(self.request.user):
 
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
@@ -3039,9 +3778,7 @@ class CreditCounterByStaffListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-        if 'Admin' in self.request.user.groups.values_list('name',
-                                                           flat=True) or 'Moderator' in self.request.user.groups.values_list(
-            'name', flat=True):
+        if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
                 endDateV = self.request.GET.get("endDate")
@@ -3080,9 +3817,8 @@ class CreditCounterByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_manage_cash_counter_records(self.request.user):
 
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
@@ -3126,9 +3862,7 @@ class MixCounterByStaffListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-        if 'Admin' in self.request.user.groups.values_list('name',
-                                                           flat=True) or 'Moderator' in self.request.user.groups.values_list(
-            'name', flat=True):
+        if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
                 endDateV = self.request.GET.get("endDate")
@@ -3168,9 +3902,8 @@ class MixCounterByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_manage_cash_counter_records(self.request.user):
 
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
@@ -3214,9 +3947,7 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-        if 'Admin' in self.request.user.groups.values_list('name',
-                                                           flat=True) or 'Moderator' in self.request.user.groups.values_list(
-            'name', flat=True):
+        if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
                 endDateV = self.request.GET.get("endDate")
@@ -3254,9 +3985,8 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_manage_cash_counter_records(self.request.user):
 
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
@@ -3299,9 +4029,7 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-        if 'Admin' in self.request.user.groups.values_list('name',
-                                                           flat=True) or 'Moderator' in self.request.user.groups.values_list(
-            'name', flat=True):
+        if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
                 endDateV = self.request.GET.get("endDate")
@@ -3339,9 +4067,8 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_manage_cash_counter_records(self.request.user):
 
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
@@ -3384,26 +4111,24 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-        if 'Admin' in self.request.user.groups.values_list('name',
-                                                           flat=True) or 'Moderator' in self.request.user.groups.values_list(
-            'name', flat=True):
+        if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
 
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Expense")
 
             except:
-                return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+                return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
                                                                    mode__iexact="Expense")
         else:
-            return _cash_counter_list_base_qs().filter(isDeleted__exact=False,
+            return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Expense",
                                                                createdBy__user_ID_id=self.request.user.pk)
@@ -3423,9 +4148,8 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_manage_cash_counter_records(self.request.user):
 
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
@@ -3598,7 +4322,12 @@ def generate_cash_counter_report(request):
     ccol = _cash_counter_collection_list_base_qs(request).filter(
         collectionDateTime__date=colDate.date(),
         isDeleted__exact=False
-    ).order_by('collectedBy__name')
+    )
+    if not _can_filter_all_cash_counter(request.user):
+        ccol = ccol.filter(collectedBy__user_ID_id=request.user.pk)
+    elif staffID and staffID != 'All':
+        ccol = ccol.filter(collectedBy_id=int(staffID))
+    ccol = ccol.order_by('collectedBy__name')
 
     for a in ccol:
         if a.modeOfPayment == 'Cash':
@@ -3627,8 +4356,12 @@ def generate_cash_counter_report(request):
     col = _cash_counter_list_base_qs(request).filter(
         datetime__date=colDate.date(),
         isDeleted__exact=False
-    ).order_by(
-        'mode')
+    )
+    if not _can_filter_all_cash_counter(request.user):
+        col = col.filter(createdBy__user_ID_id=request.user.pk)
+    elif staffID and staffID != 'All':
+        col = col.filter(createdBy_id=int(staffID))
+    col = col.order_by('mode')
     for a in col:
         if a.mode == 'Cash':
             cash_total += a.amount
@@ -3748,9 +4481,7 @@ class CashCounterCollectionListJson(BaseDatatableView):
                      ]
 
     def get_initial_queryset(self):
-        if 'Admin' in self.request.user.groups.values_list('name',
-                                                           flat=True) or 'Moderator' in self.request.user.groups.values_list(
-            'name', flat=True):
+        if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
                 endDateV = self.request.GET.get("endDate")
@@ -3791,9 +4522,8 @@ class CashCounterCollectionListJson(BaseDatatableView):
 
     def prepare_results(self, qs):
         json_data = []
-        group_names = _request_group_names(self.request)
         for item in qs:
-            if 'Admin' in group_names:
+            if _can_manage_cash_counter_records(self.request.user):
 
                 action = '''
                   <a href="/edit_cash_counter_collection/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
@@ -3866,8 +4596,7 @@ def edit_cash_counter_collection_by_admin_api(request):
             cus = tenant_qs(request, Party).select_related().get(pk=int(party))
 
             obj = tenant_qs(request, CollectionCashCounter).get(pk=int(ID))
-            request_groups = _request_group_names(request)
-            if 'Admin' in request_groups or 'Moderator' in request_groups:
+            if _can_review_collections(request.user):
                 obj.partyID_id = cus.pk
                 obj.modeOfPayment = paymentMode
                 obj.paidAmount = float(amountPaid)

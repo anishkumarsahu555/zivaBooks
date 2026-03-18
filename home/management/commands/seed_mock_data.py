@@ -2,13 +2,12 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.text import slugify
 
 from activation.models import EcomValidity, Validity
-from home.apiView import seed_default_groups
 from home.models import (
     Attendance,
     Bank,
@@ -29,16 +28,62 @@ from home.models import (
 
 
 User = get_user_model()
-DEFAULT_STAFF_GROUPS = [
-    "Owner",
-    "Admin",
-    "Moderator",
-    "Collection",
-    "SalesAdmin",
-    "CashCounter",
-    "NormalStaff",
-    "Viewer",
-]
+DEFAULT_STAFF_GROUPS = {
+    "Tenant Control": "__all__",
+    "Operations Admin": [
+        "home.can_manage_staff",
+        "home.can_manage_staff_groups",
+        "home.can_manage_parties",
+        "home.can_view_party_credentials",
+        "home.can_approve_collection",
+        "home.can_view_audit_logs",
+        "home.view_collection",
+        "home.view_sales",
+        "home.view_cashcounter",
+        "home.view_attendance",
+    ],
+    "Field Collections": [
+        "home.add_collection",
+        "home.change_collection",
+        "home.view_collection",
+        "home.view_party",
+        "home.view_attendance",
+    ],
+    "Sales Desk": [
+        "home.add_sales",
+        "home.change_sales",
+        "home.view_sales",
+        "home.can_manage_sales",
+        "home.can_view_sales_reports",
+        "home.view_party",
+    ],
+    "Counter Desk": [
+        "home.add_cashcounter",
+        "home.change_cashcounter",
+        "home.view_cashcounter",
+        "home.add_collectioncashcounter",
+        "home.change_collectioncashcounter",
+        "home.view_collectioncashcounter",
+        "home.can_manage_cash_counter",
+        "home.can_view_cash_counter_reports",
+    ],
+    "Backoffice Audit": [
+        "home.view_attendance",
+        "home.can_view_collection_reports",
+        "home.can_view_sales_reports",
+        "home.can_view_cash_counter_reports",
+        "home.can_view_audit_logs",
+    ],
+}
+
+SEEDED_PASSWORDS = {
+    "admin": "admin123",
+    "collector": "collect123",
+    "sales": "sales123",
+    "cash": "cash123",
+    "audit": "audit123",
+    "customer": "customer123",
+}
 
 
 class Command(BaseCommand):
@@ -46,7 +91,6 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
-        seed_default_groups()
         seeded = [
             self._seed_tenant(
                 tenant_name="Alpha Traders",
@@ -71,6 +115,7 @@ class Command(BaseCommand):
                 whatsapp_name="Beta Whatsapp",
             ),
         ]
+        self._print_seeded_credentials(seeded)
         self.stdout.write(self.style.SUCCESS(f"Seeded mock data for {len(seeded)} tenants."))
 
     def _seed_tenant(
@@ -147,92 +192,110 @@ class Command(BaseCommand):
         staff_user = self._ensure_staff_user(
             tenant=tenant,
             user=owner,
-            role_name="Owner",
+            role_name="Tenant Control",
             membership_role=TenantMembership.Role.OWNER,
             name=f"{tenant_name} Owner",
             phone="9000000001",
             email=owner_email,
             address=f"HQ - {tenant_name}",
             party_group=party_group,
-            staff_group=staff_groups["Owner"],
+            staff_group=staff_groups["Tenant Control"],
         )
 
         admin_user = self._ensure_auth_user(
             username=f"{slugify(tenant_name).replace('-', '')}.admin",
             email=f"admin@{slugify(tenant_name)}.example.com",
-            password="admin123",
+            password=SEEDED_PASSWORDS["admin"],
         )
         admin_staff = self._ensure_staff_user(
             tenant=tenant,
             user=admin_user,
-            role_name="Admin",
+            role_name="Operations Admin",
             membership_role=TenantMembership.Role.ADMIN,
             name=f"{tenant_name} Admin",
             phone="9000000009",
             email=admin_user.email,
             address=f"Admin Office - {tenant_name}",
             party_group=party_group,
-            staff_group=staff_groups["Admin"],
+            staff_group=staff_groups["Operations Admin"],
         )
 
         collector_user = self._ensure_auth_user(
             username=f"{slugify(tenant_name).replace('-', '')}.collector",
             email=f"collector@{slugify(tenant_name)}.example.com",
-            password="collect123",
+            password=SEEDED_PASSWORDS["collector"],
         )
         collector = self._ensure_staff_user(
             tenant=tenant,
             user=collector_user,
-            role_name="Collection",
+            role_name="Field Collections",
             membership_role=TenantMembership.Role.STAFF,
             name=f"{tenant_name} Collector",
             phone="9000000002",
             email=collector_user.email,
             address=f"Field Office - {tenant_name}",
             party_group=party_group,
-            staff_group=staff_groups["Collection"],
+            staff_group=staff_groups["Field Collections"],
         )
 
         sales_user = self._ensure_auth_user(
             username=f"{slugify(tenant_name).replace('-', '')}.sales",
             email=f"sales@{slugify(tenant_name)}.example.com",
-            password="sales123",
+            password=SEEDED_PASSWORDS["sales"],
         )
         sales_staff = self._ensure_staff_user(
             tenant=tenant,
             user=sales_user,
-            role_name="SalesAdmin",
+            role_name="Sales Desk",
             membership_role=TenantMembership.Role.STAFF,
             name=f"{tenant_name} Sales",
             phone="9000000003",
             email=sales_user.email,
             address=f"Sales Desk - {tenant_name}",
             party_group=party_group,
-            staff_group=staff_groups["SalesAdmin"],
+            staff_group=staff_groups["Sales Desk"],
         )
 
         cash_user = self._ensure_auth_user(
             username=f"{slugify(tenant_name).replace('-', '')}.cash",
             email=f"cash@{slugify(tenant_name)}.example.com",
-            password="cash123",
+            password=SEEDED_PASSWORDS["cash"],
         )
         cash_staff = self._ensure_staff_user(
             tenant=tenant,
             user=cash_user,
-            role_name="CashCounter",
+            role_name="Counter Desk",
             membership_role=TenantMembership.Role.STAFF,
             name=f"{tenant_name} Cash Counter",
             phone="9000000004",
             email=cash_user.email,
             address=f"Cash Desk - {tenant_name}",
             party_group=party_group,
-            staff_group=staff_groups["CashCounter"],
+            staff_group=staff_groups["Counter Desk"],
+        )
+
+        audit_user = self._ensure_auth_user(
+            username=f"{slugify(tenant_name).replace('-', '')}.audit",
+            email=f"audit@{slugify(tenant_name)}.example.com",
+            password=SEEDED_PASSWORDS["audit"],
+        )
+        audit_staff = self._ensure_staff_user(
+            tenant=tenant,
+            user=audit_user,
+            role_name="Backoffice Audit",
+            membership_role=TenantMembership.Role.STAFF,
+            name=f"{tenant_name} Audit",
+            phone="9000000005",
+            email=audit_user.email,
+            address=f"Audit Desk - {tenant_name}",
+            party_group=party_group,
+            staff_group=staff_groups["Backoffice Audit"],
         )
 
         party_login = self._ensure_auth_user(
             username=f"{slugify(tenant_name).replace('-', '')}.customer",
             email=f"customer@{slugify(tenant_name)}.example.com",
-            password="customer123",
+            password=SEEDED_PASSWORDS["customer"],
         )
         TenantMembership.objects.update_or_create(
             tenant=tenant,
@@ -248,7 +311,7 @@ class Command(BaseCommand):
                 "address": f"Market Area - {tenant_name}",
                 "openingBalance": Decimal("5000.00"),
                 "username": party_login.username,
-                "password": "customer123",
+                "password": SEEDED_PASSWORDS["customer"],
                 "partyGroupID": party_group,
                 "assignTo": collector,
                 "isDeleted": False,
@@ -372,6 +435,7 @@ class Command(BaseCommand):
 
         return {
             "tenant": tenant,
+            "owner_password": owner_password,
             "owner": owner,
             "staff_groups": staff_groups,
             "party_group": party_group,
@@ -383,6 +447,7 @@ class Command(BaseCommand):
             "collector": collector,
             "sales_staff": sales_staff,
             "cash_staff": cash_staff,
+            "audit_staff": audit_staff,
             "party": party,
             "collection": collection,
             "sales": sales,
@@ -402,13 +467,24 @@ class Command(BaseCommand):
         return user
 
     def _ensure_staff_group(self, tenant, group_name):
-        from django.contrib.auth.models import Group
-
-        base_group = Group.objects.filter(name=group_name).first()
         tenant_group_name = f"{tenant.slug}:{group_name}"
         django_group, _ = Group.objects.get_or_create(name=tenant_group_name)
-        if base_group is not None:
-            django_group.permissions.set(base_group.permissions.all())
+        permission_codenames = DEFAULT_STAFF_GROUPS[group_name]
+        if permission_codenames == "__all__":
+            permissions = Permission.objects.exclude(
+                content_type__app_label__in=["admin", "contenttypes", "sessions"]
+            )
+        else:
+            permissions = []
+            for perm_name in permission_codenames:
+                app_label, codename = perm_name.split(".", 1)
+                permission = Permission.objects.filter(
+                    content_type__app_label=app_label,
+                    codename=codename,
+                ).first()
+                if permission:
+                    permissions.append(permission)
+        django_group.permissions.set(permissions)
         staff_group, created = StaffGroup.objects.get_or_create(
             tenant=tenant,
             name=group_name,
@@ -501,3 +577,17 @@ class Command(BaseCommand):
             content_type__app_label__in=["admin", "contenttypes", "sessions"]
         )
         user.user_permissions.set(all_permissions)
+
+    def _print_seeded_credentials(self, seeded):
+        self.stdout.write("Seeded credentials:")
+        for item in seeded:
+            tenant = item["tenant"]
+            tenant_key = tenant.slug.replace("-", "")
+            self.stdout.write(f"- {tenant.name}")
+            self.stdout.write(f"  owner: {item['owner'].username} / {item['owner_password']}")
+            self.stdout.write(f"  admin: {tenant_key}.admin / {SEEDED_PASSWORDS['admin']}")
+            self.stdout.write(f"  collector: {tenant_key}.collector / {SEEDED_PASSWORDS['collector']}")
+            self.stdout.write(f"  sales: {tenant_key}.sales / {SEEDED_PASSWORDS['sales']}")
+            self.stdout.write(f"  cash: {tenant_key}.cash / {SEEDED_PASSWORDS['cash']}")
+            self.stdout.write(f"  audit: {tenant_key}.audit / {SEEDED_PASSWORDS['audit']}")
+            self.stdout.write(f"  customer: {tenant_key}.customer / {SEEDED_PASSWORDS['customer']}")

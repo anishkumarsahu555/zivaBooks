@@ -95,6 +95,64 @@
             margin-bottom: 12px;
         }
 
+        .preset-panel {
+            background: #f8fbfd;
+            border: 1px solid #dce7f3;
+            border-radius: 14px;
+            margin-bottom: 12px;
+            padding: 12px;
+        }
+
+        .preset-panel-header {
+            color: #0f172a;
+            font-size: 0.88rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .preset-grid {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .preset-helper {
+            color: #475569;
+            font-size: 0.74rem;
+            line-height: 1.45;
+            margin-top: 8px;
+        }
+
+        .preset-description {
+            color: #64748b;
+            font-size: 0.76rem;
+            line-height: 1.45;
+            margin-top: 8px;
+        }
+
+        .preset-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .preset-chip {
+            background: #eef6ff;
+            border: 1px solid #dbeafe;
+            border-radius: 999px;
+            color: #1d4ed8;
+            font-size: 0.7rem;
+            padding: 4px 8px;
+        }
+
+        .preset-chip.is-bundle {
+            background: #ecfeff;
+            border-color: #a5f3fc;
+            color: #0f766e;
+            font-weight: 700;
+        }
+
         .permission-search {
             width: 100%;
         }
@@ -422,6 +480,10 @@
                 <i class="arrow left icon"></i>
                 Staff Group List
             </a>
+            <a class="item" href="{% url 'homeApp:permission_reference' %}">
+                <i class="shield alternate icon"></i>
+                Permission Reference
+            </a>
             {% if group_obj %}
                 <a class="item" href="{% url 'homeApp:staff_group_detail' group_obj.id %}">
                     <i class="eye icon"></i>
@@ -497,6 +559,28 @@
                         <h3 class="group-form-card-title">Permission Assignment</h3>
                     </div>
                     <div class="group-form-card-body">
+                        <div class="preset-panel">
+                            <div class="preset-panel-header">Preset Bundles</div>
+                            <div class="preset-grid">
+                                <select class="ui fluid multiple search dropdown" id="permissionPreset" multiple>
+                                    {% for preset in permission_presets %}
+                                        <option value="{{ preset.key }}" {% if preset.key in selected_preset_keys %}selected{% endif %}>{{ preset.label }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="toolbar-btn" type="button" onclick="applySelectedPresets()">
+                                    <i class="magic icon"></i>
+                                    Apply Bundles
+                                </button>
+                            </div>
+                            <div class="preset-helper">
+                                Choose one or more bundles. Applying them merges all included permissions, then you can fine-tune manually.
+                            </div>
+                            <div class="preset-description" id="presetDescription">
+                                Select one or more bundles to compose the final permission set.
+                            </div>
+                            <div class="preset-preview" id="presetPreview"></div>
+                        </div>
+
                         <div class="permission-toolbar">
                             <input class="permission-search" type="text" id="permissionSearch" placeholder="Search permissions">
                             <div class="toolbar-actions">
@@ -563,7 +647,10 @@
 {% endblock %}
 
 {% block js %}
+    {{ permission_presets|json_script:"permission-presets-data" }}
     <script>
+        var permissionPresets = JSON.parse(document.getElementById('permission-presets-data').textContent);
+
         function togglePermissionBody(header) {
             var module = $(header).closest('.permission-module');
             module.toggleClass('is-open');
@@ -618,6 +705,63 @@
             refreshSelectedPreview();
         }
 
+        function selectedPresets() {
+            var presetKeys = $('#permissionPreset').val() || [];
+            return permissionPresets.filter(function (preset) {
+                return presetKeys.indexOf(preset.key) !== -1;
+            });
+        }
+
+        function refreshPresetPreview() {
+            var presets = selectedPresets();
+            var preview = $('#presetPreview');
+            if (!presets.length) {
+                $('#presetDescription').text('Select one or more bundles to compose the final permission set.');
+                preview.empty();
+                return;
+            }
+            var mergedPermissionNames = [];
+            var seen = new Set();
+            presets.forEach(function (preset) {
+                (preset.permission_names || []).forEach(function (name) {
+                    if (!seen.has(name)) {
+                        seen.add(name);
+                        mergedPermissionNames.push(name);
+                    }
+                });
+            });
+            var descriptions = presets.map(function (preset) { return preset.label + ': ' + preset.description; });
+            $('#presetDescription').text(descriptions.join(' '));
+            var bundleChips = presets.map(function (preset) {
+                return '<span class="preset-chip is-bundle">' + preset.label + '</span>';
+            }).join('');
+            var permissionChips = mergedPermissionNames.map(function (name) {
+                return '<span class="preset-chip">' + name + '</span>';
+            }).join('');
+            preview.html(bundleChips + permissionChips);
+        }
+
+        function applySelectedPresets() {
+            var presets = selectedPresets();
+            if (!presets.length) {
+                $('body').toast({class: 'warning', message: 'Choose at least one bundle first.'});
+                return;
+            }
+            var selectedIds = new Set();
+            presets.forEach(function (preset) {
+                (preset.permission_ids || []).forEach(function (value) {
+                    selectedIds.add(String(value));
+                });
+            });
+            $('.permission-check').each(function () {
+                this.checked = selectedIds.has(String($(this).val()));
+                $(this).closest('.permission-option').toggleClass('is-checked', this.checked);
+            });
+            openRelevantModules();
+            refreshSelectedPreview();
+            $('body').toast({class: 'success', message: presets.length + ' bundle(s) applied.'});
+        }
+
         function submitStaffGroupForm() {
             var data = new FormData();
             var pageMode = '{{ page_mode }}';
@@ -661,11 +805,17 @@
             $(this).closest('.permission-option').toggleClass('is-checked', this.checked);
             refreshSelectedPreview();
         });
+        $('#permissionPreset').dropdown({
+            clearable: true,
+            fullTextSearch: 'exact'
+        });
+        $('#permissionPreset').on('change', refreshPresetPreview);
         $('.permission-check').each(function () {
             $(this).closest('.permission-option').toggleClass('is-checked', this.checked);
         });
         $('.permission-module-body').hide();
         openRelevantModules();
         refreshSelectedPreview();
+        refreshPresetPreview();
     </script>
 {% endblock %}

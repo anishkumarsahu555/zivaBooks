@@ -1,0 +1,89 @@
+<div id="dashboard-home-root">
+    {% if dashboard_state.license_message %}
+        <div class="ui tiny warning message dashboard-license-banner">
+            <i class="close icon"></i>
+            <div class="header">License Reminder</div>
+            <p>{{ dashboard_state.license_message }}</p>
+        </div>
+    {% endif %}
+
+<section class="dashboard-hero">
+    <div class="dashboard-hero-copy">
+        <div class="dashboard-hero-kicker">Permission Based Workspace</div>
+        <h1 class="dashboard-hero-title">{{ dashboard_state.hero.title }}</h1>
+        <p class="dashboard-hero-subtitle">{{ dashboard_state.hero.subtitle }}</p>
+        <div class="dashboard-hero-tags">
+            <span class="dashboard-hero-tag is-tenant">{{ dashboard_state.hero.tenant_name }}</span>
+            <span class="dashboard-hero-tag">{{ dashboard_state.hero.module_count }} modules</span>
+            <span class="dashboard-hero-tag">{{ dashboard_state.hero.quick_count }} quick actions</span>
+            {% for module_label in dashboard_state.hero.module_labels %}
+                <span class="dashboard-hero-tag">{{ module_label }}</span>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+{% for group in dashboard_state.metric_groups %}
+    <section class="dashboard-metric-group tone-{{ group.tone }}">
+        <div class="dashboard-group-header">
+            <div>
+                <h2 class="dashboard-group-title">{{ group.title }}</h2>
+                <div class="dashboard-group-subtitle">{{ group.subtitle }}</div>
+            </div>
+        </div>
+        <div class="dashboard-stat-grid">
+            {% for card in group.cards %}
+                <article class="dashboard-stat-card">
+                    <div class="dashboard-stat-icon">
+                        <i class="{{ card.icon }} icon"></i>
+                    </div>
+                    <div class="dashboard-stat-value">
+                        <span id="{{ card.id }}">{{ card.static_value|default:"0" }}</span>
+                        {% if card.secondary_id %}
+                            <span class="dashboard-stat-split">/</span>
+                            <span id="{{ card.secondary_id }}">{{ card.secondary_static_value|default:"0" }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="dashboard-stat-label">{{ card.label }}</div>
+                    <div class="dashboard-stat-description">{{ card.description }}</div>
+                    <a class="dashboard-stat-link" href="{{ card.action_url }}">{{ card.action_label }}</a>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+{% endfor %}
+
+{% if dashboard_state.action_sections %}
+    <section class="dashboard-actions-shell">
+        <div class="dashboard-group-header">
+            <div>
+                <h2 class="dashboard-group-title">Workspace Modules</h2>
+                <div class="dashboard-group-subtitle">These modules are rendered directly from the permissions active for this user.</div>
+            </div>
+        </div>
+        <div class="dashboard-action-grid">
+            {% for section in dashboard_state.action_sections %}
+                <article class="dashboard-action-panel tone-{{ section.tone }}">
+                    <div class="dashboard-action-panel-header">
+                        <div class="dashboard-action-panel-title">{{ section.title }}</div>
+                        <div class="dashboard-action-panel-count">{{ section.items|length }} item{{ section.items|length|pluralize }}</div>
+                    </div>
+                    <div class="dashboard-action-list">
+                        {% for item in section.items %}
+                            <a class="dashboard-action-chip" href="{{ item.url }}">
+                                <i class="{{ item.icon }} icon"></i>
+                                {{ item.label }}
+                            </a>
+                        {% endfor %}
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% else %}
+        <div class="ui info message">
+            <div class="header">No modules available</div>
+            <p>This user does not currently have any dashboard modules assigned.</p>
+        </div>
+    {% endif %}
+</div>

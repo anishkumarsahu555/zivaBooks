@@ -53,12 +53,14 @@
                 <div style="cursor: pointer;" class="item active" data-tab="user"
                 >Sales List
                 </div>
-                <div style=" position: absolute;right: 1.5rem;top: 18px;">
-                    <a href="{% url 'homeApp:add_sales' %}" class="ui green mini plus button right">
-                        <i class="plus square outline icon"></i>
-                        Add Sales
-                    </a>
-                </div>
+                {% if sales_capabilities.can_add %}
+                    <div style=" position: absolute;right: 1.5rem;top: 18px;">
+                        <a href="{% url 'homeApp:add_sales' %}" class="ui green mini plus button right">
+                            <i class="plus square outline icon"></i>
+                            Add Sales
+                        </a>
+                    </div>
+                {% endif %}
             </div>
 
             <div class="ui tab " data-tab="user">
@@ -67,7 +69,7 @@
 
 
                     <div class="">
-                        {% if request.user.username == 'USER376' %}
+                        {% if sales_capabilities.can_filter_staff %}
                             <div class="ui form">
                                 <form class="ui tiny form">
                                     <div class="fields">
@@ -141,56 +143,60 @@
                     </div>
                 </div>
 
-                <div class="ui basic modal custom" id="deleteUser">
-                    <div class="ui icon header">
-                        <i class="archive icon"></i>
-                        Sales Details will be Deleted
-                    </div>
-                    <div class="content">
-                        <p style="text-align: center">The Sale will be deleted, are you sure to delete this
-                            Sale?</p>
-                    </div>
-                    <div class="actions">
-                        <div class="ui red basic cancel inverted button">
-                            <i class="remove icon"></i>
-                            No
+                {% if sales_capabilities.can_delete %}
+                    <div class="ui basic modal custom" id="deleteUser">
+                        <div class="ui icon header">
+                            <i class="archive icon"></i>
+                            Sales Details will be Deleted
                         </div>
-                        <input type="hidden" id="UserID">
-                        <div class="ui green ok inverted button" onclick="deleteUser()">
-                            <i class="checkmark icon"></i>
-                            Yes
+                        <div class="content">
+                            <p style="text-align: center">The Sale will be deleted, are you sure to delete this
+                                Sale?</p>
+                        </div>
+                        <div class="actions">
+                            <div class="ui red basic cancel inverted button">
+                                <i class="remove icon"></i>
+                                No
+                            </div>
+                            <input type="hidden" id="UserID">
+                            <div class="ui green ok inverted button" onclick="deleteUser()">
+                                <i class="checkmark icon"></i>
+                                Yes
+                            </div>
                         </div>
                     </div>
+                {% endif %}
+
+
+            </div>
+        </div>
+    </div>
+
+    {% if sales_capabilities.can_message %}
+        <div class="ui mini modal" id="imgModal">
+            <div class="header">
+                Send Message
+            </div>
+            <div class="content">
+                <p>Are you sure you want to send message?</p>
+            </div>
+            <input type="hidden" id="approveCollectionID">
+            <div class="actions">
+                <div class="ui negative button">
+                    No
                 </div>
-
+                <button class="ui green right labeled icon button saveBtn" onclick="confirmApproval()">
+                    Yes
+                    <i class="checkmark icon"></i>
+                </button>
+                <button style="display: none;" class="ui teal right labeled icon button saveBtnLoad">
+                    Saving ....
+                    <i class="checkmark icon"></i>
+                </button>
 
             </div>
         </div>
-    </div>
-
-    <div class="ui mini modal" id="imgModal">
-        <div class="header">
-            Send Message
-        </div>
-        <div class="content">
-            <p>Are you sure you want to send message?</p>
-        </div>
-        <input type="hidden" id="approveCollectionID">
-        <div class="actions">
-            <div class="ui negative button">
-                No
-            </div>
-            <button class="ui green right labeled icon button saveBtn" onclick="confirmApproval()">
-                Yes
-                <i class="checkmark icon"></i>
-            </button>
-            <button style="display: none;" class="ui teal right labeled icon button saveBtnLoad">
-                Saving ....
-                <i class="checkmark icon"></i>
-            </button>
-
-        </div>
-    </div>
+    {% endif %}
 {% endblock %}
 
 {% block js %}
@@ -278,6 +284,9 @@
 
 
         function delUser(id) {
+            if (!$('#deleteUser').length) {
+                return;
+            }
             $('#deleteUser')
                 .modal('show')
             ;
@@ -344,6 +353,9 @@
         }
 
         function showConfirmationModal(id) {
+            if (!$('#imgModal').length) {
+                return;
+            }
             $('#imgModal').modal('show');
             $('#approveCollectionID').val('' + id);
         }

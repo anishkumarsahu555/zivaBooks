@@ -10,27 +10,16 @@ from django.db.models import Q
 from django.db.models.functions import Length
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 # Create your views here.
 from django.views.decorators.csrf import csrf_exempt
 
 # import xlwt
 from activation.models import *
 from activation.views import is_activated
-from .authz import legacy_group_names, legacy_permission_names
 from .models import *
+from .navigation import build_sidebar_sections
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_qs
-
-
-PERMISSION_LANDING_PAGES = [
-    ('home.can_manage_staff_groups', '/staff_group_list/'),
-    ('home.can_manage_staff', '/user_list/'),
-    ('home.can_approve_collection', '/collection_list/'),
-    ('home.add_collection', '/add_collection/'),
-    ('home.can_manage_sales', '/sales_list/'),
-    ('home.can_manage_cash_counter', '/cash_counter/'),
-    ('home.view_party', '/party_list/'),
-    ('home.view_attendance', '/attendance_report/'),
-]
 
 
 # def login_or_logout(request, type):
@@ -44,40 +33,480 @@ PERMISSION_LANDING_PAGES = [
 #     except:
 #         pass
 
-
-def _request_group_names(request):
-    if not hasattr(request, "_group_name_cache"):
-        request._group_name_cache = legacy_group_names(request.user)
-    return request._group_name_cache
-
-
-def _staff_users_for_legacy_group(request, group_name):
+def _staff_users_with_permissions(request, *perm_names):
     queryset = tenant_qs(request, StaffUser).filter(isDeleted__exact=False)
-    permission_names = legacy_permission_names(group_name)
-    role_filter = Q(staffGroup__name__iexact=group_name) | Q(group__iexact=group_name)
-    if permission_names:
-        codenames = [perm_name.split('.', 1)[1] for perm_name in permission_names if '.' in perm_name]
-        role_filter |= Q(
+    codenames = [perm_name.split('.', 1)[1] for perm_name in perm_names if '.' in perm_name]
+    if not codenames:
+        return queryset.none()
+    permission_filter = (
+        Q(
             staffGroup__djangoGroup__permissions__content_type__app_label='home',
             staffGroup__djangoGroup__permissions__codename__in=codenames,
+        ) |
+        Q(
+            user_ID__user_permissions__content_type__app_label='home',
+            user_ID__user_permissions__codename__in=codenames,
         )
-    return queryset.filter(role_filter).distinct().order_by('name')
+    )
+    return queryset.filter(permission_filter).distinct().order_by('name')
 
 
 def _has_any_permission(user, perm_names):
     return any(user.has_perm(perm_name) for perm_name in perm_names)
 
 
+def _user_has_portal_access(user):
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if user.is_superuser:
+        return True
+    if build_sidebar_sections(user):
+        return True
+    return user.has_module_perms('home') or user.has_module_perms('activation')
+
+
 def _permission_catalog():
+    hidden_content_types = {
+        ('activation', 'ecomvalidity'),
+        ('activation', 'validity'),
+        ('home', 'auditlog'),
+        ('home', 'geolocationpackage'),
+        ('home', 'tenant'),
+        ('home', 'tenantmembership'),
+        ('home', 'whatsappmessage'),
+        ('home', 'whatsappmessagestatus'),
+    }
     catalog = {}
     for permission in Permission.objects.select_related('content_type').exclude(
         content_type__app_label__in=['admin', 'auth', 'contenttypes', 'sessions']
     ).order_by('content_type__app_label', 'content_type__model', 'name'):
+        if (permission.content_type.app_label, permission.content_type.model) in hidden_content_types:
+            continue
         module = permission.content_type.model.replace('_', ' ').title()
         if permission.codename.startswith('can_'):
             module = 'Custom ' + module
         catalog.setdefault(module, []).append(permission)
     return catalog
+
+
+STAFF_GROUP_PRESET_DEFS = [
+    {
+        'key': 'sales_full',
+        'label': 'Sales FullList',
+        'description': 'Full sales access with FullList, approve, delete, and reports.',
+        'permissions': [
+            'home.view_sales',
+            'home.add_sales',
+            'home.change_sales',
+            'home.delete_sales',
+            'home.can_manage_sales',
+            'home.can_approve_sales',
+            'home.can_view_sales_reports',
+        ],
+    },
+    {
+        'key': 'sales_add_list',
+        'label': 'Sales Add + MyList',
+        'description': 'Can add new sales and work only with MyList records.',
+        'permissions': [
+            'home.view_sales',
+            'home.add_sales',
+        ],
+    },
+    {
+        'key': 'sales_add_edit_list',
+        'label': 'Sales Add + Edit + MyList',
+        'description': 'Can create, update, and view only MyList sales without delete or approval.',
+        'permissions': [
+            'home.view_sales',
+            'home.add_sales',
+            'home.change_sales',
+        ],
+    },
+    {
+        'key': 'sales_view_only',
+        'label': 'Sales View MyList',
+        'description': 'Read-only access to MyList sales.',
+        'permissions': [
+            'home.view_sales',
+        ],
+    },
+    {
+        'key': 'orders_full',
+        'label': 'Orders FullList',
+        'description': 'Full orders access with FullList, approve, delete, and reports.',
+        'permissions': [
+            'home.view_order',
+            'home.add_order',
+            'home.change_order',
+            'home.delete_order',
+            'home.can_manage_orders',
+            'home.can_approve_orders',
+            'home.can_view_order_reports',
+        ],
+    },
+    {
+        'key': 'orders_add_list',
+        'label': 'Orders Add + MyList',
+        'description': 'Can add new orders and work only with MyList records.',
+        'permissions': [
+            'home.view_order',
+            'home.add_order',
+        ],
+    },
+    {
+        'key': 'orders_add_edit_list',
+        'label': 'Orders Add + Edit + MyList',
+        'description': 'Can create, update, and view only MyList orders before approval.',
+        'permissions': [
+            'home.view_order',
+            'home.add_order',
+            'home.change_order',
+        ],
+    },
+    {
+        'key': 'orders_view_only',
+        'label': 'Orders View MyList',
+        'description': 'Read-only access to MyList orders.',
+        'permissions': [
+            'home.view_order',
+        ],
+    },
+    {
+        'key': 'collection_full',
+        'label': 'Collection FullList',
+        'description': 'Full collection workflow with FullList, approval, tally, and reports.',
+        'permissions': [
+            'home.view_collection',
+            'home.add_collection',
+            'home.change_collection',
+            'home.delete_collection',
+            'home.can_approve_collection',
+            'home.can_tally_collection',
+            'home.can_view_collection_reports',
+        ],
+    },
+    {
+        'key': 'collection_add_list',
+        'label': 'Collection Add + MyList',
+        'description': 'Can create and view only MyList collections.',
+        'permissions': [
+            'home.view_collection',
+            'home.add_collection',
+        ],
+    },
+    {
+        'key': 'collection_add_edit_list',
+        'label': 'Collection Add + Edit + MyList',
+        'description': 'Can create, update, and view only MyList collections.',
+        'permissions': [
+            'home.view_collection',
+            'home.add_collection',
+            'home.change_collection',
+        ],
+    },
+    {
+        'key': 'collection_view_only',
+        'label': 'Collection View MyList',
+        'description': 'Read-only access to MyList collections.',
+        'permissions': [
+            'home.view_collection',
+        ],
+    },
+    {
+        'key': 'cash_counter_full',
+        'label': 'Cash Counter FullList',
+        'description': 'Full cash counter workflow with FullList and counter collection access.',
+        'permissions': [
+            'home.view_cashcounter',
+            'home.add_cashcounter',
+            'home.change_cashcounter',
+            'home.delete_cashcounter',
+            'home.view_collectioncashcounter',
+            'home.add_collectioncashcounter',
+            'home.change_collectioncashcounter',
+            'home.delete_collectioncashcounter',
+            'home.can_manage_cash_counter',
+            'home.can_view_cash_counter_reports',
+        ],
+    },
+    {
+        'key': 'cash_counter_add_list',
+        'label': 'Cash Counter Add + MyList',
+        'description': 'Can create and view only MyList cash counter records.',
+        'permissions': [
+            'home.view_cashcounter',
+            'home.add_cashcounter',
+            'home.view_collectioncashcounter',
+            'home.add_collectioncashcounter',
+        ],
+    },
+    {
+        'key': 'cash_counter_add_edit_list',
+        'label': 'Cash Counter Add + Edit + MyList',
+        'description': 'Can create, update, and view only MyList cash counter records.',
+        'permissions': [
+            'home.view_cashcounter',
+            'home.add_cashcounter',
+            'home.change_cashcounter',
+            'home.view_collectioncashcounter',
+            'home.add_collectioncashcounter',
+            'home.change_collectioncashcounter',
+        ],
+    },
+    {
+        'key': 'cash_counter_view_only',
+        'label': 'Cash Counter View MyList',
+        'description': 'Read-only access to MyList cash counter records.',
+        'permissions': [
+            'home.view_cashcounter',
+            'home.view_collectioncashcounter',
+        ],
+    },
+    {
+        'key': 'party_full',
+        'label': 'Party FullList',
+        'description': 'Full party + bank management with credentials access.',
+        'permissions': [
+            'home.can_manage_parties',
+            'home.can_view_party_credentials',
+            'home.view_party',
+            'home.add_party',
+            'home.change_party',
+            'home.delete_party',
+            'home.view_partygroup',
+            'home.add_partygroup',
+            'home.change_partygroup',
+            'home.delete_partygroup',
+            'home.view_bank',
+            'home.add_bank',
+            'home.change_bank',
+            'home.delete_bank',
+        ],
+    },
+    {
+        'key': 'party_manage',
+        'label': 'Party Manage FullList',
+        'description': 'Manage party + bank lists without credential visibility.',
+        'permissions': [
+            'home.can_manage_parties',
+            'home.view_party',
+            'home.add_party',
+            'home.change_party',
+            'home.delete_party',
+            'home.view_partygroup',
+            'home.add_partygroup',
+            'home.change_partygroup',
+            'home.delete_partygroup',
+            'home.view_bank',
+            'home.add_bank',
+            'home.change_bank',
+            'home.delete_bank',
+        ],
+    },
+    {
+        'key': 'party_list_only',
+        'label': 'Party List FullList',
+        'description': 'View-only party, party group, and bank lists.',
+        'permissions': [
+            'home.can_manage_parties',
+            'home.view_party',
+            'home.view_partygroup',
+            'home.view_bank',
+        ],
+    },
+    {
+        'key': 'attendance_full',
+        'label': 'Attendance FullList',
+        'description': 'Full attendance access with all-staff visibility and reports.',
+        'permissions': [
+            'home.view_attendance',
+            'home.add_attendance',
+            'home.change_attendance',
+            'home.can_view_all_attendance',
+            'home.can_view_attendance_reports',
+        ],
+    },
+    {
+        'key': 'attendance_add_edit_list',
+        'label': 'Attendance Add + Edit + MyList',
+        'description': 'Mark and update your own attendance records.',
+        'permissions': [
+            'home.view_attendance',
+            'home.add_attendance',
+            'home.change_attendance',
+        ],
+    },
+    {
+        'key': 'attendance_add_list',
+        'label': 'Attendance Add + MyList',
+        'description': 'Mark your attendance and view your own records.',
+        'permissions': [
+            'home.view_attendance',
+            'home.add_attendance',
+        ],
+    },
+    {
+        'key': 'attendance_view_only',
+        'label': 'Attendance View MyList',
+        'description': 'Read-only access to your own attendance records.',
+        'permissions': [
+            'home.view_attendance',
+        ],
+    },
+    {
+        'key': 'staff_full',
+        'label': 'Staff FullList',
+        'description': 'Full staff and group administration.',
+        'permissions': [
+            'home.can_manage_staff_groups',
+            'home.can_manage_staff',
+            'home.can_reset_staff_password',
+            'home.can_assign_staff_groups',
+            'home.view_staffgroup',
+            'home.add_staffgroup',
+            'home.change_staffgroup',
+            'home.delete_staffgroup',
+            'home.view_staffuser',
+            'home.add_staffuser',
+            'home.change_staffuser',
+            'home.delete_staffuser',
+        ],
+    },
+    {
+        'key': 'staff_groups_full',
+        'label': 'Staff Groups FullList',
+        'description': 'Create and maintain staff groups and permissions.',
+        'permissions': [
+            'home.can_manage_staff_groups',
+            'home.view_staffgroup',
+            'home.add_staffgroup',
+            'home.change_staffgroup',
+            'home.delete_staffgroup',
+        ],
+    },
+    {
+        'key': 'staff_users_full',
+        'label': 'Staff Users FullList',
+        'description': 'Manage staff users and their group assignment.',
+        'permissions': [
+            'home.can_manage_staff',
+            'home.can_reset_staff_password',
+            'home.can_assign_staff_groups',
+            'home.view_staffuser',
+            'home.add_staffuser',
+            'home.change_staffuser',
+            'home.delete_staffuser',
+        ],
+    },
+]
+
+
+def _staff_group_presets():
+    permission_lookup = {
+        f'{permission.content_type.app_label}.{permission.codename}': permission
+        for permission in Permission.objects.select_related('content_type').all()
+    }
+    presets = []
+    for preset in STAFF_GROUP_PRESET_DEFS:
+        ids = []
+        names = []
+        for perm_name in preset['permissions']:
+            permission = permission_lookup.get(perm_name)
+            if permission:
+                ids.append(permission.id)
+                names.append(permission.name)
+        presets.append({
+            'key': preset['key'],
+            'label': preset['label'],
+            'description': preset['description'],
+            'permission_ids': ids,
+            'permission_names': names,
+        })
+    return presets
+
+
+def _preset_reference_sections():
+    sections = {}
+    for preset in _staff_group_presets():
+        module_name = preset['label'].split(' ', 1)[0]
+        sections.setdefault(module_name, []).append(preset)
+    return sections
+
+
+def _is_admin_like(user):
+    return _has_any_permission(user, [
+        'home.can_manage_staff',
+        'home.can_manage_staff_groups',
+        'home.can_manage_parties',
+        'home.can_view_party_credentials',
+        'home.can_approve_collection',
+        'home.can_view_audit_logs',
+    ])
+
+
+def _sales_capabilities(user):
+    can_add = user.has_perm('home.add_sales')
+    can_edit = user.has_perm('home.change_sales') or user.has_perm('home.can_manage_sales') or user.has_perm('home.can_view_party_credentials')
+    can_delete = user.has_perm('home.can_view_party_credentials')
+    can_message = user.has_perm('home.can_manage_sales') or user.has_perm('home.can_approve_sales') or user.has_perm('home.can_view_party_credentials')
+    can_export = user.has_perm('home.can_view_sales_reports') or user.has_perm('home.can_view_party_credentials') or user.has_perm('home.can_view_audit_logs')
+    can_filter_staff = _is_admin_like(user) or user.has_perm('home.can_manage_sales')
+    return {
+        'can_add': can_add,
+        'can_edit': can_edit,
+        'can_delete': can_delete,
+        'can_message': can_message,
+        'can_export': can_export,
+        'can_filter_staff': can_filter_staff,
+    }
+
+
+def _order_capabilities(user):
+    can_add = user.has_perm('home.add_order')
+    can_edit = user.has_perm('home.change_order') or user.has_perm('home.can_manage_orders') or user.has_perm('home.can_view_party_credentials')
+    can_delete = user.has_perm('home.delete_order') or user.has_perm('home.can_view_party_credentials')
+    can_approve = user.has_perm('home.can_approve_orders') or user.has_perm('home.can_manage_orders') or user.has_perm('home.can_view_party_credentials')
+    can_filter_staff = _is_admin_like(user) or user.has_perm('home.can_manage_orders') or user.has_perm('home.can_view_party_credentials')
+    can_set_order_date = user.has_perm('home.can_manage_orders') or user.has_perm('home.can_view_party_credentials') or user.has_perm('home.can_approve_orders')
+    return {
+        'can_add': can_add,
+        'can_edit': can_edit,
+        'can_delete': can_delete,
+        'can_approve': can_approve,
+        'can_filter_staff': can_filter_staff,
+        'can_set_order_date': can_set_order_date,
+    }
+
+
+def _collection_capabilities(user):
+    can_add = user.has_perm('home.add_collection')
+    can_edit = user.has_perm('home.change_collection') or user.has_perm('home.can_approve_collection') or user.has_perm('home.can_view_party_credentials')
+    can_delete = user.has_perm('home.can_view_party_credentials')
+    can_export = user.has_perm('home.can_view_collection_reports') or user.has_perm('home.can_view_party_credentials') or user.has_perm('home.can_view_audit_logs')
+    can_filter_staff = user.has_perm('home.can_approve_collection') or user.has_perm('home.can_view_party_credentials')
+    return {
+        'can_add': can_add,
+        'can_edit': can_edit,
+        'can_delete': can_delete,
+        'can_export': can_export,
+        'can_filter_staff': can_filter_staff,
+    }
+
+
+def _cash_counter_capabilities(user):
+    can_add = user.has_perm('home.add_cashcounter') or user.has_perm('home.add_collectioncashcounter') or user.has_perm('home.can_manage_cash_counter')
+    can_edit = user.has_perm('home.change_cashcounter') or user.has_perm('home.change_collectioncashcounter') or user.has_perm('home.can_manage_cash_counter') or user.has_perm('home.can_view_party_credentials')
+    can_delete = user.has_perm('home.can_view_party_credentials')
+    can_export = user.has_perm('home.can_view_cash_counter_reports') or user.has_perm('home.can_view_party_credentials') or user.has_perm('home.can_view_audit_logs')
+    can_filter_staff = user.has_perm('home.can_manage_cash_counter') or user.has_perm('home.can_view_party_credentials') or user.has_perm('home.can_approve_collection')
+    return {
+        'can_add': can_add,
+        'can_edit': can_edit,
+        'can_delete': can_delete,
+        'can_export': can_export,
+        'can_filter_staff': can_filter_staff,
+    }
 
 
 def permission_required_any(*perm_names):
@@ -91,54 +520,6 @@ def permission_required_any(*perm_names):
         return wrapper
 
     return decorator
-
-
-def check_group(*group_names):
-    def _check_group(view_func):
-        @wraps(view_func)
-        def wrapper(request, *args, **kwargs):
-            if _request_group_names(request).intersection(group_names):
-                return view_func(request, *args, **kwargs)
-            return redirect('/')
-
-        return wrapper
-
-    return _check_group
-
-
-# def check_two_group(admin, collector):
-#     def _check_group(view_func):
-#         @wraps(view_func)
-#         def wrapper(request, *args, **kwargs):
-#             if request.user.groups.filter(name=admin).exists() or request.user.groups.filter(name=collector).exists():
-#                 pass
-#             else:
-#                 return redirect('/')
-#             return view_func(request, *args, **kwargs)
-#
-#         return wrapper
-#
-#     return _check_group
-
-def check_two_group(*group_names):
-    """
-    Decorator to check if a user belongs to ANY of the given groups.
-    Example:
-        @check_groups('Admin', 'Moderator', 'Staff')
-        def my_view(request):
-            ...
-    """
-
-    def _check_group(view_func):
-        @wraps(view_func)
-        def wrapper(request, *args, **kwargs):
-            if _request_group_names(request).intersection(group_names):
-                return view_func(request, *args, **kwargs)
-            return redirect('/')
-
-        return wrapper
-
-    return _check_group
 
 
 def loginPage(request):
@@ -155,6 +536,7 @@ def admin_home(request):
         message = "Your App License is Valid till {}".format(val.expiryDate.strftime('%d-%m-%Y'))
     except:
         message = "You are using a trial version."
+    request.dashboard_license_message = message
 
     context = {
         'message': message,
@@ -190,6 +572,15 @@ def staff_group_list(request):
 
 @permission_required_any('home.can_manage_staff_groups')
 @is_activated()
+def permission_reference(request):
+    context = {
+        'preset_sections': _preset_reference_sections(),
+    }
+    return render(request, 'home/admin/permissionReference.html', context)
+
+
+@permission_required_any('home.can_manage_staff_groups')
+@is_activated()
 def staff_group_create(request):
     context = {
         'page_mode': 'create',
@@ -197,7 +588,9 @@ def staff_group_create(request):
         'submit_label': 'Create Group',
         'group_obj': None,
         'permission_catalog': _permission_catalog(),
+        'permission_presets': _staff_group_presets(),
         'selected_permission_ids': [],
+        'selected_preset_keys': [],
     }
     return render(request, 'home/admin/staffGroupForm.html', context)
 
@@ -209,14 +602,25 @@ def staff_group_edit(request, id):
         tenant_qs(request, StaffGroup).select_related('djangoGroup').filter(isDeleted=False),
         pk=id,
     )
+    # Ensure hidden/internal model permissions never show in edit mode (and counts stay accurate).
+    visible_permission_ids = {permission.id for perms in _permission_catalog().values() for permission in perms}
     selected_permission_ids = list(group.djangoGroup.permissions.values_list('id', flat=True)) if group.djangoGroup_id else []
+    selected_permission_ids = [perm_id for perm_id in selected_permission_ids if perm_id in visible_permission_ids]
+    selected_set = set(selected_permission_ids)
+    presets = _staff_group_presets()
+    selected_preset_keys = [
+        preset['key'] for preset in presets
+        if set(preset.get('permission_ids') or []).issubset(selected_set) and preset.get('permission_ids')
+    ]
     context = {
         'page_mode': 'edit',
         'page_title': 'Edit Staff Group',
         'submit_label': 'Update Group',
         'group_obj': group,
         'permission_catalog': _permission_catalog(),
+        'permission_presets': presets,
         'selected_permission_ids': selected_permission_ids,
+        'selected_preset_keys': selected_preset_keys,
     }
     return render(request, 'home/admin/staffGroupForm.html', context)
 
@@ -231,6 +635,20 @@ def staff_group_detail(request, id):
     assigned_permissions = list(
         group.djangoGroup.permissions.select_related('content_type').order_by('content_type__model', 'name')
     ) if group.djangoGroup_id else []
+    hidden_content_types = {
+        ('activation', 'ecomvalidity'),
+        ('activation', 'validity'),
+        ('home', 'auditlog'),
+        ('home', 'geolocationpackage'),
+        ('home', 'tenant'),
+        ('home', 'tenantmembership'),
+        ('home', 'whatsappmessage'),
+        ('home', 'whatsappmessagestatus'),
+    }
+    assigned_permissions = [
+        permission for permission in assigned_permissions
+        if (permission.content_type.app_label, permission.content_type.model) not in hidden_content_types
+    ]
     permission_modules = {}
     for permission in assigned_permissions:
         module = permission.content_type.model.replace('_', ' ').title()
@@ -252,26 +670,52 @@ def staff_group_detail(request, id):
     return render(request, 'home/admin/staffGroupDetail.html', context)
 
 
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials')
 @is_activated()
 def party_group_list(request):
-    return render(request, 'home/admin/partyGroupList.html')
+    can_view_credentials = request.user.has_perm('home.can_view_party_credentials')
+    context = {
+        'party_group_capabilities': {
+            'can_add': request.user.has_perm('home.add_partygroup') or can_view_credentials,
+            'can_edit': request.user.has_perm('home.change_partygroup') or can_view_credentials,
+            'can_delete': request.user.has_perm('home.delete_partygroup') or can_view_credentials,
+        },
+    }
+    return render(request, 'home/admin/partyGroupList.html', context)
 
 
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials')
 @is_activated()
 def bank_list(request):
-    return render(request, 'home/admin/BankList.html')
+    can_view_credentials = request.user.has_perm('home.can_view_party_credentials')
+    context = {
+        'bank_capabilities': {
+            'can_add': request.user.has_perm('home.add_bank') or can_view_credentials,
+            'can_edit': request.user.has_perm('home.change_bank') or can_view_credentials,
+            'can_delete': request.user.has_perm('home.delete_bank') or can_view_credentials,
+        },
+    }
+    return render(request, 'home/admin/BankList.html', context)
 
 
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials')
 @is_activated()
 def party_list(request):
     party_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
     staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
+    can_view_credentials = request.user.has_perm('home.can_view_party_credentials')
+    can_add = request.user.has_perm('home.add_party') or can_view_credentials
+    can_edit = request.user.has_perm('home.change_party') or can_view_credentials
+    can_delete = request.user.has_perm('home.delete_party') or can_view_credentials
     context = {
         'party_groups': party_groups,
-        'staffs': staffs
+        'staffs': staffs,
+        'party_capabilities': {
+            'can_view_credentials': can_view_credentials,
+            'can_add': can_add,
+            'can_edit': can_edit,
+            'can_delete': can_delete,
+        },
     }
     return render(request, 'home/admin/PartyList.html', context)
 
@@ -308,11 +752,9 @@ def postLogin(request):
 
         if user is not None:
             login(request, user)
-            user_groups = _request_group_names(request)
-            allowed_groups = ['Owner', 'Admin', 'Moderator', 'Collection', 'NormalStaff', 'CashCounter',
-                              'SalesAdmin', 'Customer', 'Viewer']
-            if any(group in user_groups for group in allowed_groups):
+            if _user_has_portal_access(request.user):
                 return JsonResponse({'message': 'success', 'data': '/home/'}, safe=False)
+            logout(request)
         return JsonResponse({'message': 'fail'}, safe=False)
     return JsonResponse({'message': 'fail'}, safe=False)
 
@@ -320,25 +762,21 @@ def postLogin(request):
 #
 def homepage(request):
     if request.user.is_authenticated:
-        if request.user.has_perm('home.can_view_party_credentials'):
-            return redirect('/admin_home/')
-        elif request.user.has_perm('home.add_collection'):
-            return redirect('/collection_home/')
-        elif request.user.has_perm('home.can_manage_cash_counter'):
-            return redirect('/cash_counter_home/')
-        elif request.user.has_perm('home.view_attendance'):
-            return redirect('/staff_home/')
-        elif request.user.has_perm('home.view_party'):
-            return redirect('/customer_home/')
-        for perm_name, path in PERMISSION_LANDING_PAGES:
-            if request.user.has_perm(perm_name):
-                return redirect(path)
-        return render(request, 'home/login.html')
-    else:
-        return render(request, 'home/login.html')
+        if _user_has_portal_access(request.user):
+            if request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_manage_staff'):
+                try:
+                    val = tenant_qs(request, Validity).last()
+                    request.dashboard_license_message = "Your App License is Valid till {}".format(
+                        val.expiryDate.strftime('%d-%m-%Y')
+                    )
+                except Exception:
+                    request.dashboard_license_message = "You are using a trial version."
+            return render(request, 'home/baseIndex.html')
+        logout(request)
+    return render(request, 'home/login.html')
 
 
-@check_group('Customer')
+@permission_required_any('home.view_party')
 def customer_home(request):
     party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only(
         'id', 'name', 'phone', 'address', 'username', 'password'
@@ -381,7 +819,7 @@ def customer_home(request):
     return render(request, 'home/customer.html', context)
 
 
-@check_group('Customer')
+@permission_required_any('home.view_party')
 def customer_change_password(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
@@ -415,9 +853,15 @@ def customer_change_password(request):
     return JsonResponse({'message': 'success', 'success': 'Password changed successfully.'}, status=200)
 
 
+@permission_required_any('home.add_collection')
 def add_collection(request):
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
-    staffs = _staff_users_for_legacy_group(request, 'Collection')
+    staffs = _staff_users_with_permissions(
+        request,
+        'home.add_collection',
+        'home.change_collection',
+        'home.view_collection',
+    )
     p_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
     context = {
         'instance': instance,
@@ -427,15 +871,17 @@ def add_collection(request):
     return render(request, 'home/collection/addCollection.html', context)
 
 
+@permission_required_any('home.view_collection', 'home.add_collection', 'home.change_collection', 'home.can_approve_collection')
 def my_collection(request):
     context = {
+        'collection_capabilities': _collection_capabilities(request.user),
     }
     return render(request, 'home/collection/collectionListByStaff.html', context)
 
 
 # admin
 @is_activated()
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_approve_collection', 'home.can_view_party_credentials')
 def collection_list(request):
     staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
     context = {
@@ -445,7 +891,7 @@ def collection_list(request):
 
 
 @is_activated()
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_approve_collection', 'home.can_view_party_credentials')
 def cheque_reminder_list(request):
     staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
     context = {
@@ -454,7 +900,7 @@ def cheque_reminder_list(request):
     return render(request, 'home/admin/collectionListChequeReminder.html', context)
 
 
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_approve_collection', 'home.can_view_party_credentials')
 def take_collection(request):
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
     context = {
@@ -512,7 +958,7 @@ def generate_collection_date(request):
 
 # ----------staff-------------------
 
-@check_group('NormalStaff', 'SalesAdmin')
+@permission_required_any('home.view_attendance', 'home.add_sales', 'home.view_sales', 'home.can_manage_sales')
 def staff_home(request):
     obj = get_object_or_404(tenant_qs(request, StaffUser), user_ID__pk=request.user.pk)
     context = {
@@ -554,7 +1000,7 @@ def attendance_report(request):
         return redirect('/')
 
 
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_manage_staff', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def attendance_report_admin(request):
     if request.user.is_authenticated:
         staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
@@ -567,28 +1013,42 @@ def attendance_report_admin(request):
 
 
 # ----------------------------- Sales ----------------------
+@permission_required_any('home.add_sales')
 def add_sales(request):
     return render(request, 'home/sales/addSales.html')
 
 
 @is_activated()
-@check_two_group('Admin', 'Moderator', 'SalesAdmin')
+@permission_required_any('home.can_manage_sales', 'home.view_sales', 'home.change_sales')
 def sales_list(request):
-    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
+    capabilities = _sales_capabilities(request.user)
+    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name') if capabilities['can_filter_staff'] else []
     context = {
-        'staffs': staffs
+        'staffs': staffs,
+        'sales_capabilities': capabilities,
     }
     return render(request, 'home/sales/salesListByAdmin.html', context)
 
 
+@permission_required_any('home.view_sales', 'home.add_sales', 'home.change_sales', 'home.can_manage_sales')
 def my_sales_list(request):
+    capabilities = _sales_capabilities(request.user)
     context = {
+        'staffs': tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name') if capabilities['can_filter_staff'] else [],
+        'sales_capabilities': capabilities,
     }
     return render(request, 'home/sales/salesListByStaff.html', context)
 
 
+@permission_required_any('home.change_sales', 'home.can_manage_sales', 'home.can_view_party_credentials')
 def edit_sales(request, id=None):
     obj = get_object_or_404(tenant_qs(request, Sales), pk=id)
+    capabilities = _sales_capabilities(request.user)
+    admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_sales')
+
+    if not admin_like:
+        if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
+            return redirect('homeApp:my_sales_list')
     invoice = obj.invoiceNumber
     splitVoice = invoice.split('/')
 
@@ -597,23 +1057,99 @@ def edit_sales(request, id=None):
         'series': splitVoice[0],
         'number': splitVoice[1],
         'year': splitVoice[2],
+        'sales_edit_readonly': bool(obj.isApproved and not admin_like),
+        'sales_return_url': reverse('homeApp:sales_list') if admin_like else reverse('homeApp:my_sales_list'),
     }
     return render(request, 'home/sales/editSales.html', context)
 
 
+# ----------------------------- Orders ----------------------
+@permission_required_any('home.add_order')
+def add_order(request):
+    return render(request, 'home/orders/addOrder.html', {
+        'order_capabilities': _order_capabilities(request.user),
+    })
+
+
+@is_activated()
+@permission_required_any('home.can_manage_orders', 'home.view_order', 'home.change_order')
+def orders_list(request):
+    capabilities = _order_capabilities(request.user)
+    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name') if capabilities['can_filter_staff'] else []
+    context = {
+        'staffs': staffs,
+        'order_capabilities': capabilities,
+    }
+    return render(request, 'home/orders/ordersListByAdmin.html', context)
+
+
+@permission_required_any('home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders')
+def my_orders_list(request):
+    capabilities = _order_capabilities(request.user)
+    context = {
+        'staffs': tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name') if capabilities['can_filter_staff'] else [],
+        'order_capabilities': capabilities,
+    }
+    return render(request, 'home/orders/ordersListByStaff.html', context)
+
+
+@permission_required_any('home.change_order', 'home.can_manage_orders', 'home.can_view_party_credentials')
+def edit_order(request, id=None):
+    obj = get_object_or_404(tenant_qs(request, Order), pk=id)
+    capabilities = _order_capabilities(request.user)
+    admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_orders') or request.user.has_perm('home.can_manage_orders')
+
+    if not admin_like:
+        if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
+            return redirect('homeApp:my_orders_list')
+
+    attachments = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order=obj).order_by('-id')
+    context = {
+        'obj': obj,
+        'attachments': attachments,
+        'order_capabilities': capabilities,
+        'order_edit_readonly': bool(str(obj.status) == Order.Status.APPROVED and not admin_like),
+        'order_return_url': reverse('homeApp:orders_list') if admin_like else reverse('homeApp:my_orders_list'),
+    }
+    return render(request, 'home/orders/editOrder.html', context)
+
+
+@permission_required_any('home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders')
+def order_detail(request, id=None):
+    obj = get_object_or_404(tenant_qs(request, Order).select_related('partyID', 'createdBy', 'approvedBy'), pk=id)
+    capabilities = _order_capabilities(request.user)
+    admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_orders') or request.user.has_perm('home.can_manage_orders')
+
+    if not admin_like:
+        if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
+            return redirect('homeApp:my_orders_list')
+
+    attachments = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order=obj).order_by('-id')
+    context = {
+        'obj': obj,
+        'attachments': attachments,
+        'order_capabilities': capabilities,
+        'is_admin_like': admin_like,
+        'can_approve_order': capabilities.get('can_approve', False) and str(obj.status) != Order.Status.APPROVED,
+        'can_edit_order': capabilities.get('can_edit', False) and (admin_like or str(obj.status) != Order.Status.APPROVED),
+        'order_return_url': reverse('homeApp:orders_list') if admin_like else reverse('homeApp:my_orders_list'),
+    }
+    return render(request, 'home/orders/orderDetail.html', context)
+
+
 # -----------------------Message---------------------
-@check_two_group('Admin', 'Moderator')
+@permission_required_any('home.can_manage_sales', 'home.can_approve_collection', 'home.can_view_audit_logs')
 def message_list(request):
     return render(request, 'home/messageList.html')
 
 
 # -----------------------CashCounter---------------------
-@check_group('CashCounter')
+@permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter')
 def cash_counter_home(request):
     return render(request, 'home/cashCounter/indexCashCounter.html')
 
 
-@check_group('CashCounter', 'Admin', 'Moderator')
+@permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def cash_counter(request):
     banks = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
     context = {
@@ -622,12 +1158,14 @@ def cash_counter(request):
     return render(request, 'home/cashCounter/todaysCounter.html', context)
 
 
-@check_group('CashCounter', 'Admin', 'Moderator')
+@permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter', 'home.view_collectioncashcounter', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def my_cash_counter_list(request):
-    return render(request, 'home/cashCounter/cashCounterListByStaff.html')
+    return render(request, 'home/cashCounter/cashCounterListByStaff.html', {
+        'cash_counter_capabilities': _cash_counter_capabilities(request.user),
+    })
 
 
-@check_group('CashCounter', 'Admin', 'Moderator')
+@permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def edit_cash_counter(request, id=None):
     obj = get_object_or_404(tenant_qs(request, CashCounter), pk=id)
     banks = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
@@ -655,10 +1193,15 @@ def edit_cash_counter(request, id=None):
     return render(request, 'home/cashCounter/editCashCounter.html', context)
 
 
-@check_group('CashCounter', 'Admin', 'Moderator')
+@permission_required_any('home.can_manage_cash_counter', 'home.view_collectioncashcounter', 'home.add_collectioncashcounter', 'home.change_collectioncashcounter', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def cash_counter_collection(request):
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
-    staffs = _staff_users_for_legacy_group(request, 'Collection')
+    staffs = _staff_users_with_permissions(
+        request,
+        'home.add_collection',
+        'home.change_collection',
+        'home.view_collection',
+    )
     p_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
     context = {
         'instance': instance,

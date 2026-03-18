@@ -1,0 +1,26 @@
+{% if sidebar_sections %}
+    {% for section in sidebar_sections %}
+        <div class="item">
+            <div class="header">{{ section.title }}</div>
+            <div class="menu">
+                {% for item in section.items %}
+                    <a class="item" href="{{ item.url }}">
+                        <div><i class="{{ item.icon }} icon"></i>{{ item.label }}</div>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="ui segment bgColor inverted">
+    <div class="ui tiny olive inverted progress">
+        <div class="bar" style="width: 54%"></div>
+        <div class="label">Developed By Ziva Infotech</div>
+    </div>
+
+    <div class="ui tiny teal inverted progress">
+        <div class="bar" style="width:78%"></div>
+        <div class="label">v 2.0.1</div>
+    </div>
+</div>

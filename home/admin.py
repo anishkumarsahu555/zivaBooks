@@ -41,6 +41,20 @@ class PartyAdmin(admin.ModelAdmin):
 admin.site.register(Party, PartyAdmin)
 
 
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'orderNumber', 'partyID', 'status', 'createdBy', 'buildDate', 'datetime', 'lastUpdatedOn', 'isDeleted']
+
+
+admin.site.register(Order, OrderAdmin)
+
+
+class OrderAttachmentAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'order', 'label', 'datetime', 'lastUpdatedOn', 'isDeleted']
+
+
+admin.site.register(OrderAttachment, OrderAttachmentAdmin)
+
+
 class CollectionAdmin(admin.ModelAdmin):
     search_fields = ['partyID', 'modeOfPayment', 'paidAmount', 'collectedBy', 'remark']
     list_display = ['tenant', 'partyID', 'modeOfPayment', 'paidAmount', 'collectionDateTime', 'remark', 'collectionAddress',

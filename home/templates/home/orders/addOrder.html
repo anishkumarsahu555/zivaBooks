@@ -1,0 +1,173 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block title %}
+    <title>Add Order</title>
+{% endblock %}
+
+{% block body %}
+    <div class="ui aligned basic grid">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div style="cursor:pointer;" class="item active" data-tab="user">Add Order</div>
+            </div>
+            <div class="ui tab" data-tab="user">
+                <div class="ui row teal stacked segment padded">
+                    <div class="content">
+                        <form class="ui small form" id="addForm" enctype="multipart/form-data">{% csrf_token %}
+                            <div class="two fields">
+                                <div class="eight wide field required">
+                                    <label>Party</label>
+                                    <select class="ui clearable search dropdown" id="party">
+                                        <option value="">Search By Party Name</option>
+                                    </select>
+                                </div>
+                                {% if order_capabilities.can_set_order_date %}
+                                    <div class="eight wide field required">
+                                        <label>Order Date</label>
+                                        <div class="ui calendar" id="cDate">
+                                            <div class="ui input">
+                                                <input type="text" placeholder="dd/mm/yyyy" id="buildDate">
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="eight wide field">
+                                        <label>Order Date</label>
+                                        <input type="text" id="buildDate" disabled>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="one fields">
+                                <div class="sixteen wide field">
+                                    <label>Order Text</label>
+                                    <textarea id="orderText" rows="6" placeholder="Type order details here..."></textarea>
+                                </div>
+                            </div>
+                            <div class="one fields">
+                                <div class="sixteen wide field">
+                                    <label>Remark</label>
+                                    <input type="text" id="remark" placeholder="Optional remark">
+                                </div>
+                            </div>
+                            <div class="one fields">
+                                <div class="sixteen wide field">
+                                    <label>Images (optional)</label>
+                                    <input type="file" id="images" multiple accept="image/*">
+                                    <div id="imagePreview" style="margin-top:10px;"></div>
+                                </div>
+                            </div>
+                            <input type="hidden" id="lat" value="0.0">
+                            <input type="hidden" id="lng" value="0.0">
+                            <input type="hidden" id="loc" value="N/A">
+                        </form>
+                    </div>
+                    <div class="ui aligned basic grid">
+                        <div class="row" style="padding-left:5px;padding-right:5px">
+                            <div class="16 wide column center aligned">
+                                <button onclick="orderSave()" id="saveBtn" class="ui green button saveBtn">Create Order</button>
+                                <button style="display:none;" class="ui teal double loading button saveBtnLoad">Saving ....</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script>
+        $('.ui.dropdown').dropdown({fullTextSearch: true});
+
+        {% if order_capabilities.can_set_order_date %}
+            $('#cDate').calendar({
+                monthFirst: false,
+                type: 'date',
+                formatter: { date: function (date) { if (!date) return ''; return date.getDate() + '/' + (date.getMonth()+1) + '/' + date.getFullYear(); } }
+            });
+        {% endif %}
+        var today = new Date();
+        $('#buildDate').val(today.getDate() + '/' + (today.getMonth()+1) + '/' + today.getFullYear());
+
+        function getCustomerList() {
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:list_party_api' %}",
+                success: function (response) {
+                    $('#party').html('');
+                    $('#party').append('<option value=\"\">Search By Party Name</option>');
+                    for (var j = 0; j < response.data.length; j++) {
+                        $('#party').append('<option value=\"' + response.data[j]['ID'] + '\">' + response.data[j]['DisplayDetail'] + '</option>');
+                    }
+                }
+            });
+        }
+        $(getCustomerList());
+
+        function hydrateGeo() {
+            try {
+                if (!navigator.geolocation) return;
+                navigator.geolocation.getCurrentPosition(function (pos) {
+                    $('#lat').val('' + pos.coords.latitude);
+                    $('#lng').val('' + pos.coords.longitude);
+                });
+            } catch (e) {}
+        }
+        $(hydrateGeo());
+
+        $('#images').on('change', function () {
+            var preview = $('#imagePreview');
+            preview.html('');
+            var files = this.files || [];
+            for (var i = 0; i < files.length; i++) {
+                preview.append('<div class="ui tiny label" style="margin:2px;">' + files[i].name + '</div>');
+            }
+        });
+
+        function orderSave() {
+            showLoading();
+            var buildDate = $('#buildDate').val();
+            var party = $('#party').val();
+            if (party === '') {
+                $('body').toast({class:'orange', message:'* fields are required !'});
+                hideLoading();
+                return;
+            }
+            var data = new FormData();
+            data.append('buildDate', buildDate);
+            data.append('party', party);
+            data.append('orderText', $('#orderText').val());
+            data.append('remark', $('#remark').val());
+            data.append('lat', $('#lat').val());
+            data.append('lng', $('#lng').val());
+            data.append('loc', $('#loc').val());
+            var files = $('#images')[0].files;
+            for (var i = 0; i < files.length; i++) {
+                data.append('images', files[i]);
+            }
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:add_order_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class:'success', message:'Order Created Successfully.'});
+                        hideLoading();
+                        location.href = "{% url 'homeApp:my_orders_list' %}";
+                    } else {
+                        $('body').toast({class:'error', message:'An error occurred !'});
+                        hideLoading();
+                    }
+                },
+                error: function () {
+                    $('body').toast({class:'error', message:'An error occurred !'});
+                    hideLoading();
+                }
+            });
+        }
+    </script>
+{% endblock %}

@@ -1,6 +1,5 @@
 {% extends 'home/cashCounter/indexCashCounter.html' %}
 {% load static %}
-{% load custom_has_group_tag %}
 
 {% block datatables_css_extra %}
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
@@ -67,7 +66,7 @@
 
 
                     <div class="">
-                           {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
+                           {% if cash_counter_capabilities.can_filter_staff or cash_counter_capabilities.can_export %}
                             <div class="ui form">
                                 <form class="ui tiny form">
                                     <div class="fields">
@@ -106,18 +105,23 @@
 
                                             </select>
                                         </div>{% endcomment %}
+                                        <input type="hidden" id="staffID" value="All">
                                         <div class="seven wide field">
                                             <label>Action</label>
-                                            <button class="ui tiny active button" type="button"
-                                                    onclick="filterDetails()">
-                                                <i class="funnel dollar icon"></i>
-                                                Search
-                                            </button>
-                                            <a id="reportUrl"
-                                           href="{% url 'homeApp:generate_cash_counter_report' %}"
-                                           style="float: right;"
-                                           class="teal tiny ui button">Download Report
-                                        </a>
+                                            {% if cash_counter_capabilities.can_filter_staff %}
+                                                <button class="ui tiny active button" type="button"
+                                                        onclick="filterDetails()">
+                                                    <i class="funnel dollar icon"></i>
+                                                    Search
+                                                </button>
+                                            {% endif %}
+                                            {% if cash_counter_capabilities.can_export %}
+                                                <a id="reportUrl"
+                                               href="{% url 'homeApp:generate_cash_counter_report' %}"
+                                               style="float: right;"
+                                               class="teal tiny ui button">Download Report
+                                            </a>
+                                            {% endif %}
 
                                         </div>
                                     </div>
@@ -773,7 +777,7 @@
         function filterDetails() {
             var startDate = $('#startDateF').val();
             var endDate = $('#endDateF').val();
-            var staffID = $('#staffID').val();
+            var staffID = $('#staffID').val() || 'All';
             cashTab.ajax.url('{% url 'homeApp:CashCounterByStaffListJson' %}?startDate=' + startDate + '&endDate=' + endDate + '&staffID=' + staffID).load();
             cardTab.ajax.url('{% url 'homeApp:CardCounterByStaffListJson' %}?startDate=' + startDate + '&endDate=' + endDate + '&staffID=' + staffID).load();
             mixTab.ajax.url('{% url 'homeApp:MixCounterByStaffListJson' %}?startDate=' + startDate + '&endDate=' + endDate + '&staffID=' + staffID).load();
@@ -847,8 +851,11 @@
 
         function ChangeDate() {
             var startDateF = $('#startDateF').val();
-            var staffID = $('#staffID').val();
-            $("#reportUrl").attr("href", "{% url 'homeApp:generate_cash_counter_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
+            var staffID = $('#staffID').val() || 'All';
+            var reportUrl = $('#reportUrl');
+            if (reportUrl.length) {
+                reportUrl.attr("href", "{% url 'homeApp:generate_cash_counter_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
+            }
         }
     </script>
 

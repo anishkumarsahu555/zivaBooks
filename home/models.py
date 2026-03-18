@@ -385,6 +385,76 @@ class WhatsappMessageStatus(TenantOwnedModel):
         ]
 
 
+class Order(TenantOwnedModel):
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        APPROVED = "approved", "Approved"
+        CANCELLED = "cancelled", "Cancelled"
+        FULFILLED = "fulfilled", "Fulfilled"
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='orders')
+    orderNumber = models.CharField(max_length=40, blank=True, null=True, db_index=True)
+    partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders')
+    buildDate = models.DateField(blank=True, null=True)
+
+    orderText = models.TextField(blank=True, null=True)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    # Optional capture location.
+    latitude = models.CharField(max_length=200, default='0.0', blank=True, null=True)
+    longitude = models.CharField(max_length=200, default='0.0', blank=True, null=True)
+    location = models.TextField(blank=True, null=True)
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+
+    createdBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_created'
+    )
+    approvedOn = models.DateTimeField(blank=True, null=True)
+    approvedBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_approved'
+    )
+
+    def __str__(self):
+        return self.orderNumber or f'Order#{self.pk}'
+
+    class Meta:
+        verbose_name_plural = 'Orders'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'buildDate'], name='order_tenant_del_build_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'status'], name='order_tenant_del_status_idx'),
+            models.Index(fields=['tenant', 'partyID'], name='order_tenant_party_idx'),
+            models.Index(fields=['tenant', 'createdBy'], name='order_tenant_staff_idx'),
+        ]
+        permissions = [
+            ('can_approve_orders', 'Can approve orders'),
+            ('can_manage_orders', 'Can manage orders'),
+            ('can_view_order_reports', 'Can view order reports'),
+        ]
+
+
+class OrderAttachment(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='order_attachments')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='attachments')
+    label = models.CharField(max_length=120, blank=True, null=True)
+    image = StdImageField(
+        upload_to='orders/attachments/',
+        blank=True,
+        variations={
+            'thumbnail': (240, 240, True),
+            'medium': (900, 900),
+        },
+        delete_orphans=True,
+    )
+
+    class Meta:
+        verbose_name_plural = 'Order Attachments'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'order'], name='orderatt_tenant_order_idx'),
+        ]
+
+
 class Sales(TenantOwnedModel):
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sales')
     partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL)

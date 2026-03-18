@@ -1,5 +1,4 @@
 {% extends 'home/admin/index.html' %}
-{% load custom_has_group_tag %}
 {% load static %}
 {% block title %}
     <title>Edit Sales</title>
@@ -167,6 +166,11 @@
                     <div class="ui  aligned basic  grid">
                         <div class="row" style="padding-left: 5px;padding-right: 5px">
                             <div class="16 wide column center aligned">
+                                {% if sales_edit_readonly %}
+                                    <div class="ui orange basic label" style="margin-bottom: 10px;">
+                                        This sale is already approved and is locked for editing.
+                                    </div>
+                                {% endif %}
                                 <button onclick="salesSave()" id="saveBtn" class="ui green  button saveBtn">
                                     Update Detail
                                 </button>
@@ -202,6 +206,9 @@
     </script>
 
     <script>
+        var salesEditReadOnly = {{ sales_edit_readonly|yesno:"true,false" }};
+        var salesReturnUrl = "{{ sales_return_url|default:'' }}";
+
         var today = new Date();
         $('#cDate')
             .calendar({
@@ -225,6 +232,11 @@
         $(loadDetail());
 
         function loadDetail() {
+            if (salesEditReadOnly) {
+                // Disable form and hide update button for staff once approved.
+                $('#addForm input, #addForm select, #addForm textarea').prop('disabled', true);
+                $('#saveBtn').hide();
+            }
 
             setTimeout(function () {
                 $('#party').val("{{obj.partyID.pk}}").change();
@@ -235,6 +247,10 @@
         }
 
         function salesSave() {
+            if (salesEditReadOnly) {
+                $('body').toast({class: 'warning', message: 'Approved sales cannot be updated.'});
+                return;
+            }
             showLoading();
             var invoiceSeriesSelect = $('#invoiceSeriesSelect').html();
             var invoiceNo = $('#invoiceNo').val();
@@ -287,7 +303,11 @@
 
                             hideLoading();
 
-                            location.href = "{% url 'homeApp:sales_list' %}"
+                            if (salesReturnUrl) {
+                                location.href = salesReturnUrl;
+                            } else {
+                                location.href = "{% url 'homeApp:my_sales_list' %}";
+                            }
 
                         } else {
                             $('body')
@@ -302,6 +322,16 @@
                         return response;
                     },
                     error: function () {
+                        try {
+                            if (arguments && arguments.length > 0) {
+                                var xhr = arguments[0];
+                                if (xhr && xhr.status === 403) {
+                                    $('body').toast({class: 'warning', message: 'This sale is locked (approved) or you do not have permission to update it.'});
+                                    hideLoading();
+                                    return;
+                                }
+                            }
+                        } catch (e) {}
                         $('body')
                             .toast({
                                 class: 'error',

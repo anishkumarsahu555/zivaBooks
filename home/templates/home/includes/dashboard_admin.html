@@ -1,0 +1,106 @@
+{% if perms.home.can_manage_staff or perms.home.can_view_party_credentials %}
+    <div class="ui error mini message">
+        <i class="close icon"></i>
+        <div class="header">
+            License Reminder!
+        </div>
+        <p style="font-weight: bold">{{ message }}</p>
+    </div>
+{% endif %}
+<div class="ui grid stackable padded">
+    <div class="four wide computer eight wide tablet sixteen wide mobile column">
+        <div class="ui fluid card">
+            <div class="content">
+                <div class="ui right floated header red">
+                    <i class="users icon"></i>
+                </div>
+                <div class="header">
+                    <div class="ui red header" id="customerCount">0</div>
+                </div>
+                <div class="meta">Total Parties</div>
+                <div class="description">Total number of Parties.</div>
+            </div>
+            <div class="extra content">
+                <div class="ui two buttons">
+                    <a class="ui red button" href="{% url 'homeApp:party_list' %}">More Info</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="four wide computer eight wide tablet sixteen wide mobile column">
+        <div class="ui fluid card">
+            <div class="content">
+                <div class="ui right floated header green">
+                    <i class="user tie icon"></i>
+                </div>
+                <div class="header">
+                    <div class="ui header green" id="salesCount">0</div>
+                </div>
+                <div class="meta">Total Users</div>
+                <div class="description">Total number of Staff users.</div>
+            </div>
+            <div class="extra content">
+                <div class="ui two buttons">
+                    <a class="ui green button" href="{% url 'homeApp:user_list' %}">More Info</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="four wide computer eight wide tablet sixteen wide mobile column">
+        <div class="ui fluid card">
+            <div class="content">
+                <div class="ui right floated header teal">
+                    <i class="map marker alternate icon"></i>
+                </div>
+                <div class="header">
+                    <div class="ui teal header" id="todayInstallmentCount">0</div>
+                </div>
+                <div class="meta">Geolocation Service</div>
+                <div class="description">Number of location service used.</div>
+            </div>
+            <div class="extra content">
+                <div class="ui two buttons">
+                    <a class="ui teal button" href="#">More Info</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="four wide computer eight wide tablet sixteen wide mobile column">
+        <div class="ui fluid card">
+            <div class="content">
+                <div class="ui right floated header purple">
+                    <i class="hand holding usd icon"></i>
+                </div>
+                <div class="header">
+                    <div class="ui purple header" id="collection">0</div>
+                </div>
+                <div class="meta">Today's Collection</div>
+                <div class="description">Total amount of collections.</div>
+            </div>
+            <div class="extra content">
+                <div class="ui two buttons">
+                    <a class="ui purple button" href="{% url 'homeApp:collection_list' %}">More Info</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="four wide computer eight wide tablet sixteen wide mobile column">
+        <div class="ui fluid card">
+            <div class="content">
+                <div class="ui right floated header purple">
+                    <i class="shopping cart icon"></i>
+                </div>
+                <div class="header">
+                    <div class="ui orange header" id="sale">0</div>
+                </div>
+                <div class="meta">Today's Sales</div>
+                <div class="description">Total amount of sales.</div>
+            </div>
+            <div class="extra content">
+                <div class="ui two buttons">
+                    <a class="ui olive button" href="{% url 'homeApp:sales_list' %}">More Info</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

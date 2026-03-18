@@ -24,6 +24,7 @@ urlpatterns = [
     path('my_profile/', my_profile, name='my_profile'),
     path('admin_home/', admin_home, name='admin_home'),
     path('staff_group_list/', staff_group_list, name='staff_group_list'),
+    path('permission_reference/', permission_reference, name='permission_reference'),
     path('staff_group_create/', staff_group_create, name='staff_group_create'),
     path('staff_group_edit/<int:id>/', staff_group_edit, name='staff_group_edit'),
     path('staff_group_list/<int:id>/', staff_group_detail, name='staff_group_detail'),
@@ -90,6 +91,11 @@ urlpatterns = [
 
     path('api/get_admin_dashboard_report_api/', get_admin_dashboard_report_api, name='get_admin_dashboard_report_api'),
     path('api/get_staff_dashboard_report_api/', get_staff_dashboard_report_api, name='get_staff_dashboard_report_api'),
+    path('api/get_party_dashboard_report_api/', get_party_dashboard_report_api, name='get_party_dashboard_report_api'),
+    path('api/get_bank_dashboard_report_api/', get_bank_dashboard_report_api, name='get_bank_dashboard_report_api'),
+    path('api/get_sales_dashboard_report_api/', get_sales_dashboard_report_api, name='get_sales_dashboard_report_api'),
+    path('api/get_orders_dashboard_report_api/', get_orders_dashboard_report_api, name='get_orders_dashboard_report_api'),
+    path('api/get_attendance_dashboard_report_api/', get_attendance_dashboard_report_api, name='get_attendance_dashboard_report_api'),
 
     #
     path('api/generate_collection_report/', generate_collection_report, name='generate_collection_report'),
@@ -124,11 +130,28 @@ urlpatterns = [
     path('api/send_message_sales/', send_message_sales, name='send_message_sales'),
     path('edit_sales/<int:id>/', edit_sales, name='edit_sales'),
 
+    # Orders
+    path('add_order/', add_order, name='add_order'),
+    path('orders_list/', orders_list, name='orders_list'),
+    path('my_orders_list/', my_orders_list, name='my_orders_list'),
+    path('edit_order/<int:id>/', edit_order, name='edit_order'),
+    path('order_detail/<int:id>/', order_detail, name='order_detail'),
+
     # message List
     path('message_list/', message_list, name='message_list'),
     path('api/MessageListJson/', MessageListJson.as_view(), name='MessageListJson'),
     path('api/re_send_message_sales/', re_send_message_sales, name='re_send_message_sales'),
     path('api/enable_tally_post_api/', enable_tally_post_api, name='enable_tally_post_api'),
+
+    # Orders API
+    path('api/add_order_api/', add_order_api, name='add_order_api'),
+    path('api/update_order_api/', update_order_api, name='update_order_api'),
+    path('api/delete_order/', delete_order, name='delete_order'),
+    path('api/approve_order/', approve_order, name='approve_order'),
+    path('api/delete_order_attachment/', delete_order_attachment, name='delete_order_attachment'),
+    path('api/generate_order_pdf/', generate_order_pdf, name='generate_order_pdf'),
+    path('api/OrdersByAdminListJson/', OrdersByAdminListJson.as_view(), name='OrdersByAdminListJson'),
+    path('api/OrdersByStaffListJson/', OrdersByStaffListJson.as_view(), name='OrdersByStaffListJson'),
 
     # cashCounter
     path('cash_counter_home/', cash_counter_home, name='cash_counter_home'),

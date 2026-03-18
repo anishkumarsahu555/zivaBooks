@@ -1,6 +1,5 @@
 {% load static %}
 {% load pwa %}
-{% load custom_has_group_tag %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -37,30 +36,6 @@
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
             -webkit-tap-highlight-color: rgba(0, 0, 0, 0.06);
-        }
-
-        .sidenav {
-            height: 100%;
-            width: 200px;
-            position: fixed;
-            z-index: 1;
-            top: 40px;
-            left: 0;
-            background-color: #000000;
-            overflow-x: hidden;
-            padding-top: 10px;
-        }
-
-        .sidenav a {
-            padding: 15px 12px 15px 16px;
-            text-decoration: none;
-            font-size: 18px;
-            color: #818181;
-            display: block;
-        }
-
-        .sidenav a:hover {
-            color: #f1f1f1;
         }
 
         .preloader {
@@ -113,16 +88,6 @@
             }
         }
 
-        .custom_search {
-            width: 100%;
-            -webkit-transition: width 0.4s ease-in-out;
-            transition: width 0.4s ease-in-out;
-        }
-
-        .custom_search:focus {
-            width: 100%;
-        }
-
         .bgColor {
             background-color: #0e2d46 !important;
         }
@@ -143,6 +108,310 @@
         .dataTables_scroll {
             position: inherit !important;
         }
+
+        .dashboard-license-banner {
+            border-radius: 16px;
+            margin-bottom: 14px;
+        }
+
+        .dashboard-hero {
+            background:
+                radial-gradient(circle at top right, rgba(248, 250, 252, 0.22), transparent 26%),
+                radial-gradient(circle at left center, rgba(56, 189, 248, 0.18), transparent 28%),
+                linear-gradient(135deg, #091a2b, #12324a 52%, #0f766e);
+            border-radius: 26px;
+            color: #f8fafc;
+            margin-bottom: 18px;
+            overflow: hidden;
+            padding: 24px 24px 22px;
+            position: relative;
+        }
+
+        .dashboard-hero-kicker {
+            color: rgba(241, 245, 249, 0.75);
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .dashboard-hero-title {
+            font-size: clamp(1.7rem, 3vw, 2.5rem);
+            font-weight: 800;
+            line-height: 1.02;
+            margin: 0 0 10px;
+        }
+
+        .dashboard-hero-subtitle {
+            color: rgba(226, 232, 240, 0.92);
+            font-size: 0.95rem;
+            line-height: 1.55;
+            margin: 0;
+            max-width: 780px;
+        }
+
+        .dashboard-hero-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .dashboard-hero-tag {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 999px;
+            color: #e2e8f0;
+            font-size: 0.76rem;
+            font-weight: 700;
+            padding: 6px 10px;
+        }
+
+        .dashboard-hero-tag.is-tenant {
+            background: rgba(45, 212, 191, 0.14);
+            border-color: rgba(45, 212, 191, 0.28);
+            color: #ccfbf1;
+        }
+
+        .dashboard-metric-group,
+        .dashboard-actions-shell {
+            background: #ffffff;
+            border: 1px solid #dce7f3;
+            border-radius: 24px;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
+            margin-bottom: 18px;
+            overflow: hidden;
+        }
+
+        .dashboard-group-header {
+            align-items: flex-start;
+            background: linear-gradient(180deg, #f8fbff, #eef6fb);
+            border-bottom: 1px solid #dce7f3;
+            display: flex;
+            justify-content: space-between;
+            padding: 18px 20px;
+        }
+
+        .dashboard-group-title {
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 800;
+            margin: 0 0 4px;
+        }
+
+        .dashboard-group-subtitle {
+            color: #64748b;
+            font-size: 0.82rem;
+            line-height: 1.5;
+        }
+
+        .dashboard-stat-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            padding: 18px;
+        }
+
+        .dashboard-stat-card {
+            background:
+                radial-gradient(circle at top right, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0) 36%),
+                linear-gradient(180deg, #fbfdff, #f5f9fc);
+            border: 1px solid #e2ebf3;
+            border-radius: 20px;
+            min-height: 190px;
+            padding: 16px;
+            position: relative;
+        }
+
+        .dashboard-stat-icon {
+            color: #0f766e;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        .dashboard-stat-value {
+            color: #0f172a;
+            font-size: 1.7rem;
+            font-weight: 800;
+            line-height: 1.05;
+            margin-bottom: 8px;
+        }
+
+        .dashboard-stat-split {
+            color: #94a3b8;
+            font-weight: 600;
+            margin: 0 4px;
+        }
+
+        .dashboard-stat-label {
+            color: #0f172a;
+            font-size: 0.92rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .dashboard-stat-description {
+            color: #64748b;
+            font-size: 0.77rem;
+            line-height: 1.45;
+            margin-bottom: 16px;
+        }
+
+        .dashboard-stat-link {
+            align-items: center;
+            background: #0f172a;
+            border-radius: 999px;
+            color: #ffffff;
+            display: inline-flex;
+            font-size: 0.75rem;
+            font-weight: 700;
+            gap: 6px;
+            padding: 8px 12px;
+            text-decoration: none;
+        }
+
+        .dashboard-stat-link:hover {
+            color: #ffffff;
+            opacity: 0.92;
+        }
+
+        .dashboard-action-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            padding: 18px;
+        }
+
+        .dashboard-action-panel {
+            background: linear-gradient(180deg, #fbfdff, #f7fafc);
+            border: 1px solid #e2ebf3;
+            border-radius: 20px;
+            padding: 16px;
+        }
+
+        .dashboard-action-panel-header {
+            align-items: baseline;
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .dashboard-action-panel-title {
+            color: #0f172a;
+            font-size: 0.95rem;
+            font-weight: 800;
+        }
+
+        .dashboard-action-panel-count {
+            color: #64748b;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .dashboard-action-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .dashboard-action-chip {
+            align-items: center;
+            background: #ffffff;
+            border: 1px solid #d7e5f2;
+            border-radius: 999px;
+            color: #1e293b;
+            display: inline-flex;
+            font-size: 0.78rem;
+            font-weight: 700;
+            gap: 8px;
+            min-height: 38px;
+            padding: 0 12px;
+            text-decoration: none;
+        }
+
+        .dashboard-action-chip:hover {
+            background: #f8fbff;
+            color: #0f172a;
+        }
+
+        .tone-ocean .dashboard-group-header,
+        .tone-ocean .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #f8fbff, #eef6fb);
+        }
+
+        .tone-mint .dashboard-group-header,
+        .tone-mint .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #f4fdf8, #ebf8f0);
+        }
+
+        .tone-ember .dashboard-group-header,
+        .tone-ember .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #fff8f3, #fff0e5);
+        }
+
+        .tone-berry .dashboard-group-header,
+        .tone-berry .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #fff6fa, #fdeef6);
+        }
+
+        .tone-violet .dashboard-group-header,
+        .tone-violet .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #f8f5ff, #f1ebff);
+        }
+
+        .tone-sky .dashboard-group-header,
+        .tone-sky .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #f3fbff, #eaf6ff);
+        }
+
+        .tone-sun .dashboard-group-header,
+        .tone-sun .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #fffdf4, #fff7dd);
+        }
+
+        .tone-aqua .dashboard-group-header,
+        .tone-aqua .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #f3feff, #e5f8fb);
+        }
+
+        .tone-rose .dashboard-group-header,
+        .tone-rose .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #fff7f9, #feeef2);
+        }
+
+        .tone-ink .dashboard-group-header,
+        .tone-ink .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #f5f7ff, #edf0ff);
+        }
+
+        .tone-slate .dashboard-group-header,
+        .tone-slate .dashboard-action-panel {
+            background-image: linear-gradient(180deg, #f8fafc, #eef2f6);
+        }
+
+        @media (max-width: 640px) {
+            .dashboard-hero,
+            .dashboard-group-header,
+            .dashboard-stat-grid,
+            .dashboard-action-grid {
+                padding-left: 14px;
+                padding-right: 14px;
+            }
+
+            .dashboard-hero {
+                border-radius: 20px;
+                padding-top: 18px;
+                padding-bottom: 18px;
+            }
+
+            .dashboard-metric-group,
+            .dashboard-actions-shell {
+                border-radius: 18px;
+            }
+        }
     </style>
 
 </head>
@@ -150,424 +419,7 @@
 <body>
 <!-- sidebar -->
 <div class="ui sidebar inverted bgColor vertical menu sidebar-menu" id="sidebar">
-
-
-    {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
-        <div class="item">
-            <div class="header">General</div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:admin_home' %}">
-                    <div>
-                        <i class="tachometer alternate icon"></i>
-                        Dashboard
-                    </div>
-                </a>
-            </div>
-        </div>
-
-        <div class="item">
-            <div class="header">
-                Staff
-            </div>
-            <div class="menu">
-                {% if perms.home.can_manage_staff_groups %}
-                <a class="item" href="{% url 'homeApp:staff_group_list' %}">
-                    <div><i class="users cog icon"></i>Staff Groups</div>
-                </a>
-                {% endif %}
-                {% if perms.home.can_manage_staff %}
-                <a class="item" href="{% url 'homeApp:user_list' %}">
-                    <div><i class="user tie icon"></i>Staff List</div>
-                </a>
-                {% endif %}
-
-            </div>
-        </div>
-        <div class="item">
-            <div class="header">
-                Collections
-            </div>
-            <div class="menu">
-                {% if perms.home.add_collection %}
-                <a class="item" href="{% url 'homeApp:take_collection' %}">
-                    <div><i class="hand holding usd icon"></i>Take Collection</div>
-                </a>
-                {% endif %}
-                {% if perms.home.view_collection %}
-                <a class="item" href="{% url 'homeApp:collection_list' %}">
-                    <div><i class="book icon"></i>Collection List</div>
-                </a> <a class="item" href="{% url 'homeApp:cheque_reminder_list' %}">
-                <div><i class="bell icon"></i>Cheque Reminder List</div>
-            </a>
-                {% endif %}
-
-            </div>
-        </div>
-        <div class="item">
-            <div class="header">
-                Sales
-            </div>
-            <div class="menu">
-                {% if perms.home.add_sales %}
-                <a class="item" href="{% url 'homeApp:add_sales' %}">
-                    <div><i class="shopping cart icon"></i>Add Sale</div>
-                </a>
-                {% endif %}
-                {% if perms.home.view_sales %}
-                <a class="item" href="{% url 'homeApp:sales_list' %}">
-                    <div><i class="book icon"></i>Sales List</div>
-                </a>
-                {% endif %}
-
-            </div>
-        </div>
-        <div class="item">
-            <div class="header">
-                Cash Counter
-            </div>
-            <div class="menu">
-                {% if perms.home.can_manage_cash_counter %}
-                <a class="item" href="{% url 'homeApp:cash_counter' %}">
-                    <div><i class="calendar check icon"></i>Today's Cash Counter</div>
-                </a> <a class="item" href="{% url 'homeApp:cash_counter_collection' %}">
-                <div><i class="calendar check icon"></i>Today's Collection Counter</div>
-            </a>
-                <a class="item" href="{% url 'homeApp:my_cash_counter_list' %}">
-                    <div><i class="calendar alternate icon"></i>Cash Counter List</div>
-                </a>
-                {% endif %}
-            </div>
-        </div>
-
-        <div class="item">
-            <div class="header">
-                Party
-            </div>
-            <div class="menu">
-                {% if perms.home.can_manage_parties %}
-                <a class="item" href="{% url 'homeApp:party_group_list' %}">
-                    <div><i class="user friends icon"></i>Party Group List</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:party_list' %}">
-                    <div><i class="address book icon"></i>Party List</div>
-                </a>
-                {% endif %}
-
-            </div>
-        </div>
-         <div class="item">
-            <div class="header">
-                Attendance
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:add_attendance' %}">
-                    <div><i class="calendar check icon"></i>Today's Attendance</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:attendance_report_admin' %}">
-                    <div><i class="calendar alternate icon"></i>Attendance Report</div>
-                </a>
-
-            </div>
-        </div>
-
-        <div class="item">
-            <div class="header">
-                Banks
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:bank_list' %}">
-                    <div><i class="university icon"></i>Bank List</div>
-                </a>
-
-            </div>
-        </div>
-
-        <div class="item">
-            <div class="header">
-                Message History
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:message_list' %}">
-                    <div><i class="comment dots outline icon"></i>Message List</div>
-                </a>
-
-            </div>
-        </div>
-
-
-        <div class="item">
-            <div class="header">
-                Profile
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:my_profile' %}">
-                    <div><i class="user icon"></i>My Profile</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:logout' %}">
-                    <div><i class="sign out alternate icon"></i>Logout</div>
-                </a>
-            </div>
-        </div>
-    {% endif %}
-
-
-    {% comment %}
-Collection side bar
-{% endcomment %}
-    {% if perms.home.add_collection and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs %}
-        <div class="item">
-            <div class="header">General</div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:collection_home' %}">
-                    <div>
-                        <i class="tachometer alternate icon"></i>
-                        Dashboard
-                    </div>
-                </a>
-            </div>
-        </div>
-        <div class="item">
-            <div class="header">
-                Collections
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:add_collection' %}">
-                    <div><i class="hand holding usd icon"></i>Take Collection</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:my_collection' %}">
-                    <div><i class="book icon"></i>Collection List</div>
-                </a>
-
-            </div>
-        </div>
-        <div class="item">
-            <div class="header">
-                Sales
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:add_sales' %}">
-                    <div><i class="shopping cart icon"></i>Add Sale</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:my_sales_list' %}">
-                    <div><i class="book icon"></i>Sales List</div>
-                </a>
-
-            </div>
-        </div>
-
-        <!--        <div class="item">-->
-        <!--            <div class="header">-->
-        <!--                Attendance-->
-        <!--            </div>-->
-        <!--            <div class="menu">-->
-        <!--                <a class="item" href="{% url 'homeApp:add_attendance' %}">-->
-        <!--                    <div><i class="calendar check icon"></i>Today's Attendance</div>-->
-        <!--                </a>-->
-        <!--                <a class="item" href="{% url 'homeApp:attendance_report' %}">-->
-        <!--                    <div><i class="calendar alternate icon"></i>Attendance Report</div>-->
-        <!--                </a>-->
-
-        <!--            </div>-->
-        <!--        </div>-->
-
-        <div class="item">
-            <div class="header">
-                Profile
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:my_profile_collection' %}">
-                    <div><i class="user icon"></i>My Profile</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:logout' %}">
-                    <div><i class="sign out alternate icon"></i>Logout</div>
-                </a>
-            </div>
-        </div>
-    {% endif %}
-
-    {% comment %}Staff item{% endcomment %}
-    {% if perms.home.view_attendance and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs and not perms.home.can_manage_sales and not perms.home.can_manage_cash_counter and not perms.home.add_collection %}
-        <div class="item">
-            <div class="header">General</div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:staff_home' %}">
-                    <div>
-                        <i class="tachometer alternate icon"></i>
-                        Dashboard
-                    </div>
-                </a>
-            </div>
-        </div>
-        <!--        <div class="item">-->
-        <!--            <div class="header">-->
-        <!--                Attendance-->
-        <!--            </div>-->
-        <!--            <div class="menu">-->
-        <!--                <a class="item" href="{% url 'homeApp:add_attendance' %}">-->
-        <!--                    <div><i class="calendar check icon"></i>Today's Attendance</div>-->
-        <!--                </a>-->
-        <!--                <a class="item" href="{% url 'homeApp:attendance_report' %}">-->
-        <!--                    <div><i class="calendar alternate icon"></i>Attendance Report</div>-->
-        <!--                </a>-->
-
-        <!--            </div>-->
-        <!--        </div>-->
-        <div class="item">
-            <div class="header">
-                Sales
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:add_sales' %}">
-                    <div><i class="shopping cart icon"></i>Add Sale</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:my_sales_list' %}">
-                    <div><i class="book icon"></i>Sales List</div>
-                </a>
-
-            </div>
-        </div>
-
-        <div class="item">
-            <div class="header">
-                Profile
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:my_profile_collection' %}">
-                    <div><i class="user icon"></i>My Profile</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:logout' %}">
-                    <div><i class="sign out alternate icon"></i>Logout</div>
-                </a>
-            </div>
-        </div>
-    {% endif %}
-
-    {% if perms.home.can_manage_sales and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs %}
-        <div class="item">
-            <div class="header">General</div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:collection_home' %}">
-                    <div>
-                        <i class="tachometer alternate icon"></i>
-                        Dashboard
-                    </div>
-                </a>
-            </div>
-        </div>
-        <div class="item">
-            <div class="header">
-                Collections
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:add_collection' %}">
-                    <div><i class="hand holding usd icon"></i>Take Collection</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:my_collection' %}">
-                    <div><i class="book icon"></i>Collection List</div>
-                </a>
-
-            </div>
-        </div>
-        <div class="item">
-            <div class="header">
-                Sales
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:add_sales' %}">
-                    <div><i class="shopping cart icon"></i>Add Sale</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:sales_list' %}">
-                    <div><i class="book icon"></i>Sales List</div>
-                </a>
-
-            </div>
-        </div>
-
-        <div class="item">
-            <div class="header">
-                Profile
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:my_profile_collection' %}">
-                    <div><i class="user icon"></i>My Profile</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:logout' %}">
-                    <div><i class="sign out alternate icon"></i>Logout</div>
-                </a>
-            </div>
-        </div>
-    {% endif %}
-
-    {% if perms.home.can_manage_cash_counter and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs %}
-        <div class="item">
-            <div class="header">General</div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:cash_counter_home' %}">
-                    <div>
-                        <i class="tachometer alternate icon"></i>
-                        Dashboard
-                    </div>
-                </a>
-            </div>
-        </div>
-        <div class="item">
-            <div class="header">
-                Cash Counter
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:cash_counter' %}">
-                    <div><i class="calendar check icon"></i>Today's Cash Counter</div>
-                </a> <a class="item" href="{% url 'homeApp:cash_counter_collection' %}">
-                <div><i class="calendar check icon"></i>Today's Collection Counter</div>
-            </a>
-                <a class="item" href="{% url 'homeApp:my_cash_counter_list' %}">
-                    <div><i class="calendar alternate icon"></i>Cash Counter List</div>
-                </a>
-
-            </div>
-        </div>
-
-        <div class="item">
-            <div class="header">
-                Sales
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:add_sales' %}">
-                    <div><i class="shopping cart icon"></i>Add Sale</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:my_sales_list' %}">
-                    <div><i class="book icon"></i>Sales List</div>
-                </a>
-
-            </div>
-        </div>
-
-        <div class="item">
-            <div class="header">
-                Profile
-            </div>
-            <div class="menu">
-                <a class="item" href="{% url 'homeApp:my_profile_collection' %}">
-                    <div><i class="user icon"></i>My Profile</div>
-                </a>
-                <a class="item" href="{% url 'homeApp:logout' %}">
-                    <div><i class="sign out alternate icon"></i>Logout</div>
-                </a>
-            </div>
-        </div>
-    {% endif %}
-
-    <div class="ui segment bgColor inverted">
-        <div class="ui tiny olive inverted progress">
-            <div class="bar" style="width: 54%"></div>
-            <div class="label">Developed By Ziva Infotech</div>
-        </div>
-
-        <div class="ui tiny teal inverted progress">
-            <div class="bar" style="width:78%"></div>
-            <div class="label">v 2.0.1</div>
-        </div>
-    </div>
+    {% include 'home/includes/sidebar_navigation.html' %}
 </div>
 
 <!-- sidebar -->
@@ -611,481 +463,7 @@ Collection side bar
 
             </div>
             <div class="ui tab  " data-tab="user" style="padding: 5px;">
-                {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
-                    {% if perms.home.can_manage_staff or perms.home.can_view_party_credentials %}
-                        <div class="ui error mini message">
-                            <i class="close icon"></i>
-                            <div class="header">
-                                License Reminder!
-                            </div>
-                            <p style="font-weight: bold">{{ message }}</p>
-                        </div>
-                    {% endif %}
-                    <div class="ui grid stackable padded">
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header red">
-                                        <i class="users icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui red header" id="customerCount">
-                                            0
-                                        </div>
-                                    </div>
-                                    <div class="meta">
-                                        Total Parties
-                                    </div>
-                                    <div class="description">
-                                        Total number of Parties.
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui red button" href="{% url 'homeApp:party_list' %}">More Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header green">
-                                        <i class="user tie icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui header green" id="salesCount">
-                                            0
-                                        </div>
-                                    </div>
-                                    <div class="meta">
-                                        Total Users
-                                    </div>
-                                    <div class="description">
-                                        Total number of Staff users.
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui green button" href="{% url 'homeApp:user_list' %}">More Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header teal">
-                                        <i class="map marker alternate icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui teal header" id="todayInstallmentCount">0</div>
-                                    </div>
-                                    <div class="meta">
-                                        Geolocation Service
-                                    </div>
-                                    <div class="description">
-                                        Number of location service used.
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui teal button" href="#">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header purple">
-                                        <i class="hand holding usd icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui purple header" id="collection">0</div>
-                                    </div>
-                                    <div class="meta">
-                                        Today's Collection
-                                    </div>
-                                    <div class="description">
-                                        Total amount of collections.
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui purple button" href="{% url 'homeApp:collection_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header purple">
-                                        <i class="shopping cart icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui orange header" id="sale">0</div>
-                                    </div>
-                                    <div class="meta">
-                                        Today's Sales
-                                    </div>
-                                    <div class="description">
-                                        Total amount of sales.
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui olive button" href="{% url 'homeApp:sales_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
-
-                {% if perms.home.add_collection or perms.home.can_manage_sales %}
-
-                    <div class="ui grid stackable padded">
-                        <div class="five wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header red">
-                                        <i class="users icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui red header" id="customerCount">
-                                            0
-                                        </div>
-                                    </div>
-                                    <div class="meta">
-                                        Parties Assigned
-                                    </div>
-                                    <div class="description">
-                                        Total parties assigned.
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui red disabled button" href="#">More Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        {% comment %}  <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header green">
-                                        <i class="coins icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui header green" id="salesCount">
-                                            0
-                                        </div>
-                                    </div>
-                                    <div class="meta">
-                                        Lifetime Collections
-                                    </div>
-                                    <div class="description">
-                                        Total lifetime amount collected.
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui green disabled button" href="#">More Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>{% endcomment %}
-                        <div class="six wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header teal">
-                                        <i class="tasks icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui teal header" id="todayInstallmentCount">0</div>
-                                    </div>
-                                    <div class="meta">
-                                        Collection Count
-                                    </div>
-                                    <div class="description">
-                                        Number of today's Collections.
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui teal button" href="{% url 'homeApp:my_collection' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="five wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header purple">
-                                        <i class="hand holding usd icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui purple header" id="collection">0</div>
-                                    </div>
-                                    <div class="meta">
-                                        Today's Collection
-                                    </div>
-                                    <div class="description">
-                                        Total amount collected .
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui purple button" href="{% url 'homeApp:my_collection' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                {% endif %}
-                {% if perms.home.view_attendance and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs and not perms.home.can_manage_sales and not perms.home.can_manage_cash_counter and not perms.home.add_collection %}
-                    <div class="ui one column blue card " style="width: 100%">
-                        <div class="content">
-                            <div class="center aligned header">Welcome, {{ obj.name }}</div>
-                            <div class="center aligned description">
-                                {% if perms.home.view_attendance and not perms.home.can_manage_sales %}
-                                    <p>zivaBooks provides staff attendance and many more.</p>
-                                {% else %}
-                                    <p>zivaBooks provides staff to manage sales and many more.</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="extra content">
-                            <div class="center aligned author">
-                                {% if obj.photo %}
-                                    <img class="ui avatar image" src="{{ obj.photo.url }}">
-                                {% else %}
-                                    <img class="ui avatar image" src="/static/images/default-avatar.svg">
-                                {% endif %}
-                                {{ obj.name }}
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
-
-                {% if perms.home.can_manage_cash_counter or perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
-
-                    <div class="ui grid stackable padded">
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header red">
-                                        <i class="rupee sign icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui red header" id="cashCount1">
-                                            0
-                                        </div>
-                                    </div>
-                                    <div class="meta">
-                                        Cash Counter
-                                    </div>
-                                    <div class="description">
-                                        {#                                        Total Cash Collected.#}
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui orange button" href="{% url 'homeApp:my_cash_counter_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header green">
-                                        <i class="rupee sign icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui header green" id="cardCount2">
-                                            0
-                                        </div>
-                                    </div>
-                                    <div class="meta">
-                                        Card Counter
-                                    </div>
-                                    <div class="description">
-                                        {#                                        Total lifetime amount collected.#}
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui blue button" href="{% url 'homeApp:my_cash_counter_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header teal">
-                                        <i class="rupee sign icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui teal header" id="creditCount3">0</div>
-                                    </div>
-                                    <div class="meta">
-                                        Credit Counter
-                                    </div>
-                                    <div class="description">
-                                        {#                                        Number of today's Collections.#}
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui yellow button" href="{% url 'homeApp:my_cash_counter_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header purple">
-                                        <i class="rupee sign icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui purple header"><span id="mixCashCount4">0</span> / <span
-                                                id="mixCardCount4">0</span></div>
-                                    </div>
-                                    <div class="meta">
-                                        (Cash/Card) Mix Counter
-                                    </div>
-                                    <div class="description">
-                                        {#                                        Total amount collected .#}
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui pink button" href="{% url 'homeApp:my_cash_counter_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header red">
-                                        <i class="rupee sign icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui red header" id="collectionCount5">
-                                            0
-                                        </div>
-                                    </div>
-                                    <div class="meta">
-                                        Collection Counter
-                                    </div>
-                                    <div class="description">
-                                        {#                                        Total parties assigned.#}
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui red button" href="{% url 'homeApp:my_cash_counter_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header green">
-                                        <i class="rupee sign icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui header green" id="returnCount6">
-                                            0
-                                        </div>
-                                    </div>
-                                    <div class="meta">
-                                        Return Counter
-                                    </div>
-                                    <div class="description">
-                                        {#                                        Total lifetime amount collected.#}
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui green button" href="{% url 'homeApp:my_cash_counter_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header teal">
-                                        <i class="rupee sign icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui teal header" id="expenseCount7">0</div>
-                                    </div>
-                                    <div class="meta">
-                                        Expense Counter
-                                    </div>
-                                    <div class="description">
-                                        {#                                        Number of today's Collections.#}
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui teal button" href="{% url 'homeApp:my_cash_counter_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="four wide computer eight wide tablet sixteen wide mobile column">
-                            <div class="ui fluid card">
-                                <div class="content">
-                                    <div class="ui right floated header purple">
-                                        <i class="rupee sign icon"></i>
-                                    </div>
-                                    <div class="header">
-                                        <div class="ui purple header" id="advanceCount8">0</div>
-                                    </div>
-                                    <div class="meta">
-                                        Advance Counter
-                                    </div>
-                                    <div class="description">
-                                        {#                                        Total amount collected .#}
-                                    </div>
-                                </div>
-                                <div class="extra content">
-                                    <div class="ui two buttons">
-                                        <a class="ui purple button" href="{% url 'homeApp:my_cash_counter_list' %}">More
-                                            Info</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                {% endif %}
-
+                {% include 'home/includes/dashboard_dynamic.html' %}
             </div>
         {% endblock %}
 
@@ -1161,6 +539,7 @@ Collection side bar
 
 
 {% block js %}
+    {{ dashboard_state.metric_groups|json_script:"dashboard-metric-groups-data" }}
     <script>
         $('.message .close')
             .on('click', function () {
@@ -1170,132 +549,44 @@ Collection side bar
                 ;
             })
         ;
-        {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
+        function showDashboardError() {
+            $('body')
+                .toast({
+                    class: 'error',
+                    message: 'An error occurred !'
+                })
+            ;
+        }
 
-            $(GetDetail());
+        function loadDashboardMetrics(url, fieldMap) {
+            $.ajax({
+                type: 'get',
+                url: url,
+                success: function (response) {
+                    $.each(fieldMap, function (selector, key) {
+                        $(selector).html(response.data[key]);
+                    });
+                },
+                error: showDashboardError
+            });
+        }
 
-            function GetDetail() {
-                $.ajax({
-                    type: 'get',
-                    url: '{% url "homeApp:get_admin_dashboard_report_api" %}',
-
-                    success: function (response) {
-                        $('#customerCount').html(response.data['partyCount']);
-                        $('#salesCount').html(response.data['staffCount']);
-                        $('#todayInstallmentCount').html(response.data['locationCount']);
-                        $('#collection').html(response.data['collection']);
-                        $('#sale').html(response.data['Sale']);
-
-
-                    },
-                    error: function () {
-                        $('body')
-                            .toast({
-                                class: 'error',
-                                message: 'An error occurred !'
-                            })
-                        ;
+        if ($('#dashboard-home-root').length) {
+            var dashboardMetricGroups = JSON.parse(document.getElementById('dashboard-metric-groups-data').textContent);
+            dashboardMetricGroups.forEach(function (group) {
+                if (!group.endpoint) {
+                    return;
+                }
+                var fieldMap = {};
+                (group.cards || []).forEach(function (card) {
+                    fieldMap['#' + card.id] = card.field;
+                    if (card.secondary_id && card.secondary_field) {
+                        fieldMap['#' + card.secondary_id] = card.secondary_field;
                     }
                 });
-            }
-        {% endif %}
-
-        {% if perms.home.add_collection or perms.home.can_manage_sales %}
-            $(GetDetail());
-            function GetDetail() {
-                $.ajax({
-                    type: 'get',
-                    url: '{% url "homeApp:get_staff_dashboard_report_api" %}',
-
-                    success: function (response) {
-                        $('#customerCount').html(response.data['partyCount']);
-                        $('#salesCount').html(response.data['collection_total']);
-                        $('#todayInstallmentCount').html(response.data['collection_totalCount']);
-                        $('#collection').html(response.data['collection']);
-
-
-                    },
-                    error: function () {
-                        $('body')
-                            .toast({
-                                class: 'error',
-                                message: 'An error occurred !'
-                            })
-                        ;
-                    }
-                });
-            }
-
-
-        {% endif %}
-
-
-        {% if perms.home.can_manage_cash_counter and not perms.home.can_manage_staff and not perms.home.can_manage_parties and not perms.home.can_view_party_credentials and not perms.home.can_approve_collection and not perms.home.can_view_audit_logs %}
-            $(GetDetailCashCounter());
-            function GetDetailCashCounter() {
-                $.ajax({
-                    type: 'get',
-                    url: '{% url "homeApp:get_cash_counter_dashboard_report_api" %}',
-
-                    success: function (response) {
-                        $('#cashCount1').html(response.data['cash_total']);
-                        $('#cardCount2').html(response.data['card_total']);
-                        $('#creditCount3').html(response.data['credit_total']);
-                        $('#collectionCount5').html(response.data['collection_total']);
-                        $('#expenseCount7').html(response.data['expense_total']);
-                        $('#advanceCount8').html(response.data['advance_total']);
-                        $('#returnCount6').html(response.data['return_total']);
-                        $('#mixCashCount4').html(response.data['mix_cash_total']);
-                        $('#mixCardCount4').html(response.data['mix_card_total']);
-
-
-                    },
-                    error: function () {
-                        $('body')
-                            .toast({
-                                class: 'error',
-                                message: 'An error occurred !'
-                            })
-                        ;
-                    }
-                });
-            }
-
-
-        {% endif %}
-
-        {% if perms.home.can_manage_staff or perms.home.can_manage_staff_groups or perms.home.can_manage_parties or perms.home.can_view_party_credentials or perms.home.can_approve_collection or perms.home.can_view_audit_logs %}
-            $(GetDetailCashCounter());
-            function GetDetailCashCounter() {
-                $.ajax({
-                    type: 'get',
-                    url: '{% url "homeApp:get_cash_counter_dashboard_report_admin_api" %}',
-
-                    success: function (response) {
-                        $('#cashCount1').html(response.data['cash_total']);
-                        $('#cardCount2').html(response.data['card_total']);
-                        $('#creditCount3').html(response.data['credit_total']);
-                        $('#collectionCount5').html(response.data['collection_total']);
-                        $('#expenseCount7').html(response.data['expense_total']);
-                        $('#advanceCount8').html(response.data['advance_total']);
-                        $('#returnCount6').html(response.data['return_total']);
-                        $('#mixCashCount4').html(response.data['mix_cash_total']);
-                        $('#mixCardCount4').html(response.data['mix_card_total']);
-
-
-                    },
-                    error: function () {
-                        $('body')
-                            .toast({
-                                class: 'error',
-                                message: 'An error occurred !'
-                            })
-                        ;
-                    }
-                });
-            }
-
-        {% endif %}
+                loadDashboardMetrics(group.endpoint, fieldMap);
+            });
+        }
 
     </script>
 

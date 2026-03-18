@@ -1,5 +1,4 @@
 {% extends 'home/admin/index.html' %}
-{% load custom_has_group_tag %}
 {% load static %}
 
 {% block datatables_css_extra %}
@@ -55,12 +54,14 @@
                 >Sales List
                 </div>
 
-                <div style=" position: absolute;right: 1.5rem;top: 18px;">
-                    <a href="{% url 'homeApp:add_sales' %}" class="ui green mini plus button right">
-                        <i class="plus square outline icon"></i>
-                        Add Sales
-                    </a>
-                </div>
+                {% if sales_capabilities.can_add %}
+                    <div style=" position: absolute;right: 1.5rem;top: 18px;">
+                        <a href="{% url 'homeApp:add_sales' %}" class="ui green mini plus button right">
+                            <i class="plus square outline icon"></i>
+                            Add Sales
+                        </a>
+                    </div>
+                {% endif %}
 
             </div>
 
@@ -94,19 +95,21 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="three wide  field" style="width: 40%">
-                                        <label>Staff</label>
-                                        <select class="ui fluid search dropdown" id="staffID" onchange="ChangeDate()">
-                                            <option value="All">All</option>
-                                            {% for staff in staffs %}
-                                                <option value="{{ staff.id }}">{{ staff.name|capfirst }}
-                                                    - {{ staff.partyGroupID.name|capfirst }}
-                                                </option>
-                                            {% endfor %}
-
-
-                                        </select>
-                                    </div>
+                                    {% if sales_capabilities.can_filter_staff %}
+                                        <div class="three wide  field" style="width: 40%">
+                                            <label>Staff</label>
+                                            <select class="ui fluid search dropdown" id="staffID" onchange="ChangeDate()">
+                                                <option value="All">All</option>
+                                                {% for staff in staffs %}
+                                                    <option value="{{ staff.id }}">{{ staff.name|capfirst }}
+                                                        - {{ staff.partyGroupID.name|capfirst }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    {% else %}
+                                        <input type="hidden" id="staffID" value="All">
+                                    {% endif %}
                                     <div class="seven wide field">
                                         <label>Action</label>
                                         <button class="ui tiny active button" type="button"
@@ -114,7 +117,7 @@
                                             <i class="funnel dollar icon"></i>
                                             Search
                                         </button>
-                                        {% if perms.home.can_approve_sales or perms.home.can_view_party_credentials or perms.home.can_view_audit_logs %}
+                                        {% if sales_capabilities.can_export %}
 
                                             <a id="reportUrl"
                                                href="{% url 'homeApp:generate_sales_report' %}"
@@ -151,56 +154,60 @@
                     </div>
                 </div>
 
-                <div class="ui basic modal custom" id="deleteUser">
-                    <div class="ui icon header">
-                        <i class="archive icon"></i>
-                        Sales Details will be Deleted
-                    </div>
-                    <div class="content">
-                        <p style="text-align: center">The Sale will be deleted, are you sure to delete this
-                            Sale?</p>
-                    </div>
-                    <div class="actions">
-                        <div class="ui red basic cancel inverted button">
-                            <i class="remove icon"></i>
-                            No
+                {% if sales_capabilities.can_delete %}
+                    <div class="ui basic modal custom" id="deleteUser">
+                        <div class="ui icon header">
+                            <i class="archive icon"></i>
+                            Sales Details will be Deleted
                         </div>
-                        <input type="hidden" id="UserID">
-                        <div class="ui green ok inverted button" onclick="deleteUser()">
-                            <i class="checkmark icon"></i>
-                            Yes
+                        <div class="content">
+                            <p style="text-align: center">The Sale will be deleted, are you sure to delete this
+                                Sale?</p>
+                        </div>
+                        <div class="actions">
+                            <div class="ui red basic cancel inverted button">
+                                <i class="remove icon"></i>
+                                No
+                            </div>
+                            <input type="hidden" id="UserID">
+                            <div class="ui green ok inverted button" onclick="deleteUser()">
+                                <i class="checkmark icon"></i>
+                                Yes
+                            </div>
                         </div>
                     </div>
+                {% endif %}
+
+
+            </div>
+        </div>
+    </div>
+
+    {% if sales_capabilities.can_message %}
+        <div class="ui mini modal" id="imgModal">
+            <div class="header">
+                Approve Sale?
+            </div>
+            <div class="content">
+                <p>Are you sure you want to approve this sale?</p>
+            </div>
+            <input type="hidden" id="approveCollectionID">
+            <div class="actions">
+                <div class="ui negative button">
+                    No
                 </div>
-
+                <button class="ui green right labeled icon button saveBtn" onclick="confirmApproval()">
+                    Yes
+                    <i class="checkmark icon"></i>
+                </button>
+                <button style="display: none;" class="ui teal right labeled icon button saveBtnLoad">
+                    Saving ....
+                    <i class="checkmark icon"></i>
+                </button>
 
             </div>
         </div>
-    </div>
-
-    <div class="ui mini modal" id="imgModal">
-        <div class="header">
-            Approve Sale?
-        </div>
-        <div class="content">
-            <p>Are you sure you want to approve this sale?</p>
-        </div>
-        <input type="hidden" id="approveCollectionID">
-        <div class="actions">
-            <div class="ui negative button">
-                No
-            </div>
-            <button class="ui green right labeled icon button saveBtn" onclick="confirmApproval()">
-                Yes
-                <i class="checkmark icon"></i>
-            </button>
-            <button style="display: none;" class="ui teal right labeled icon button saveBtnLoad">
-                Saving ....
-                <i class="checkmark icon"></i>
-            </button>
-
-        </div>
-    </div>
+    {% endif %}
 {% endblock %}
 
 {% block js %}
@@ -291,6 +298,9 @@
 
 
         function delUser(id) {
+            if (!$('#deleteUser').length) {
+                return;
+            }
             $('#deleteUser')
                 .modal('show')
             ;
@@ -357,6 +367,9 @@
         }
 
         function showConfirmationModal(id) {
+            if (!$('#imgModal').length) {
+                return;
+            }
             $('#imgModal').modal('show');
             $('#approveCollectionID').val('' + id);
         }
@@ -419,7 +432,9 @@
         function ChangeDate() {
             var startDateF = $('#startDateF').val();
             var staffID = $('#staffID').val();
-            $("#reportUrl").attr("href", "{% url 'homeApp:generate_sales_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
+            if ($('#reportUrl').length) {
+                $("#reportUrl").attr("href", "{% url 'homeApp:generate_sales_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
+            }
         }
     </script>
 

@@ -1,0 +1,126 @@
+{% extends 'home/admin/index.html' %}
+
+{% block title %}
+    <title>Permission Reference</title>
+{% endblock %}
+
+{% block css %}
+    <style>
+        .permission-ref-shell {
+            padding: 10px;
+        }
+
+        .permission-ref-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .permission-ref-card {
+            background: #ffffff;
+            border: 1px solid #dce7f3;
+            border-radius: 18px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+            overflow: hidden;
+        }
+
+        .permission-ref-header {
+            background: linear-gradient(180deg, #f8fbff, #eef6fb);
+            border-bottom: 1px solid #dce7f3;
+            padding: 14px 16px;
+        }
+
+        .permission-ref-title {
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .permission-ref-body {
+            padding: 14px;
+        }
+
+        .preset-card {
+            background: #f8fbfd;
+            border: 1px solid #e2ebf3;
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .preset-card + .preset-card {
+            margin-top: 10px;
+        }
+
+        .preset-name {
+            color: #0f172a;
+            font-size: 0.88rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .preset-description {
+            color: #64748b;
+            font-size: 0.77rem;
+            line-height: 1.45;
+            margin-bottom: 10px;
+        }
+
+        .permission-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .permission-chip {
+            background: #eef6ff;
+            border: 1px solid #dbeafe;
+            border-radius: 999px;
+            color: #1d4ed8;
+            font-size: 0.7rem;
+            line-height: 1.3;
+            padding: 4px 8px;
+        }
+
+        @media (max-width: 640px) {
+            .permission-ref-shell {
+                padding: 6px;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="permission-ref-shell">
+        <div class="ui secondary pointing menu">
+            <a class="item" href="{% url 'homeApp:staff_group_list' %}">
+                <i class="arrow left icon"></i>
+                Staff Group List
+            </a>
+            <div class="item active">Permission Reference</div>
+        </div>
+
+        <div class="permission-ref-grid">
+            {% for section, presets in preset_sections.items %}
+                <section class="permission-ref-card">
+                    <div class="permission-ref-header">
+                        <h2 class="permission-ref-title">{{ section }} Presets</h2>
+                    </div>
+                    <div class="permission-ref-body">
+                        {% for preset in presets %}
+                            <article class="preset-card">
+                                <div class="preset-name">{{ preset.label }}</div>
+                                <div class="preset-description">{{ preset.description }}</div>
+                                <div class="permission-chip-list">
+                                    {% for permission_name in preset.permission_names %}
+                                        <span class="permission-chip">{{ permission_name }}</span>
+                                    {% endfor %}
+                                </div>
+                            </article>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endfor %}
+        </div>
+    </div>
+{% endblock %}

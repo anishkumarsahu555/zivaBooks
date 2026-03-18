@@ -60,11 +60,16 @@ TEMPLATES = [
         'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
+            # Make commonly used filters available without `{% load %}`.
+            'builtins': [
+                'home.templatetags.formatting',
+            ],
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'home.context_processors.app_navigation',
             ],
         },
     },

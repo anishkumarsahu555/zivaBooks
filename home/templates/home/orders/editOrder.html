@@ -1,0 +1,247 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block title %}
+    <title>Edit Order</title>
+{% endblock %}
+
+{% block body %}
+    <div class="ui aligned basic grid">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div style="cursor:pointer;" class="item active" data-tab="user">Order {{ obj.orderNumber|default:obj.pk }}</div>
+                <div style="position:absolute;right:1.5rem;top:18px;">
+                    <a href="{{ order_return_url }}" class="ui teal mini button">
+                        <i class="arrow left icon"></i>
+                        Back
+                    </a>
+                </div>
+            </div>
+            <div class="ui tab" data-tab="user">
+                <div class="ui row teal stacked segment padded">
+                    <div class="content">
+                        {% if order_edit_readonly %}
+                            <div class="ui orange basic label" style="margin-bottom: 10px;">
+                                This order is approved and locked for editing.
+                            </div>
+                        {% endif %}
+
+                        <form class="ui small form" id="editForm" enctype="multipart/form-data">{% csrf_token %}
+                            <div class="two fields">
+                                <div class="eight wide field required">
+                                    <label>Party</label>
+                                    <select class="ui clearable search dropdown" id="party">
+                                        <option value="">Search By Party Name</option>
+                                    </select>
+                                </div>
+                                <div class="eight wide field">
+                                    <label>Order Date</label>
+                                    <div class="ui calendar" id="cDate">
+                                        <div class="ui input">
+                                            <input type="text" placeholder="dd/mm/yyyy" id="buildDate">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="one fields">
+                                <div class="sixteen wide field">
+                                    <label>Order Text</label>
+                                    <textarea id="orderText" rows="6">{{ obj.orderText|default:'' }}</textarea>
+                                </div>
+                            </div>
+                            <div class="one fields">
+                                <div class="sixteen wide field">
+                                    <label>Remark</label>
+                                    <input type="text" id="remark" value="{{ obj.remark|default:'' }}">
+                                </div>
+                            </div>
+                            <div class="one fields">
+                                <div class="sixteen wide field">
+                                    <label>Add More Images (optional)</label>
+                                    <input type="file" id="images" multiple accept="image/*">
+                                </div>
+                            </div>
+                            <input type="hidden" id="ID" value="{{ obj.pk }}">
+                            <input type="hidden" id="lat" value="{{ obj.latitude|default:'0.0' }}">
+                            <input type="hidden" id="lng" value="{{ obj.longitude|default:'0.0' }}">
+                            <input type="hidden" id="loc" value="{{ obj.location|default:'N/A' }}">
+                        </form>
+
+                        <div class="ui divider"></div>
+                        <div class="ui tiny header">Attachments</div>
+                        <div class="ui four stackable cards">
+                            {% for att in attachments %}
+                                <div class="card">
+                                    <div class="image">
+                                        <img src="{{ att.image.thumbnail.url }}">
+                                    </div>
+                                    <div class="content">
+                                        <div class="description">{{ att.label|default:'Image' }}</div>
+                                    </div>
+                                    <div class="extra content">
+                                        {% if not order_edit_readonly %}
+                                            <button class="ui tiny red button" type="button" onclick="deleteAttachment('{{ att.id }}')">
+                                                <i class="trash icon"></i>
+                                                Remove
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% empty %}
+                                <div class="ui tiny grey label">No images uploaded.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="ui aligned basic grid">
+                        <div class="row" style="padding-left:5px;padding-right:5px">
+                            <div class="16 wide column center aligned">
+                                <button onclick="orderUpdate()" id="saveBtn" class="ui green button saveBtn">Update</button>
+                                <button style="display:none;" class="ui teal double loading button saveBtnLoad">Saving ....</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script>
+        $('.ui.dropdown').dropdown({fullTextSearch: true});
+        var orderEditReadOnly = {{ order_edit_readonly|yesno:"true,false" }};
+        var orderReturnUrl = "{{ order_return_url|default:'' }}";
+
+        {% if obj.buildDate %}
+            $('#cDate').calendar({
+                initialDate: {{ obj.buildDate|date:'d' }} + '/' + {{ obj.buildDate|date:'m' }} + '/' + {{ obj.buildDate|date:'Y' }},
+                monthFirst: false,
+                type: 'date',
+                formatter: { date: function (date) { if (!date) return ''; return date.getDate() + '/' + (date.getMonth()+1) + '/' + date.getFullYear(); } }
+            });
+            $('#buildDate').val({{ obj.buildDate|date:'d' }} + '/' + {{ obj.buildDate|date:'m' }} + '/' + {{ obj.buildDate|date:'Y' }});
+        {% else %}
+            $('#cDate').calendar({
+                monthFirst: false,
+                type: 'date',
+                formatter: { date: function (date) { if (!date) return ''; return date.getDate() + '/' + (date.getMonth()+1) + '/' + date.getFullYear(); } }
+            });
+        {% endif %}
+
+        function getCustomerList() {
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:list_party_api' %}",
+                success: function (response) {
+                    $('#party').html('');
+                    $('#party').append('<option value=\"\">Search By Party Name</option>');
+                    for (var j = 0; j < response.data.length; j++) {
+                        $('#party').append('<option value=\"' + response.data[j]['ID'] + '\">' + response.data[j]['DisplayDetail'] + '</option>');
+                    }
+                    $('#party').val("{{ obj.partyID.pk|default:'' }}").change();
+                }
+            });
+        }
+        $(getCustomerList());
+
+        function hydrateGeo() {
+            try {
+                if (!navigator.geolocation) return;
+                navigator.geolocation.getCurrentPosition(function (pos) {
+                    $('#lat').val('' + pos.coords.latitude);
+                    $('#lng').val('' + pos.coords.longitude);
+                });
+            } catch (e) {}
+        }
+        $(hydrateGeo());
+
+        if (orderEditReadOnly) {
+            $('#editForm input, #editForm select, #editForm textarea').prop('disabled', true);
+            $('#saveBtn').hide();
+        }
+        // Order date is editable only for full-rights users.
+        if (!{{ order_capabilities.can_set_order_date|yesno:"true,false" }}) {
+            $('#buildDate').prop('disabled', true);
+        }
+
+        function orderUpdate() {
+            if (orderEditReadOnly) {
+                $('body').toast({class:'warning', message:'Approved orders cannot be updated.'});
+                return;
+            }
+            showLoading();
+            var data = new FormData();
+            data.append('ID', $('#ID').val());
+            data.append('buildDate', $('#buildDate').val());
+            data.append('party', $('#party').val());
+            data.append('orderText', $('#orderText').val());
+            data.append('remark', $('#remark').val());
+            data.append('lat', $('#lat').val());
+            data.append('lng', $('#lng').val());
+            data.append('loc', $('#loc').val());
+            var files = $('#images')[0].files;
+            for (var i = 0; i < files.length; i++) {
+                data.append('images', files[i]);
+            }
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:update_order_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class:'success', message:'Order Updated Successfully.'});
+                        hideLoading();
+                        if (orderReturnUrl) {
+                            location.href = orderReturnUrl;
+                        }
+                    } else {
+                        $('body').toast({class:'error', message:'An error occurred !'});
+                        hideLoading();
+                    }
+                },
+                error: function (xhr) {
+                    if (xhr && xhr.status === 403) {
+                        $('body').toast({class:'warning', message:'This order is locked (approved) or you do not have permission.'});
+                        hideLoading();
+                        return;
+                    }
+                    $('body').toast({class:'error', message:'An error occurred !'});
+                    hideLoading();
+                }
+            });
+        }
+
+        function deleteAttachment(id) {
+            if (orderEditReadOnly) return;
+            showLoading();
+            var data = new FormData();
+            data.append('userID', id);
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:delete_order_attachment" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class:'success', message:'Attachment removed.'});
+                        hideLoading();
+                        location.reload();
+                    } else {
+                        $('body').toast({class:'error', message:'An error occurred !'});
+                        hideLoading();
+                    }
+                },
+                error: function () {
+                    $('body').toast({class:'error', message:'An error occurred !'});
+                    hideLoading();
+                }
+            });
+        }
+    </script>
+{% endblock %}

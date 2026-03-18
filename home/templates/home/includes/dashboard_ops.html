@@ -1,0 +1,59 @@
+<div class="ui grid stackable padded">
+    <div class="five wide computer eight wide tablet sixteen wide mobile column">
+        <div class="ui fluid card">
+            <div class="content">
+                <div class="ui right floated header red">
+                    <i class="users icon"></i>
+                </div>
+                <div class="header">
+                    <div class="ui red header" id="customerCount">0</div>
+                </div>
+                <div class="meta">Parties Assigned</div>
+                <div class="description">Total parties assigned.</div>
+            </div>
+            <div class="extra content">
+                <div class="ui two buttons">
+                    <a class="ui red disabled button" href="#">More Info</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="six wide computer eight wide tablet sixteen wide mobile column">
+        <div class="ui fluid card">
+            <div class="content">
+                <div class="ui right floated header teal">
+                    <i class="tasks icon"></i>
+                </div>
+                <div class="header">
+                    <div class="ui teal header" id="todayInstallmentCount">0</div>
+                </div>
+                <div class="meta">Collection Count</div>
+                <div class="description">Number of today's Collections.</div>
+            </div>
+            <div class="extra content">
+                <div class="ui two buttons">
+                    <a class="ui teal button" href="{% url 'homeApp:my_collection' %}">More Info</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="five wide computer eight wide tablet sixteen wide mobile column">
+        <div class="ui fluid card">
+            <div class="content">
+                <div class="ui right floated header purple">
+                    <i class="hand holding usd icon"></i>
+                </div>
+                <div class="header">
+                    <div class="ui purple header" id="collection">0</div>
+                </div>
+                <div class="meta">Today's Collection</div>
+                <div class="description">Total amount collected .</div>
+            </div>
+            <div class="extra content">
+                <div class="ui two buttons">
+                    <a class="ui purple button" href="{% url 'homeApp:my_collection' %}">More Info</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

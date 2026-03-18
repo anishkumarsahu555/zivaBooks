@@ -56,10 +56,12 @@
                 >Party List
                 </div>
                 <div style=" position: absolute;right: 1.5rem;top: 18px;">
-                    <button class="ui green mini plus button right" onclick="showUserModal()">
-                        <i class="plus square outline icon"></i>
-                        Add Party
-                    </button>
+                    {% if party_capabilities.can_add %}
+                        <button class="ui green mini plus button right" onclick="showUserModal()">
+                            <i class="plus square outline icon"></i>
+                            Add Party
+                        </button>
+                    {% endif %}
                 </div>
             </div>
             <div class="ui tab " data-tab="user">
@@ -277,12 +279,18 @@
 {% endblock %}
 
 {% block js %}
+    {{ party_capabilities|json_script:"party-capabilities-data" }}
     <script>
+        var partyCaps = JSON.parse(document.getElementById('party-capabilities-data').textContent);
 
         var userTab;
 
 
         function showUserModal() {
+            if (!partyCaps.can_add) {
+                $('body').toast({class: 'warning', message: 'You do not have permission to add parties.'});
+                return;
+            }
             $('#myModalUser').modal('show');
             myOwnReset();
         }
@@ -475,6 +483,10 @@
         }
 
         function deleteUser() {
+            if (!partyCaps.can_delete) {
+                $('body').toast({class: 'warning', message: 'You do not have permission to delete parties.'});
+                return;
+            }
             var id = $('#UserID').val();
             var formdata = new FormData();
             formdata.append('userID', id);
@@ -522,7 +534,8 @@
 
         }
 
-        function GetUserDetails(id) {
+        function GetUserDetails(id, mode) {
+            mode = mode || 'edit';
             myOwnReset();
             $('#userModal').modal('show');
             $.ajax({
@@ -538,6 +551,10 @@
                     $('#partyGroupEdit').val(response.data['PartyGroup']).change();
                     $('#staffIDEdit').val(response.data['AssignTo']).change();
 
+                    var isReadOnly = (mode === 'view') || !partyCaps.can_edit;
+                    $('#userModal .header').text(isReadOnly ? 'View Party Details' : 'Edit Party Details');
+                    $('#userModal input, #userModal select, #userModal textarea').prop('disabled', isReadOnly);
+                    $('#userModal .saveBtn').toggle(!isReadOnly);
 
                 },
                 error: function () {
@@ -552,6 +569,10 @@
         }
 
         function editUser() {
+            if (!partyCaps.can_edit) {
+                $('body').toast({class: 'warning', message: 'You do not have permission to edit parties.'});
+                return;
+            }
             showLoading();
             var EditId = $('#EditId').val();
             var partyName = $('#partyNameEdit').val();
