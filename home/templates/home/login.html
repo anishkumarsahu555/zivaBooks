@@ -657,6 +657,31 @@
 </div>
 <p class="credit" style="">Developed by <a href="http://zivainfotech.com" target="_blank">Ziva Infotech</a></p>
 <script>
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    var csrftoken = getCookie('csrftoken');
+    $.ajaxSetup({
+        beforeSend: function (xhr, settings) {
+            var method = (settings.type || settings.method || 'GET').toUpperCase();
+            if (!(/^(GET|HEAD|OPTIONS|TRACE)$/).test(method) && !this.crossDomain) {
+                xhr.setRequestHeader('X-CSRFToken', csrftoken);
+            }
+        }
+    });
+
     function UserLogin() {
         var username = $('#userName').val();
         var password = $('#password').val();

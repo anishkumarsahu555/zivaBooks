@@ -2,7 +2,6 @@ import csv
 import os
 from datetime import datetime, timedelta
 from functools import wraps
-
 from django.contrib.auth import logout, authenticate, login, update_session_auth_hash
 from django.contrib.auth.models import Permission
 from django.core.cache import cache
@@ -13,8 +12,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
 # Create your views here.
-from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
-
+from django.views.decorators.csrf import ensure_csrf_cookie
 # import xlwt
 from activation.models import *
 from activation.views import is_activated
@@ -23,8 +21,6 @@ from .books import ensure_books_for_tenant
 from .navigation import build_sidebar_sections
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_qs
 from .otp import get_collection_otp_payload, get_collection_status_payload, OTP_TTL_SECONDS
-
-
 # def login_or_logout(request, type):
 #     try:
 #         data = LoginAndLogoutStatus()
@@ -35,7 +31,6 @@ from .otp import get_collection_otp_payload, get_collection_status_payload, OTP_
 #             data.save()
 #     except:
 #         pass
-
 def _staff_users_with_permissions(request, *perm_names):
     queryset = tenant_qs(request, StaffUser).filter(isDeleted__exact=False)
     codenames = [perm_name.split('.', 1)[1] for perm_name in perm_names if '.' in perm_name]
@@ -52,12 +47,8 @@ def _staff_users_with_permissions(request, *perm_names):
         )
     )
     return queryset.filter(permission_filter).distinct().order_by('name')
-
-
 def _has_any_permission(user, perm_names):
     return any(user.has_perm(perm_name) for perm_name in perm_names)
-
-
 def _user_has_portal_access(user):
     if not getattr(user, 'is_authenticated', False):
         return False
@@ -66,14 +57,10 @@ def _user_has_portal_access(user):
     if build_sidebar_sections(user):
         return True
     return user.has_module_perms('home') or user.has_module_perms('activation')
-
-
 def _is_party_portal_user(user):
     if not getattr(user, 'is_authenticated', False):
         return False
     return TenantMembership.objects.filter(user=user, role=TenantMembership.Role.PARTY).exists()
-
-
 def _ensure_party_portal_permissions(user):
     """
     Party/customer users need at least `home.view_party` for the customer portal views.
@@ -95,8 +82,6 @@ def _ensure_party_portal_permissions(user):
             pass
     except Exception:
         return
-
-
 def _permission_catalog():
     hidden_content_types = {
         ('activation', 'ecomvalidity'),
@@ -119,8 +104,6 @@ def _permission_catalog():
             module = 'Custom ' + module
         catalog.setdefault(module, []).append(permission)
     return catalog
-
-
 STAFF_GROUP_PRESET_DEFS = [
     {
         'key': 'sales_full',
@@ -432,8 +415,6 @@ STAFF_GROUP_PRESET_DEFS = [
         ],
     },
 ]
-
-
 def _staff_group_presets():
     permission_lookup = {
         f'{permission.content_type.app_label}.{permission.codename}': permission
@@ -456,16 +437,12 @@ def _staff_group_presets():
             'permission_names': names,
         })
     return presets
-
-
 def _preset_reference_sections():
     sections = {}
     for preset in _staff_group_presets():
         module_name = preset['label'].split(' ', 1)[0]
         sections.setdefault(module_name, []).append(preset)
     return sections
-
-
 def _is_admin_like(user):
     return _has_any_permission(user, [
         'home.can_manage_staff',
@@ -475,8 +452,6 @@ def _is_admin_like(user):
         'home.can_approve_collection',
         'home.can_view_audit_logs',
     ])
-
-
 def _sales_capabilities(user):
     can_add = user.has_perm('home.add_sales')
     can_edit = user.has_perm('home.change_sales') or user.has_perm('home.can_manage_sales') or user.has_perm('home.can_view_party_credentials')
@@ -492,8 +467,6 @@ def _sales_capabilities(user):
         'can_export': can_export,
         'can_filter_staff': can_filter_staff,
     }
-
-
 def _order_capabilities(user):
     can_add = user.has_perm('home.add_order')
     can_edit = user.has_perm('home.change_order') or user.has_perm('home.can_manage_orders') or user.has_perm('home.can_view_party_credentials')
@@ -509,8 +482,6 @@ def _order_capabilities(user):
         'can_filter_staff': can_filter_staff,
         'can_set_order_date': can_set_order_date,
     }
-
-
 def _collection_capabilities(user):
     can_add = user.has_perm('home.add_collection')
     can_edit = user.has_perm('home.change_collection') or user.has_perm('home.can_approve_collection') or user.has_perm('home.can_view_party_credentials')
@@ -524,8 +495,6 @@ def _collection_capabilities(user):
         'can_export': can_export,
         'can_filter_staff': can_filter_staff,
     }
-
-
 def _cash_counter_capabilities(user):
     can_add = user.has_perm('home.add_cashcounter') or user.has_perm('home.add_collectioncashcounter') or user.has_perm('home.can_manage_cash_counter')
     can_edit = user.has_perm('home.change_cashcounter') or user.has_perm('home.change_collectioncashcounter') or user.has_perm('home.can_manage_cash_counter') or user.has_perm('home.can_view_party_credentials')
@@ -539,8 +508,6 @@ def _cash_counter_capabilities(user):
         'can_export': can_export,
         'can_filter_staff': can_filter_staff,
     }
-
-
 def permission_required_any(*perm_names):
     def decorator(view_func):
         @wraps(view_func)
@@ -548,19 +515,14 @@ def permission_required_any(*perm_names):
             if request.user.is_authenticated and _has_any_permission(request.user, perm_names):
                 return view_func(request, *args, **kwargs)
             return redirect('/')
-
         return wrapper
-
     return decorator
-
-
+@ensure_csrf_cookie
 def loginPage(request):
     # if not request.user.is_authenticated:
     return render(request, 'home/login.html')
     # else:
     #     return redirect('/admin_home/')
-
-
 @permission_required_any('home.can_view_party_credentials', 'home.can_manage_staff')
 def admin_home(request):
     try:
@@ -574,18 +536,13 @@ def admin_home(request):
     except Exception:
         message = "You are using a trial version."
     request.dashboard_license_message = message
-
     context = {
         'message': message,
     }
     return render(request, 'home/admin/index.html', context)
-
-
 @permission_required_any('home.add_collection', 'home.can_manage_sales')
 def collection_home(request):
     return render(request, 'home/collection/indexCollection.html')
-
-
 @permission_required_any('home.can_manage_staff')
 @is_activated()
 def user_list(request):
@@ -596,8 +553,6 @@ def user_list(request):
         'party_groups': party_groups
     }
     return render(request, 'home/admin/userList.html', context)
-
-
 @permission_required_any('home.can_manage_staff_groups')
 @is_activated()
 def staff_group_list(request):
@@ -605,8 +560,6 @@ def staff_group_list(request):
         'permission_catalog': _permission_catalog(),
     }
     return render(request, 'home/admin/staffGroupList.html', context)
-
-
 @permission_required_any('home.can_manage_staff_groups')
 @is_activated()
 def permission_reference(request):
@@ -614,8 +567,6 @@ def permission_reference(request):
         'preset_sections': _preset_reference_sections(),
     }
     return render(request, 'home/admin/permissionReference.html', context)
-
-
 @permission_required_any('home.can_manage_staff_groups')
 @is_activated()
 def staff_group_create(request):
@@ -630,8 +581,6 @@ def staff_group_create(request):
         'selected_preset_keys': [],
     }
     return render(request, 'home/admin/staffGroupForm.html', context)
-
-
 @permission_required_any('home.can_manage_staff_groups')
 @is_activated()
 def staff_group_edit(request, id):
@@ -660,8 +609,6 @@ def staff_group_edit(request, id):
         'selected_preset_keys': selected_preset_keys,
     }
     return render(request, 'home/admin/staffGroupForm.html', context)
-
-
 @permission_required_any('home.can_manage_staff_groups')
 @is_activated()
 def staff_group_detail(request, id):
@@ -705,8 +652,6 @@ def staff_group_detail(request, id):
         'permission_count': len(assigned_permissions),
     }
     return render(request, 'home/admin/staffGroupDetail.html', context)
-
-
 @permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials')
 @is_activated()
 def party_group_list(request):
@@ -719,8 +664,6 @@ def party_group_list(request):
         },
     }
     return render(request, 'home/admin/partyGroupList.html', context)
-
-
 @permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials')
 @is_activated()
 def bank_list(request):
@@ -734,8 +677,6 @@ def bank_list(request):
         'can_view_bank_balances': can_view_credentials,
     }
     return render(request, 'home/admin/BankList.html', context)
-
-
 @permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials')
 @is_activated()
 def party_list(request):
@@ -756,38 +697,27 @@ def party_list(request):
         },
     }
     return render(request, 'home/admin/PartyList.html', context)
-
-
 def user_logout(request):
     # login_or_logout(request, 'Logout')
     logout(request)
     return redirect("homeApp:loginPage")
-
-
 def my_profile(request):
     instance = get_object_or_404(tenant_qs(request, StaffUser), user_ID_id=request.user.pk)
     context = {
         'instance': instance
     }
     return render(request, 'home/admin/profileAdmin.html', context)
-
-
 def my_profile_collection(request):
     instance = get_object_or_404(tenant_qs(request, StaffUser), user_ID_id=request.user.pk)
     context = {
         'instance': instance
     }
     return render(request, 'home/collection/profile.html', context)
-
-
-@csrf_exempt
 def postLogin(request):
     if request.method == 'POST':
         username = request.POST.get('userName')
         password = request.POST.get('password')
-
         user = authenticate(request, username=username, password=password)
-
         if user is not None:
             login(request, user)
             try:
@@ -811,9 +741,8 @@ def postLogin(request):
             logout(request)
         return JsonResponse({'message': 'fail'}, safe=False)
     return JsonResponse({'message': 'fail'}, safe=False)
-
-
 #
+@ensure_csrf_cookie
 def homepage(request):
     if request.user.is_authenticated:
         if _is_party_portal_user(request.user):
@@ -836,8 +765,6 @@ def homepage(request):
             return render(request, 'home/baseIndex.html')
         logout(request)
     return render(request, 'home/login.html')
-
-
 def _parse_customer_date(value, default=None):
     if not value:
         return default
@@ -849,8 +776,6 @@ def _parse_customer_date(value, default=None):
         return datetime.strptime(value, '%Y-%m-%d').date()
     except Exception:
         return default
-
-
 def _customer_visible_party_ledger_qs(request, qs):
     """
     Customer portal should show only:
@@ -870,8 +795,6 @@ def _customer_visible_party_ledger_qs(request, qs):
         (Q(source=PartyLedgerEntry.Source.COLLECTION) & Q(source_object_id__in=approved_collection_ids)) |
         (Q(source=PartyLedgerEntry.Source.COUNTER_COLLECTION) & Q(source_object_id__in=approved_counter_collection_ids))
     )
-
-
 @ensure_csrf_cookie
 @permission_required_any('home.view_party')
 def customer_home(request):
@@ -880,7 +803,6 @@ def customer_home(request):
     ).order_by('-id').first()
     if not party:
         return redirect('/')
-
     today = datetime.today().date()
     # Default: current month range (better than "today" for customers).
     start_default = today.replace(day=1)
@@ -888,7 +810,6 @@ def customer_home(request):
     end_date = _parse_customer_date(request.GET.get('endDate'), today)
     if end_date and start_date and end_date < start_date:
         start_date, end_date = end_date, start_date
-
     base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
     base_qs = _customer_visible_party_ledger_qs(request, base_qs)
     prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
@@ -896,13 +817,11 @@ def customer_home(request):
         credit_total=Sum('credit'),
     )
     opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
-
     range_qs = base_qs.filter(txDateTime__date__range=[start_date, end_date]).order_by('txDateTime', 'id')
     range_totals = range_qs.aggregate(debit_total=Sum('debit'), credit_total=Sum('credit'))
     range_debit = float(range_totals['debit_total'] or 0.0)
     range_credit = float(range_totals['credit_total'] or 0.0)
     closing = opening + range_debit - range_credit
-
     context = {
         'party': party,
         'startDate': start_date.strftime('%d/%m/%Y'),
@@ -918,26 +837,21 @@ def customer_home(request):
     except Exception:
         pass
     return render(request, 'home/customer.html', context)
-
-
 @permission_required_any('home.view_party')
 def customer_ledger_kpis(request):
     if request.method != 'GET':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
-
     party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only(
         'id', 'openingBalance'
     ).order_by('-id').first()
     if not party:
         return JsonResponse({'message': 'error', 'error': 'Party not found.'}, status=404)
-
     today = datetime.today().date()
     start_default = today.replace(day=1)
     start_date = _parse_customer_date(request.GET.get('startDate'), start_default)
     end_date = _parse_customer_date(request.GET.get('endDate'), today)
     if end_date and start_date and end_date < start_date:
         start_date, end_date = end_date, start_date
-
     base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
     base_qs = _customer_visible_party_ledger_qs(request, base_qs)
     prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
@@ -945,7 +859,6 @@ def customer_ledger_kpis(request):
         credit_total=Sum('credit'),
     )
     opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
-
     range_totals = base_qs.filter(txDateTime__date__range=[start_date, end_date]).aggregate(
         debit_total=Sum('debit'),
         credit_total=Sum('credit'),
@@ -953,7 +866,6 @@ def customer_ledger_kpis(request):
     range_debit = float(range_totals['debit_total'] or 0.0)
     range_credit = float(range_totals['credit_total'] or 0.0)
     closing = opening + range_debit - range_credit
-
     return JsonResponse({
         'message': 'success',
         'opening': opening,
@@ -963,47 +875,34 @@ def customer_ledger_kpis(request):
         'startDate': start_date.strftime('%d/%m/%Y') if start_date else '',
         'endDate': end_date.strftime('%d/%m/%Y') if end_date else '',
     })
-
-
 @permission_required_any('home.view_party')
 def customer_change_password(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
-
     current_password = request.POST.get('current_password')
     new_password = request.POST.get('new_password')
     confirm_password = request.POST.get('confirm_password')
-
     if not current_password or not new_password or not confirm_password:
         return JsonResponse({'message': 'error', 'error': 'All password fields are required.'}, status=400)
-
     if not request.user.check_password(current_password):
         return JsonResponse({'message': 'error', 'error': 'Current password is incorrect.'}, status=400)
-
     if len(new_password) != 6 or not new_password.isdigit():
         return JsonResponse({'message': 'error', 'error': 'New password must be exactly 6 digits.'}, status=400)
-
     if new_password != confirm_password:
         return JsonResponse({'message': 'error', 'error': 'New password and confirm password do not match.'},
                             status=400)
-
     request.user.set_password(new_password)
     request.user.save(update_fields=['password'])
     update_session_auth_hash(request, request.user)
-
     party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).last()
     if party:
         party.password = new_password
         party.save(update_fields=['password'])
-
     return JsonResponse({'message': 'success', 'success': 'Password changed successfully.'}, status=200)
-
-
 @permission_required_any('home.view_party')
 def customer_active_collection_otp(request):
     if request.method != 'GET':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
-
     # Only customer/party users should see OTP.
     party_id = request.session.get('cust_party_id')
     tenant_id = request.session.get('cust_tenant_id')
@@ -1017,7 +916,6 @@ def customer_active_collection_otp(request):
             tenant_id = int(tenant_id)
         except Exception:
             tenant_id = None
-
     if not party_id:
         party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only('id', 'tenant_id').order_by('-id').first()
         if not party:
@@ -1029,7 +927,6 @@ def customer_active_collection_otp(request):
             request.session['cust_tenant_id'] = tenant_id
         except Exception:
             pass
-
     payload = get_collection_otp_payload(tenant_id, party_id)
     if not payload:
         status_payload = get_collection_status_payload(tenant_id, party_id)
@@ -1059,7 +956,6 @@ def customer_active_collection_otp(request):
             'collectDate': meta.get('collectDate', ''),
             'paymentID': meta.get('paymentID', ''),
         }, safe=False)
-
     otp = str(payload.get('otp') or '').strip()
     created_ts = payload.get('created_ts')
     ttl = int(payload.get('ttl') or OTP_TTL_SECONDS)
@@ -1070,12 +966,10 @@ def customer_active_collection_otp(request):
         created_ts = None
     if not otp or created_ts is None:
         return JsonResponse({'message': 'success', 'active': False}, safe=False)
-
     now_ts = int(timezone.now().timestamp())
     expires_in = max(0, (created_ts + ttl) - now_ts)
     if expires_in <= 0:
         return JsonResponse({'message': 'success', 'active': False}, safe=False)
-
     return JsonResponse({
         'message': 'success',
         'active': True,
@@ -1085,8 +979,6 @@ def customer_active_collection_otp(request):
         'amountPaid': meta.get('amountPaid', ''),
         'collectDate': meta.get('collectDate', ''),
     }, safe=False)
-
-
 @permission_required_any('home.add_collection')
 def add_collection(request):
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
@@ -1103,16 +995,12 @@ def add_collection(request):
         'p_groups': p_groups,
     }
     return render(request, 'home/collection/addCollection.html', context)
-
-
 @permission_required_any('home.view_collection', 'home.add_collection', 'home.change_collection', 'home.can_approve_collection')
 def my_collection(request):
     context = {
         'collection_capabilities': _collection_capabilities(request.user),
     }
     return render(request, 'home/collection/collectionListByStaff.html', context)
-
-
 # admin
 @is_activated()
 @permission_required_any('home.can_approve_collection', 'home.can_view_party_credentials')
@@ -1122,8 +1010,6 @@ def collection_list(request):
         'staffs': staffs
     }
     return render(request, 'home/admin/collectionListByAdmin.html', context)
-
-
 @is_activated()
 @permission_required_any('home.can_approve_collection', 'home.can_view_party_credentials')
 def cheque_reminder_list(request):
@@ -1132,8 +1018,6 @@ def cheque_reminder_list(request):
         'staffs': staffs
     }
     return render(request, 'home/admin/collectionListChequeReminder.html', context)
-
-
 @permission_required_any('home.can_approve_collection', 'home.can_view_party_credentials')
 def take_collection(request):
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
@@ -1141,8 +1025,6 @@ def take_collection(request):
         'instance': instance
     }
     return render(request, 'home/admin/takeCollection.html', context)
-
-
 def edit_collection(request, id=None):
     obj = get_object_or_404(tenant_qs(request, Collection), pk=id)
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
@@ -1151,8 +1033,6 @@ def edit_collection(request, id=None):
         'obj': obj
     }
     return render(request, 'home/admin/editCollection.html', context)
-
-
 def get_party_data(request):
     module_dir = os.path.dirname(__file__)  # get current directory
     file_path = os.path.join(module_dir, 'PartiesCSV.csv')
@@ -1166,7 +1046,6 @@ def get_party_data(request):
                 party = partyGroup.pk
             except:
                 party = None
-
             try:
                 user = tenant_qs(request, StaffUser).get(name__iexact=lines[3])
                 usr = user.pk
@@ -1180,30 +1059,21 @@ def get_party_data(request):
             p.assignTo_id = usr
             p.save()
     return HttpResponse('Ok')
-
-
 def generate_collection_date(request):
     col = tenant_qs(request, Collection).all()
     for c in col:
         c.collectionDateTime = c.datetime
         c.save()
     return HttpResponse('Ok')
-
-
 # ----------staff-------------------
-
 @permission_required_any('home.view_attendance', 'home.add_sales', 'home.view_sales', 'home.can_manage_sales')
 def staff_home(request):
     obj = get_object_or_404(tenant_qs(request, StaffUser), user_ID__pk=request.user.pk)
     context = {
         'obj': obj
     }
-
     return render(request, 'home/NormalStaff/indexStaff.html', context)
-
-
 # ---------------------------attendance-------------------
-
 def add_attendance(request):
     if request.user.is_authenticated:
         try:
@@ -1220,20 +1090,15 @@ def add_attendance(request):
         context = {
             'obj': instance,
             'date': datetime.today().date()
-
         }
         return render(request, 'home/addTodayAttendance.html', context)
     else:
         return redirect('/')
-
-
 def attendance_report(request):
     if request.user.is_authenticated:
         return render(request, 'home/attendanceReportStaff.html')
     else:
         return redirect('/')
-
-
 @permission_required_any('home.can_manage_staff', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def attendance_report_admin(request):
     if request.user.is_authenticated:
@@ -1244,14 +1109,10 @@ def attendance_report_admin(request):
         return render(request, 'home/attendanceReportAdmin.html', context)
     else:
         return redirect('/')
-
-
 # ----------------------------- Sales ----------------------
 @permission_required_any('home.add_sales')
 def add_sales(request):
     return render(request, 'home/sales/addSales.html')
-
-
 @is_activated()
 @permission_required_any('home.can_manage_sales', 'home.view_sales', 'home.change_sales')
 def sales_list(request):
@@ -1262,8 +1123,6 @@ def sales_list(request):
         'sales_capabilities': capabilities,
     }
     return render(request, 'home/sales/salesListByAdmin.html', context)
-
-
 @permission_required_any('home.view_sales', 'home.add_sales', 'home.change_sales', 'home.can_manage_sales')
 def my_sales_list(request):
     capabilities = _sales_capabilities(request.user)
@@ -1272,20 +1131,16 @@ def my_sales_list(request):
         'sales_capabilities': capabilities,
     }
     return render(request, 'home/sales/salesListByStaff.html', context)
-
-
 @permission_required_any('home.change_sales', 'home.can_manage_sales', 'home.can_view_party_credentials')
 def edit_sales(request, id=None):
     obj = get_object_or_404(tenant_qs(request, Sales), pk=id)
     capabilities = _sales_capabilities(request.user)
     admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_sales')
-
     if not admin_like:
         if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
             return redirect('homeApp:my_sales_list')
     invoice = obj.invoiceNumber
     splitVoice = invoice.split('/')
-
     context = {
         'obj': obj,
         'series': splitVoice[0],
@@ -1295,16 +1150,12 @@ def edit_sales(request, id=None):
         'sales_return_url': reverse('homeApp:sales_list') if admin_like else reverse('homeApp:my_sales_list'),
     }
     return render(request, 'home/sales/editSales.html', context)
-
-
 # ----------------------------- Orders ----------------------
 @permission_required_any('home.add_order')
 def add_order(request):
     return render(request, 'home/orders/addOrder.html', {
         'order_capabilities': _order_capabilities(request.user),
     })
-
-
 @is_activated()
 @permission_required_any('home.can_manage_orders', 'home.view_order', 'home.change_order')
 def orders_list(request):
@@ -1315,8 +1166,6 @@ def orders_list(request):
         'order_capabilities': capabilities,
     }
     return render(request, 'home/orders/ordersListByAdmin.html', context)
-
-
 @permission_required_any('home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders')
 def my_orders_list(request):
     capabilities = _order_capabilities(request.user)
@@ -1325,18 +1174,14 @@ def my_orders_list(request):
         'order_capabilities': capabilities,
     }
     return render(request, 'home/orders/ordersListByStaff.html', context)
-
-
 @permission_required_any('home.change_order', 'home.can_manage_orders', 'home.can_view_party_credentials')
 def edit_order(request, id=None):
     obj = get_object_or_404(tenant_qs(request, Order), pk=id)
     capabilities = _order_capabilities(request.user)
     admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_orders') or request.user.has_perm('home.can_manage_orders')
-
     if not admin_like:
         if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
             return redirect('homeApp:my_orders_list')
-
     attachments = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order=obj).order_by('-id')
     context = {
         'obj': obj,
@@ -1346,18 +1191,14 @@ def edit_order(request, id=None):
         'order_return_url': reverse('homeApp:orders_list') if admin_like else reverse('homeApp:my_orders_list'),
     }
     return render(request, 'home/orders/editOrder.html', context)
-
-
 @permission_required_any('home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders')
 def order_detail(request, id=None):
     obj = get_object_or_404(tenant_qs(request, Order).select_related('partyID', 'createdBy', 'approvedBy'), pk=id)
     capabilities = _order_capabilities(request.user)
     admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_orders') or request.user.has_perm('home.can_manage_orders')
-
     if not admin_like:
         if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
             return redirect('homeApp:my_orders_list')
-
     attachments = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order=obj).order_by('-id')
     context = {
         'obj': obj,
@@ -1369,20 +1210,14 @@ def order_detail(request, id=None):
         'order_return_url': reverse('homeApp:orders_list') if admin_like else reverse('homeApp:my_orders_list'),
     }
     return render(request, 'home/orders/orderDetail.html', context)
-
-
 # -----------------------Message---------------------
 @permission_required_any('home.can_manage_sales', 'home.can_approve_collection', 'home.can_view_audit_logs')
 def message_list(request):
     return render(request, 'home/messageList.html')
-
-
 # -----------------------CashCounter---------------------
 @permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter')
 def cash_counter_home(request):
     return render(request, 'home/cashCounter/indexCashCounter.html')
-
-
 @permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def cash_counter(request):
     banks = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
@@ -1390,20 +1225,15 @@ def cash_counter(request):
         'banks': banks
     }
     return render(request, 'home/cashCounter/todaysCounter.html', context)
-
-
 @permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter', 'home.view_collectioncashcounter', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def my_cash_counter_list(request):
     return render(request, 'home/cashCounter/cashCounterListByStaff.html', {
         'cash_counter_capabilities': _cash_counter_capabilities(request.user),
     })
-
-
 @permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def edit_cash_counter(request, id=None):
     obj = get_object_or_404(tenant_qs(request, CashCounter), pk=id)
     banks = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
-
     invoice = obj.invoiceNumber
     try:
         splitVoice = invoice.split('/')
@@ -1414,7 +1244,6 @@ def edit_cash_counter(request, id=None):
             'year': splitVoice[2],
             'banks': banks
         }
-
     except:
         context = {
             'obj': obj,
@@ -1423,10 +1252,7 @@ def edit_cash_counter(request, id=None):
             'year': "",
             'banks': banks
         }
-
     return render(request, 'home/cashCounter/editCashCounter.html', context)
-
-
 @permission_required_any('home.can_manage_cash_counter', 'home.view_collectioncashcounter', 'home.add_collectioncashcounter', 'home.change_collectioncashcounter', 'home.can_view_party_credentials', 'home.can_approve_collection')
 def cash_counter_collection(request):
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
@@ -1443,8 +1269,6 @@ def cash_counter_collection(request):
         'p_groups': p_groups,
     }
     return render(request, 'home/cashCounter/addCollectionCashCounter.html', context)
-
-
 def edit_cash_counter_collection(request, id=None):
     obj = get_object_or_404(tenant_qs(request, CollectionCashCounter), pk=id)
     instance = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
@@ -1453,8 +1277,6 @@ def edit_cash_counter_collection(request, id=None):
         'obj': obj
     }
     return render(request, 'home/cashCounter/editCashCounterCollection.html', context)
-
-
 def get_all_unsent_messages(request):
     msgs = (
         tenant_qs(request, WhatsappMessageStatus)
@@ -1477,11 +1299,7 @@ def get_all_unsent_messages(request):
             'datetime': msg.datetime,
             'status': msg.status,
         })
-
     return JsonResponse(data, safe=False)
-
-
-@csrf_exempt
 def update_sent_msg_status(request):
     if request.method == 'POST':
         id = request.POST.get("id")
@@ -1490,8 +1308,6 @@ def update_sent_msg_status(request):
         obj.save()
         return JsonResponse({'message': 'success'}, safe=False)
     return JsonResponse({'message': 'error'}, safe=False)
-
-
 def _parse_ddmmyyyy(value, default=None):
     if not value:
         return default
@@ -1499,8 +1315,6 @@ def _parse_ddmmyyyy(value, default=None):
         return datetime.strptime(value, '%d/%m/%Y').date()
     except Exception:
         return default
-
-
 @permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter', 'home.can_view_party_credentials')
 def cashbook(request):
     tenant = get_current_tenant(request)
@@ -1511,20 +1325,17 @@ def cashbook(request):
     account = accounts.filter(pk=int(account_id)).first() if account_id and account_id.isdigit() else accounts.first()
     if account is None:
         return render(request, 'home/books/cashbook.html', {'accounts': [], 'entries': [], 'account': None})
-
     today = datetime.today().date()
     start_date = _parse_ddmmyyyy(request.GET.get('startDate'), today)
     end_date = _parse_ddmmyyyy(request.GET.get('endDate'), today)
     if end_date and start_date and end_date < start_date:
         start_date, end_date = end_date, start_date
-
     base_qs = tenant_qs(request, BookTransaction).filter(isDeleted=False, account=account)
     prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
         in_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.IN)),
         out_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.OUT)),
     )
     opening = (account.openingBalance or 0.0) + float(prior['in_total'] or 0.0) - float(prior['out_total'] or 0.0)
-
     qs = (
         base_qs
         .filter(txDateTime__date__range=[start_date, end_date])
@@ -1548,12 +1359,10 @@ def cashbook(request):
             'out': out_amt,
             'balance': balance,
         })
-
     can_view_credentials = request.user.has_perm('home.can_view_party_credentials')
     can_manage_cash_entries = request.user.has_perm('home.can_manage_cash_counter') or can_view_credentials or request.user.has_perm('home.can_manage_books')
     can_transfer = can_view_credentials or request.user.has_perm('home.can_manage_books')
     banks = tenant_qs(request, Bank).filter(isDeleted=False).order_by('name') if can_transfer else tenant_qs(request, Bank).none()
-
     context = {
         'accounts': accounts,
         'account': account,
@@ -1569,8 +1378,6 @@ def cashbook(request):
         'banks': banks,
     }
     return render(request, 'home/books/cashbook.html', context)
-
-
 @permission_required_any('home.can_view_party_credentials')
 def bankbook(request):
     tenant = get_current_tenant(request)
@@ -1579,17 +1386,14 @@ def bankbook(request):
     banks = tenant_qs(request, Bank).filter(isDeleted=False).order_by('name')
     accounts = tenant_qs(request, BookAccount).filter(isDeleted=False, type=BookAccount.Type.BANK).select_related('bank').order_by('name')
     transfer_accounts = tenant_qs(request, BookAccount).filter(isDeleted=False).select_related('bank').order_by('type', 'name')
-
     bank_id = request.GET.get('bank')
     selected_bank = banks.filter(pk=int(bank_id)).first() if bank_id and bank_id.isdigit() else banks.first()
     account = accounts.filter(bank=selected_bank).first() if selected_bank else accounts.first()
-
     today = datetime.today().date()
     start_date = _parse_ddmmyyyy(request.GET.get('startDate'), today)
     end_date = _parse_ddmmyyyy(request.GET.get('endDate'), today)
     if end_date and start_date and end_date < start_date:
         start_date, end_date = end_date, start_date
-
     entries = []
     opening = 0.0
     range_in = 0.0
@@ -1623,7 +1427,6 @@ def bankbook(request):
                 'balance': balance,
             })
         closing = balance
-
     context = {
         'banks': banks,
         'accounts': accounts,
@@ -1640,8 +1443,6 @@ def bankbook(request):
         'can_manage_books': request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_manage_books'),
     }
     return render(request, 'home/books/bankbook.html', context)
-
-
 @permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials', 'home.view_party')
 def party_ledger(request, party_id):
     """
@@ -1656,20 +1457,17 @@ def party_ledger(request, party_id):
             return redirect('/')
     else:
         party = get_object_or_404(tenant_qs(request, Party), pk=party_id, isDeleted=False)
-
     today = datetime.today().date()
     start_date = _parse_ddmmyyyy(request.GET.get('startDate'), today)
     end_date = _parse_ddmmyyyy(request.GET.get('endDate'), today)
     if end_date and start_date and end_date < start_date:
         start_date, end_date = end_date, start_date
-
     base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
     prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
         debit_total=Sum('debit'),
         credit_total=Sum('credit'),
     )
     opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
-
     range_totals = base_qs.filter(txDateTime__date__range=[start_date, end_date]).aggregate(
         debit_total=Sum('debit'),
         credit_total=Sum('credit'),
@@ -1677,7 +1475,6 @@ def party_ledger(request, party_id):
     range_debit = float(range_totals['debit_total'] or 0.0)
     range_credit = float(range_totals['credit_total'] or 0.0)
     closing = opening + range_debit - range_credit
-
     context = {
         'party': party,
         'startDate': start_date.strftime('%d/%m/%Y'),

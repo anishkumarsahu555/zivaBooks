@@ -2,7 +2,6 @@ import threading
 from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
-
 import requests
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
@@ -19,10 +18,8 @@ from django.utils.crypto import get_random_string
 from django.utils.html import escape
 from django.utils import timezone
 from django.views.decorators.cache import cache_page
-from django.views.decorators.csrf import csrf_exempt
 from django_datatables_view.base_datatable_view import BaseDatatableView
 from weasyprint import CSS, HTML
-
 from home.models import *
 from home.books import sync_book_transactions
 from home.otp import (
@@ -35,9 +32,7 @@ from home.otp import (
 )
 from home.party_ledger import sync_party_ledger_entries_for_object
 from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_qs
-
 User = get_user_model()
-
 BASE_URL_WHATSAPP = "https://bot.betablaster.in/api/"
 DEFAULT_AVATAR_URL = "/static/images/default-avatar.svg"
 DEFAULT_GROUP_PERMISSION_MAP = {
@@ -99,7 +94,6 @@ DEFAULT_GROUP_PERMISSION_MAP = {
         'home.can_view_audit_logs',
     ],
 }
-
 ADMIN_LIKE_PERMS = (
     'home.can_manage_staff',
     'home.can_manage_staff_groups',
@@ -108,20 +102,16 @@ ADMIN_LIKE_PERMS = (
     'home.can_approve_collection',
     'home.can_view_audit_logs',
 )
-
-
 class LocationThread(threading.Thread):
     def __init__(self, lat, lng):
         self.lat = lat
         self.lng = lng
         self._is_running = True
         threading.Thread.__init__(self)
-
     def run(self):
         while (self._is_running):
             location = tenant_qs(get_current_tenant(None), GeolocationPackage).filter(isDeleted__exact=False).last()
             if location.used < location.balance:
-
                 r = requests.get(
                     "https://revgeocode.search.hereapi.com/v1/revgeocode?at=" + self.lat + "%2C" + self.lng + "&lang=en-US&apikey=VtAAEVuyqdswCZr8X1BdBzM-4JTpeAdivmp4_3ILPs4")
                 data = r.json()
@@ -130,17 +120,11 @@ class LocationThread(threading.Thread):
                 return data["items"][0]["address"]["label"]
             else:
                 return ""
-
         self.stop()
-
     def stop(self):
         self._is_running = False
-
-
 def get_location(lat, lng):
     LocationThread(lat, lng).start()
-
-
 class MessageThread(threading.Thread):
     def __init__(self, number, message, partyName):
         self.number = number
@@ -148,13 +132,11 @@ class MessageThread(threading.Thread):
         self.partyName = partyName
         self._is_running = True
         threading.Thread.__init__(self)
-
     def run(self):
         while (self._is_running):
             msg = tenant_qs(get_current_tenant(None), WhatsappMessage).filter(isDeleted__exact=False).last()
             if msg.used < msg.balance:
                 try:
-
                     # r = requests.get(
                     #     msg.name + "send?number=91" + self.number + "&type=text&message=" + self.message + "&instance_id=" + msg.instanceID + "&access_token=" + msg.apiKey,
                     #     verify=False)
@@ -172,7 +154,6 @@ class MessageThread(threading.Thread):
                     except:
                         obj.status = 'Fail'
                     obj.save()
-
                     msg.used = (msg.used + 1)
                     msg.save()
                 except:
@@ -183,7 +164,6 @@ class MessageThread(threading.Thread):
                     obj.messageTo = self.partyName
                     obj.status = 'Fail'
                     obj.save()
-
             else:
                 obj = WhatsappMessageStatus()
                 assign_tenant(obj, get_current_tenant(None))
@@ -192,17 +172,11 @@ class MessageThread(threading.Thread):
                 obj.messageTo = self.partyName
                 obj.status = 'Fail'
                 obj.save()
-
             self.stop()
-
     def stop(self):
         self._is_running = False
-
-
 def send_message(number, message, party):
     MessageThread(number, message, party).start()
-
-
 def _parse_party_id_value(raw: str):
     if raw is None:
         return None
@@ -218,9 +192,6 @@ def _parse_party_id_value(raw: str):
     if value.isdigit():
         return int(value)
     return None
-
-
-@csrf_exempt
 def request_collection_otp_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
@@ -234,7 +205,6 @@ def request_collection_otp_api(request):
         cus = tenant_qs(request, Party).filter(isDeleted=False, pk=party_id).only('id', 'name', 'phone', 'tenant_id').first()
         if not cus:
             return JsonResponse({'message': 'error', 'error': 'Party not found.'}, status=404)
-
         payment_mode = (request.POST.get('paymentMode') or '').strip()
         amount_paid_raw = (request.POST.get('amountPaid') or '').strip()
         collect_date = (request.POST.get('collectDate') or '').strip()
@@ -242,7 +212,6 @@ def request_collection_otp_api(request):
             amount_paid = float(amount_paid_raw) if amount_paid_raw != '' else None
         except Exception:
             amount_paid = None
-
         meta = {}
         if payment_mode:
             meta['paymentMode'] = payment_mode
@@ -250,15 +219,11 @@ def request_collection_otp_api(request):
             meta['amountPaid'] = amount_paid
         if collect_date:
             meta['collectDate'] = collect_date
-
         otp = get_random_string(length=6, allowed_chars='0123456789')
         set_collection_otp(cus.tenant_id, cus.pk, otp, ttl=OTP_TTL_SECONDS, meta=meta)
         return JsonResponse({'message': 'success', 'expires_in': OTP_TTL_SECONDS}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
-
-
-@csrf_exempt
 def verify_collection_otp_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
@@ -281,9 +246,6 @@ def verify_collection_otp_api(request):
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
-
-
-@csrf_exempt
 def clear_collection_otp_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
@@ -302,21 +264,15 @@ def clear_collection_otp_api(request):
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
-
-
 def formatINR(number):
     s, *d = str(number).partition(".")
     r = ",".join([s[x - 2:x] for x in range(-3, -len(s), -2)][::-1] + [s[-3:]])
     return "".join([r] + d)
-
-
 def _decimal_from_request(value, default='0'):
     try:
         return Decimal(str(value).strip())
     except (InvalidOperation, AttributeError):
         return Decimal(default)
-
-
 def _permission_catalog():
     hidden_content_types = {
         ('activation', 'ecomvalidity'),
@@ -339,90 +295,48 @@ def _permission_catalog():
             module = 'Custom ' + module
         permission_groups[module].append(permission)
     return dict(permission_groups)
-
-
 def _has_any_permission(user, *perm_names):
     if len(perm_names) == 1 and isinstance(perm_names[0], (list, tuple, set)):
         perm_names = tuple(perm_names[0])
     return any(user.has_perm(perm_name) for perm_name in perm_names)
-
-
 def _is_admin_like(user):
     return _has_any_permission(user, ADMIN_LIKE_PERMS)
-
-
 def _can_manage_staff(user):
     return user.has_perm('home.can_manage_staff')
-
-
 def _can_manage_party_records(user):
     return _has_any_permission(user, 'home.can_manage_parties', 'home.can_view_party_credentials')
-
-
 def _can_view_party_credentials(user):
     return user.has_perm('home.can_view_party_credentials')
-
-
 def _can_add_party(user):
     return user.has_perm('home.add_party') or _can_view_party_credentials(user)
-
-
 def _can_edit_party(user):
     return user.has_perm('home.change_party') or _can_view_party_credentials(user)
-
-
 def _can_delete_party(user):
     return user.has_perm('home.delete_party') or _can_view_party_credentials(user)
-
-
 def _can_add_party_group(user):
     return user.has_perm('home.add_partygroup') or _can_view_party_credentials(user)
-
-
 def _can_edit_party_group(user):
     return user.has_perm('home.change_partygroup') or _can_view_party_credentials(user)
-
-
 def _can_delete_party_group(user):
     return user.has_perm('home.delete_partygroup') or _can_view_party_credentials(user)
-
-
 def _can_add_bank(user):
     return user.has_perm('home.add_bank') or _can_view_party_credentials(user)
-
-
 def _can_edit_bank(user):
     return user.has_perm('home.change_bank') or _can_view_party_credentials(user)
-
-
 def _can_delete_bank(user):
     return user.has_perm('home.delete_bank') or _can_view_party_credentials(user)
-
-
 def _can_review_collections(user):
     return _has_any_permission(user, 'home.can_approve_collection', 'home.can_view_party_credentials')
-
-
 def _can_auto_approve_collections(user):
     return user.has_perm('home.can_view_party_credentials')
-
-
 def _can_manage_sales(user):
     return _has_any_permission(user, 'home.can_manage_sales', 'home.can_approve_sales')
-
-
 def _has_sales_access(user):
     return _has_any_permission(user, 'home.can_manage_sales', 'home.can_approve_sales', 'home.view_sales', 'home.add_sales', 'home.change_sales')
-
-
 def _can_manage_cash_counter_records(user):
     return user.has_perm('home.can_view_party_credentials')
-
-
 def _can_filter_all_collections(user):
     return _can_review_collections(user)
-
-
 def _can_filter_all_cash_counter(user):
     return _has_any_permission(
         user,
@@ -430,52 +344,28 @@ def _can_filter_all_cash_counter(user):
         'home.can_view_party_credentials',
         'home.can_approve_collection',
     )
-
-
 def _can_filter_all_sales(user):
     return _is_admin_like(user) or _can_manage_sales(user)
-
-
 def _can_edit_sales(user):
     return user.has_perm('home.change_sales') or _can_manage_sales(user) or user.has_perm('home.can_view_party_credentials')
-
-
 def _can_delete_sales(user):
     return user.has_perm('home.can_view_party_credentials')
-
-
 def _can_manage_orders(user):
     return _has_any_permission(user, 'home.can_manage_orders', 'home.can_approve_orders')
-
-
 def _can_filter_all_orders(user):
     return _is_admin_like(user) or _can_manage_orders(user) or user.has_perm('home.can_view_party_credentials')
-
-
 def _can_add_order(user):
     return user.has_perm('home.add_order')
-
-
 def _can_edit_order(user):
     return user.has_perm('home.change_order') or _can_manage_orders(user) or user.has_perm('home.can_view_party_credentials')
-
-
 def _can_delete_order(user):
     return user.has_perm('home.delete_order') or user.has_perm('home.can_view_party_credentials')
-
-
 def _can_approve_orders(user):
     return user.has_perm('home.can_approve_orders') or user.has_perm('home.can_manage_orders') or user.has_perm('home.can_view_party_credentials')
-
-
 def _can_set_order_date(user):
     return user.has_perm('home.can_manage_orders') or user.has_perm('home.can_approve_orders') or user.has_perm('home.can_view_party_credentials')
-
-
 def _format_order_number(pk):
     return 'O' + str(int(pk)).zfill(8)
-
-
 def _can_edit_order_record(user, order_obj):
     if not user.is_authenticated or order_obj is None:
         return False
@@ -490,8 +380,6 @@ def _can_edit_order_record(user, order_obj):
     if not staff:
         return False
     return order_obj.createdBy_id == staff.pk
-
-
 def _can_delete_order_record(user, order_obj):
     if not user.is_authenticated or order_obj is None:
         return False
@@ -506,8 +394,6 @@ def _can_delete_order_record(user, order_obj):
     if not staff:
         return False
     return order_obj.createdBy_id == staff.pk
-
-
 def _can_edit_sales_record(user, sale_obj):
     """
     Staff can edit only their own Sales records and only before approval.
@@ -519,27 +405,20 @@ def _can_edit_sales_record(user, sale_obj):
         return False
     if sale_obj is None:
         return False
-
     admin_like = _can_manage_sales(user) or user.has_perm('home.can_view_party_credentials')
     if sale_obj.isApproved and not admin_like:
         return False
-
     if admin_like:
         return True
-
     # MyList scope: createdBy must be this staff user.
     staff = tenant_qs(user, StaffUser).filter(user_ID_id=user.pk, isDeleted=False).only('id').first()
     if not staff:
         return False
     return sale_obj.createdBy_id == staff.pk
-
-
 def _tenant_group_name(request_or_tenant, base_name):
     tenant = get_current_tenant(request_or_tenant) if not hasattr(request_or_tenant, 'slug') else request_or_tenant
     tenant_slug = getattr(tenant, 'slug', 'tenant')
     return f'{tenant_slug}:{base_name}'
-
-
 def _get_or_create_tenant_django_group(request_or_tenant, base_name, existing_group=None):
     django_group_name = _tenant_group_name(request_or_tenant, base_name)
     if existing_group is not None:
@@ -548,8 +427,6 @@ def _get_or_create_tenant_django_group(request_or_tenant, base_name, existing_gr
         return existing_group
     django_group, _ = Group.objects.get_or_create(name=django_group_name)
     return django_group
-
-
 def _sync_staff_group_permissions(staff_group, permission_ids):
     django_group = staff_group.djangoGroup
     if django_group is None:
@@ -559,8 +436,6 @@ def _sync_staff_group_permissions(staff_group, permission_ids):
     permissions = Permission.objects.filter(id__in=permission_ids)
     django_group.permissions.set(permissions)
     return django_group
-
-
 def _sync_staff_user_group_membership(staff_user):
     if not staff_user.user_ID_id:
         return
@@ -568,8 +443,6 @@ def _sync_staff_user_group_membership(staff_user):
     user.groups.clear()
     if staff_user.staffGroup and staff_user.staffGroup.djangoGroup:
         user.groups.add(staff_user.staffGroup.djangoGroup)
-
-
 def seed_default_groups():
     all_permissions = Permission.objects.exclude(content_type__app_label__in=['admin', 'contenttypes', 'sessions'])
     for group_name, permission_codenames in DEFAULT_GROUP_PERMISSION_MAP.items():
@@ -584,8 +457,6 @@ def seed_default_groups():
                 if perm:
                     perms.append(perm)
             group.permissions.set(perms)
-
-
 def _image_url(image_field, variation=None):
     if not image_field:
         return DEFAULT_AVATAR_URL
@@ -594,8 +465,6 @@ def _image_url(image_field, variation=None):
         if candidate and getattr(candidate, 'url', None):
             return candidate.url
     return getattr(image_field, 'url', '') or DEFAULT_AVATAR_URL
-
-
 def _collection_list_base_qs(request_or_user):
     return tenant_qs(request_or_user, Collection).select_related(
         'partyID', 'transferredPartyID', 'bankID', 'collectedBy', 'approvedBy'
@@ -605,38 +474,28 @@ def _collection_list_base_qs(request_or_user):
         'partyID__name', 'transferredPartyID__name', 'bankID__name',
         'collectedBy__name', 'approvedBy__name'
     )
-
-
 def _sales_list_base_qs(request_or_user):
     return tenant_qs(request_or_user, Sales).select_related('partyID', 'createdBy', 'approvedBy').only(
         'id', 'paymentID', 'invoiceNumber', 'amount', 'buildDate', 'datetime', 'remark', 'isApproved',
         'partyID__name', 'createdBy__name', 'approvedBy__name'
     )
-
-
 def _orders_list_base_qs(request_or_user):
     return tenant_qs(request_or_user, Order).select_related('partyID', 'createdBy', 'approvedBy').only(
         'id', 'orderNumber', 'buildDate', 'datetime', 'lastUpdatedOn', 'remark', 'approvedOn',
         'status', 'latitude', 'longitude', 'location',
         'partyID__name', 'createdBy__name', 'approvedBy__name'
     )
-
-
 def _attendance_list_base_qs(request_or_user):
     return tenant_qs(request_or_user, Attendance).select_related('staffID').only(
         'id', 'datetime', 'isLogIn', 'isLogOut', 'loginDateTime', 'logoutDateTime',
         'login_remark', 'logout_remark', 'login_location', 'logout_location', 'staffID__name'
     )
-
-
 def _cash_counter_list_base_qs(request_or_user):
     return tenant_qs(request_or_user, CashCounter).select_related('partyID', 'bankID', 'createdBy').only(
         'id', 'counterID', 'invoiceNumber', 'amount', 'mixCashAmount', 'mixCardAmount', 'mode',
         'expenseType', 'remark', 'datetime', 'partyID__name', 'bankID__name',
         'bankID__accountNumber', 'createdBy__name'
     )
-
-
 def _cash_counter_collection_list_base_qs(request_or_user):
     return tenant_qs(request_or_user, CollectionCashCounter).select_related(
         'partyID', 'transferredPartyID', 'bankID', 'collectedBy', 'approvedBy'
@@ -645,25 +504,18 @@ def _cash_counter_collection_list_base_qs(request_or_user):
         'collectionDateTime', 'datetime', 'isApproved', 'chequeDate',
         'partyID__name', 'transferredPartyID__name', 'bankID__name', 'collectedBy__name', 'approvedBy__name'
     )
-
-
 def _get_party_cache_version():
     version = cache.get('party_list_cache_version')
     if version is None:
         version = 1
         cache.set('party_list_cache_version', version, timeout=None)
     return version
-
-
 def _bump_party_cache_version():
     version = cache.get('party_list_cache_version') or 1
     cache.set('party_list_cache_version', version + 1, timeout=None)
-
-
 def deduct_location_balance(lat, lng):
     location = tenant_qs(get_current_tenant(None), GeolocationPackage).filter(isDeleted__exact=False).last()
     if location.used < location.balance:
-
         r = requests.get(
             "https://revgeocode.search.hereapi.com/v1/revgeocode?at=" + lat + "%2C" + lng + "&lang=en-US&apikey=VtAAEVuyqdswCZr8X1BdBzM-4JTpeAdivmp4_3ILPs4")
         data = r.json()
@@ -672,8 +524,6 @@ def deduct_location_balance(lat, lng):
         return data["items"][0]["address"]["label"]
     else:
         return ""
-
-
 def send_whatsapp_message(number, message):
     msg = tenant_qs(get_current_tenant(None), WhatsappMessage).filter(isDeleted__exact=False).last()
     if msg.used < msg.balance:
@@ -683,10 +533,7 @@ def send_whatsapp_message(number, message):
         # data = r.json()
         msg.used = (msg.used + 1)
         msg.save()
-
-
 @transaction.atomic
-@csrf_exempt
 def add_staff_group_api(request):
     if request.method == 'POST':
         try:
@@ -707,11 +554,8 @@ def add_staff_group_api(request):
             return JsonResponse({'message': 'success', 'group_id': obj.pk}, safe=False)
         except Exception as exc:
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
-
-
 class StaffGroupListJson(BaseDatatableView):
     order_columns = ['name', 'description', 'datetime']
-
     def get_initial_queryset(self):
         qs = tenant_qs(self.request, StaffGroup).filter(isDeleted__exact=False)
         start_date = self.request.GET.get('startDate')
@@ -724,13 +568,11 @@ class StaffGroupListJson(BaseDatatableView):
             except ValueError:
                 pass
         return qs.only('id', 'name', 'description', 'datetime')
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(Q(name__icontains=search) | Q(description__icontains=search))
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -754,8 +596,6 @@ class StaffGroupListJson(BaseDatatableView):
                 action,
             ])
         return json_data
-
-
 def get_staff_group_detail(request):
     group_id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, StaffGroup), id=group_id)
@@ -809,10 +649,7 @@ def get_staff_group_detail(request):
         module: [{'id': perm.id, 'name': perm.name, 'codename': perm.codename} for perm in perms]
         for module, perms in _permission_catalog().items()
     }}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def edit_staff_group_api(request):
     if request.method == 'POST':
         try:
@@ -834,10 +671,7 @@ def edit_staff_group_api(request):
             return JsonResponse({'message': 'success', 'group_id': obj.pk}, safe=False)
         except Exception as exc:
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_staff_group_api(request):
     if request.method == 'POST':
         try:
@@ -851,11 +685,8 @@ def delete_staff_group_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except Exception:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 #
 @transaction.atomic
-@csrf_exempt
 def add_staff_api(request):
     if request.method == 'POST':
         try:
@@ -869,7 +700,6 @@ def add_staff_api(request):
             # PartyGroup = request.POST.get("PartyGroup")
             imageUpload = request.FILES["imageUpload"]
             imageUploadID = request.FILES["imageUploadID"]
-
             staff = StaffUser()
             assign_tenant(staff, request)
             staff.photo = imageUpload
@@ -895,32 +725,25 @@ def add_staff_api(request):
                 new_user = User()
                 new_user.username = username
                 new_user.set_password(UserPwd)
-
                 new_user.save()
                 staff.username = username
                 staff.user_ID_id = new_user.pk
-
                 staff.save()
                 ensure_membership(new_user, staff.tenant, TenantMembership.Role.STAFF)
                 _sync_staff_user_group_membership(staff)
             return JsonResponse({'message': 'success'}, safe=False)
         except Exception:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 #
 class StaffUserListJson(BaseDatatableView):
     order_columns = ['photo', 'name', 'username', 'userPassword', 'group', 'phone', 'address',
                      'isActive', 'datetime']
-
     def get_initial_queryset(self):
         return tenant_qs(self.request, StaffUser).select_related('staffGroup').filter(isDeleted__exact=False).only(
             'id', 'photo', 'name', 'username', 'userPassword', 'group', 'phone',
             'address', 'isActive', 'datetime', 'staffGroup__name'
         )
-
     def filter_queryset(self, qs):
-
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
@@ -929,9 +752,7 @@ class StaffUserListJson(BaseDatatableView):
                 | Q(address__icontains=search) | Q(isActive__icontains=search)
                 | Q(datetime__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -953,7 +774,6 @@ class StaffUserListJson(BaseDatatableView):
                 username = "*********"
                 password = "*********"
             group_name = item.staffGroup.name if item.staffGroup_id else item.group
-
             json_data.append([
                 images,  # escape HTML for security reasons
                 escape(item.name),
@@ -965,14 +785,9 @@ class StaffUserListJson(BaseDatatableView):
                 escape(item.isActive),
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 action,
-
             ])
-
         return json_data
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_staff_user(request):
     if request.method == 'POST':
         try:
@@ -983,12 +798,9 @@ def delete_staff_user(request):
             new_user = User.objects.select_related().get(pk=staff.user_ID_id)
             new_user.is_active = False
             new_user.save()
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 def get_staff_user_detail(request):
     id = request.GET.get('id')
     C_User = get_object_or_404(tenant_qs(request, StaffUser), id=id)
@@ -1009,13 +821,9 @@ def get_staff_user_detail(request):
         'IsActive': C_User.isActive,
         'ImgUrl': _image_url(C_User.photo, 'medium'),
         'IDUrl': _image_url(C_User.idProof, 'medium')
-
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def edit_staff_api(request):
     if request.method == 'POST':
         try:
@@ -1028,7 +836,6 @@ def edit_staff_api(request):
             UserStatus = request.POST.get("UserStatus")
             UserPwd = request.POST.get("UserPwd")
             # PartyGroup = request.POST.get("PartyGroup")
-
             staff = tenant_qs(request, StaffUser).select_related().get(pk=int(EditUserId))
             try:
                 imageUpload = request.FILES["imageUpload"]
@@ -1055,7 +862,6 @@ def edit_staff_api(request):
             staff.isActive = UserStatus
             staff.userPassword = UserPwd
             staff.save()
-
             new_user = User.objects.select_related().get(pk=staff.user_ID_id)
             new_user.set_password(UserPwd)
             if UserStatus == 'Active':
@@ -1068,13 +874,10 @@ def edit_staff_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except Exception:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 #
 # # ---------------------------------Party Groups ----------------------------------------------------
 #
 @transaction.atomic
-@csrf_exempt
 def add_party_group_api(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -1084,21 +887,16 @@ def add_party_group_api(request):
         try:
             groupName = request.POST.get("groupName")
             description = request.POST.get("description")
-
             obj = PartyGroup()
             assign_tenant(obj, request)
             obj.name = groupName
             obj.description = description
             obj.save()
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 #
 @transaction.atomic
-@csrf_exempt
 def delete_part_group(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -1113,11 +911,8 @@ def delete_part_group(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 class PartyGroupListJson(BaseDatatableView):
     order_columns = ['name', 'description', 'datetime']
-
     def get_initial_queryset(self):
         # if 'Admin' in group_names:
         if not getattr(self.request, 'user', None) or not self.request.user.is_authenticated:
@@ -1127,18 +922,14 @@ class PartyGroupListJson(BaseDatatableView):
         return tenant_qs(self.request, PartyGroup).filter(isDeleted__exact=False).only(
             'id', 'name', 'description', 'datetime'
         )
-
     def filter_queryset(self, qs):
-
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
                 Q(name__icontains=search) | Q(description__icontains=search)
                 | Q(datetime__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -1152,7 +943,6 @@ class PartyGroupListJson(BaseDatatableView):
                 action = '''<button data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','view')" class="ui circular teal icon button">
                     <i class="eye icon"></i>
                   </button>'''.format(item.pk)
-
             if can_delete:
                 action = action + ''' <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
                     <i class="trash alternate icon"></i>
@@ -1162,12 +952,8 @@ class PartyGroupListJson(BaseDatatableView):
                 escape(item.description),
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 action,
-
             ])
-
         return json_data
-
-
 def get_party_group_detail(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
@@ -1176,18 +962,14 @@ def get_party_group_detail(request):
     id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, PartyGroup), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
-
     data = {
         'ID': instance.pk,
         'Name': instance.name,
         'Description': instance.description,
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 #
 @transaction.atomic
-@csrf_exempt
 def edit_part_group_api(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -1201,17 +983,12 @@ def edit_part_group_api(request):
             obj = tenant_qs(request, PartyGroup).select_related().get(id=int(Id))
             obj.name = name
             obj.description = description
-
             obj.save()
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 # # ----------------------------------Banks------------------------
 @transaction.atomic
-@csrf_exempt
 def add_bank_api(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -1222,22 +999,17 @@ def add_bank_api(request):
             bankName = request.POST.get("bankName")
             accountNumber = request.POST.get("accountNumber")
             description = request.POST.get("description")
-
             obj = Bank()
             assign_tenant(obj, request)
             obj.name = bankName
             obj.accountNumber = accountNumber
             obj.description = description
             obj.save()
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 class BankListJson(BaseDatatableView):
     order_columns = ['name', 'accountNumber', 'description', 'datetime']
-
     def get_initial_queryset(self):
         # if 'Admin' in group_names:
         if not getattr(self.request, 'user', None) or not self.request.user.is_authenticated:
@@ -1247,18 +1019,14 @@ class BankListJson(BaseDatatableView):
         return tenant_qs(self.request, Bank).filter(isDeleted__exact=False).only(
             'id', 'name', 'accountNumber', 'description', 'datetime'
         )
-
     def filter_queryset(self, qs):
-
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
                 Q(name__icontains=search) | Q(accountNumber__icontains=search) | Q(description__icontains=search)
                 | Q(datetime__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -1272,7 +1040,6 @@ class BankListJson(BaseDatatableView):
                 action = '''<button data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','view')" class="ui circular teal icon button">
                     <i class="eye icon"></i>
                   </button>'''.format(item.pk)
-
             if can_delete:
                 action = action + ''' <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
                     <i class="trash alternate icon"></i>
@@ -1283,12 +1050,8 @@ class BankListJson(BaseDatatableView):
                 escape(item.description),
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 action,
-
             ])
-
         return json_data
-
-
 def get_bank_detail(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
@@ -1297,7 +1060,6 @@ def get_bank_detail(request):
     id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, Bank), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
-
     data = {
         'ID': instance.pk,
         'Name': instance.name,
@@ -1305,10 +1067,7 @@ def get_bank_detail(request):
         'Description': instance.description,
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def edit_bank_api(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -1324,16 +1083,11 @@ def edit_bank_api(request):
             obj.name = name
             obj.accountNumber = accountNumber
             obj.description = description
-
             obj.save()
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_bank(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -1348,11 +1102,8 @@ def delete_bank(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 # ----------------------------- Party ---------------------
 @transaction.atomic
-@csrf_exempt
 def add_party_api(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -1366,7 +1117,6 @@ def add_party_api(request):
             partyGroup = request.POST.get("partyGroup")
             # address = request.POST.get("address")
             staffID = request.POST.get("staffID")
-
             obj = Party()
             assign_tenant(obj, request)
             obj.name = partyName
@@ -1381,21 +1131,16 @@ def add_party_api(request):
                 obj.partyGroupID_id = int(partyGroup)
             except:
                 pass
-
             username = get_random_string(length=6, allowed_chars='0123456789')
             while User.objects.filter(username__exact=username).exists():
                 username = get_random_string(length=6, allowed_chars='0123456789')
-
             password = get_random_string(length=6, allowed_chars='0123456789')
-
             new_user = User()
             new_user.username = username
             new_user.set_password(password)
             new_user.save()
-
             group, _ = Group.objects.get_or_create(name='Customer')
             group.user_set.add(new_user.pk)
-
             obj.username = username
             obj.password = password
             obj.userID_id = new_user.pk
@@ -1405,41 +1150,31 @@ def add_party_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def generate_party_users_api(request):
     if request.method == 'GET':
         if not request.user.is_authenticated:
             return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-
         if not _can_manage_party_records(request.user):
             return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
         try:
             customer_group, _ = Group.objects.get_or_create(name='Customer')
             created = 0
             skipped = 0
-
             parties = tenant_qs(request, Party).filter(isDeleted__exact=False).order_by('id')
             for party in parties:
                 if party.userID_id:
                     skipped = skipped + 1
                     continue
-
                 username = get_random_string(length=6, allowed_chars='0123456789')
                 while User.objects.filter(username__exact=username).exists():
                     username = get_random_string(length=6, allowed_chars='0123456789')
                 password = get_random_string(length=6, allowed_chars='0123456789')
-
                 new_user = User()
                 new_user.username = username
                 new_user.set_password(password)
                 new_user.save()
-
                 customer_group.user_set.add(new_user.pk)
-
                 party.username = username
                 party.password = password
                 party.userID_id = new_user.pk
@@ -1448,7 +1183,6 @@ def generate_party_users_api(request):
                 created = created + 1
             if created > 0:
                 _bump_party_cache_version()
-
             return JsonResponse({
                 'message': 'success',
                 'created': created,
@@ -1456,19 +1190,14 @@ def generate_party_users_api(request):
             }, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 class PartyListJson(BaseDatatableView):
     order_columns = ['name', 'phone', 'openingBalance', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
-
     def get_initial_queryset(self):
         return tenant_qs(self.request, Party).select_related('partyGroupID', 'assignTo').filter(isDeleted__exact=False).only(
             'id', 'name', 'phone', 'openingBalance', 'username', 'password', 'address', 'datetime',
             'partyGroupID__name', 'assignTo__name'
         )
-
     def filter_queryset(self, qs):
-
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
@@ -1477,16 +1206,13 @@ class PartyListJson(BaseDatatableView):
                 | Q(partyGroupID__name__icontains=search) | Q(assignTo__name__icontains=search) | Q(
                     datetime__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             can_view_credentials = _can_view_party_credentials(self.request.user)
             can_edit = _can_edit_party(self.request.user)
             can_delete = _can_delete_party(self.request.user)
-
             if can_edit:
                 action = '''<button data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','edit')" class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
@@ -1495,12 +1221,10 @@ class PartyListJson(BaseDatatableView):
                 action = '''<button data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','view')" class="ui circular teal icon button">
                     <i class="eye icon"></i>
                   </button>'''.format(item.pk)
-
             ledger_url = reverse('homeApp:party_ledger', args=[item.pk])
             action = action + ''' <a data-inverted="" data-tooltip="Ledger" data-position="left center" data-variation="mini" style="font-size:10px;" href="{}" class="ui circular blue icon button">
                     <i class="book icon"></i>
                   </a>'''.format(ledger_url)
-
             if can_delete:
                 action = action + ''' <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
                     <i class="trash alternate icon"></i>
@@ -1513,7 +1237,6 @@ class PartyListJson(BaseDatatableView):
                 usr = item.assignTo.name
             except:
                 usr = 'N/A'
-
             if can_view_credentials and item.username:
                 username = '''{} <button data-copy="{}" class="ui mini icon button copy-btn" type="button" title="Copy Username"><i class="copy outline icon"></i></button>'''.format(
                     escape(item.username),
@@ -1523,7 +1246,6 @@ class PartyListJson(BaseDatatableView):
                 username = 'N/A'
             else:
                 username = '<div class="ui tiny label">Hidden</div>'
-
             if can_view_credentials and item.password:
                 password = '''{} <button data-copy="{}" class="ui mini icon button copy-btn" type="button" title="Copy Password"><i class="copy outline icon"></i></button>'''.format(
                     escape(item.password),
@@ -1543,22 +1265,16 @@ class PartyListJson(BaseDatatableView):
                 usr,
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 action,
-
             ])
-
         return json_data
-
-
 def get_party_detail(request):
     id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, Party), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
-
     try:
         party = instance.partyGroupID.pk
     except:
         party = 'N/A'
-
     try:
         usr = instance.assignTo.pk
     except:
@@ -1573,10 +1289,7 @@ def get_party_detail(request):
         'AssignTo': usr,
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def edit_party_api(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -1609,10 +1322,7 @@ def edit_party_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_party(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -1628,8 +1338,6 @@ def delete_party(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 def list_party_api(request):
     try:
         version = _get_party_cache_version()
@@ -1640,7 +1348,6 @@ def list_party_api(request):
             obj_list = tenant_qs(request, Party).select_related('partyGroupID').filter(isDeleted__exact=False).only(
                 'id', 'name', 'phone', 'partyGroupID__name'
             ).order_by('name')
-
             for obj in obj_list:
                 party = obj.partyGroupID.name if obj.partyGroupID else 'N/A'
                 obj_dic = {
@@ -1653,12 +1360,9 @@ def list_party_api(request):
                 }
                 o_list.append(obj_dic)
             cache.set(cache_key, o_list, timeout=60 * 30)
-
         return JsonResponse({'message': 'success', 'data': o_list}, safe=False)
     except:
         return JsonResponse({'message': 'error'}, safe=False)
-
-
 def list_party_by_executive_or_station_api(request):
     try:
         executive = request.GET.get('executive')
@@ -1669,20 +1373,17 @@ def list_party_by_executive_or_station_api(request):
         cached = cache.get(cache_key)
         if cached is not None:
             return JsonResponse({'message': 'success', 'data': cached}, safe=False)
-
         obj_list = tenant_qs(request, Party).select_related('partyGroupID').filter(
             isDeleted__exact=False
         ).only(
             'id', 'name', 'phone', 'partyGroupID__name'
         )
-
         if executive != 'All' and station == 'All':
             obj_list = obj_list.filter(assignTo__id=int(executive))
         elif executive == 'All' and station != 'All':
             obj_list = obj_list.filter(partyGroupID__id=int(station))
         elif executive != 'All' and station != 'All':
             obj_list = obj_list.filter(assignTo__id=int(executive), partyGroupID__id=int(station))
-
         obj_list = obj_list.order_by('name')
         for obj in obj_list:
             try:
@@ -1699,16 +1400,12 @@ def list_party_by_executive_or_station_api(request):
             }
             o_list.append(obj_dic)
         cache.set(cache_key, o_list, timeout=60 * 15)
-
         return JsonResponse({'message': 'success', 'data': o_list}, safe=False)
     except:
         return JsonResponse({'message': 'error'}, safe=False)
-
-
 # ------------------------------Collection ----------------------------------------
 # ----------------------------- Party ---------------------
 @transaction.atomic
-@csrf_exempt
 def add_collection_by_staff_api(request):
     if request.method == 'POST':
         try:
@@ -1748,7 +1445,6 @@ def add_collection_by_staff_api(request):
                     obj.transferredPartyID_id = int(tParty.pk)
                 except:
                     pass
-
             obj.detail = detail
             obj.remark = remark
             obj.latitude = lat
@@ -1760,21 +1456,16 @@ def add_collection_by_staff_api(request):
                 obj.collectionAddress = "From Field"
             except:
                 pass
-
             obj.save()
             obj.paymentID = str(obj.pk).zfill(8)
             obj.collectionDateTime = obj.datetime
             obj.save()
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def add_collection_by_admin_api(request):
     if request.method == 'POST':
         try:
@@ -1850,7 +1541,6 @@ def add_collection_by_admin_api(request):
                     obj.transferredPartyID_id = int(tParty.pk)
                 except:
                     pass
-
             obj.detail = detail
             obj.remark = remark
             obj.latitude = lat
@@ -1860,9 +1550,7 @@ def add_collection_by_admin_api(request):
             if otp_required:
                 obj.otpVerified = True
                 obj.otpVerifiedOn = timezone.now()
-
             obj.collectionAddress = "From Shop."
-
             obj.save()
             obj.paymentID = str(obj.pk).zfill(8)
             # If user selected a date-only value, keep the entry time (not 12:00 AM).
@@ -1924,10 +1612,7 @@ def add_collection_by_admin_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def edit_collection_by_admin_api(request):
     if request.method == 'POST':
         try:
@@ -1949,7 +1634,6 @@ def edit_collection_by_admin_api(request):
                 return JsonResponse({'message': 'cheque_date_required'}, safe=False)
             # cus = Party.objects.select_related().get(pk=int(c[1]))
             cus = tenant_qs(request, Party).select_related().get(pk=int(party))
-
             obj = tenant_qs(request, Collection).get(pk=int(ID))
             if _can_review_collections(request.user):
                 obj.partyID_id = cus.pk
@@ -1997,18 +1681,14 @@ def edit_collection_by_admin_api(request):
             #     send_whatsapp_message(obj.partyID.phone, msg)
             # except:
             #     pass
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 class CollectionByStaffListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID.name', 'paidAmount', 'modeOfPayment', 'collectionDateTime', 'datetime',
                      'bankID.name', 'detail', 'transferredPartyID',
                      'remark',
                      ]
-
     def get_initial_queryset(self):
         # user = StaffUser.objects.get(user_ID__id = self.request.pk)
         # if 'Admin' in group_names:
@@ -2017,7 +1697,6 @@ class CollectionByStaffListJson(BaseDatatableView):
             collectionDateTime__date=datetime.today().date(),
             collectedBy__user_ID_id=self.request.user.pk
         )
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -2031,9 +1710,7 @@ class CollectionByStaffListJson(BaseDatatableView):
                 | Q(collectionDateTime__icontains=search) | Q(datetime__icontains=search) | Q(
                     collectionAddress__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -2065,14 +1742,9 @@ class CollectionByStaffListJson(BaseDatatableView):
                 escape(item.detail),
                 escape(tparty),
                 escape(item.remark),
-
                 action,
-
             ])
-
         return json_data
-
-
 class CollectionByAdminListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID.name', 'paidAmount', 'action', 'modeOfPayment', 'collectedBy.name',
                      'collectionDateTime', 'datetime',
@@ -2080,7 +1752,6 @@ class CollectionByAdminListJson(BaseDatatableView):
                      'transferredPartyID',
                      'collectionAddress', 'remark'
                      ]
-
     def get_initial_queryset(self):
         try:
             startDateV = self.request.GET.get("startDate")
@@ -2105,7 +1776,6 @@ class CollectionByAdminListJson(BaseDatatableView):
             if not _can_filter_all_collections(self.request.user):
                 return queryset.filter(collectedBy__user_ID_id=self.request.user.pk)
             return queryset
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -2121,14 +1791,11 @@ class CollectionByAdminListJson(BaseDatatableView):
                     collectedBy__name__icontains=search)
                 | Q(approvedBy__name__icontains=search) | Q(isApproved__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_auto_approve_collections(self.request.user):
-
                 action = '''<button  data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "showConfirmationModal('{}')" class="ui circular facebook icon button purple">
                    <i class="whatsapp icon"></i>
                   </button>
@@ -2185,7 +1852,6 @@ class CollectionByAdminListJson(BaseDatatableView):
                 isTallied = '''<div class="ui tiny red label" data-tooltip="Enable Tally" data-position="left center" data-variation="mini" style="cursor:pointer"  onclick = "confirmTallyModel('{}')">
                             No
                           </div>'''.format(item.pk)
-
             json_data.append([
                 escape(item.paymentID),
                 escape(item.partyID.name),
@@ -2204,19 +1870,14 @@ class CollectionByAdminListJson(BaseDatatableView):
                 escape(tparty),
                 escape(item.collectionAddress),
                 escape(item.remark),
-
             ])
-
         return json_data
-
-
 class ChequeReminderCollectionListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID.name', 'paidAmount', 'modeOfPayment', 'collectedBy.name',
                      'collectionDateTime', 'datetime',
                      'isApproved', 'approvedBy.name', 'bankID.name', 'detail', 'chequeDate', 'collectionAddress',
                      'remark'
                      ]
-
     def get_initial_queryset(self):
         try:
             startDateV = self.request.GET.get("startDate")
@@ -2224,7 +1885,6 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
             staffID = self.request.GET.get("staffID")
             sDate = datetime.strptime(startDateV, '%d/%m/%Y')
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
             queryset = _collection_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 chequeDate__range=[sDate.date(), eDate.date()],
@@ -2244,7 +1904,6 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
             if not _can_filter_all_collections(self.request.user):
                 return queryset.filter(collectedBy__user_ID_id=self.request.user.pk)
             return queryset
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -2259,14 +1918,11 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
                     collectedBy__name__icontains=search)
                 | Q(approvedBy__name__icontains=search) | Q(isApproved__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_auto_approve_collections(self.request.user):
-
                 action = '''<button  data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "showConfirmationModal('{}')" class="ui circular facebook icon button purple">
                    <i class="whatsapp icon"></i>
                   </button>
@@ -2311,7 +1967,6 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
                 isApproved = '''<div class="ui tiny red label">
                   No
                 </div>'''
-
             json_data.append([
                 escape(item.paymentID),
                 escape(item.partyID.name),
@@ -2328,14 +1983,9 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
                 escape(item.collectionAddress),
                 escape(item.remark),
                 action,
-
             ])
-
         return json_data
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_collection(request):
     if request.method == 'POST':
         try:
@@ -2348,10 +1998,7 @@ def delete_collection(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def approve_collection(request):
     if request.method == 'POST':
         try:
@@ -2369,7 +2016,6 @@ def approve_collection(request):
             try:
                 msg = "Sir, Your Payment has been received by {} Rs.{}/- on Dt.{} ag. Ref. No. {}, Kindly confirm the same. If you have any query Please feel free to contact on this no. 7005607770. Thanks, BSS".format(
                     obj.modeOfPayment, obj.paidAmount, str(obj.collectionDateTime.strftime('%d-%m-%Y')), obj.paymentID)
-
                 # send_whatsapp_message(obj.partyID.phone, msg)
                 try:
                     numbers = str(obj.partyID.phone).split('.')
@@ -2377,14 +2023,11 @@ def approve_collection(request):
                         send_message(n, msg, obj.partyID.name)
                 except:
                     send_message(obj.partyID.phone, msg, obj.partyID.name)
-
             except:
                 pass
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
 def change_password_api(request):
     if request.method == 'POST':
@@ -2400,13 +2043,9 @@ def change_password_api(request):
             if user is not None:
                 login(request, user)
                 return JsonResponse({'message': 'success'}, safe=False)
-
             return JsonResponse({'message': 'success'}, safe=False)
-
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @cache_page(60 * 5)
 def get_admin_dashboard_report_api(request):
     today = datetime.today().date()
@@ -2421,7 +2060,6 @@ def get_admin_dashboard_report_api(request):
         isDeleted=False,
         buildDate__exact=today
     ).aggregate(total=Sum('amount'))['total'] or 0.0
-
     data = {
         'partyCount': formatINR(party_count),
         'staffCount': staff_count,
@@ -2430,8 +2068,6 @@ def get_admin_dashboard_report_api(request):
         'Sale': formatINR(sales_total),
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 @cache_page(60 * 5)
 def get_staff_dashboard_report_api(request):
     today = datetime.today().date()
@@ -2439,14 +2075,12 @@ def get_staff_dashboard_report_api(request):
         user_ID_id=request.user.pk,
         isDeleted=False
     ).values_list('partyGroupID_id', flat=True).first()
-
     party_count = 0
     if user_party_group_id:
         party_count = tenant_qs(request, Party).filter(
             isDeleted=False,
             partyGroupID_id=user_party_group_id
         ).count()
-
     collection_stats = tenant_qs(request, Collection).filter(
         isDeleted=False,
         collectedBy__user_ID_id=request.user.pk
@@ -2455,7 +2089,6 @@ def get_staff_dashboard_report_api(request):
         today_amount=Sum('paidAmount', filter=Q(collectionDateTime__date=today)),
         today_count=Count('id', filter=Q(collectionDateTime__date=today)),
     )
-
     data = {
         'partyCount': formatINR(party_count),
         'collection_totalCount': collection_stats['today_count'] or 0,
@@ -2463,27 +2096,23 @@ def get_staff_dashboard_report_api(request):
         'collection': formatINR(collection_stats['today_amount'] or 0.0)
     }
     return JsonResponse({'data': data}, safe=False)
-
 @cache_page(60 * 5)
 def get_party_dashboard_report_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'forbidden'}, status=403)
     if not _has_any_permission(request.user, 'home.can_manage_parties', 'home.can_view_party_credentials'):
         return JsonResponse({'message': 'forbidden'}, status=403)
-
     today = datetime.today().date()
     thirty_days_ago = today - timedelta(days=30)
     parties = tenant_qs(request, Party).filter(isDeleted=False)
     party_groups = tenant_qs(request, PartyGroup).filter(isDeleted=False)
     staff_qs = tenant_qs(request, StaffUser).filter(isDeleted=False, user_ID_id=request.user.pk)
     staff = staff_qs.first()
-
     total_parties = parties.count()
     assigned_parties = parties.filter(assignTo__isnull=False).count()
     unassigned_parties = parties.filter(assignTo__isnull=True).count()
     recent_parties = parties.filter(datetime__date__gte=thirty_days_ago).count()
     my_assigned_parties = parties.filter(assignTo=staff).count() if staff else 0
-
     data = {
         'party_total_count': total_parties,
         'party_group_count': party_groups.count(),
@@ -2493,21 +2122,17 @@ def get_party_dashboard_report_api(request):
         'party_my_assigned_count': my_assigned_parties,
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 @cache_page(60 * 5)
 def get_bank_dashboard_report_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'forbidden'}, status=403)
     if not _has_any_permission(request.user, 'home.can_manage_parties', 'home.can_view_party_credentials'):
         return JsonResponse({'message': 'forbidden'}, status=403)
-
     banks = tenant_qs(request, Bank).filter(isDeleted=False)
     total_banks = banks.count()
     banks_with_account = banks.exclude(accountNumber__isnull=True).exclude(accountNumber__exact='').count()
     banks_missing_account = total_banks - banks_with_account
     banks_used = tenant_qs(request, Collection).filter(isDeleted=False, bankID__isnull=False).values('bankID').distinct().count()
-
     data = {
         'bank_total_count': total_banks,
         'bank_used_count': banks_used,
@@ -2515,17 +2140,13 @@ def get_bank_dashboard_report_api(request):
         'bank_missing_account_count': banks_missing_account,
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 def get_bank_balances_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'forbidden'}, status=403)
     # Bank balances are sensitive; restrict to admin/owner-style access.
     if not request.user.has_perm('home.can_view_party_credentials'):
         return JsonResponse({'message': 'forbidden'}, status=403)
-
     bank_required_modes = ['Online', 'Cheque', 'Cheque CC']
-
     banks = list(
         tenant_qs(request, Bank)
         .filter(isDeleted=False)
@@ -2533,7 +2154,6 @@ def get_bank_balances_api(request):
         .order_by('name')
     )
     totals_by_bank = {bank['id']: 0.0 for bank in banks}
-
     collection_totals = (
         tenant_qs(request, Collection)
         .filter(isDeleted=False, bankID__isnull=False, modeOfPayment__in=bank_required_modes)
@@ -2542,7 +2162,6 @@ def get_bank_balances_api(request):
     )
     for row in collection_totals:
         totals_by_bank[row['bankID']] = totals_by_bank.get(row['bankID'], 0.0) + float(row['total'] or 0.0)
-
     counter_collection_totals = (
         tenant_qs(request, CollectionCashCounter)
         .filter(isDeleted=False, bankID__isnull=False, modeOfPayment__in=bank_required_modes)
@@ -2551,7 +2170,6 @@ def get_bank_balances_api(request):
     )
     for row in counter_collection_totals:
         totals_by_bank[row['bankID']] = totals_by_bank.get(row['bankID'], 0.0) + float(row['total'] or 0.0)
-
     cash_counter_card_totals = (
         tenant_qs(request, CashCounter)
         .filter(isDeleted=False, bankID__isnull=False, mode='Card')
@@ -2560,7 +2178,6 @@ def get_bank_balances_api(request):
     )
     for row in cash_counter_card_totals:
         totals_by_bank[row['bankID']] = totals_by_bank.get(row['bankID'], 0.0) + float(row['total'] or 0.0)
-
     cash_counter_mix_totals = (
         tenant_qs(request, CashCounter)
         .filter(isDeleted=False, bankID__isnull=False, mode='Mix')
@@ -2569,7 +2186,6 @@ def get_bank_balances_api(request):
     )
     for row in cash_counter_mix_totals:
         totals_by_bank[row['bankID']] = totals_by_bank.get(row['bankID'], 0.0) + float(row['total'] or 0.0)
-
     data = []
     for bank in banks:
         data.append({
@@ -2578,10 +2194,7 @@ def get_bank_balances_api(request):
             'accountNumber': bank['accountNumber'] or '',
             'balance': totals_by_bank.get(bank['id'], 0.0),
         })
-
     return JsonResponse({'message': 'success', 'data': data}, safe=False)
-
-
 def _parse_books_date(value):
     if not value:
         return None
@@ -2589,31 +2202,24 @@ def _parse_books_date(value):
         return datetime.strptime(value, '%d/%m/%Y').date()
     except Exception:
         return None
-
-
 @transaction.atomic
-@csrf_exempt
 def add_book_manual_tx_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, safe=False)
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-
     account_id = request.POST.get('accountId')
     direction = request.POST.get('direction')
     amount = request.POST.get('amount')
     date = request.POST.get('date')
     narration = request.POST.get('narration', '')
     party_id = request.POST.get('partyId')
-
     if not account_id or not direction or not amount:
         return JsonResponse({'message': 'invalid'}, safe=False)
-
     try:
         account = tenant_qs(request, BookAccount).select_related('bank').get(pk=int(account_id), isDeleted=False)
     except Exception:
         return JsonResponse({'message': 'invalid_account'}, safe=False)
-
     # Permissions
     if account.type == BookAccount.Type.BANK:
         if not request.user.has_perm('home.can_view_party_credentials'):
@@ -2621,23 +2227,18 @@ def add_book_manual_tx_api(request):
     else:
         if not _has_any_permission(request.user, 'home.can_manage_cash_counter', 'home.can_view_party_credentials', 'home.can_manage_books'):
             return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
     try:
         amount_value = float(amount)
     except Exception:
         return JsonResponse({'message': 'invalid_amount'}, safe=False)
     if amount_value <= 0:
         return JsonResponse({'message': 'invalid_amount'}, safe=False)
-
     tx_date = _parse_books_date(date) or datetime.today().date()
     tx_datetime = datetime.combine(tx_date, datetime.now().time())
-
     party = None
     if party_id and party_id.isdigit():
         party = tenant_qs(request, Party).filter(isDeleted=False, pk=int(party_id)).first()
-
     staff_user = tenant_qs(request, StaffUser).filter(isDeleted=False, user_ID_id=request.user.pk).first()
-
     tx = BookTransaction()
     assign_tenant(tx, request)
     tx.account = account
@@ -2650,10 +2251,7 @@ def add_book_manual_tx_api(request):
     tx.source = BookTransaction.Source.MANUAL
     tx.save()
     return JsonResponse({'message': 'success'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def transfer_books_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, safe=False)
@@ -2661,13 +2259,11 @@ def transfer_books_api(request):
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
     if not request.user.has_perm('home.can_view_party_credentials') and not request.user.has_perm('home.can_manage_books'):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
     from_account_id = request.POST.get('fromAccountId')
     to_account_id = request.POST.get('toAccountId')
     amount = request.POST.get('amount')
     date = request.POST.get('date')
     note = request.POST.get('note', '')
-
     if not from_account_id or not to_account_id or not amount:
         return JsonResponse({'message': 'invalid'}, safe=False)
     try:
@@ -2683,12 +2279,10 @@ def transfer_books_api(request):
         return JsonResponse({'message': 'invalid_amount'}, safe=False)
     if amount_value <= 0:
         return JsonResponse({'message': 'invalid_amount'}, safe=False)
-
     tx_date = _parse_books_date(date) or datetime.today().date()
     tx_datetime = datetime.combine(tx_date, datetime.now().time())
     staff_user = tenant_qs(request, StaffUser).filter(isDeleted=False, user_ID_id=request.user.pk).first()
     transfer_id = get_random_string(20)
-
     out_tx = BookTransaction()
     assign_tenant(out_tx, request)
     out_tx.account = from_account
@@ -2700,7 +2294,6 @@ def transfer_books_api(request):
     out_tx.source = BookTransaction.Source.TRANSFER
     out_tx.transferId = transfer_id
     out_tx.save()
-
     in_tx = BookTransaction()
     assign_tenant(in_tx, request)
     in_tx.account = to_account
@@ -2712,12 +2305,8 @@ def transfer_books_api(request):
     in_tx.source = BookTransaction.Source.TRANSFER
     in_tx.transferId = transfer_id
     in_tx.save()
-
     return JsonResponse({'message': 'success'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def transfer_cash_to_bank_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, safe=False)
@@ -2725,7 +2314,6 @@ def transfer_cash_to_bank_api(request):
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
     if not request.user.has_perm('home.can_view_party_credentials') and not request.user.has_perm('home.can_manage_books'):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
     from_account_id = request.POST.get('fromAccountId')
     to_bank_id = request.POST.get('toBankId')
     if not to_bank_id:
@@ -2734,7 +2322,6 @@ def transfer_cash_to_bank_api(request):
         bank = tenant_qs(request, Bank).get(pk=int(to_bank_id), isDeleted=False)
     except Exception:
         return JsonResponse({'message': 'invalid_bank'}, safe=False)
-
     tenant = get_current_tenant(request)
     to_account = (
         BookAccount.objects
@@ -2748,7 +2335,6 @@ def transfer_cash_to_bank_api(request):
             bank=bank,
             name=f'{bank.name} - {bank.accountNumber}' if bank.accountNumber else bank.name,
         )
-
     from_account_id = request.POST.get('fromAccountId')
     amount = request.POST.get('amount')
     date = request.POST.get('date')
@@ -2759,19 +2345,16 @@ def transfer_cash_to_bank_api(request):
         from_account = tenant_qs(request, BookAccount).get(pk=int(from_account_id), isDeleted=False)
     except Exception:
         return JsonResponse({'message': 'invalid_account'}, safe=False)
-
     try:
         amount_value = float(amount)
     except Exception:
         return JsonResponse({'message': 'invalid_amount'}, safe=False)
     if amount_value <= 0:
         return JsonResponse({'message': 'invalid_amount'}, safe=False)
-
     tx_date = _parse_books_date(date) or datetime.today().date()
     tx_datetime = datetime.combine(tx_date, datetime.now().time())
     staff_user = tenant_qs(request, StaffUser).filter(isDeleted=False, user_ID_id=request.user.pk).first()
     transfer_id = get_random_string(20)
-
     out_tx = BookTransaction()
     assign_tenant(out_tx, request)
     out_tx.account = from_account
@@ -2783,7 +2366,6 @@ def transfer_cash_to_bank_api(request):
     out_tx.source = BookTransaction.Source.TRANSFER
     out_tx.transferId = transfer_id
     out_tx.save()
-
     in_tx = BookTransaction()
     assign_tenant(in_tx, request)
     in_tx.account = to_account
@@ -2795,25 +2377,19 @@ def transfer_cash_to_bank_api(request):
     in_tx.source = BookTransaction.Source.TRANSFER
     in_tx.transferId = transfer_id
     in_tx.save()
-
     return JsonResponse({'message': 'success'}, safe=False)
-
-
 def get_book_tx_detail_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
     tx_id = request.GET.get('id')
     if not tx_id or not tx_id.isdigit():
         return JsonResponse({'message': 'invalid'}, safe=False)
-
     tx = tenant_qs(request, BookTransaction).select_related('account', 'account__bank').filter(isDeleted=False, pk=int(tx_id)).first()
     if tx is None:
         return JsonResponse({'message': 'not_found'}, safe=False)
-
     # Bankbook transactions are admin-only.
     if tx.account.type == BookAccount.Type.BANK and not request.user.has_perm('home.can_view_party_credentials'):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
     return JsonResponse({
         'message': 'success',
         'data': {
@@ -2828,93 +2404,70 @@ def get_book_tx_detail_api(request):
             'transferId': tx.transferId or '',
         },
     }, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def edit_book_tx_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, safe=False)
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-
     tx_id = request.POST.get('id')
     if not tx_id or not tx_id.isdigit():
         return JsonResponse({'message': 'invalid'}, safe=False)
-
     tx = tenant_qs(request, BookTransaction).select_related('account').filter(isDeleted=False, pk=int(tx_id)).first()
     if tx is None:
         return JsonResponse({'message': 'not_found'}, safe=False)
-
     # Only manual entries are editable. Auto-synced rows must be edited at the source record.
     if tx.source != BookTransaction.Source.MANUAL:
         return JsonResponse({'message': 'edit_source'}, safe=False)
-
     if tx.account.type == BookAccount.Type.BANK and not request.user.has_perm('home.can_view_party_credentials'):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
     if tx.account.type == BookAccount.Type.CASH and not _has_any_permission(request.user, 'home.can_manage_cash_counter', 'home.can_view_party_credentials', 'home.can_manage_books'):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
     direction = request.POST.get('direction')
     amount = request.POST.get('amount')
     date = request.POST.get('date')
     narration = request.POST.get('narration', '')
-
     if direction not in (BookTransaction.Direction.IN, BookTransaction.Direction.OUT):
         return JsonResponse({'message': 'invalid_direction'}, safe=False)
-
     try:
         amount_value = float(amount)
     except Exception:
         return JsonResponse({'message': 'invalid_amount'}, safe=False)
     if amount_value <= 0:
         return JsonResponse({'message': 'invalid_amount'}, safe=False)
-
     tx_date = _parse_books_date(date) or tx.txDateTime.date()
     tx.txDateTime = datetime.combine(tx_date, tx.txDateTime.time())
     tx.direction = direction
     tx.amount = amount_value
     tx.narration = narration
     tx.save()
-
     return JsonResponse({'message': 'success'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_book_tx_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, safe=False)
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-
     tx_id = request.POST.get('id')
     if not tx_id or not tx_id.isdigit():
         return JsonResponse({'message': 'invalid'}, safe=False)
-
     tx = tenant_qs(request, BookTransaction).select_related('account').filter(isDeleted=False, pk=int(tx_id)).first()
     if tx is None:
         return JsonResponse({'message': 'not_found'}, safe=False)
-
     if tx.account.type == BookAccount.Type.BANK and not request.user.has_perm('home.can_view_party_credentials'):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
     if tx.account.type == BookAccount.Type.CASH and not _has_any_permission(request.user, 'home.can_manage_cash_counter', 'home.can_view_party_credentials', 'home.can_manage_books'):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
     # Only manual/transfer rows are deletable directly.
     if tx.source not in (BookTransaction.Source.MANUAL, BookTransaction.Source.TRANSFER):
         return JsonResponse({'message': 'delete_source'}, safe=False)
-
     if tx.source == BookTransaction.Source.TRANSFER and tx.transferId:
         tenant = get_current_tenant(request)
         BookTransaction.objects.filter(tenant=tenant, isDeleted=False, transferId=tx.transferId).update(isDeleted=True)
         return JsonResponse({'message': 'success'}, safe=False)
-
     tx.isDeleted = True
     tx.save()
     return JsonResponse({'message': 'success'}, safe=False)
-
-
 def _format_money_compact(value):
     try:
         val = float(value or 0.0)
@@ -2923,47 +2476,37 @@ def _format_money_compact(value):
     if abs(val - int(val)) < 1e-9:
         return formatINR(format(int(val), '.0f'))
     return formatINR(format(val, '.2f'))
-
-
 class BookTransactionListJson(BaseDatatableView):
     """
     Server-side DataTables list for BookTransaction.
     Uses a fixed chronological ordering so the running balance remains meaningful.
     """
-
     order_columns = ['txDateTime', 'narration', 'party__name', 'amount', 'amount', 'balance', 'source', 'id']
-
     def dispatch(self, request, *args, **kwargs):
         if not request.user.is_authenticated:
             return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
         return super().dispatch(request, *args, **kwargs)
-
     def _parse_date(self, value):
         return _parse_books_date(value)
-
     def _get_account(self):
         account_id = self.request.GET.get('accountId') or self.request.GET.get('account')
         if not account_id or not str(account_id).isdigit():
             return None
         return tenant_qs(self.request, BookAccount).filter(isDeleted=False, pk=int(account_id)).first()
-
     def _ensure_permitted(self, account):
         if account is None:
             return False
         if account.type == BookAccount.Type.BANK:
             return self.request.user.has_perm('home.can_view_party_credentials')
         return _has_any_permission(self.request.user, 'home.can_manage_cash_counter', 'home.can_view_party_credentials', 'home.can_manage_books')
-
     def get_initial_queryset(self):
         account = self._get_account()
         if not self._ensure_permitted(account):
             return BookTransaction.objects.none()
-
         start_date = self._parse_date(self.request.GET.get('startDate')) or datetime.today().date()
         end_date = self._parse_date(self.request.GET.get('endDate')) or start_date
         if end_date < start_date:
             start_date, end_date = end_date, start_date
-
         base_qs = tenant_qs(self.request, BookTransaction).filter(isDeleted=False, account=account)
         prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
             in_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.IN)),
@@ -2971,13 +2514,11 @@ class BookTransactionListJson(BaseDatatableView):
         )
         opening = float(account.openingBalance or 0.0) + float(prior['in_total'] or 0.0) - float(prior['out_total'] or 0.0)
         self._opening = opening
-
         qs = (
             base_qs
             .filter(txDateTime__date__range=[start_date, end_date])
             .select_related('party', 'account')
         )
-
         signed_amount = Case(
             When(direction=BookTransaction.Direction.IN, then=F('amount')),
             default=ExpressionWrapper(-F('amount'), output_field=FloatField()),
@@ -2985,7 +2526,6 @@ class BookTransactionListJson(BaseDatatableView):
         )
         running_delta = Window(expression=Sum(signed_amount), order_by=[F('txDateTime').asc(), F('id').asc()])
         balance_expr = ExpressionWrapper(Value(opening, output_field=FloatField()) + running_delta, output_field=FloatField())
-
         qs = qs.annotate(
             in_amount=Case(
                 When(direction=BookTransaction.Direction.IN, then=F('amount')),
@@ -3000,10 +2540,8 @@ class BookTransactionListJson(BaseDatatableView):
             balance=balance_expr,
         )
         return qs
-
     def ordering(self, qs):
         return qs.order_by('txDateTime', 'id')
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -3015,7 +2553,6 @@ class BookTransactionListJson(BaseDatatableView):
                 | Q(amount__icontains=search)
             )
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         can_manage = _has_any_permission(self.request.user, 'home.can_manage_cash_counter', 'home.can_view_party_credentials', 'home.can_manage_books')
@@ -3038,7 +2575,6 @@ class BookTransactionListJson(BaseDatatableView):
                   </button>'''
             else:
                 action = '''<div class="ui tiny label">Auto</div>'''
-
             party_name = item.party.name if item.party_id else '-'
             json_data.append([
                 escape(item.txDateTime.strftime('%d-%m-%Y %I:%M %p')),
@@ -3051,8 +2587,6 @@ class BookTransactionListJson(BaseDatatableView):
                 action,
             ])
         return json_data
-
-
 def _parse_ddmmyyyy_api(value, default=None):
     if not value:
         return default
@@ -3064,11 +2598,8 @@ def _parse_ddmmyyyy_api(value, default=None):
         return datetime.strptime(value, '%Y-%m-%d').date()
     except Exception:
         return default
-
-
 class PartyLedgerListJson(BaseDatatableView):
     order_columns = ['txDateTime', 'particulars', 'txDateTime', 'txDateTime']
-
     def _customer_visible_party_ledger_qs(self, qs):
         approved_collection_ids = tenant_qs(self.request, Collection).filter(
             isDeleted=False,
@@ -3083,34 +2614,27 @@ class PartyLedgerListJson(BaseDatatableView):
             (Q(source=PartyLedgerEntry.Source.COLLECTION) & Q(source_object_id__in=approved_collection_ids)) |
             (Q(source=PartyLedgerEntry.Source.COUNTER_COLLECTION) & Q(source_object_id__in=approved_counter_collection_ids))
         )
-
     def _resolve_party(self):
         party_id = self.request.GET.get('partyId')
         if not party_id or not str(party_id).isdigit():
             return None
-
         if self.request.user.has_perm('home.can_manage_parties') or self.request.user.has_perm('home.can_view_party_credentials'):
             return tenant_qs(self.request, Party).filter(isDeleted=False, pk=int(party_id)).only('id', 'openingBalance', 'name').first()
-
         # Party portal user can only view own ledger.
         return tenant_qs(self.request, Party).filter(isDeleted=False, userID_id=self.request.user.pk).only('id', 'openingBalance', 'name').first()
-
     def get_initial_queryset(self):
         party = self._resolve_party()
         if not party:
             return tenant_qs(self.request, PartyLedgerEntry).none()
-
         is_customer_view = TenantMembership.objects.filter(
             user=self.request.user,
             role=TenantMembership.Role.PARTY,
         ).exists()
-
         today = datetime.today().date()
         start_date = _parse_ddmmyyyy_api(self.request.GET.get('startDate'), today)
         end_date = _parse_ddmmyyyy_api(self.request.GET.get('endDate'), today)
         if end_date and start_date and end_date < start_date:
             start_date, end_date = end_date, start_date
-
         base_qs = tenant_qs(self.request, PartyLedgerEntry).filter(isDeleted=False, party=party)
         if is_customer_view:
             base_qs = self._customer_visible_party_ledger_qs(base_qs)
@@ -3120,7 +2644,6 @@ class PartyLedgerListJson(BaseDatatableView):
         )
         opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
         self._opening_balance = opening
-
         qs = base_qs.filter(txDateTime__date__range=[start_date, end_date])
         signed = ExpressionWrapper(F('debit') - F('credit'), output_field=FloatField())
         # Compute running totals in chronological order, but display latest-first.
@@ -3131,7 +2654,6 @@ class PartyLedgerListJson(BaseDatatableView):
                 order_by=[F('txDateTime').asc(), F('id').asc()],
             ),
         ).order_by('-txDateTime', '-id')
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -3141,10 +2663,8 @@ class PartyLedgerListJson(BaseDatatableView):
                 Q(source__icontains=search)
             )
         return qs
-
     def ordering(self, qs):
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         opening = float(getattr(self, '_opening_balance', 0.0) or 0.0)
@@ -3158,7 +2678,6 @@ class PartyLedgerListJson(BaseDatatableView):
             debit = float(item.debit or 0.0)
             credit = float(item.credit or 0.0)
             signed = debit - credit
-
             # Many legacy/admin flows save collection dates as date-only (00:00 time).
             # For display, prefer the record creation time in that case.
             time_dt = item.txDateTime
@@ -3172,7 +2691,6 @@ class PartyLedgerListJson(BaseDatatableView):
                     time_dt = item.datetime
             except Exception:
                 time_dt = item.txDateTime
-
             date_html = '<div class="pl-date">{}</div><div class="pl-time">{}</div>'.format(
                 escape(item.txDateTime.strftime('%d-%m-%Y')),
                 escape(time_dt.strftime('%I:%M %p')),
@@ -3187,12 +2705,10 @@ class PartyLedgerListJson(BaseDatatableView):
                 if particulars.startswith('Collection'):
                     particulars = 'Payment' + particulars[len('Collection'):]
                 particulars = particulars.replace('(Collection)', '(Payment)')
-
                 # Drop trailing remark chunks; reference is shown separately below.
                 if ' - ' in particulars:
                     parts = [p for p in particulars.split(' - ') if p]
                     particulars = parts[0] if parts else particulars
-
             ref = (item.reference or '').strip()
             ref_html = ''
             if is_customer_view:
@@ -3211,15 +2727,12 @@ class PartyLedgerListJson(BaseDatatableView):
                     if ref:
                         ref_label = 'Payment ID'
                         ref_value = ref
-
                 if ref_label and ref_value:
                     ref_html = '<div class="pl-ref"><span class="pl-ref-chip">{}</span><span class="pl-ref-val">{}</span></div>'.format(
                         escape(ref_label),
                         escape(ref_value),
                     )
-
             part_html = '<div class="pl-part">{}</div>{}'.format(escape(particulars), ref_html)
-
             if abs(signed) < 1e-9:
                 amt_html = '-'
             elif signed > 0:
@@ -3230,7 +2743,6 @@ class PartyLedgerListJson(BaseDatatableView):
                 amt_html = '<span class="pl-amt pl-amt-out"><span class="pl-chip pl-chip-cr">CR</span> ₹ {}</span>'.format(
                     formatINR(format(abs(signed), '.2f'))
                 )
-
             json_data.append([
                 date_html,
                 part_html,
@@ -3238,15 +2750,12 @@ class PartyLedgerListJson(BaseDatatableView):
                 formatINR(format(balance, '.2f')),
             ])
         return json_data
-
-
 @cache_page(60 * 5)
 def get_sales_dashboard_report_api(request):
     today = datetime.today().date()
     queryset = tenant_qs(request, Sales).filter(isDeleted=False)
     if not _can_filter_all_sales(request.user):
         queryset = queryset.filter(createdBy__user_ID_id=request.user.pk)
-
     today_qs = queryset.filter(buildDate=today)
     data = {
         'sales_today_total': formatINR(today_qs.aggregate(total=Sum('amount'))['total'] or 0.0),
@@ -3255,18 +2764,14 @@ def get_sales_dashboard_report_api(request):
         'sales_record_count': queryset.count(),
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 @cache_page(60 * 5)
 def get_orders_dashboard_report_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'forbidden'}, status=403)
-
     today = datetime.today().date()
     queryset = tenant_qs(request, Order).filter(isDeleted=False)
     if not _can_filter_all_orders(request.user):
         queryset = queryset.filter(createdBy__user_ID_id=request.user.pk)
-
     today_qs = queryset.filter(buildDate=today)
     data = {
         'orders_today_count': today_qs.count(),
@@ -3275,8 +2780,6 @@ def get_orders_dashboard_report_api(request):
         'orders_record_count': queryset.count(),
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 @cache_page(60 * 5)
 def get_attendance_dashboard_report_api(request):
     today = datetime.today().date()
@@ -3311,8 +2814,6 @@ def get_attendance_dashboard_report_api(request):
         'attendance_monthly_count': monthly_qs.count(),
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 def generate_collection_report(request):
     cDate = request.GET.get('cDate')
     staffID = request.GET.get('staffID')
@@ -3339,7 +2840,6 @@ def generate_collection_report(request):
         col = base_qs.filter(collectedBy__user_ID_id=request.user.pk).order_by('collectedBy__name')
         staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk).first()
         staffName = staff.name if staff else 'MyList'
-
     for a in col:
         if a.modeOfPayment == 'Cash':
             a_total_cash = a_total_cash + a.paidAmount
@@ -3362,18 +2862,13 @@ def generate_collection_report(request):
         'a_total_party': a_total_party,
         'total': a_total_cash + a_total_cheque + a_total_online + a_total_cheque_cc + a_total_party
     }
-
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/admin/collectionReportPDF.html", context)
-
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
     return response
-
-
 # ----------- attendance API----------------
 @transaction.atomic
-@csrf_exempt
 def add_attendance_api(request):
     if request.method == 'POST':
         try:
@@ -3383,7 +2878,6 @@ def add_attendance_api(request):
             lng = request.POST.get("lng")
             obj = tenant_qs(request, Attendance).get(datetime__date=datetime.today().date(),
                                          staffID__user_ID__id=request.user.pk)
-
             if stat == 'Login':
                 obj.isLogIn = True
                 obj.login_remark = remark
@@ -3405,24 +2899,19 @@ def add_attendance_api(request):
                 except:
                     pass
             obj.save()
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 class StaffAttendanceListJson(BaseDatatableView):
     order_columns = ['datetime', 'loginDateTime', 'login_location', 'login_remark', 'logoutDateTime', 'logout_location',
                      'logout_remark',
                      ]
-
     def get_initial_queryset(self):
         try:
             startDateV = self.request.GET.get("startDate")
             endDateV = self.request.GET.get("endDate")
             sDate = datetime.strptime(startDateV, '%d/%m/%Y')
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
             return _attendance_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 datetime__range=(sDate.date(), eDate.date() + timedelta(days=1)),
@@ -3434,7 +2923,6 @@ class StaffAttendanceListJson(BaseDatatableView):
                 datetime__date=datetime.today().date(),
                 staffID__user_ID__id=self.request.user.pk
             )
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -3444,9 +2932,7 @@ class StaffAttendanceListJson(BaseDatatableView):
                     logout_location__icontains=search)
                 | Q(datetime__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -3458,7 +2944,6 @@ class StaffAttendanceListJson(BaseDatatableView):
                 login_time = '-'
                 login_remark = '-'
                 login_location = '-'
-
             if item.isLogOut == True:
                 logout_time = item.logoutDateTime.strftime('%I:%M %p')
                 logout_remark = item.logout_remark
@@ -3467,7 +2952,6 @@ class StaffAttendanceListJson(BaseDatatableView):
                 logout_time = '-'
                 logout_remark = '-'
                 logout_location = '-'
-
             json_data.append([
                 escape(item.datetime.strftime('%d-%m-%Y')),
                 login_time,
@@ -3476,17 +2960,12 @@ class StaffAttendanceListJson(BaseDatatableView):
                 logout_time,
                 logout_location,
                 logout_remark
-
             ])
-
         return json_data
-
-
 class AdminAttendanceListJson(BaseDatatableView):
     order_columns = ['datetime', 'staffID.name', 'loginDateTime', 'logoutDateTime', 'login_location', 'login_remark',
                      'logout_location', 'logout_remark',
                      ]
-
     def get_initial_queryset(self):
         try:
             startDateV = self.request.GET.get("startDate")
@@ -3495,26 +2974,21 @@ class AdminAttendanceListJson(BaseDatatableView):
             sDate = datetime.strptime(startDateV, '%d/%m/%Y')
             eDate = datetime.strptime(endDateV, '%d/%m/%Y')
             if staffID == 'All':
-
                 return _attendance_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     datetime__range=(sDate.date(), eDate.date() + timedelta(days=1))
                 )
-
             else:
-
                 return _attendance_list_base_qs(self.request).filter(
                     isDeleted__exact=False,
                     datetime__range=(sDate.date(), eDate.date() + timedelta(days=1)),
                     staffID_id=int(staffID)
                 )
-
         except:
             return _attendance_list_base_qs(self.request).filter(
                 isDeleted__exact=False,
                 datetime__date=datetime.today().date()
             )
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -3524,9 +2998,7 @@ class AdminAttendanceListJson(BaseDatatableView):
                     logout_location__icontains=search)
                 | Q(datetime__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -3538,7 +3010,6 @@ class AdminAttendanceListJson(BaseDatatableView):
                 login_time = '-'
                 login_remark = '-'
                 login_location = '-'
-
             if item.isLogOut == True:
                 logout_time = item.logoutDateTime.strftime('%I:%M %p')
                 logout_remark = item.logout_remark
@@ -3547,7 +3018,6 @@ class AdminAttendanceListJson(BaseDatatableView):
                 logout_time = '-'
                 logout_remark = '-'
                 logout_location = '-'
-
             json_data.append([
                 escape(item.datetime.strftime('%d-%m-%Y')),
                 escape(item.staffID.name),
@@ -3555,42 +3025,31 @@ class AdminAttendanceListJson(BaseDatatableView):
                 logout_time,
                 login_location,
                 login_remark,
-
                 logout_location,
                 logout_remark
-
             ])
-
         return json_data
-
-
 def generate_attendance_pdf_staff_report(request):
     cDate = request.GET.get('cDate')
     eDate = request.GET.get('eDate')
     startDate = datetime.strptime(cDate, '%d/%m/%Y')
     endDate = datetime.strptime(eDate, '%d/%m/%Y')
-
     col = tenant_qs(request, Attendance).select_related().filter(datetime__range=(
         startDate.date(), endDate.date() + timedelta(days=1)),
         isDeleted__exact=False, staffID__user_ID_id__exact=request.user.pk).order_by(
         'datetime')
     user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
-
     context = {
         'startDate': startDate,
         'endDate': endDate,
         'col': col,
         'staffName': user.name,
     }
-
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/report/staffAttendanceReportPDF.html", context)
-
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
     return response
-
-
 def generate_attendance_pdf_admin_report(request):
     cDate = request.GET.get('cDate')
     eDate = request.GET.get('eDate')
@@ -3606,46 +3065,35 @@ def generate_attendance_pdf_admin_report(request):
         col = tenant_qs(request, Attendance).select_related().filter(datetime__range=(
             startDate.date(), endDate.date() + timedelta(days=1)),
             isDeleted__exact=False, staffID_id=int(staffID)).order_by('datetime')
-
         user = tenant_qs(request, StaffUser).get(id=int(staffID))
         staffName = user.name
-
     context = {
         'startDate': startDate,
         'endDate': endDate,
         'col': col,
         'staffName': staffName,
     }
-
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/report/adminAttendanceReportPDF.html", context)
-
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
     return response
-
-
 # -------------------Message List---------------
 class MessageListJson(BaseDatatableView):
     order_columns = ['messageTo', 'phone', 'message', 'datetime', 'status']
-
     def get_initial_queryset(self):
         # if 'Admin' in group_names:
         return tenant_qs(self.request, WhatsappMessageStatus).filter(isDeleted__exact=False).only(
             'id', 'messageTo', 'phone', 'message', 'datetime', 'status'
         )
-
     def filter_queryset(self, qs):
-
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
                 Q(messageTo__icontains=search) | Q(phone__icontains=search) | Q(message__icontains=search)
                 | Q(status__icontains=search) | Q(datetime__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -3657,24 +3105,16 @@ class MessageListJson(BaseDatatableView):
                 status = '''<a class="ui tiny red label" onclick="ResendMsg('{}')">
                              Fail
                            </a>'''.format(item.pk)
-
             json_data.append([
                 escape(item.messageTo),
                 escape(item.phone),
                 escape(item.message),
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 status,
-
             ])
-
         return json_data
-
-
 # ----------------------Orders-----------------
-
-
 @transaction.atomic
-@csrf_exempt
 def add_order_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, status=405, safe=False)
@@ -3690,7 +3130,6 @@ def add_order_api(request):
         lat = request.POST.get('lat')
         lng = request.POST.get('lng')
         loc = request.POST.get('loc')
-
         obj = Order()
         assign_tenant(obj, request)
         obj.orderText = order_text
@@ -3707,7 +3146,6 @@ def add_order_api(request):
             obj.longitude = lng
         if loc and loc != 'N/A':
             obj.location = loc
-
         staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk, isDeleted=False).only('id').first()
         if staff:
             obj.createdBy_id = staff.pk
@@ -3717,20 +3155,15 @@ def add_order_api(request):
         # Auto-generate order number like Sales.paymentID.
         obj.orderNumber = _format_order_number(obj.pk)
         obj.save(update_fields=['orderNumber', 'lastUpdatedOn'])
-
         for f in request.FILES.getlist('images'):
             att = OrderAttachment(order=obj)
             assign_tenant(att, request)
             att.image = f
             att.save()
-
         return JsonResponse({'message': 'success', 'order_id': obj.pk}, safe=False)
     except Exception:
         return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def update_order_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, status=405, safe=False)
@@ -3741,7 +3174,6 @@ def update_order_api(request):
         obj = tenant_qs(request, Order).select_related('createdBy').get(pk=int(order_id))
         if not _can_edit_order_record(request.user, obj):
             return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
         build_date = request.POST.get('buildDate')
         party_id = request.POST.get('party')
         order_text = request.POST.get('orderText')
@@ -3750,7 +3182,6 @@ def update_order_api(request):
         lat = request.POST.get('lat')
         lng = request.POST.get('lng')
         loc = request.POST.get('loc')
-
         if order_text is not None:
             obj.orderText = order_text
         if remark is not None:
@@ -3768,20 +3199,15 @@ def update_order_api(request):
         if loc is not None and loc != 'N/A':
             obj.location = loc
         obj.save()
-
         for f in request.FILES.getlist('images'):
             att = OrderAttachment(order=obj)
             assign_tenant(att, request)
             att.image = f
             att.save()
-
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception:
         return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_order(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, status=405, safe=False)
@@ -3797,10 +3223,7 @@ def delete_order(request):
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception:
         return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def approve_order(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, status=405, safe=False)
@@ -3820,10 +3243,7 @@ def approve_order(request):
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception:
         return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_order_attachment(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error'}, status=405, safe=False)
@@ -3839,8 +3259,6 @@ def delete_order_attachment(request):
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception:
         return JsonResponse({'message': 'error'}, safe=False)
-
-
 class OrdersByAdminListJson(BaseDatatableView):
     # Must match the number of columns returned in prepare_results.
     order_columns = [
@@ -3849,7 +3267,6 @@ class OrdersByAdminListJson(BaseDatatableView):
         'createdBy__name', 'lastUpdatedOn', 'datetime',
         'id', 'id'
     ]
-
     def get_initial_queryset(self):
         queryset = _orders_list_base_qs(self.request).filter(isDeleted=False)
         if not _can_filter_all_orders(self.request.user):
@@ -3867,7 +3284,6 @@ class OrdersByAdminListJson(BaseDatatableView):
             return queryset
         except Exception:
             return queryset
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -3878,7 +3294,6 @@ class OrdersByAdminListJson(BaseDatatableView):
                 | Q(remark__icontains=search)
             )
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         can_approve = _can_approve_orders(self.request.user)
@@ -3907,14 +3322,12 @@ class OrdersByAdminListJson(BaseDatatableView):
                     '''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk)
                 )
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
-
             party = item.partyID.name if getattr(item, 'partyID', None) else '-'
             created_by = item.createdBy.name if getattr(item, 'createdBy', None) else '-'
             approved_by = item.approvedBy.name if getattr(item, 'approvedBy', None) else '-'
             approved_on = item.approvedOn.strftime('%d-%m-%Y %I:%M %p') if getattr(item, 'approvedOn', None) else '-'
             status_label = '<div class="ui tiny green label">Approved</div>' if approved else '<div class="ui tiny orange label">Pending</div>'
             att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
-
             json_data.append([
                 escape(item.orderNumber or str(item.pk)),
                 escape(party),
@@ -3929,15 +3342,12 @@ class OrdersByAdminListJson(BaseDatatableView):
                 action,
             ])
         return json_data
-
-
 class OrdersByStaffListJson(BaseDatatableView):
     # Must match the number of columns returned in prepare_results.
     order_columns = [
         'orderNumber', 'partyID__name', 'buildDate', 'status',
         'lastUpdatedOn', 'datetime', 'id', 'id'
     ]
-
     def get_initial_queryset(self):
         queryset = _orders_list_base_qs(self.request).filter(isDeleted=False)
         if not _can_filter_all_orders(self.request.user):
@@ -3952,7 +3362,6 @@ class OrdersByStaffListJson(BaseDatatableView):
             return queryset
         except Exception:
             return queryset
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -3963,7 +3372,6 @@ class OrdersByStaffListJson(BaseDatatableView):
                 | Q(remark__icontains=search)
             )
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         can_edit = _can_edit_order(self.request.user)
@@ -3986,11 +3394,9 @@ class OrdersByStaffListJson(BaseDatatableView):
                     '''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk)
                 )
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
-
             party = item.partyID.name if getattr(item, 'partyID', None) else '-'
             status_label = '<div class="ui tiny green label">Approved</div>' if approved else '<div class="ui tiny orange label">Pending</div>'
             att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
-
             json_data.append([
                 escape(item.orderNumber or str(item.pk)),
                 escape(party),
@@ -4002,18 +3408,14 @@ class OrdersByStaffListJson(BaseDatatableView):
                 action,
             ])
         return json_data
-
-
 def generate_order_pdf(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
     if not _has_any_permission(request.user, 'home.view_order', 'home.can_manage_orders', 'home.can_view_party_credentials'):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
     order_id = request.GET.get('id')
     if not order_id:
         return JsonResponse({'message': 'error'}, status=400, safe=False)
-
     order = get_object_or_404(
         tenant_qs(request, Order).select_related('partyID', 'createdBy', 'approvedBy'),
         pk=int(order_id),
@@ -4022,7 +3424,6 @@ def generate_order_pdf(request):
     if not _can_filter_all_orders(request.user):
         if getattr(order.createdBy, 'user_ID_id', None) != request.user.pk:
             return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
     attachments = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order=order).order_by('id')
     location = order.location or ('{},{}'.format(order.latitude, order.longitude) if order.latitude and order.longitude else '-')
     context = {
@@ -4030,22 +3431,15 @@ def generate_order_pdf(request):
         'attachments': attachments,
         'location': location,
     }
-
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = f"attachment; filename=order-{order.orderNumber or order.pk}.pdf"
     html = render_to_string("home/orders/orderPDF.html", context)
-
     # base_url allows WeasyPrint to resolve media/static URLs.
     base_url = request.build_absolute_uri('/')
     HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 1cm; }')])
     return response
-
-
 # ----------------------Sales-----------------
-
-
 @transaction.atomic
-@csrf_exempt
 def add_sales_by_admin_api(request):
     if request.method == 'POST':
         try:
@@ -4081,18 +3475,14 @@ def add_sales_by_admin_api(request):
             #         send_message(obj.partyID.phone, msg, obj.partyID.name)
             # except:
             #     pass
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 class SalesByAdminListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID.name', 'invoiceNumber', 'amount', 'action', 'buildDate', 'createdBy.name',
                      'isApproved', 'approvedBy.name',
                      'datetime', 'remark'
                      ]
-
     def get_initial_queryset(self):
         queryset = _sales_list_base_qs(self.request).filter(isDeleted__exact=False)
         if not _can_filter_all_sales(self.request.user):
@@ -4109,7 +3499,6 @@ class SalesByAdminListJson(BaseDatatableView):
             return queryset
         except:
             return queryset.filter(buildDate__exact=datetime.today().date())
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -4119,11 +3508,8 @@ class SalesByAdminListJson(BaseDatatableView):
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search) | Q(buildDate__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -4135,12 +3521,10 @@ class SalesByAdminListJson(BaseDatatableView):
             if _can_delete_sales(self.request.user):
                 action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
-
             try:
                 createdBy = item.createdBy.name
             except:
                 createdBy = '-'
-
             try:
                 approvedBy = item.approvedBy.name
             except:
@@ -4153,7 +3537,6 @@ class SalesByAdminListJson(BaseDatatableView):
                 isApproved = '''<div class="ui tiny red label">
                              No
                            </div>'''
-
             json_data.append([
                 escape(item.paymentID),
                 escape(item.partyID.name),
@@ -4166,17 +3549,12 @@ class SalesByAdminListJson(BaseDatatableView):
                 approvedBy,
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.remark),
-
             ])
-
         return json_data
-
-
 class SalesByStaffListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID.name', 'invoiceNumber', 'amount', 'buildDate', 'createdBy.name',
                      'datetime', 'remark'
                      ]
-
     def get_initial_queryset(self):
         queryset = _sales_list_base_qs(self.request).filter(isDeleted__exact=False)
         if not _can_filter_all_sales(self.request.user):
@@ -4193,13 +3571,11 @@ class SalesByStaffListJson(BaseDatatableView):
             return queryset
         except:
             return queryset.filter(buildDate__exact=datetime.today().date())
-
     #
     # else:
     #
     #     return Sales.objects.select_related().filter(isDeleted__exact=False,
     #                                                       buildDate__exact=datetime.today().date(), createdBy__user_ID_id=self.request.user.pk)
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -4209,11 +3585,8 @@ class SalesByStaffListJson(BaseDatatableView):
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search) | Q(buildDate__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
@@ -4229,12 +3602,10 @@ class SalesByStaffListJson(BaseDatatableView):
             if _can_delete_sales(self.request.user):
                 action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
-
             try:
                 createdBy = item.createdBy.name
             except:
                 createdBy = '-'
-
             json_data.append([
                 escape(item.paymentID),
                 escape(item.partyID.name),
@@ -4245,12 +3616,8 @@ class SalesByStaffListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.remark),
                 action,
-
             ])
-
         return json_data
-
-
 def generate_sales_report(request):
     cDate = request.GET.get('cDate')
     staffID = request.GET.get('staffID')
@@ -4271,28 +3638,20 @@ def generate_sales_report(request):
             'createdBy__name')
         user = tenant_qs(request, StaffUser).get(pk=int(staffID))
         staffName = user.name + ' - ' + user.partyGroupID.name
-
     for a in col:
         a_total = a_total + a.amount
-
     context = {
         'date': colDate,
         'col': col,
         'staffName': staffName,
         'total': a_total,
-
     }
-
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/report/salesReportPDF.html", context)
-
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
     return response
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_sales(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -4308,10 +3667,7 @@ def delete_sales(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def update_sales_by_admin_api(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -4329,10 +3685,8 @@ def update_sales_by_admin_api(request):
             # cus = Party.objects.select_related().get(pk=int(c[1]))
             cus = tenant_qs(request, Party).select_related().get(pk=int(party))
             obj = tenant_qs(request, Sales).get(pk=int(ID))
-
             if not _can_edit_sales_record(request.user, obj):
                 return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-
             obj.partyID_id = cus.pk
             obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
             obj.amount = float(amount)
@@ -4340,14 +3694,10 @@ def update_sales_by_admin_api(request):
             obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y')
             obj.save()
             sync_party_ledger_entries_for_object(obj)
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def send_message_sales(request):
     if request.method == 'POST':
         if not request.user.is_authenticated:
@@ -4365,7 +3715,6 @@ def send_message_sales(request):
             try:
                 msg = "Your order has been dispatched Ag. Bill No. {} Dt. {} Amt. Rs. {}, Please confirm received the material. If you have any queries about your order, Please feel free contact on this no 7005607770. Thanks, BSS".format(
                     obj.invoiceNumber, obj.buildDate.strftime('%d-%m-%Y'), obj.amount)
-
                 # send_whatsapp_message(obj.partyID.phone, msg)
                 try:
                     numbers = str(obj.partyID.phone).split('.')
@@ -4373,16 +3722,12 @@ def send_message_sales(request):
                         send_message(n, msg, obj.partyID.name)
                 except:
                     send_message(obj.partyID.phone, msg, obj.partyID.name)
-
             except:
                 pass
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def re_send_message_sales(request):
     if request.method == 'POST':
         try:
@@ -4402,12 +3747,10 @@ def re_send_message_sales(request):
                         #     msg.save()
                         #     obj.save()
                         #     return JsonResponse({'message': 'success'}, safe=False)
-
                         # else:
                         obj.status = 'Fail'
                         obj.save()
                         return JsonResponse({'message': 'error'}, safe=False)
-
                     except:
                         obj.status = 'Fail'
                         obj.save()
@@ -4417,10 +3760,7 @@ def re_send_message_sales(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def enable_tally_post_api(request):
     if request.method == 'POST':
         try:
@@ -4434,11 +3774,8 @@ def enable_tally_post_api(request):
                 return JsonResponse({'message': 'error'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 # cash counter api
 @transaction.atomic
-@csrf_exempt
 def add_cash_counter_entry_api(request):
     if request.method == 'POST':
         try:
@@ -4483,13 +3820,10 @@ def add_cash_counter_entry_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 class CashCounterByStaffListJson(BaseDatatableView):
     order_columns = ['counterID', 'invoiceNumber', 'amount', 'createdBy.name',
                      'datetime', 'remark'
                      ]
-
     def get_initial_queryset(self):
         if _can_filter_all_cash_counter(self.request.user):
             try:
@@ -4497,12 +3831,10 @@ class CashCounterByStaffListJson(BaseDatatableView):
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Cash")
-
             except:
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
@@ -4512,7 +3844,6 @@ class CashCounterByStaffListJson(BaseDatatableView):
                                                                datetime__date=datetime.today().date(),
                                                                createdBy__user_ID_id=self.request.user.pk,
                                                                mode__iexact="Cash")
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -4522,16 +3853,12 @@ class CashCounterByStaffListJson(BaseDatatableView):
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_manage_cash_counter_records(self.request.user):
-
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                 <i class="pen icon"></i>
@@ -4543,12 +3870,10 @@ class CashCounterByStaffListJson(BaseDatatableView):
                 action = '''<div class="ui tiny label">
               Denied
             </div>'''
-
             try:
                 createdBy = item.createdBy.name
             except:
                 createdBy = '-'
-
             json_data.append([
                 escape(item.counterID),
                 escape(item.invoiceNumber),
@@ -4557,17 +3882,12 @@ class CashCounterByStaffListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.remark),
                 action,
-
             ])
-
         return json_data
-
-
 class CardCounterByStaffListJson(BaseDatatableView):
     order_columns = ['counterID', 'invoiceNumber', 'amount', 'createdBy.name',
                      'datetime', 'remark'
                      ]
-
     def get_initial_queryset(self):
         if _can_filter_all_cash_counter(self.request.user):
             try:
@@ -4575,23 +3895,19 @@ class CardCounterByStaffListJson(BaseDatatableView):
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Card")
-
             except:
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
                                                                    mode__iexact="Card")
-
         else:
             return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Card",
                                                                createdBy__user_ID_id=self.request.user.pk)
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -4601,16 +3917,12 @@ class CardCounterByStaffListJson(BaseDatatableView):
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_manage_cash_counter_records(self.request.user):
-
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                 <i class="pen icon"></i>
@@ -4622,7 +3934,6 @@ class CardCounterByStaffListJson(BaseDatatableView):
                 action = '''<div class="ui tiny label">
               Denied
             </div>'''
-
             try:
                 createdBy = item.createdBy.name
             except:
@@ -4632,7 +3943,6 @@ class CardCounterByStaffListJson(BaseDatatableView):
                     item.remark)
             except:
                 remark = escape(item.remark)
-
             json_data.append([
                 escape(item.counterID),
                 escape(item.invoiceNumber),
@@ -4641,17 +3951,12 @@ class CardCounterByStaffListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 remark,
                 action,
-
             ])
-
         return json_data
-
-
 class ReturnCounterByStaffListJson(BaseDatatableView):
     order_columns = ['counterID', 'invoiceNumber', 'amount', 'createdBy.name',
                      'datetime', 'remark'
                      ]
-
     def get_initial_queryset(self):
         if _can_filter_all_cash_counter(self.request.user):
             try:
@@ -4659,12 +3964,10 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Return")
-
             except:
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
@@ -4674,7 +3977,6 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Return",
                                                                createdBy__user_ID_id=self.request.user.pk)
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -4684,16 +3986,12 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_manage_cash_counter_records(self.request.user):
-
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                 <i class="pen icon"></i>
@@ -4705,12 +4003,10 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
                 action = '''<div class="ui tiny label">
               Denied
             </div>'''
-
             try:
                 createdBy = item.createdBy.name
             except:
                 createdBy = '-'
-
             json_data.append([
                 escape(item.counterID),
                 escape(item.invoiceNumber),
@@ -4719,17 +4015,12 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.remark),
                 action,
-
             ])
-
         return json_data
-
-
 class CreditCounterByStaffListJson(BaseDatatableView):
     order_columns = ['counterID', 'partyID.name', 'invoiceNumber', 'amount', 'createdBy.name',
                      'datetime', 'remark'
                      ]
-
     def get_initial_queryset(self):
         if _can_filter_all_cash_counter(self.request.user):
             try:
@@ -4737,12 +4028,10 @@ class CreditCounterByStaffListJson(BaseDatatableView):
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Credit")
-
             except:
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
@@ -4752,7 +4041,6 @@ class CreditCounterByStaffListJson(BaseDatatableView):
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Credit",
                                                                createdBy__user_ID_id=self.request.user.pk)
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -4763,16 +4051,12 @@ class CreditCounterByStaffListJson(BaseDatatableView):
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_manage_cash_counter_records(self.request.user):
-
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                 <i class="pen icon"></i>
@@ -4784,7 +4068,6 @@ class CreditCounterByStaffListJson(BaseDatatableView):
                 action = '''<div class="ui tiny label">
               Denied
             </div>'''
-
             try:
                 createdBy = item.createdBy.name
             except:
@@ -4793,7 +4076,6 @@ class CreditCounterByStaffListJson(BaseDatatableView):
                 party = item.partyID.name
             except:
                 party = 'N/A'
-
             json_data.append([
                 escape(item.counterID),
                 escape(party),
@@ -4803,17 +4085,12 @@ class CreditCounterByStaffListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.remark),
                 action,
-
             ])
-
         return json_data
-
-
 class MixCounterByStaffListJson(BaseDatatableView):
     order_columns = ['counterID', 'invoiceNumber', 'mixCashAmount', 'mixCardAmount', 'createdBy.name',
                      'datetime', 'remark'
                      ]
-
     def get_initial_queryset(self):
         if _can_filter_all_cash_counter(self.request.user):
             try:
@@ -4821,12 +4098,10 @@ class MixCounterByStaffListJson(BaseDatatableView):
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Mix")
-
             except:
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
@@ -4837,7 +4112,6 @@ class MixCounterByStaffListJson(BaseDatatableView):
                                                                datetime__date=datetime.today().date(),
                                                                createdBy__user_ID_id=self.request.user.pk,
                                                                mode__iexact="Mix")
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -4848,16 +4122,12 @@ class MixCounterByStaffListJson(BaseDatatableView):
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_manage_cash_counter_records(self.request.user):
-
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                 <i class="pen icon"></i>
@@ -4869,7 +4139,6 @@ class MixCounterByStaffListJson(BaseDatatableView):
                 action = '''<div class="ui tiny label">
               Denied
             </div>'''
-
             try:
                 createdBy = item.createdBy.name
             except:
@@ -4888,17 +4157,12 @@ class MixCounterByStaffListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 remark,
                 action,
-
             ])
-
         return json_data
-
-
 class CollectionCounterByStaffListJson(BaseDatatableView):
     order_columns = ['counterID', 'partyID.name', 'amount', 'createdBy.name',
                      'datetime', 'remark'
                      ]
-
     def get_initial_queryset(self):
         if _can_filter_all_cash_counter(self.request.user):
             try:
@@ -4906,12 +4170,10 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Collection")
-
             except:
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
@@ -4921,7 +4183,6 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Collection",
                                                                createdBy__user_ID_id=self.request.user.pk)
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -4931,16 +4192,12 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
                     amount__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_manage_cash_counter_records(self.request.user):
-
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                 <i class="pen icon"></i>
@@ -4952,7 +4209,6 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
                 action = '''<div class="ui tiny label">
               Denied
             </div>'''
-
             try:
                 createdBy = item.createdBy.name
             except:
@@ -4961,7 +4217,6 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
                 party = item.partyID.name
             except:
                 party = 'N/A'
-
             json_data.append([
                 escape(item.counterID),
                 escape(party),
@@ -4970,17 +4225,12 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.remark),
                 action,
-
             ])
-
         return json_data
-
-
 class AdvanceCounterByStaffListJson(BaseDatatableView):
     order_columns = ['counterID', 'partyID.name', 'amount', 'createdBy.name',
                      'datetime', 'remark'
                      ]
-
     def get_initial_queryset(self):
         if _can_filter_all_cash_counter(self.request.user):
             try:
@@ -4988,12 +4238,10 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Advance")
-
             except:
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
@@ -5003,7 +4251,6 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Advance",
                                                                createdBy__user_ID_id=self.request.user.pk)
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -5013,16 +4260,12 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
                     amount__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_manage_cash_counter_records(self.request.user):
-
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                 <i class="pen icon"></i>
@@ -5034,7 +4277,6 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
                 action = '''<div class="ui tiny label">
               Denied
             </div>'''
-
             try:
                 createdBy = item.createdBy.name
             except:
@@ -5043,7 +4285,6 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
                 party = item.partyID.name
             except:
                 party = 'N/A'
-
             json_data.append([
                 escape(item.counterID),
                 escape(party),
@@ -5052,17 +4293,12 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.remark),
                 action,
-
             ])
-
         return json_data
-
-
 class ExpenseCounterByStaffListJson(BaseDatatableView):
     order_columns = ['counterID', 'remark', 'amount', 'createdBy.name',
                      'datetime'
                      ]
-
     def get_initial_queryset(self):
         if _can_filter_all_cash_counter(self.request.user):
             try:
@@ -5070,12 +4306,10 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__range=[sDate.date(),
                                                                                     eDate.date() + timedelta(days=1)],
                                                                    mode__iexact="Expense")
-
             except:
                 return _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                    datetime__date=datetime.today().date(),
@@ -5085,7 +4319,6 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
                                                                datetime__date=datetime.today().date(),
                                                                mode__iexact="Expense",
                                                                createdBy__user_ID_id=self.request.user.pk)
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -5094,16 +4327,12 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
                     amount__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search)
                 | Q(datetime__icontains=search)
-
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_manage_cash_counter_records(self.request.user):
-
                 action = '''
               <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                 <i class="pen icon"></i>
@@ -5115,12 +4344,10 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
                 action = '''<div class="ui tiny label">
               Denied
             </div>'''
-
             try:
                 createdBy = item.createdBy.name
             except:
                 createdBy = '-'
-
             json_data.append([
                 escape(item.counterID),
                 escape(item.expenseType) + ' - ' + escape(item.remark),
@@ -5128,12 +4355,8 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
                 createdBy,
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 action,
-
             ])
-
         return json_data
-
-
 @cache_page(60 * 30)
 def get_cash_counter_dashboard_report_api(request):
     today = datetime.today().date()
@@ -5165,8 +4388,6 @@ def get_cash_counter_dashboard_report_api(request):
         'mix_card_total': formatINR(totals['mix_card_total'] or 0.0)
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 @cache_page(60 * 30)
 def get_cash_counter_dashboard_report_admin_api(request):
     today = datetime.today().date()
@@ -5196,10 +4417,7 @@ def get_cash_counter_dashboard_report_admin_api(request):
         'mix_card_total': formatINR(totals['mix_card_total'] or 0.0)
     }
     return JsonResponse({'data': data}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def delete_cash_counter(request):
     if request.method == 'POST':
         try:
@@ -5211,7 +4429,6 @@ def delete_cash_counter(request):
                 id = id
                 obj = tenant_qs(request, CashCounter).get(pk=int(id))
             # Output: 56
-
             obj.isDeleted = True
             obj.save()
             sync_book_transactions(obj)
@@ -5219,10 +4436,7 @@ def delete_cash_counter(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 @transaction.atomic
-@csrf_exempt
 def update_cash_counter_by_admin_api(request):
     if request.method == 'POST':
         try:
@@ -5253,7 +4467,6 @@ def update_cash_counter_by_admin_api(request):
                 obj.expenseType = expenseType
             if mode == "Card" or mode == "Mix":
                 obj.bankID_id = int(bank)
-
             obj.mode = mode
             obj.remark = remark
             obj.entryDate = datetime.now()
@@ -5265,8 +4478,6 @@ def update_cash_counter_by_admin_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 def generate_cash_counter_report(request):
     cDate = request.GET.get('cDate')
     staffID = request.GET.get('staffID')
@@ -5285,7 +4496,6 @@ def generate_cash_counter_report(request):
     elif staffID and staffID != 'All':
         ccol = ccol.filter(collectedBy_id=int(staffID))
     ccol = ccol.order_by('collectedBy__name')
-
     for a in ccol:
         if a.modeOfPayment == 'Cash':
             a_total_cash = a_total_cash + a.paidAmount
@@ -5299,7 +4509,6 @@ def generate_cash_counter_report(request):
             a_total_party = a_total_party + a.paidAmount
     context = {
     }
-
     cash_total = 0.0
     card_total = 0.0
     credit_total = 0.0
@@ -5309,7 +4518,6 @@ def generate_cash_counter_report(request):
     mix_cash_total = 0.0
     mix_card_total = 0.0
     collection_total = 0.0
-
     col = _cash_counter_list_base_qs(request).filter(
         datetime__date=colDate.date(),
         isDeleted__exact=False
@@ -5359,19 +4567,13 @@ def generate_cash_counter_report(request):
         'a_total_cheque_cc': a_total_cheque_cc,
         'a_total_party': a_total_party,
         'a_total': a_total_cash + a_total_cheque + a_total_online + a_total_cheque_cc + a_total_party
-
     }
-
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/report/cashCounterReportPDF.html", context)
-
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
     return response
-
-
 @transaction.atomic
-@csrf_exempt
 def add_collection_from_cash_counter_api(request):
     if request.method == 'POST':
         try:
@@ -5411,7 +4613,6 @@ def add_collection_from_cash_counter_api(request):
                     obj.transferredPartyID_id = int(tParty.pk)
                 except:
                     pass
-
             obj.detail = detail
             obj.remark = remark
             obj.latitude = lat
@@ -5423,19 +4624,15 @@ def add_collection_from_cash_counter_api(request):
                 obj.collectionAddress = "From Shop Counter"
             except:
                 pass
-
             obj.save()
             obj.paymentID = 'CCC' + str(obj.pk).zfill(8)
             obj.collectionDateTime = obj.datetime
             obj.save()
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
-
-
 class CashCounterCollectionListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID.name', 'paidAmount', 'modeOfPayment', 'collectedBy.name',
                      'collectionDateTime', 'datetime',
@@ -5443,7 +4640,6 @@ class CashCounterCollectionListJson(BaseDatatableView):
                      'transferredPartyID',
                      'remark', 'action'
                      ]
-
     def get_initial_queryset(self):
         if _can_filter_all_cash_counter(self.request.user):
             try:
@@ -5451,21 +4647,17 @@ class CashCounterCollectionListJson(BaseDatatableView):
                 endDateV = self.request.GET.get("endDate")
                 sDate = datetime.strptime(startDateV, '%d/%m/%Y')
                 eDate = datetime.strptime(endDateV, '%d/%m/%Y')
-
                 return _cash_counter_collection_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                              collectionDateTime__date__range=[
                                                                                  sDate.date(),
                                                                                  eDate.date()])
-
             except:
                 return _cash_counter_collection_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                              datetime__date=datetime.today().date())
         else:
             return _cash_counter_collection_list_base_qs(self.request).filter(isDeleted__exact=False,
                                                                          datetime__date=datetime.today().date(),
-
                                                                          collectedBy__user_ID_id=self.request.user.pk)
-
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -5481,14 +4673,11 @@ class CashCounterCollectionListJson(BaseDatatableView):
                     collectedBy__name__icontains=search)
                 | Q(approvedBy__name__icontains=search) | Q(isApproved__icontains=search)
             )
-
         return qs
-
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
             if _can_manage_cash_counter_records(self.request.user):
-
                 action = '''
                   <a href="/edit_cash_counter_collection/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
@@ -5519,7 +4708,6 @@ class CashCounterCollectionListJson(BaseDatatableView):
                 collectedBy = item.collectedBy.name
             except:
                 collectedBy = '-'
-
             json_data.append([
                 escape(item.paymentID),
                 escape(item.partyID.name),
@@ -5534,14 +4722,9 @@ class CashCounterCollectionListJson(BaseDatatableView):
                 escape(tparty),
                 escape(item.remark),
                 action,
-
             ])
-
         return json_data
-
-
 @transaction.atomic
-@csrf_exempt
 def edit_cash_counter_collection_by_admin_api(request):
     if request.method == 'POST':
         try:
@@ -5563,7 +4746,6 @@ def edit_cash_counter_collection_by_admin_api(request):
                 return JsonResponse({'message': 'cheque_date_required'}, safe=False)
             # cus = Party.objects.select_related().get(pk=int(c[1]))
             cus = tenant_qs(request, Party).select_related().get(pk=int(party))
-
             obj = tenant_qs(request, CollectionCashCounter).get(pk=int(ID))
             if _can_review_collections(request.user):
                 obj.partyID_id = cus.pk
@@ -5611,7 +4793,6 @@ def edit_cash_counter_collection_by_admin_api(request):
             #     send_whatsapp_message(obj.partyID.phone, msg)
             # except:
             #     pass
-
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
