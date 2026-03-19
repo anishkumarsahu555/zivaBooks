@@ -198,6 +198,16 @@
 
 
                             </div>
+                            <div class="one fields">
+                                <div class="sixteen wide field required">
+                                    <label>Collection Date</label>
+                                    <div class="ui calendar" id="collectionDate">
+                                        <div class="ui input">
+                                            <input type="text" placeholder="Date" id="collectDate" name="collectDate">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="one  fields ">
 
                                 <div class="sixteen wide  field ">
@@ -206,6 +216,47 @@
                                 </div>
 
 
+                            </div>
+
+                            <div class="one fields">
+                                <div class="sixteen wide field">
+                                    <div class="ui checkbox" style="margin-top: 4px;">
+                                        <input type="checkbox" id="otpRequired" onchange="toggleOtp()">
+                                        <label>OTP confirmation (optional)</label>
+                                    </div>
+                                    <div id="otpBox" style="display:none; margin-top: 10px;">
+                                        <div class="ui mini message" id="otpStatus" style="display:none;"></div>
+                                        <div class="ui equal width stackable grid" style="margin: 0;">
+                                            <div class="row" style="padding: 0;">
+                                                <div class="column" style="padding: 0 6px 0 0;">
+                                                    <button type="button" class="ui tiny button" id="sendOtpBtn" onclick="sendOtp()">
+                                                        <i class="key icon"></i> Generate OTP
+                                                    </button>
+                                                </div>
+                                                <div class="column" style="padding: 0 6px;">
+                                                    <div class="ui tiny input" style="width: 100%;">
+                                                        <input type="text" id="otpCode" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Enter OTP" onkeyup="autoVerifyOtp()">
+                                                    </div>
+                                                </div>
+                                                <div class="column" style="padding: 0 0 0 6px;">
+                                                    <button type="button" class="ui tiny teal button" id="verifyOtpBtn" onclick="verifyOtp()">
+                                                        <i class="check icon"></i> Verify
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div style="margin-top: 8px;">
+                                            <button type="button" class="ui tiny basic button" id="editOtpBtn" style="display:none;" onclick="editOtpDetails()">
+                                                <i class="edit icon"></i> Edit details
+                                            </button>
+                                        </div>
+                                        <div class="ui tiny label green" id="otpVerifiedBadge" style="display:none; margin-top: 8px;">
+                                            <i class="check circle icon"></i> Verified
+                                        </div>
+                                        <input type="hidden" id="otpVerified" value="0">
+                                        <input type="hidden" id="otpRequested" value="0">
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="ui label teal" data-variation="mini" data-inverted="" data-tooltip="Location"
@@ -274,6 +325,230 @@
                     }
                 }
             );
+        $('#collectionDate')
+            .calendar({
+                initialDate: today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear(),
+                monthFirst: false,
+                type: 'date',
+                formatter: {
+                    date: function (date, settings) {
+                        if (!date) return '';
+                        var day = String(date.getDate());
+                        var month = String(date.getMonth() + 1);
+                        var year = date.getFullYear();
+                        return day + '/' + month + '/' + year;
+                    }
+                }
+            });
+
+        function getSelectedPartyValue() {
+            var partyAssign = $('#partyAssign').val();
+            if (partyAssign === 'All') {
+                return $('#partyAllAll').val();
+            }
+            return $('#partyAllFilter').val();
+        }
+
+        function toggleOtp() {
+            var enabled = $('#otpRequired').is(':checked');
+            if (!enabled) {
+                $('#otpBox').hide();
+                $('#otpStatus').hide();
+                $('#otpCode').val('').prop('disabled', false);
+                $('#otpVerified').val('0');
+                $('#otpRequested').val('0');
+                $('#otpVerifiedBadge').hide();
+                $('#editOtpBtn').hide();
+                try { unlockFormAfterOtp(); } catch (e) {}
+                return;
+            }
+            $('#otpBox').show();
+            $('#otpCode').focus();
+        }
+
+        function setOtpStatus(type, message) {
+            var box = $('#otpStatus');
+            box.removeClass('positive negative info warning');
+            if (type === 'success') box.addClass('positive');
+            else if (type === 'error') box.addClass('negative');
+            else if (type === 'warn') box.addClass('warning');
+            else box.addClass('info');
+            box.html(message);
+            box.show();
+        }
+
+        function lockFormAfterOtp() {
+            setDropdownDisabled('#partyAssign', true);
+            setDropdownDisabled('#executive', true);
+            setDropdownDisabled('#station', true);
+            setDropdownDisabled('#partyAllAll', true);
+            setDropdownDisabled('#partyAllFilter', true);
+            setDropdownDisabled('#paymentMode', true);
+            $('#amountPaid').prop('disabled', true);
+            $('#collectDate').prop('disabled', true);
+            $('#chequeDate').prop('disabled', true);
+            setDropdownDisabled('#bank', true);
+            $('#detail').prop('disabled', true);
+            setDropdownDisabled('#TransferredParty', true);
+            $('#editOtpBtn').show();
+        }
+
+        function unlockFormAfterOtp() {
+            setDropdownDisabled('#partyAssign', false);
+            setDropdownDisabled('#executive', false);
+            setDropdownDisabled('#station', false);
+            setDropdownDisabled('#partyAllAll', false);
+            setDropdownDisabled('#partyAllFilter', false);
+            setDropdownDisabled('#paymentMode', false);
+            $('#amountPaid').prop('disabled', false);
+            $('#collectDate').prop('disabled', false);
+            $('#chequeDate').prop('disabled', false);
+            setDropdownDisabled('#bank', false);
+            $('#detail').prop('disabled', false);
+            setDropdownDisabled('#TransferredParty', false);
+            $('#editOtpBtn').hide();
+        }
+
+        function setDropdownDisabled(selector, disabled) {
+            var $select = $(selector);
+            if (!$select.length) return;
+
+            $select.prop('disabled', !!disabled);
+
+            // Semantic/Fomantic select dropdowns often render a separate div; disable both.
+            try {
+                $select.dropdown(disabled ? 'set disabled' : 'set enabled');
+            } catch (e) {}
+
+            var $dropdown = $select.closest('.ui.dropdown');
+            if (!$dropdown.length) $dropdown = $select.parent('.ui.dropdown');
+            if (!$dropdown.length) $dropdown = $select.next('.ui.dropdown');
+            if (!$dropdown.length) $dropdown = $select.closest('.field').find('.ui.dropdown').first();
+
+            if ($dropdown.length) {
+                $dropdown.toggleClass('disabled', !!disabled);
+            }
+        }
+
+        function editOtpDetails() {
+            var party = getSelectedPartyValue();
+            if (!party) {
+                setOtpStatus('warn', 'Select Party first.');
+                return;
+            }
+            $('#editOtpBtn').addClass('loading disabled');
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:clear_collection_otp_api" %}',
+                dataType: 'json',
+                data: { party: party },
+                complete: function () {
+                    $('#otpCode').val('').prop('disabled', false);
+                    $('#otpVerified').val('0');
+                    $('#otpRequested').val('0');
+                    $('#otpVerifiedBadge').hide();
+                    $('#sendOtpBtn').removeClass('disabled');
+                    $('#verifyOtpBtn').removeClass('green disabled').addClass('teal');
+                    $('#editOtpBtn').removeClass('loading disabled').hide();
+                    unlockFormAfterOtp();
+                    setOtpStatus('info', 'OTP cleared. You can edit details now.');
+                }
+            });
+        }
+
+        function sendOtp() {
+            var party = getSelectedPartyValue();
+            var paymentMode = $('#paymentMode').val();
+            var amountPaid = $('#amountPaid').val();
+            var collectDate = $('#collectDate').val();
+            if (!party) {
+                setOtpStatus('warn', 'Select Party first.');
+                return;
+            }
+            if (!paymentMode || !amountPaid || !collectDate) {
+                setOtpStatus('warn', 'Fill Mode, Amount, and Collection Date before generating OTP.');
+                return;
+            }
+            $('#sendOtpBtn').addClass('loading disabled');
+            $('#otpVerified').val('0');
+            $('#otpRequested').val('0');
+            $('#verifyOtpBtn').removeClass('green');
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:request_collection_otp_api" %}',
+                dataType: 'json',
+                data: { party: party, paymentMode: paymentMode, amountPaid: amountPaid, collectDate: collectDate },
+                success: function (response) {
+                    if (response.message === 'success') {
+                        setOtpStatus('info', 'OTP generated. Ask customer to check OTP on their Ledger screen (valid 5 minutes).');
+                        $('#otpCode').focus();
+                        $('#otpRequested').val('1');
+                        lockFormAfterOtp();
+                    } else {
+                        setOtpStatus('error', (response && response.error) ? response.error : 'Unable to generate OTP.');
+                    }
+                },
+                error: function (xhr) {
+                    var msg = 'Unable to generate OTP.';
+                    if (xhr && xhr.status) msg += ' (HTTP ' + xhr.status + ')';
+                    setOtpStatus('error', msg);
+                },
+                complete: function () {
+                    setTimeout(function () {
+                        $('#sendOtpBtn').removeClass('loading disabled');
+                    }, 1200);
+                }
+            });
+        }
+
+        function verifyOtp() {
+            var party = getSelectedPartyValue();
+            var otp = ($('#otpCode').val() || '').trim();
+            if (!party) {
+                setOtpStatus('warn', 'Select Party first.');
+                return;
+            }
+            if (!(otp.length === 6 && /^[0-9]{6}$/.test(otp))) {
+                setOtpStatus('warn', 'Enter 6 digit OTP.');
+                return;
+            }
+            $('#verifyOtpBtn').addClass('loading disabled');
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:verify_collection_otp_api" %}',
+                dataType: 'json',
+                data: { party: party, otp: otp },
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('#otpVerified').val('1');
+                        $('#verifyOtpBtn').removeClass('teal').addClass('green').addClass('disabled');
+                        $('#sendOtpBtn').addClass('disabled');
+                        $('#otpCode').prop('disabled', true);
+                        $('#otpVerifiedBadge').show();
+                        setOtpStatus('success', 'OTP verified.');
+                    } else {
+                        $('#otpVerified').val('0');
+                        setOtpStatus('error', 'Invalid OTP.');
+                    }
+                },
+                error: function (xhr) {
+                    var msg = 'Unable to verify OTP.';
+                    if (xhr && xhr.status) msg += ' (HTTP ' + xhr.status + ')';
+                    setOtpStatus('error', msg);
+                },
+                complete: function () {
+                    $('#verifyOtpBtn').removeClass('loading disabled');
+                }
+            });
+        }
+
+        var otpTypingTimer = null;
+        function autoVerifyOtp() {
+            clearTimeout(otpTypingTimer);
+            var otp = ($('#otpCode').val() || '').trim();
+            if (otp.length !== 6) return;
+            otpTypingTimer = setTimeout(function () { verifyOtp(); }, 300);
+        }
 
         function partyAssignType() {
             var partyAssign = $('#partyAssign').val();
@@ -325,6 +600,10 @@
             var bank = $('#bank').val();
             var detail = $('#detail').val();
             var remark = $('#remark').val();
+            var collectDate = $('#collectDate').val();
+            var otpRequired = $('#otpRequired').is(':checked');
+            var otpVerified = $('#otpVerified').val();
+            var otpCode = ($('#otpCode').val() || '').trim();
             var lat = $('#lat').val();
             var lng = $('#lng').val();
             var chequeDate = $('#chequeDate').val();
@@ -335,7 +614,7 @@
                 var party = $('#partyAllFilter').val();
             }
 
-            if (party === '' || paymentMode === '' || amountPaid === '') {
+            if (party === '' || paymentMode === '' || amountPaid === '' || collectDate === '') {
                 $('body')
                     .toast({
                         class: 'orange',
@@ -367,6 +646,11 @@
                 hideLoading();
                 return;
             } else {
+                if (otpRequired && otpVerified !== '1') {
+                    $('body').toast({ class: 'orange', message: 'Please verify OTP before submitting.' });
+                    hideLoading();
+                    return;
+                }
                 data = new FormData();
                 data.append('party', party);
                 data.append('paymentMode', paymentMode);
@@ -376,8 +660,11 @@
                 data.append('lat', lat);
                 data.append('lng', lng);
                 data.append('remark', remark);
-               data.append('chequeDate', chequeDate);
-                   data.append('TransferredParty', TransferredParty);
+                data.append('otpRequired', otpRequired ? '1' : '0');
+                data.append('otpCode', otpCode);
+                data.append('chequeDate', chequeDate);
+                data.append('collectDate', collectDate);
+                data.append('TransferredParty', TransferredParty);
 
                 $.ajax({
                     type: 'post',
@@ -397,6 +684,7 @@
                                 });
 
                             hideLoading();
+                            try { $('#otpRequired').prop('checked', false); toggleOtp(); } catch (e) {}
 
                             location.href = "{% url 'homeApp:my_collection' %}"
 
@@ -415,6 +703,15 @@
                                     message: 'Cheque date is required for cheque payments.'
                                 })
                             ;
+                            hideLoading();
+                        } else if (response.message === 'otp_required') {
+                            $('body').toast({ class: 'orange', message: 'OTP is required. Please enter OTP.' });
+                            hideLoading();
+                        } else if (response.message === 'otp_invalid') {
+                            $('body').toast({ class: 'orange', message: 'Invalid OTP. Please verify OTP again.' });
+                            hideLoading();
+                        } else if (response.message === 'otp_mismatch') {
+                            $('body').toast({ class: 'orange', message: 'OTP details mismatch (mode/amount/date). Generate OTP again.' });
                             hideLoading();
                         } else {
                             $('body')

@@ -195,7 +195,12 @@ def _parse_party_id_value(raw: str):
 def request_collection_otp_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
-    if not _has_any_permission(request.user, 'home.can_approve_collection', 'home.can_view_party_credentials'):
+    if not _has_any_permission(
+        request.user,
+        'home.can_approve_collection',
+        'home.can_view_party_credentials',
+        'home.add_collection',
+    ):
         return JsonResponse({'message': 'error', 'error': 'Permission denied.'}, status=403)
     try:
         party = request.POST.get('party') or ''
@@ -227,7 +232,12 @@ def request_collection_otp_api(request):
 def verify_collection_otp_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
-    if not _has_any_permission(request.user, 'home.can_approve_collection', 'home.can_view_party_credentials'):
+    if not _has_any_permission(
+        request.user,
+        'home.can_approve_collection',
+        'home.can_view_party_credentials',
+        'home.add_collection',
+    ):
         return JsonResponse({'message': 'error', 'error': 'Permission denied.'}, status=403)
     try:
         party = request.POST.get('party') or ''
@@ -249,7 +259,12 @@ def verify_collection_otp_api(request):
 def clear_collection_otp_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
-    if not _has_any_permission(request.user, 'home.can_approve_collection', 'home.can_view_party_credentials'):
+    if not _has_any_permission(
+        request.user,
+        'home.can_approve_collection',
+        'home.can_view_party_credentials',
+        'home.add_collection',
+    ):
         return JsonResponse({'message': 'error', 'error': 'Permission denied.'}, status=403)
     try:
         party = request.POST.get('party') or ''
@@ -440,8 +455,18 @@ def _sync_staff_user_group_membership(staff_user):
     if not staff_user.user_ID_id:
         return
     user = staff_user.user_ID
-    user.groups.clear()
-    if staff_user.staffGroup and staff_user.staffGroup.djangoGroup:
+    tenant_id = getattr(staff_user, 'tenant_id', None)
+    if tenant_id:
+        tenant_group_ids = list(
+            StaffGroup.objects.filter(
+                tenant_id=tenant_id,
+                djangoGroup__isnull=False,
+            ).values_list('djangoGroup_id', flat=True)
+        )
+        if tenant_group_ids:
+            user.groups.remove(*Group.objects.filter(id__in=tenant_group_ids))
+
+    if staff_user.staffGroup and staff_user.staffGroup.djangoGroup_id:
         user.groups.add(staff_user.staffGroup.djangoGroup)
 def seed_default_groups():
     all_permissions = Permission.objects.exclude(content_type__app_label__in=['admin', 'contenttypes', 'sessions'])
@@ -1416,16 +1441,53 @@ def add_collection_by_staff_api(request):
             bank = request.POST.get("bank")
             detail = request.POST.get("detail")
             remark = request.POST.get("remark")
+            otp_required = str(request.POST.get("otpRequired") or "").lower() in {"1", "true", "yes", "on"}
+            otp_code = (request.POST.get("otpCode") or "").strip()
             lat = request.POST.get("lat")
             lng = request.POST.get("lng")
             chequeDate = request.POST.get("chequeDate")
+            collectDate = request.POST.get("collectDate")
+            collect_date_obj = None
+            if collectDate:
+                try:
+                    collect_date_obj = datetime.strptime(collectDate, '%d/%m/%Y').date()
+                except Exception:
+                    collect_date_obj = None
             bank_required_modes = {'Online', 'Cheque', 'Cheque CC'}
             if paymentMode in bank_required_modes and not bank:
                 return JsonResponse({'message': 'bank_required'}, safe=False)
             if paymentMode in {'Cheque', 'Cheque CC'} and not chequeDate:
                 return JsonResponse({'message': 'cheque_date_required'}, safe=False)
-            c = str(party).split('@')
-            cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
+            party_id = _parse_party_id_value(party)
+            if not party_id:
+                return JsonResponse({'message': 'error'}, safe=False)
+            cus = tenant_qs(request, Party).select_related().get(pk=party_id)
+            if otp_required:
+                if not (otp_code.isdigit() and len(otp_code) == 6):
+                    return JsonResponse({'message': 'otp_required'}, safe=False)
+                payload = get_collection_otp_payload(cus.tenant_id, cus.pk) or {}
+                if not payload or str(payload.get('otp')) != otp_code:
+                    return JsonResponse({'message': 'otp_invalid'}, safe=False)
+                meta = payload.get('meta') if isinstance(payload.get('meta'), dict) else {}
+                try:
+                    meta_mode = (meta.get('paymentMode') or '').strip()
+                    if meta_mode and meta_mode != paymentMode:
+                        return JsonResponse({'message': 'otp_mismatch'}, safe=False)
+                except Exception:
+                    pass
+                try:
+                    meta_amt = meta.get('amountPaid', None)
+                    if meta_amt is not None:
+                        if abs(float(meta_amt) - float(amountPaid)) > 0.01:
+                            return JsonResponse({'message': 'otp_mismatch'}, safe=False)
+                except Exception:
+                    pass
+                try:
+                    meta_date = (meta.get('collectDate') or '').strip()
+                    if meta_date and meta_date != (collectDate or ''):
+                        return JsonResponse({'message': 'otp_mismatch'}, safe=False)
+                except Exception:
+                    pass
             obj = Collection()
             assign_tenant(obj, request)
             obj.isTallied = False
@@ -1451,6 +1513,9 @@ def add_collection_by_staff_api(request):
             obj.longitude = lng
             user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.collectedBy_id = user.pk
+            if otp_required:
+                obj.otpVerified = True
+                obj.otpVerifiedOn = timezone.now()
             try:
                 # obj.collectionAddress = deduct_location_balance(lat, lng)
                 obj.collectionAddress = "From Field"
@@ -1458,10 +1523,40 @@ def add_collection_by_staff_api(request):
                 pass
             obj.save()
             obj.paymentID = str(obj.pk).zfill(8)
-            obj.collectionDateTime = obj.datetime
-            obj.save()
+            if collect_date_obj:
+                try:
+                    base_dt = obj.datetime or timezone.now()
+                    try:
+                        base_dt = timezone.localtime(base_dt)
+                    except Exception:
+                        pass
+                    obj.collectionDateTime = datetime.combine(collect_date_obj, base_dt.timetz().replace(microsecond=0))
+                except Exception:
+                    obj.collectionDateTime = obj.datetime
+            else:
+                obj.collectionDateTime = obj.datetime
+            obj.save(update_fields=['paymentID', 'collectionDateTime', 'otpVerified', 'otpVerifiedOn', 'lastUpdatedOn'])
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
+            if otp_required:
+                try:
+                    clear_collection_otp(cus.tenant_id, cus.pk)
+                except Exception:
+                    pass
+                try:
+                    set_collection_status(
+                        cus.tenant_id,
+                        cus.pk,
+                        status='received',
+                        meta={
+                            'paymentMode': paymentMode,
+                            'amountPaid': float(amountPaid),
+                            'collectDate': collectDate,
+                            'paymentID': obj.paymentID,
+                        },
+                    )
+                except Exception:
+                    pass
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)

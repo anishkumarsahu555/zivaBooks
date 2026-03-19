@@ -6,8 +6,11 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.urls import reverse
 from django.test import TestCase
+from django.test.utils import override_settings
 
 from home.models import AuditLog, Collection, Party, Sales, StaffGroup, StaffUser, Tenant, TenantMembership
+from home.apiView import _sync_staff_user_group_membership
+from home.otp import get_collection_otp_payload
 
 
 User = get_user_model()
@@ -289,3 +292,119 @@ class SalesEditLockTests(TestCase):
         self.assertEqual(response.status_code, 200)
         sale.refresh_from_db()
         self.assertEqual(sale.amount, 99.0)
+
+
+class StaffGroupMembershipSyncTests(TestCase):
+    def test_sync_does_not_clear_unrelated_groups(self):
+        tenant = Tenant.objects.create(name="Sync Tenant", slug="sync-tenant")
+        user = User.objects.create_user(username="sync-user", password="secret123")
+
+        customer_group = Group.objects.create(name="Customer")
+        other_group = Group.objects.create(name="Unrelated")
+        user.groups.add(customer_group, other_group)
+
+        g1 = Group.objects.create(name=f"{tenant.slug}:Old Staff Group")
+        g2 = Group.objects.create(name=f"{tenant.slug}:New Staff Group")
+        sg1 = StaffGroup.objects.create(tenant=tenant, name="Old Staff Group", djangoGroup=g1)
+        sg2 = StaffGroup.objects.create(tenant=tenant, name="New Staff Group", djangoGroup=g2)
+
+        staff_user = StaffUser.objects.create(
+            tenant=tenant,
+            user_ID=user,
+            name="Sync User",
+            phone="9999999988",
+            staffGroup=sg2,
+            group=sg2.name,
+            isActive="Active",
+        )
+
+        # Simulate a previous assignment.
+        user.groups.add(g1)
+
+        _sync_staff_user_group_membership(staff_user)
+
+        self.assertTrue(user.groups.filter(pk=customer_group.pk).exists())
+        self.assertTrue(user.groups.filter(pk=other_group.pk).exists())
+        self.assertFalse(user.groups.filter(pk=g1.pk).exists())
+        self.assertTrue(user.groups.filter(pk=g2.pk).exists())
+
+
+class CollectionOtpForStaffTests(TestCase):
+    @override_settings(
+        CACHES={
+            "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+        }
+    )
+    def test_staff_can_request_and_use_collection_otp(self):
+        tenant = Tenant.objects.create(name="OTP Tenant", slug="otp-tenant")
+        user = User.objects.create_user(username="otp-staff", password="secret123")
+        add_collection_perm = Permission.objects.get(codename="add_collection", content_type__app_label="home")
+        group = Group.objects.create(name=f"{tenant.slug}:Collector")
+        group.permissions.add(add_collection_perm)
+        staff_group = StaffGroup.objects.create(tenant=tenant, name="Collector", djangoGroup=group)
+        TenantMembership.objects.create(
+            tenant=tenant,
+            user=user,
+            role=TenantMembership.Role.STAFF,
+            isDefault=True,
+        )
+        staff_user = StaffUser.objects.create(
+            tenant=tenant,
+            user_ID=user,
+            name="OTP Staff",
+            phone="9999999977",
+            staffGroup=staff_group,
+            group="Collector",
+            isActive="Active",
+        )
+        user.groups.add(group)
+
+        party = Party.objects.create(tenant=tenant, name="P1", phone="9999999990", openingBalance="0")
+
+        self.client.force_login(user)
+        resp = self.client.post(
+            reverse("homeApp:request_collection_otp_api"),
+            data={
+                "party": str(party.pk),
+                "paymentMode": "Cash",
+                "amountPaid": "100",
+                "collectDate": "19/03/2026",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json().get("message"), "success")
+
+        payload = get_collection_otp_payload(party.tenant_id, party.pk)
+        self.assertIsNotNone(payload)
+        otp = payload.get("otp")
+        self.assertTrue(isinstance(otp, str) and len(otp) == 6)
+
+        verify = self.client.post(reverse("homeApp:verify_collection_otp_api"), data={"party": str(party.pk), "otp": otp})
+        self.assertEqual(verify.status_code, 200)
+        self.assertEqual(verify.json().get("message"), "success")
+
+        add_resp = self.client.post(
+            reverse("homeApp:add_collection_by_staff_api"),
+            data={
+                "party": str(party.pk),
+                "paymentMode": "Cash",
+                "amountPaid": "100",
+                "bank": "",
+                "detail": "",
+                "remark": "",
+                "lat": "0.0",
+                "lng": "0.0",
+                "chequeDate": "",
+                "collectDate": "19/03/2026",
+                "TransferredParty": "",
+                "otpRequired": "1",
+                "otpCode": otp,
+            },
+        )
+        self.assertEqual(add_resp.status_code, 200)
+        self.assertEqual(add_resp.json().get("message"), "success")
+
+        collection = Collection.objects.filter(tenant=tenant, partyID=party, collectedBy=staff_user).order_by("-id").first()
+        self.assertIsNotNone(collection)
+        self.assertTrue(collection.otpVerified)
+        self.assertIsNotNone(collection.otpVerifiedOn)
