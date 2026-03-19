@@ -1,15 +1,15 @@
 from io import StringIO
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.urls import reverse
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.test.utils import override_settings
+from django.urls import reverse
 
-from home.models import AuditLog, Collection, Party, Sales, StaffGroup, StaffUser, Tenant, TenantMembership
 from home.apiView import _sync_staff_user_group_membership
+from home.models import AuditLog, Collection, Party, Sales, StaffGroup, StaffUser, Tenant, TenantMembership
 from home.otp import get_collection_otp_payload
 
 
@@ -305,7 +305,7 @@ class StaffGroupMembershipSyncTests(TestCase):
 
         g1 = Group.objects.create(name=f"{tenant.slug}:Old Staff Group")
         g2 = Group.objects.create(name=f"{tenant.slug}:New Staff Group")
-        sg1 = StaffGroup.objects.create(tenant=tenant, name="Old Staff Group", djangoGroup=g1)
+        StaffGroup.objects.create(tenant=tenant, name="Old Staff Group", djangoGroup=g1)
         sg2 = StaffGroup.objects.create(tenant=tenant, name="New Staff Group", djangoGroup=g2)
 
         staff_user = StaffUser.objects.create(
@@ -318,7 +318,6 @@ class StaffGroupMembershipSyncTests(TestCase):
             isActive="Active",
         )
 
-        # Simulate a previous assignment.
         user.groups.add(g1)
 
         _sync_staff_user_group_membership(staff_user)
@@ -408,3 +407,109 @@ class CollectionOtpForStaffTests(TestCase):
         self.assertIsNotNone(collection)
         self.assertTrue(collection.otpVerified)
         self.assertIsNotNone(collection.otpVerifiedOn)
+
+
+@override_settings(
+    CACHES={
+        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    }
+)
+class CollectionOtpEndToEndTests(TestCase):
+    def test_end_to_end_staff_generates_customer_sees_and_staff_submits(self):
+        tenant = Tenant.objects.create(name="E2E Tenant", slug="e2e-tenant")
+
+        staff_auth = User.objects.create_user(username="e2e-staff", password="secret123")
+        add_collection_perm = Permission.objects.get(codename="add_collection", content_type__app_label="home")
+        collector_group = Group.objects.create(name=f"{tenant.slug}:Collector")
+        collector_group.permissions.add(add_collection_perm)
+        staff_group = StaffGroup.objects.create(tenant=tenant, name="Collector", djangoGroup=collector_group)
+        TenantMembership.objects.create(
+            tenant=tenant,
+            user=staff_auth,
+            role=TenantMembership.Role.STAFF,
+            isDefault=True,
+        )
+        staff_profile = StaffUser.objects.create(
+            tenant=tenant,
+            user_ID=staff_auth,
+            name="E2E Staff",
+            phone="9999999966",
+            staffGroup=staff_group,
+            group="Collector",
+            isActive="Active",
+        )
+        staff_auth.groups.add(collector_group)
+
+        party = Party.objects.create(tenant=tenant, name="P1", phone="9999999990", openingBalance="0")
+
+        customer_auth = User.objects.create_user(username="e2e-customer", password="cust123")
+        view_party_perm = Permission.objects.get(codename="view_party", content_type__app_label="home")
+        customer_auth.user_permissions.add(view_party_perm)
+        TenantMembership.objects.create(
+            tenant=tenant,
+            user=customer_auth,
+            role=TenantMembership.Role.PARTY,
+            isDefault=True,
+        )
+        party.userID_id = customer_auth.pk
+        party.save(update_fields=["userID", "lastUpdatedOn"])
+
+        staff_client = Client()
+        staff_client.force_login(staff_auth)
+        staff_client.get(reverse("homeApp:add_collection"))
+
+        resp = staff_client.post(
+            reverse("homeApp:request_collection_otp_api"),
+            data={
+                "party": str(party.pk),
+                "paymentMode": "Cash",
+                "amountPaid": "100",
+                "collectDate": "19/03/2026",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json().get("message"), "success")
+
+        payload = get_collection_otp_payload(party.tenant_id, party.pk)
+        otp = payload.get("otp")
+        self.assertTrue(isinstance(otp, str) and len(otp) == 6)
+
+        customer_client = Client()
+        customer_client.force_login(customer_auth)
+        customer_client.get(reverse("homeApp:customer_home"))
+        otp_view = customer_client.get(reverse("homeApp:customer_active_collection_otp"))
+        self.assertEqual(otp_view.status_code, 200)
+        otp_payload = otp_view.json()
+        self.assertEqual(otp_payload.get("message"), "success")
+        self.assertTrue(otp_payload.get("active"))
+        self.assertEqual(otp_payload.get("otp"), otp)
+
+        verify = staff_client.post(reverse("homeApp:verify_collection_otp_api"), data={"party": str(party.pk), "otp": otp})
+        self.assertEqual(verify.status_code, 200)
+        self.assertEqual(verify.json().get("message"), "success")
+
+        add_resp = staff_client.post(
+            reverse("homeApp:add_collection_by_staff_api"),
+            data={
+                "party": str(party.pk),
+                "paymentMode": "Cash",
+                "amountPaid": "100",
+                "bank": "",
+                "detail": "",
+                "remark": "",
+                "lat": "0.0",
+                "lng": "0.0",
+                "chequeDate": "",
+                "collectDate": "19/03/2026",
+                "TransferredParty": "",
+                "otpRequired": "1",
+                "otpCode": otp,
+            },
+        )
+        self.assertEqual(add_resp.status_code, 200)
+        self.assertEqual(add_resp.json().get("message"), "success")
+
+        collection = Collection.objects.filter(tenant=tenant, partyID=party, collectedBy=staff_profile).order_by("-id").first()
+        self.assertIsNotNone(collection)
+        self.assertTrue(collection.otpVerified)
+
