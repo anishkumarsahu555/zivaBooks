@@ -1,4 +1,27 @@
+from datetime import date
+
 from django.urls import reverse
+
+
+def _build_license_message(tenant):
+    try:
+        from activation.models import Validity
+    except Exception:
+        return ''
+
+    qs = Validity.objects.all()
+    if tenant is not None:
+        validity = qs.filter(tenant=tenant).order_by('-expiryDate', '-id').first()
+        if validity is None:
+            validity = qs.filter(tenant__isnull=True).order_by('-expiryDate', '-id').first()
+    else:
+        validity = qs.filter(tenant__isnull=True).order_by('-expiryDate', '-id').first()
+
+    if validity and validity.expiryDate:
+        if validity.expiryDate < date.today():
+            return 'Activation expired. Please contact ZivaInfotech for activation.'
+        return f'Your App License is Valid till {validity.expiryDate.strftime("%d-%m-%Y")}'
+    return 'You are using a trial version.'
 
 
 SECTION_TONES = {
@@ -546,5 +569,5 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
         'hero': hero,
         'metric_groups': metric_groups,
         'action_sections': action_sections,
-        'license_message': getattr(request, 'dashboard_license_message', ''),
+        'license_message': getattr(request, 'dashboard_license_message', '') or _build_license_message(tenant),
     }

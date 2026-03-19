@@ -564,9 +564,14 @@ def loginPage(request):
 @permission_required_any('home.can_view_party_credentials', 'home.can_manage_staff')
 def admin_home(request):
     try:
-        val = tenant_qs(request, Validity).last()
-        message = "Your App License is Valid till {}".format(val.expiryDate.strftime('%d-%m-%Y'))
-    except:
+        val = tenant_qs(request, Validity).order_by('-expiryDate', '-id').first()
+        if val and val.expiryDate and val.expiryDate < datetime.today().date():
+            message = "Activation expired. Please contact ZivaInfotech for activation."
+        elif val and val.expiryDate:
+            message = "Your App License is Valid till {}".format(val.expiryDate.strftime('%d-%m-%Y'))
+        else:
+            message = "You are using a trial version."
+    except Exception:
         message = "You are using a trial version."
     request.dashboard_license_message = message
 
@@ -785,6 +790,19 @@ def postLogin(request):
 
         if user is not None:
             login(request, user)
+            try:
+                tenant = get_current_tenant(request)
+                qs = Validity.objects.all()
+                if tenant is not None:
+                    val = qs.filter(tenant=tenant).order_by('-expiryDate', '-id').first()
+                    if val is None:
+                        val = qs.filter(tenant__isnull=True).order_by('-expiryDate', '-id').first()
+                else:
+                    val = qs.filter(tenant__isnull=True).order_by('-expiryDate', '-id').first()
+                if val and val.expiryDate and val.expiryDate < datetime.today().date():
+                    return JsonResponse({'message': 'success', 'data': '/activate/', 'expired': True}, safe=False)
+            except Exception:
+                pass
             if _is_party_portal_user(request.user):
                 _ensure_party_portal_permissions(request.user)
                 return JsonResponse({'message': 'success', 'data': '/customer_home/'}, safe=False)
@@ -804,10 +822,15 @@ def homepage(request):
         if _user_has_portal_access(request.user):
             if request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_manage_staff'):
                 try:
-                    val = tenant_qs(request, Validity).last()
-                    request.dashboard_license_message = "Your App License is Valid till {}".format(
-                        val.expiryDate.strftime('%d-%m-%Y')
-                    )
+                    val = tenant_qs(request, Validity).order_by('-expiryDate', '-id').first()
+                    if val and val.expiryDate and val.expiryDate < datetime.today().date():
+                        request.dashboard_license_message = "Activation expired. Please contact ZivaInfotech for activation."
+                    elif val and val.expiryDate:
+                        request.dashboard_license_message = "Your App License is Valid till {}".format(
+                            val.expiryDate.strftime('%d-%m-%Y')
+                        )
+                    else:
+                        request.dashboard_license_message = "You are using a trial version."
                 except Exception:
                     request.dashboard_license_message = "You are using a trial version."
             return render(request, 'home/baseIndex.html')

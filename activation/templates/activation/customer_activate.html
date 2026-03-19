@@ -1,0 +1,221 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
+    <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
+    <title>Activation Expired</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.js"></script>
+    <script src="{% static 'sw/app.js' %}"></script>
+
+    <style>
+        :root {
+            --bg-a: #eef4ff;
+            --bg-b: #f8fbff;
+            --bg-c: #fffaf5;
+            --brand-a: #091a2b;
+            --brand-b: #12324a;
+            --brand-c: #0f766e;
+            --line: rgba(15, 23, 42, 0.10);
+        }
+
+        body {
+            background:
+                radial-gradient(900px 340px at -10% -10%, #dbeafe 0%, transparent 60%),
+                radial-gradient(800px 320px at 110% 0%, #fff1df 0%, transparent 58%),
+                linear-gradient(180deg, var(--bg-a) 0%, var(--bg-b) 48%, var(--bg-c) 100%);
+            overscroll-behavior-y: contain;
+        }
+
+        .cust-nav.ui.menu {
+            border: none !important;
+            border-radius: 0 !important;
+            background:
+                radial-gradient(circle at top right, rgba(248, 250, 252, 0.20), transparent 28%),
+                linear-gradient(135deg, var(--brand-a), var(--brand-b) 52%, var(--brand-c)) !important;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18) !important;
+        }
+
+        .cust-nav .item,
+        .cust-nav .item i.icon {
+            color: rgba(248, 250, 252, 0.94) !important;
+            font-weight: 800 !important;
+        }
+
+        .cust-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cust-logo {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 18px rgba(2, 6, 23, 0.25);
+        }
+
+        .cust-pill {
+            margin-left: 10px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            font-weight: 900;
+            color: rgba(226, 232, 240, 0.95);
+        }
+
+        .cust-shell { padding: 70px 10px 28px; }
+        .cust-inner { max-width: 980px; margin: 0 auto; }
+
+        .cust-sidebar.ui.sidebar {
+            background:
+                radial-gradient(circle at top right, rgba(248, 250, 252, 0.10), transparent 32%),
+                linear-gradient(180deg, #081a2a, #0b2236 52%, #072030) !important;
+        }
+
+        .cust-sidebar .item {
+            color: rgba(226, 232, 240, 0.92) !important;
+            border-radius: 12px !important;
+            margin: 2px 8px;
+            font-weight: 800 !important;
+        }
+
+        .cust-sidenav { display: none; }
+
+        @media (min-width: 768px) {
+            .cust-shell { padding-left: 16rem; padding-right: 16px; }
+            .cust-mobile-toggle { display: none !important; }
+            .cust-sidenav {
+                display: block;
+                position: fixed;
+                top: 56px;
+                left: 0;
+                width: 15rem;
+                height: calc(100vh - 56px);
+                padding: 12px 10px 14px;
+                overflow: auto;
+                background:
+                    radial-gradient(circle at top right, rgba(248, 250, 252, 0.10), transparent 32%),
+                    linear-gradient(180deg, #081a2a, #0b2236 52%, #072030);
+                border-right: 1px solid rgba(255, 255, 255, 0.08);
+                z-index: 1000;
+            }
+            .cust-sidenav .ui.vertical.menu { background: transparent !important; border: none !important; box-shadow: none !important; }
+            .cust-sidenav .ui.vertical.menu .item {
+                color: rgba(226, 232, 240, 0.92) !important;
+                border-radius: 14px !important;
+                margin: 3px 0;
+                font-weight: 800 !important;
+            }
+            .cust-sidenav .ui.vertical.menu .active.item {
+                background: rgba(45, 212, 191, 0.18) !important;
+                color: #ccfbf1 !important;
+            }
+        }
+
+        .ui.segment.activation-card {
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
+        }
+    </style>
+</head>
+<body>
+
+<div class="ui left vertical inverted sidebar menu cust-sidebar" id="custSidebar">
+    <div class="item" style="padding: 14px 14px 10px;">
+        <div class="cust-brand">
+            <img class="cust-logo" alt="Logo" src="{% static 'sw/images/icon-192.png' %}">
+            <div>
+                <div style="font-weight: 900;">zivaBooks</div>
+                <div style="color: rgba(226,232,240,0.7); font-size: 0.78rem; margin-top: 2px;">Customer Portal</div>
+            </div>
+        </div>
+    </div>
+    <div class="item" style="padding-top: 6px; padding-bottom: 6px;">
+        <div style="color: rgba(226,232,240,0.7); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;">
+            Menu
+        </div>
+    </div>
+    <a class="item active" href="/activate/"><i class="warning circle icon"></i> Activation</a>
+    <a class="item" href="{% url 'homeApp:logout' %}"><i class="sign out alternate icon"></i> Logout</a>
+</div>
+
+<div class="cust-sidenav">
+    <div class="ui vertical inverted menu">
+        <div class="item" style="padding: 14px 14px 10px;">
+            <div class="cust-brand">
+                <img class="cust-logo" alt="Logo" src="{% static 'sw/images/icon-192.png' %}">
+                <div>
+                    <div style="font-weight: 900; color: rgba(248,250,252,0.95);">zivaBooks</div>
+                    <div style="color: rgba(226,232,240,0.7); font-size: 0.78rem; margin-top: 2px;">Customer Portal</div>
+                </div>
+            </div>
+        </div>
+        <div class="item" style="padding-top: 6px; padding-bottom: 6px;">
+            <div style="color: rgba(226,232,240,0.7); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;">
+                Menu
+            </div>
+        </div>
+        <a class="item active" href="/activate/"><i class="warning circle icon"></i> Activation</a>
+        <a class="item" href="{% url 'homeApp:logout' %}"><i class="sign out alternate icon"></i> Logout</a>
+    </div>
+</div>
+
+<div class="pusher">
+    <div class="ui top fixed menu cust-nav">
+        <div class="left menu">
+            <a class="item cust-mobile-toggle" href="#" onclick="$('#custSidebar').sidebar('toggle'); return false;">
+                <i class="bars icon"></i>
+            </a>
+            <div class="item">
+                <div class="cust-brand">
+                    <img class="cust-logo" alt="Logo" src="{% static 'sw/images/icon-192.png' %}">
+                    <div style="font-weight: 900;">zivaBooks</div>
+                    <div class="cust-pill">Activation</div>
+                </div>
+            </div>
+        </div>
+        <div class="right menu">
+            <div class="ui dropdown item">
+                <i class="user circle icon"></i>
+                {{ party.name|default:"Customer" }}
+                <i class="dropdown icon"></i>
+                <div class="menu">
+                    <a class="item" href="{% url 'homeApp:logout' %}"><i class="sign out alternate icon"></i> Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="cust-shell">
+        <div class="cust-inner">
+            <div class="ui segment activation-card">
+                <div class="ui icon message">
+                    <i class="notched exclamation triangle red icon"></i>
+                    <div class="content">
+                        <div class="header">Activation expired</div>
+                        <p>Please contact ZivaInfotech for activation.</p>
+                        <p><strong>Contact:</strong> <a href="https://zivainfotech.com/" target="_blank">ZivaInfotech</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    $('#custSidebar').sidebar({ transition: 'overlay' });
+    $('.ui.dropdown').dropdown();
+</script>
+</body>
+</html>
+
