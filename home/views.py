@@ -11,8 +11,9 @@ from django.db.models.functions import Length
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.utils import timezone
 # Create your views here.
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 
 # import xlwt
 from activation.models import *
@@ -21,6 +22,7 @@ from .models import *
 from .books import ensure_books_for_tenant
 from .navigation import build_sidebar_sections
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_qs
+from .otp import get_collection_otp_payload, get_collection_status_payload, OTP_TTL_SECONDS
 
 
 # def login_or_logout(request, type):
@@ -64,6 +66,35 @@ def _user_has_portal_access(user):
     if build_sidebar_sections(user):
         return True
     return user.has_module_perms('home') or user.has_module_perms('activation')
+
+
+def _is_party_portal_user(user):
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    return TenantMembership.objects.filter(user=user, role=TenantMembership.Role.PARTY).exists()
+
+
+def _ensure_party_portal_permissions(user):
+    """
+    Party/customer users need at least `home.view_party` for the customer portal views.
+    Some installs may have the `Customer` group without permissions; repair it lazily.
+    """
+    try:
+        perm = Permission.objects.filter(content_type__app_label='home', codename='view_party').first()
+        if not perm:
+            return
+        if not user.has_perm('home.view_party'):
+            user.user_permissions.add(perm)
+        try:
+            group, _ = Group.objects.get_or_create(name='Customer')
+            if perm not in group.permissions.all():
+                group.permissions.add(perm)
+            if not user.groups.filter(id=group.id).exists():
+                user.groups.add(group)
+        except Exception:
+            pass
+    except Exception:
+        return
 
 
 def _permission_catalog():
@@ -754,6 +785,9 @@ def postLogin(request):
 
         if user is not None:
             login(request, user)
+            if _is_party_portal_user(request.user):
+                _ensure_party_portal_permissions(request.user)
+                return JsonResponse({'message': 'success', 'data': '/customer_home/'}, safe=False)
             if _user_has_portal_access(request.user):
                 return JsonResponse({'message': 'success', 'data': '/home/'}, safe=False)
             logout(request)
@@ -764,6 +798,9 @@ def postLogin(request):
 #
 def homepage(request):
     if request.user.is_authenticated:
+        if _is_party_portal_user(request.user):
+            _ensure_party_portal_permissions(request.user)
+            return redirect('homeApp:customer_home')
         if _user_has_portal_access(request.user):
             if request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_manage_staff'):
                 try:
@@ -778,47 +815,131 @@ def homepage(request):
     return render(request, 'home/login.html')
 
 
+def _parse_customer_date(value, default=None):
+    if not value:
+        return default
+    try:
+        return datetime.strptime(value, '%d/%m/%Y').date()
+    except Exception:
+        pass
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except Exception:
+        return default
+
+
+def _customer_visible_party_ledger_qs(request, qs):
+    """
+    Customer portal should show only:
+    - Approved Sales
+    - Approved Payments (Collection / Counter Collection)
+    """
+    approved_collection_ids = tenant_qs(request, Collection).filter(
+        isDeleted=False,
+        isApproved=True,
+    ).values('id')
+    approved_counter_collection_ids = tenant_qs(request, CollectionCashCounter).filter(
+        isDeleted=False,
+        isApproved=True,
+    ).values('id')
+    return qs.filter(
+        Q(source=PartyLedgerEntry.Source.SALES) |
+        (Q(source=PartyLedgerEntry.Source.COLLECTION) & Q(source_object_id__in=approved_collection_ids)) |
+        (Q(source=PartyLedgerEntry.Source.COUNTER_COLLECTION) & Q(source_object_id__in=approved_counter_collection_ids))
+    )
+
+
+@ensure_csrf_cookie
 @permission_required_any('home.view_party')
 def customer_home(request):
     party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only(
-        'id', 'name', 'phone', 'address', 'username', 'password'
+        'id', 'name', 'phone', 'address', 'username', 'password', 'openingBalance'
     ).order_by('-id').first()
     if not party:
         return redirect('/')
 
-    msg_cache_key = f'customer_home_messages:{request.user.pk}:{party.phone}:{party.name or ""}'
-    cached_messages = cache.get(msg_cache_key)
-    if cached_messages is None:
-        base_messages = tenant_qs(request, WhatsappMessageStatus).filter(
-            isDeleted=False,
-            phone=party.phone
-        ).only('id', 'message', 'messageTo', 'phone', 'status', 'datetime').order_by('-datetime')
-        if party.name:
-            base_messages = base_messages.filter(messageTo__iexact=party.name)
+    today = datetime.today().date()
+    # Default: current month range (better than "today" for customers).
+    start_default = today.replace(day=1)
+    start_date = _parse_customer_date(request.GET.get('startDate'), start_default)
+    end_date = _parse_customer_date(request.GET.get('endDate'), today)
+    if end_date and start_date and end_date < start_date:
+        start_date, end_date = end_date, start_date
 
-        collection_messages = []
-        sales_messages = []
-        for msg in base_messages[:80]:
-            text = (msg.message or "").lower()
-            if len(collection_messages) < 10 and 'your payment has been' in text:
-                collection_messages.append(msg)
-            if len(sales_messages) < 10 and 'order has been dispatched' in text:
-                sales_messages.append(msg)
-            if len(collection_messages) >= 10 and len(sales_messages) >= 10:
-                break
+    base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
+    base_qs = _customer_visible_party_ledger_qs(request, base_qs)
+    prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+        debit_total=Sum('debit'),
+        credit_total=Sum('credit'),
+    )
+    opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
 
-        cached_messages = {
-            'collection_messages': collection_messages,
-            'sales_messages': sales_messages,
-        }
-        cache.set(msg_cache_key, cached_messages, timeout=60)
+    range_qs = base_qs.filter(txDateTime__date__range=[start_date, end_date]).order_by('txDateTime', 'id')
+    range_totals = range_qs.aggregate(debit_total=Sum('debit'), credit_total=Sum('credit'))
+    range_debit = float(range_totals['debit_total'] or 0.0)
+    range_credit = float(range_totals['credit_total'] or 0.0)
+    closing = opening + range_debit - range_credit
 
     context = {
         'party': party,
-        'collection_messages': cached_messages['collection_messages'],
-        'sales_messages': cached_messages['sales_messages'],
+        'startDate': start_date.strftime('%d/%m/%Y'),
+        'endDate': end_date.strftime('%d/%m/%Y'),
+        'opening': opening,
+        'range_debit': range_debit,
+        'range_credit': range_credit,
+        'closing': closing,
     }
+    try:
+        request.session['cust_party_id'] = int(party.pk)
+        request.session['cust_tenant_id'] = int(party.tenant_id) if party.tenant_id is not None else None
+    except Exception:
+        pass
     return render(request, 'home/customer.html', context)
+
+
+@permission_required_any('home.view_party')
+def customer_ledger_kpis(request):
+    if request.method != 'GET':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+
+    party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only(
+        'id', 'openingBalance'
+    ).order_by('-id').first()
+    if not party:
+        return JsonResponse({'message': 'error', 'error': 'Party not found.'}, status=404)
+
+    today = datetime.today().date()
+    start_default = today.replace(day=1)
+    start_date = _parse_customer_date(request.GET.get('startDate'), start_default)
+    end_date = _parse_customer_date(request.GET.get('endDate'), today)
+    if end_date and start_date and end_date < start_date:
+        start_date, end_date = end_date, start_date
+
+    base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
+    base_qs = _customer_visible_party_ledger_qs(request, base_qs)
+    prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+        debit_total=Sum('debit'),
+        credit_total=Sum('credit'),
+    )
+    opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
+
+    range_totals = base_qs.filter(txDateTime__date__range=[start_date, end_date]).aggregate(
+        debit_total=Sum('debit'),
+        credit_total=Sum('credit'),
+    )
+    range_debit = float(range_totals['debit_total'] or 0.0)
+    range_credit = float(range_totals['credit_total'] or 0.0)
+    closing = opening + range_debit - range_credit
+
+    return JsonResponse({
+        'message': 'success',
+        'opening': opening,
+        'debit': range_debit,
+        'credit': range_credit,
+        'closing': closing,
+        'startDate': start_date.strftime('%d/%m/%Y') if start_date else '',
+        'endDate': end_date.strftime('%d/%m/%Y') if end_date else '',
+    })
 
 
 @permission_required_any('home.view_party')
@@ -853,6 +974,94 @@ def customer_change_password(request):
         party.save(update_fields=['password'])
 
     return JsonResponse({'message': 'success', 'success': 'Password changed successfully.'}, status=200)
+
+
+@permission_required_any('home.view_party')
+def customer_active_collection_otp(request):
+    if request.method != 'GET':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+
+    # Only customer/party users should see OTP.
+    party_id = request.session.get('cust_party_id')
+    tenant_id = request.session.get('cust_tenant_id')
+    if party_id:
+        try:
+            party_id = int(party_id)
+        except Exception:
+            party_id = None
+    if tenant_id is not None:
+        try:
+            tenant_id = int(tenant_id)
+        except Exception:
+            tenant_id = None
+
+    if not party_id:
+        party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only('id', 'tenant_id').order_by('-id').first()
+        if not party:
+            return JsonResponse({'message': 'error', 'error': 'Permission denied.'}, status=403)
+        party_id = int(party.pk)
+        tenant_id = int(party.tenant_id) if party.tenant_id is not None else None
+        try:
+            request.session['cust_party_id'] = party_id
+            request.session['cust_tenant_id'] = tenant_id
+        except Exception:
+            pass
+
+    payload = get_collection_otp_payload(tenant_id, party_id)
+    if not payload:
+        status_payload = get_collection_status_payload(tenant_id, party_id)
+        if not status_payload:
+            return JsonResponse({'message': 'success', 'active': False}, safe=False)
+        status = str(status_payload.get('status') or '').strip()
+        created_ts = status_payload.get('created_ts')
+        ttl = int(status_payload.get('ttl') or 0)
+        meta = status_payload.get('meta') if isinstance(status_payload.get('meta'), dict) else {}
+        try:
+            created_ts = int(created_ts)
+        except Exception:
+            created_ts = None
+        if not status or created_ts is None or ttl <= 0:
+            return JsonResponse({'message': 'success', 'active': False}, safe=False)
+        now_ts = int(timezone.now().timestamp())
+        expires_in = max(0, (created_ts + ttl) - now_ts)
+        if expires_in <= 0:
+            return JsonResponse({'message': 'success', 'active': False}, safe=False)
+        return JsonResponse({
+            'message': 'success',
+            'active': False,
+            'status': status,
+            'status_expires_in': expires_in,
+            'paymentMode': meta.get('paymentMode', ''),
+            'amountPaid': meta.get('amountPaid', ''),
+            'collectDate': meta.get('collectDate', ''),
+            'paymentID': meta.get('paymentID', ''),
+        }, safe=False)
+
+    otp = str(payload.get('otp') or '').strip()
+    created_ts = payload.get('created_ts')
+    ttl = int(payload.get('ttl') or OTP_TTL_SECONDS)
+    meta = payload.get('meta') if isinstance(payload.get('meta'), dict) else {}
+    try:
+        created_ts = int(created_ts)
+    except Exception:
+        created_ts = None
+    if not otp or created_ts is None:
+        return JsonResponse({'message': 'success', 'active': False}, safe=False)
+
+    now_ts = int(timezone.now().timestamp())
+    expires_in = max(0, (created_ts + ttl) - now_ts)
+    if expires_in <= 0:
+        return JsonResponse({'message': 'success', 'active': False}, safe=False)
+
+    return JsonResponse({
+        'message': 'success',
+        'active': True,
+        'otp': otp,
+        'expires_in': expires_in,
+        'paymentMode': meta.get('paymentMode', ''),
+        'amountPaid': meta.get('amountPaid', ''),
+        'collectDate': meta.get('collectDate', ''),
+    }, safe=False)
 
 
 @permission_required_any('home.add_collection')

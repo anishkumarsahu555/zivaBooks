@@ -14,6 +14,8 @@ urlpatterns = [
     path('collection_home/', collection_home, name='collection_home'),
     path('customer_home/', customer_home, name='customer_home'),
     path('customer/change-password/', customer_change_password, name='customer_change_password'),
+    path('api/customer_ledger_kpis/', customer_ledger_kpis, name='customer_ledger_kpis'),
+    path('api/customer_active_collection_otp/', customer_active_collection_otp, name='customer_active_collection_otp'),
     path('myProfile/', my_profile_collection, name='my_profile_collection'),
     path('add_collection/', add_collection, name='add_collection'),
     path('my_collection/', my_collection, name='my_collection'),
@@ -86,6 +88,9 @@ urlpatterns = [
     path('api/add_collection_by_staff_api/', add_collection_by_staff_api, name='add_collection_by_staff_api'),
     path('api/add_collection_by_admin_api/', add_collection_by_admin_api, name='add_collection_by_admin_api'),
     path('api/edit_collection_by_admin_api/', edit_collection_by_admin_api, name='edit_collection_by_admin_api'),
+    path('api/request_collection_otp_api/', request_collection_otp_api, name='request_collection_otp_api'),
+    path('api/verify_collection_otp_api/', verify_collection_otp_api, name='verify_collection_otp_api'),
+    path('api/clear_collection_otp_api/', clear_collection_otp_api, name='clear_collection_otp_api'),
 
     # # change password
     path('api/change_password_api/', change_password_api, name='change_password_api'),

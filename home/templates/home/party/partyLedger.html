@@ -71,6 +71,23 @@
         .pl-amt-in { color: rgba(5, 150, 105, 0.95); }
         .pl-amt-out { color: rgba(225, 29, 72, 0.95); }
 
+        .pl-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 18px;
+            padding: 0 8px;
+            border-radius: 999px;
+            font-size: 0.70rem;
+            font-weight: 950;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-right: 6px;
+            transform: translateY(-1px);
+        }
+        .pl-chip-dr { background: rgba(16, 185, 129, 0.14); color: rgba(5, 150, 105, 0.98); }
+        .pl-chip-cr { background: rgba(244, 63, 94, 0.14); color: rgba(225, 29, 72, 0.98); }
+
         @media (max-width: 520px) {
             .party-ledger-table td, .party-ledger-table th { padding: 0.45em 0.5em !important; }
             .pl-part { max-width: 52vw; }

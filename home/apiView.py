@@ -17,6 +17,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.crypto import get_random_string
 from django.utils.html import escape
+from django.utils import timezone
 from django.views.decorators.cache import cache_page
 from django.views.decorators.csrf import csrf_exempt
 from django_datatables_view.base_datatable_view import BaseDatatableView
@@ -24,6 +25,14 @@ from weasyprint import CSS, HTML
 
 from home.models import *
 from home.books import sync_book_transactions
+from home.otp import (
+    OTP_TTL_SECONDS,
+    clear_collection_otp,
+    clear_collection_status,
+    get_collection_otp_payload,
+    set_collection_otp,
+    set_collection_status,
+)
 from home.party_ledger import sync_party_ledger_entries_for_object
 from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_qs
 
@@ -192,6 +201,107 @@ class MessageThread(threading.Thread):
 
 def send_message(number, message, party):
     MessageThread(number, message, party).start()
+
+
+def _parse_party_id_value(raw: str):
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value:
+        return None
+    # Common UI format: "Name - Group @ 123"
+    if '@' in value:
+        right = value.split('@')[-1].strip()
+        if right.isdigit():
+            return int(right)
+    # Fallback: just an id.
+    if value.isdigit():
+        return int(value)
+    return None
+
+
+@csrf_exempt
+def request_collection_otp_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not _has_any_permission(request.user, 'home.can_approve_collection', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'error', 'error': 'Permission denied.'}, status=403)
+    try:
+        party = request.POST.get('party') or ''
+        party_id = _parse_party_id_value(party)
+        if not party_id:
+            return JsonResponse({'message': 'error', 'error': 'Party is required.'}, status=400)
+        cus = tenant_qs(request, Party).filter(isDeleted=False, pk=party_id).only('id', 'name', 'phone', 'tenant_id').first()
+        if not cus:
+            return JsonResponse({'message': 'error', 'error': 'Party not found.'}, status=404)
+
+        payment_mode = (request.POST.get('paymentMode') or '').strip()
+        amount_paid_raw = (request.POST.get('amountPaid') or '').strip()
+        collect_date = (request.POST.get('collectDate') or '').strip()
+        try:
+            amount_paid = float(amount_paid_raw) if amount_paid_raw != '' else None
+        except Exception:
+            amount_paid = None
+
+        meta = {}
+        if payment_mode:
+            meta['paymentMode'] = payment_mode
+        if amount_paid is not None:
+            meta['amountPaid'] = amount_paid
+        if collect_date:
+            meta['collectDate'] = collect_date
+
+        otp = get_random_string(length=6, allowed_chars='0123456789')
+        set_collection_otp(cus.tenant_id, cus.pk, otp, ttl=OTP_TTL_SECONDS, meta=meta)
+        return JsonResponse({'message': 'success', 'expires_in': OTP_TTL_SECONDS}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
+
+@csrf_exempt
+def verify_collection_otp_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not _has_any_permission(request.user, 'home.can_approve_collection', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'error', 'error': 'Permission denied.'}, status=403)
+    try:
+        party = request.POST.get('party') or ''
+        code = (request.POST.get('otp') or '').strip()
+        if not (code.isdigit() and len(code) == 6):
+            return JsonResponse({'message': 'otp_invalid'}, safe=False)
+        party_id = _parse_party_id_value(party)
+        if not party_id:
+            return JsonResponse({'message': 'error', 'error': 'Party is required.'}, status=400)
+        party_obj = tenant_qs(request, Party).filter(isDeleted=False, pk=party_id).only('id', 'tenant_id').first()
+        if not party_obj:
+            return JsonResponse({'message': 'error', 'error': 'Party not found.'}, status=404)
+        payload = get_collection_otp_payload(party_obj.tenant_id, party_id) or {}
+        if not payload or str(payload.get('otp')) != code:
+            return JsonResponse({'message': 'otp_invalid'}, safe=False)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
+
+@csrf_exempt
+def clear_collection_otp_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not _has_any_permission(request.user, 'home.can_approve_collection', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'error', 'error': 'Permission denied.'}, status=403)
+    try:
+        party = request.POST.get('party') or ''
+        party_id = _parse_party_id_value(party)
+        if not party_id:
+            return JsonResponse({'message': 'error', 'error': 'Party is required.'}, status=400)
+        party_obj = tenant_qs(request, Party).filter(isDeleted=False, pk=party_id).only('id', 'tenant_id').first()
+        if not party_obj:
+            return JsonResponse({'message': 'error', 'error': 'Party not found.'}, status=404)
+        clear_collection_otp(party_obj.tenant_id, party_id)
+        clear_collection_status(party_obj.tenant_id, party_id)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
 
 
 def formatINR(number):
@@ -1675,10 +1785,18 @@ def add_collection_by_admin_api(request):
             bank = request.POST.get("bank")
             detail = request.POST.get("detail")
             remark = request.POST.get("remark")
+            otp_required = str(request.POST.get("otpRequired") or "").lower() in {"1", "true", "yes", "on"}
+            otp_code = (request.POST.get("otpCode") or "").strip()
             lat = request.POST.get("lat")
             lng = request.POST.get("lng")
             chequeDate = request.POST.get("chequeDate")
             collectDate = request.POST.get("collectDate")
+            collect_date_obj = None
+            if collectDate:
+                try:
+                    collect_date_obj = datetime.strptime(collectDate, '%d/%m/%Y').date()
+                except Exception:
+                    collect_date_obj = None
             bank_required_modes = {'Online', 'Cheque', 'Cheque CC'}
             if paymentMode in bank_required_modes and not bank:
                 return JsonResponse({'message': 'bank_required'}, safe=False)
@@ -1686,6 +1804,33 @@ def add_collection_by_admin_api(request):
                 return JsonResponse({'message': 'cheque_date_required'}, safe=False)
             c = str(party).split('@')
             cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
+            if otp_required:
+                if not (otp_code.isdigit() and len(otp_code) == 6):
+                    return JsonResponse({'message': 'otp_required'}, safe=False)
+                payload = get_collection_otp_payload(cus.tenant_id, cus.pk) or {}
+                if not payload or str(payload.get('otp')) != otp_code:
+                    return JsonResponse({'message': 'otp_invalid'}, safe=False)
+                meta = payload.get('meta') if isinstance(payload.get('meta'), dict) else {}
+                # If OTP was generated with details, enforce that the submitted values match.
+                try:
+                    meta_mode = (meta.get('paymentMode') or '').strip()
+                    if meta_mode and meta_mode != paymentMode:
+                        return JsonResponse({'message': 'otp_mismatch'}, safe=False)
+                except Exception:
+                    pass
+                try:
+                    meta_amt = meta.get('amountPaid', None)
+                    if meta_amt is not None:
+                        if abs(float(meta_amt) - float(amountPaid)) > 0.01:
+                            return JsonResponse({'message': 'otp_mismatch'}, safe=False)
+                except Exception:
+                    pass
+                try:
+                    meta_date = (meta.get('collectDate') or '').strip()
+                    if meta_date and meta_date != collectDate:
+                        return JsonResponse({'message': 'otp_mismatch'}, safe=False)
+                except Exception:
+                    pass
             obj = Collection()
             assign_tenant(obj, request)
             obj.partyID_id = cus.pk
@@ -1706,44 +1851,76 @@ def add_collection_by_admin_api(request):
                 except:
                     pass
 
-            obj.collectionDateTime = datetime.strptime(collectDate, '%d/%m/%Y')
             obj.detail = detail
             obj.remark = remark
             obj.latitude = lat
             obj.longitude = lng
             user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.collectedBy_id = user.pk
+            if otp_required:
+                obj.otpVerified = True
+                obj.otpVerifiedOn = timezone.now()
 
             obj.collectionAddress = "From Shop."
 
             obj.save()
             obj.paymentID = str(obj.pk).zfill(8)
-            # obj.collectionDateTime = obj.datetime
-            obj.save()
-            sync_book_transactions(obj)
-            sync_party_ledger_entries_for_object(obj)
-            if _can_auto_approve_collections(request.user):
+            # If user selected a date-only value, keep the entry time (not 12:00 AM).
+            if collect_date_obj:
+                try:
+                    base_dt = obj.datetime or timezone.now()
+                    try:
+                        base_dt = timezone.localtime(base_dt)
+                    except Exception:
+                        pass
+                    obj.collectionDateTime = datetime.combine(collect_date_obj, base_dt.timetz().replace(microsecond=0))
+                except Exception:
+                    obj.collectionDateTime = obj.datetime
+            else:
+                obj.collectionDateTime = obj.datetime
+            can_auto_approve = _can_auto_approve_collections(request.user)
+            if can_auto_approve:
                 try:
                     obj.isApproved = True
                     obj.approvedBy_id = user.pk
-                    # msg = "Sir, Our Executive has collected the payment of {} Rs.{}/- from you with Ref. No. {}, Kindly confirm the same. If you have any query Please feel free contact on this no. 7005607770. Thanks, BSS".format(
-                    #     obj.modeOfPayment, obj.paidAmount, obj.paymentID)
+                    obj.approvedOn = timezone.now()
+                except Exception:
+                    pass
+            obj.save()
+            sync_book_transactions(obj)
+            sync_party_ledger_entries_for_object(obj)
+            if otp_required:
+                try:
+                    clear_collection_otp(cus.tenant_id, cus.pk)
+                except Exception:
+                    pass
+                try:
+                    set_collection_status(
+                        cus.tenant_id,
+                        cus.pk,
+                        status='received',
+                        meta={
+                            'paymentMode': paymentMode,
+                            'amountPaid': float(amountPaid),
+                            'collectDate': collectDate,
+                            'paymentID': obj.paymentID,
+                        },
+                    )
+                except Exception:
+                    pass
+            if can_auto_approve:
+                try:
                     msg = "Sir, Your Payment has been received by {} Rs.{}/- on Dt.{} ag. Ref. No. {}, Kindly confirm the same. If you have any query Please feel free to contact on this no. 7005607770. Thanks, BSS".format(
                         obj.modeOfPayment, obj.paidAmount, str(obj.collectionDateTime.strftime('%d-%m-%Y')),
                         obj.paymentID)
-                    # send_whatsapp_message(obj.partyID.phone, msg)
-                    # send_message(obj.partyID.phone, msg, obj.partyID.name)
                     try:
                         numbers = str(obj.partyID.phone).split('.')
                         for n in numbers:
                             send_message(n, msg, obj.partyID.name)
                     except:
                         send_message(obj.partyID.phone, msg, obj.partyID.name)
-                    obj.save()
                 except:
                     pass
-            else:
-                pass
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -1781,7 +1958,17 @@ def edit_collection_by_admin_api(request):
                 obj.detail = detail
                 obj.remark = remark
                 obj.transferredPartyID = None
-                obj.collectionDateTime = datetime.strptime(cDate, '%d/%m/%Y')
+                # Preserve time when changing date (avoid 12:00 AM).
+                try:
+                    c_date_obj = datetime.strptime(cDate, '%d/%m/%Y').date()
+                    base_dt = obj.collectionDateTime or obj.datetime or timezone.now()
+                    try:
+                        base_dt = timezone.localtime(base_dt)
+                    except Exception:
+                        pass
+                    obj.collectionDateTime = datetime.combine(c_date_obj, base_dt.timetz().replace(microsecond=0))
+                except Exception:
+                    obj.collectionDateTime = datetime.strptime(cDate, '%d/%m/%Y')
                 if paymentMode in bank_required_modes:
                     obj.bankID_id = int(bank)
                 else:
@@ -2173,7 +2360,12 @@ def approve_collection(request):
             user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
             obj.isApproved = True
             obj.approvedBy_id = user.pk
+            obj.approvedOn = timezone.now()
             obj.save()
+            try:
+                sync_party_ledger_entries_for_object(obj)
+            except Exception:
+                pass
             try:
                 msg = "Sir, Your Payment has been received by {} Rs.{}/- on Dt.{} ag. Ref. No. {}, Kindly confirm the same. If you have any query Please feel free to contact on this no. 7005607770. Thanks, BSS".format(
                     obj.modeOfPayment, obj.paidAmount, str(obj.collectionDateTime.strftime('%d-%m-%Y')), obj.paymentID)
@@ -2867,11 +3059,30 @@ def _parse_ddmmyyyy_api(value, default=None):
     try:
         return datetime.strptime(value, '%d/%m/%Y').date()
     except Exception:
+        pass
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except Exception:
         return default
 
 
 class PartyLedgerListJson(BaseDatatableView):
     order_columns = ['txDateTime', 'particulars', 'txDateTime', 'txDateTime']
+
+    def _customer_visible_party_ledger_qs(self, qs):
+        approved_collection_ids = tenant_qs(self.request, Collection).filter(
+            isDeleted=False,
+            isApproved=True,
+        ).values('id')
+        approved_counter_collection_ids = tenant_qs(self.request, CollectionCashCounter).filter(
+            isDeleted=False,
+            isApproved=True,
+        ).values('id')
+        return qs.filter(
+            Q(source=PartyLedgerEntry.Source.SALES) |
+            (Q(source=PartyLedgerEntry.Source.COLLECTION) & Q(source_object_id__in=approved_collection_ids)) |
+            (Q(source=PartyLedgerEntry.Source.COUNTER_COLLECTION) & Q(source_object_id__in=approved_counter_collection_ids))
+        )
 
     def _resolve_party(self):
         party_id = self.request.GET.get('partyId')
@@ -2889,6 +3100,11 @@ class PartyLedgerListJson(BaseDatatableView):
         if not party:
             return tenant_qs(self.request, PartyLedgerEntry).none()
 
+        is_customer_view = TenantMembership.objects.filter(
+            user=self.request.user,
+            role=TenantMembership.Role.PARTY,
+        ).exists()
+
         today = datetime.today().date()
         start_date = _parse_ddmmyyyy_api(self.request.GET.get('startDate'), today)
         end_date = _parse_ddmmyyyy_api(self.request.GET.get('endDate'), today)
@@ -2896,6 +3112,8 @@ class PartyLedgerListJson(BaseDatatableView):
             start_date, end_date = end_date, start_date
 
         base_qs = tenant_qs(self.request, PartyLedgerEntry).filter(isDeleted=False, party=party)
+        if is_customer_view:
+            base_qs = self._customer_visible_party_ledger_qs(base_qs)
         prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
             debit_total=Sum('debit'),
             credit_total=Sum('credit'),
@@ -2903,15 +3121,16 @@ class PartyLedgerListJson(BaseDatatableView):
         opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
         self._opening_balance = opening
 
-        qs = base_qs.filter(txDateTime__date__range=[start_date, end_date]).order_by('txDateTime', 'id')
+        qs = base_qs.filter(txDateTime__date__range=[start_date, end_date])
         signed = ExpressionWrapper(F('debit') - F('credit'), output_field=FloatField())
+        # Compute running totals in chronological order, but display latest-first.
         return qs.annotate(
             signed_amount=signed,
             running_total=Window(
                 expression=Sum('signed_amount'),
                 order_by=[F('txDateTime').asc(), F('id').asc()],
             ),
-        )
+        ).order_by('-txDateTime', '-id')
 
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
@@ -2929,6 +3148,10 @@ class PartyLedgerListJson(BaseDatatableView):
     def prepare_results(self, qs):
         json_data = []
         opening = float(getattr(self, '_opening_balance', 0.0) or 0.0)
+        is_customer_view = TenantMembership.objects.filter(
+            user=self.request.user,
+            role=TenantMembership.Role.PARTY,
+        ).exists()
         for item in qs:
             running = float(item.running_total or 0.0)
             balance = opening + running
@@ -2936,18 +3159,77 @@ class PartyLedgerListJson(BaseDatatableView):
             credit = float(item.credit or 0.0)
             signed = debit - credit
 
+            # Many legacy/admin flows save collection dates as date-only (00:00 time).
+            # For display, prefer the record creation time in that case.
+            time_dt = item.txDateTime
+            try:
+                if (
+                    item.source in (PartyLedgerEntry.Source.COLLECTION, PartyLedgerEntry.Source.COUNTER_COLLECTION)
+                    and item.txDateTime
+                    and item.txDateTime.time().strftime('%H:%M:%S') == '00:00:00'
+                    and getattr(item, 'datetime', None)
+                ):
+                    time_dt = item.datetime
+            except Exception:
+                time_dt = item.txDateTime
+
             date_html = '<div class="pl-date">{}</div><div class="pl-time">{}</div>'.format(
                 escape(item.txDateTime.strftime('%d-%m-%Y')),
-                escape(item.txDateTime.strftime('%I:%M %p')),
+                escape(time_dt.strftime('%I:%M %p')),
             )
-            part_html = '<div class="pl-part">{}</div>'.format(escape(item.particulars or ''))
+            particulars = (item.particulars or '').strip()
+            if is_customer_view:
+                # Rename: Sale -> Purchase, Collection -> Payment, remove remarks.
+                if particulars.startswith('Sale'):
+                    particulars = 'Purchase' + particulars[len('Sale'):]
+                if particulars.startswith('Counter Collection'):
+                    particulars = 'Payment' + particulars[len('Counter Collection'):]
+                if particulars.startswith('Collection'):
+                    particulars = 'Payment' + particulars[len('Collection'):]
+                particulars = particulars.replace('(Collection)', '(Payment)')
+
+                # Drop trailing remark chunks; reference is shown separately below.
+                if ' - ' in particulars:
+                    parts = [p for p in particulars.split(' - ') if p]
+                    particulars = parts[0] if parts else particulars
+
+            ref = (item.reference or '').strip()
+            ref_html = ''
+            if is_customer_view:
+                ref_label = ''
+                ref_value = ''
+                if item.source == PartyLedgerEntry.Source.SALES:
+                    # Use actual Sales record id (not invoice no.)
+                    if getattr(item, 'source_object_id', None):
+                        ref_label = 'Sale ID'
+                        try:
+                            ref_value = 'S' + str(int(item.source_object_id)).zfill(8)
+                        except Exception:
+                            ref_value = 'S' + str(item.source_object_id)
+                elif item.source in (PartyLedgerEntry.Source.COLLECTION, PartyLedgerEntry.Source.COUNTER_COLLECTION):
+                    # Show payment id (generated paymentID) when available.
+                    if ref:
+                        ref_label = 'Payment ID'
+                        ref_value = ref
+
+                if ref_label and ref_value:
+                    ref_html = '<div class="pl-ref"><span class="pl-ref-chip">{}</span><span class="pl-ref-val">{}</span></div>'.format(
+                        escape(ref_label),
+                        escape(ref_value),
+                    )
+
+            part_html = '<div class="pl-part">{}</div>{}'.format(escape(particulars), ref_html)
 
             if abs(signed) < 1e-9:
                 amt_html = '-'
             elif signed > 0:
-                amt_html = '<span class="pl-amt pl-amt-in">+ ₹ {}</span>'.format(formatINR(format(abs(signed), '.2f')))
+                amt_html = '<span class="pl-amt pl-amt-in"><span class="pl-chip pl-chip-dr">DR</span> ₹ {}</span>'.format(
+                    formatINR(format(abs(signed), '.2f'))
+                )
             else:
-                amt_html = '<span class="pl-amt pl-amt-out">- ₹ {}</span>'.format(formatINR(format(abs(signed), '.2f')))
+                amt_html = '<span class="pl-amt pl-amt-out"><span class="pl-chip pl-chip-cr">CR</span> ₹ {}</span>'.format(
+                    formatINR(format(abs(signed), '.2f'))
+                )
 
             json_data.append([
                 date_html,
@@ -5290,7 +5572,17 @@ def edit_cash_counter_collection_by_admin_api(request):
                 obj.detail = detail
                 obj.remark = remark
                 obj.transferredPartyID = None
-                obj.collectionDateTime = datetime.strptime(cDate, '%d/%m/%Y')
+                # Preserve time when changing date (avoid 12:00 AM).
+                try:
+                    c_date_obj = datetime.strptime(cDate, '%d/%m/%Y').date()
+                    base_dt = obj.collectionDateTime or obj.datetime or timezone.now()
+                    try:
+                        base_dt = timezone.localtime(base_dt)
+                    except Exception:
+                        pass
+                    obj.collectionDateTime = datetime.combine(c_date_obj, base_dt.timetz().replace(microsecond=0))
+                except Exception:
+                    obj.collectionDateTime = datetime.strptime(cDate, '%d/%m/%Y')
                 if paymentMode in bank_required_modes:
                     obj.bankID_id = int(bank)
                 else:

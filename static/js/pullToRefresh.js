@@ -3,7 +3,8 @@
  * - Opt out per page: add `data-ptr="off"` on <body>.
  */
 (function () {
-    var hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
+    var hasTouchEvents = ('ontouchstart' in window);
+    var hasTouch = hasTouchEvents || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0);
     if (!hasTouch) return;
     if (!document.body || document.body.getAttribute('data-ptr') === 'off') return;
 
@@ -15,8 +16,14 @@
     var pulling = false;
     var dist = 0;
     var refreshing = false;
+    var pointerId = null;
 
     function $(sel) { return document.querySelector(sel); }
+    function updateBarTop(bar) {
+        var nav = $('nav.ui.top.fixed.menu, .ui.top.fixed.menu');
+        var top = nav ? (nav.offsetHeight || 0) : 0;
+        bar.style.top = top + 'px';
+    }
     function createBar() {
         var bar = document.createElement('div');
         bar.className = 'ptr-bar';
@@ -28,14 +35,14 @@
         document.body.appendChild(bar);
 
         // Place below fixed top nav if present.
-        var nav = $('nav.ui.top.fixed.menu');
-        var top = nav ? (nav.offsetHeight || 0) : 0;
-        bar.style.top = top + 'px';
+        updateBarTop(bar);
         return bar;
     }
 
     var bar = createBar();
     var textEl = bar.querySelector('.ptr-text');
+    window.addEventListener('resize', function () { updateBarTop(bar); }, { passive: true });
+    window.addEventListener('orientationchange', function () { updateBarTop(bar); }, { passive: true });
 
     function setText(t) {
         if (textEl) textEl.textContent = t;
@@ -63,6 +70,7 @@
         pulling = false;
         refreshing = false;
         activeScroller = scrollEl;
+        pointerId = null;
     }
 
     function isModalOpen() {
@@ -108,42 +116,89 @@
                     setTimeout(reset, 450);
                 }
             } else {
-                window.location.reload();
+                // Give the spinner a moment to animate before navigation.
+                setTimeout(function () { window.location.reload(); }, 220);
             }
         } catch (err) {
-            window.location.reload();
+            setTimeout(function () { window.location.reload(); }, 220);
         }
     }
 
     // Start hidden.
     bar.style.transform = 'translateY(' + (-maxPull) + 'px)';
 
-    document.addEventListener('touchstart', function (e) {
-        if (e.touches.length !== 1) return;
-        if (!canStart(e)) return;
-        startY = e.touches[0].clientY;
+    function begin(y, id, target) {
+        startY = y;
         pulling = true;
         dist = 0;
+        pointerId = id;
         bar.classList.add('is-active');
-    }, { passive: true });
+        try {
+            if (target && target.setPointerCapture && id != null) {
+                target.setPointerCapture(id);
+            }
+        } catch (e) { /* ignore */ }
+    }
 
-    document.addEventListener('touchmove', function (e) {
+    function move(y, e) {
         if (!pulling || startY === null) return;
-        var y = e.touches[0].clientY;
         dist = Math.max(0, y - startY);
         if (dist <= 0) return;
 
-        // Stop native pull-to-refresh / overscroll.
-        if (e.cancelable) e.preventDefault();
-        setPull(dist);
-    }, { passive: false });
+        // Ensure the bar becomes visible even if touchstart didn't fire (some webviews).
+        bar.classList.add('is-active');
 
-    document.addEventListener('touchend', function () {
+        // Stop native pull-to-refresh / overscroll.
+        if (e && e.cancelable) e.preventDefault();
+        setPull(dist);
+    }
+
+    function end() {
         if (!pulling) return;
         if (dist >= threshold) {
             triggerRefresh();
         } else {
             reset();
         }
-    }, { passive: true });
+    }
+
+    // Prefer Touch Events when available (supports preventDefault); fallback to Pointer Events when needed.
+    if (!hasTouchEvents && ('PointerEvent' in window)) {
+        document.addEventListener('pointerdown', function (e) {
+            if (e.isPrimary === false) return;
+            if (e.pointerType === 'mouse') return;
+            if (!canStart(e)) return;
+            begin(e.clientY, e.pointerId, e.target);
+        }, { passive: true });
+
+        document.addEventListener('pointermove', function (e) {
+            if (!pulling) return;
+            if (pointerId != null && e.pointerId !== pointerId) return;
+            move(e.clientY, e);
+        }, { passive: false });
+
+        document.addEventListener('pointerup', function (e) {
+            if (pointerId != null && e.pointerId !== pointerId) return;
+            end();
+        }, { passive: true });
+
+        document.addEventListener('pointercancel', function (e) {
+            if (pointerId != null && e.pointerId !== pointerId) return;
+            reset();
+        }, { passive: true });
+    } else {
+        document.addEventListener('touchstart', function (e) {
+            if (e.touches.length !== 1) return;
+            if (!canStart(e)) return;
+            begin(e.touches[0].clientY, null, null);
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function (e) {
+            if (!pulling || startY === null) return;
+            move(e.touches[0].clientY, e);
+        }, { passive: false });
+
+        document.addEventListener('touchend', function () { end(); }, { passive: true });
+        document.addEventListener('touchcancel', function () { reset(); }, { passive: true });
+    }
 })();

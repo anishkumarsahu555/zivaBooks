@@ -283,6 +283,8 @@ class Collection(TenantOwnedModel):
     chequeDate = models.DateField(blank=True, null=True)
     transferredPartyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL,
                                            related_name="TransferredPartyID")
+    otpVerified = models.BooleanField(default=False)
+    otpVerifiedOn = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return str(self.partyID.name)

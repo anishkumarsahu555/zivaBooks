@@ -62,6 +62,8 @@ def _tx_dt_for(obj, fallback_field: str = "datetime"):
 def _postings_for_collection(obj: Collection) -> Tuple[_Posting, ...]:
     if not obj.partyID_id:
         return tuple()
+    if not getattr(obj, 'isApproved', False):
+        return tuple()
     amount = _safe_float(obj.paidAmount)
     if amount <= 0:
         return tuple()
@@ -88,6 +90,8 @@ def _postings_for_collection(obj: Collection) -> Tuple[_Posting, ...]:
 
 def _postings_for_counter_collection(obj: CollectionCashCounter) -> Tuple[_Posting, ...]:
     if not obj.partyID_id:
+        return tuple()
+    if not getattr(obj, 'isApproved', False):
         return tuple()
     amount = _safe_float(obj.paidAmount)
     if amount <= 0:
@@ -280,4 +284,3 @@ def backfill_party_ledger(tenant_id: int | None = None) -> None:
         sources = [o for o in sources if o.tenant_id == tenant_id]
     for obj in sources:
         sync_party_ledger_entries_for_object(obj)
-

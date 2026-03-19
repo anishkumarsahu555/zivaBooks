@@ -1,4 +1,5 @@
 {% load static %}
+{% load formatting %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,530 +7,1311 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
-    <title>Customer Dashboard</title>
+    <title>Customer Ledger</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+    <script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+    <script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+
+    <script src="{% static 'sw/app.js' %}"></script>
+
     <style>
         :root {
-            --bg: #eef4ff;
-            --surface: #ffffff;
-            --line: #e3e8ef;
-            --text: #1f2937;
-            --muted: #6b7280;
-            --primary: #1565c0;
-            --danger: #c62828;
-            --success: #2e7d32;
-            --warning: #ef6c00;
-        }
-
-        * {
-            box-sizing: border-box;
+            --bg-a: #eef4ff;
+            --bg-b: #f8fbff;
+            --bg-c: #fffaf5;
+            --surface: rgba(255, 255, 255, 0.92);
+            --surface-strong: #ffffff;
+            --line: rgba(15, 23, 42, 0.10);
+            --text: rgba(15, 23, 42, 0.92);
+            --muted: rgba(2, 6, 23, 0.62);
+            --brand-a: #091a2b;
+            --brand-b: #12324a;
+            --brand-c: #0f766e;
+            --accent: #2dd4bf;
+            --shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
         }
 
         body {
-            margin: 0;
-            font-family: "Roboto", "Segoe UI", sans-serif;
             background:
-                    radial-gradient(900px 340px at -10% -10%, #dbeafe 0%, transparent 60%),
-                    radial-gradient(800px 320px at 110% 0%, #fff1df 0%, transparent 58%),
-                    linear-gradient(180deg, #eef4ff 0%, #f8fbff 48%, #fffaf5 100%);
+                radial-gradient(900px 340px at -10% -10%, #dbeafe 0%, transparent 60%),
+                radial-gradient(800px 320px at 110% 0%, #fff1df 0%, transparent 58%),
+                linear-gradient(180deg, var(--bg-a) 0%, var(--bg-b) 48%, var(--bg-c) 100%);
             color: var(--text);
+            overscroll-behavior-y: contain;
+        }
+
+        html, body { height: 100%; }
+
+        /* Pull-to-refresh (same as main app) */
+        .ptr-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            z-index: 1002;
+            display: flex;
+            justify-content: center;
+            pointer-events: none;
+            transition: transform 0.12s ease-out, opacity 0.12s ease-out;
+            opacity: 0;
+        }
+        .ptr-bar.is-active { opacity: 1; }
+        .ptr-pill {
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            box-shadow: 0 18px 44px rgba(2, 6, 23, 0.12);
+            border-radius: 999px;
+            padding: 8px 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            color: rgba(15, 23, 42, 0.82);
+            transform: translateY(0) scale(0.98);
+            transition: transform 0.14s ease-out, box-shadow 0.14s ease-out, background 0.14s ease-out, border-color 0.14s ease-out, color 0.14s ease-out;
+        }
+        .ptr-bar.is-ready .ptr-pill {
+            border-color: rgba(16, 185, 129, 0.28);
+            background: rgba(236, 253, 245, 0.98);
+            color: rgba(5, 150, 105, 0.95);
+            transform: translateY(0) scale(1);
+        }
+        .ptr-icon {
+            transform: rotate(var(--ptr-rotate, 0deg));
+            transition: transform 0.14s ease-out;
+        }
+        .ptr-bar.is-refreshing .ptr-icon { animation: ptrspin 0.8s linear infinite; }
+        @keyframes ptrspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        /* Top bar */
+        .cust-nav.ui.menu {
+            border: none !important;
+            border-radius: 0 !important;
+            background:
+                radial-gradient(circle at top right, rgba(248, 250, 252, 0.20), transparent 28%),
+                linear-gradient(135deg, var(--brand-a), var(--brand-b) 52%, var(--brand-c)) !important;
+            box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18) !important;
+        }
+
+        .cust-nav .item,
+        .cust-nav .item i.icon {
+            color: rgba(248, 250, 252, 0.94) !important;
+            font-weight: 800 !important;
+        }
+
+        .cust-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cust-logo {
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 18px rgba(2, 6, 23, 0.25);
+        }
+
+        .cust-pill {
+            margin-left: 10px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            font-weight: 900;
+            color: rgba(226, 232, 240, 0.95);
+        }
+
+        /* Layout */
+        .cust-shell {
+            padding: 70px 10px 28px;
+        }
+
+        .pusher {
             min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
-        .container-wrap {
-            max-width: 720px;
-            margin: 16px auto;
-            padding: 0 10px;
-            width: 100%;
+        .cust-shell {
+            flex: 1 0 auto;
         }
 
-        .card {
-            background: var(--surface);
+        .cust-footer {
+            flex: 0 0 auto;
+            margin: 0;
+            padding: 12px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+            color: rgba(2, 6, 23, 0.68);
+            border-top: 1px solid rgba(15, 23, 42, 0.10);
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(10px);
+        }
+
+        .cust-footer .cust-footer-strong { font-weight: 900; color: rgba(15, 23, 42, 0.88); }
+        .cust-footer a { color: rgba(15, 23, 42, 0.86); font-weight: 900; }
+
+        .cust-inner {
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        /* Sidebar */
+        .cust-sidebar.ui.sidebar {
+            background:
+                radial-gradient(circle at top right, rgba(248, 250, 252, 0.10), transparent 32%),
+                linear-gradient(180deg, #081a2a, #0b2236 52%, #072030) !important;
+        }
+
+        .cust-sidebar .item {
+            color: rgba(226, 232, 240, 0.92) !important;
+            border-radius: 12px !important;
+            margin: 2px 8px;
+            font-weight: 800 !important;
+            transition: background 0.14s ease-out, transform 0.14s ease-out;
+        }
+
+        .cust-sidebar .item.active,
+        .cust-sidebar .item:hover {
+            background: rgba(255, 255, 255, 0.07) !important;
+            color: #ccfbf1 !important;
+            transform: translateX(1px);
+        }
+
+        .cust-sidebar .item.active {
+            background: rgba(45, 212, 191, 0.18) !important;
+            position: relative;
+        }
+
+        .cust-sidebar .item.active::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 10px;
+            bottom: 10px;
+            width: 3px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, rgba(45, 212, 191, 0.95), rgba(56, 189, 248, 0.95));
+        }
+
+        .cust-sidebar .item i.icon {
+            opacity: 0.95;
+        }
+
+        .cust-sidenav {
+            display: none;
+        }
+
+        @media (min-width: 768px) {
+            .cust-shell {
+                padding-left: 16rem;
+                padding-right: 16px;
+            }
+
+            .cust-mobile-toggle {
+                display: none !important;
+            }
+
+            .cust-sidenav {
+                display: block;
+                position: fixed;
+                top: 56px;
+                left: 0;
+                width: 15rem;
+                height: calc(100vh - 56px);
+                padding: 12px 10px 14px;
+                overflow: auto;
+                background:
+                    radial-gradient(circle at top right, rgba(248, 250, 252, 0.10), transparent 32%),
+                    linear-gradient(180deg, #081a2a, #0b2236 52%, #072030);
+                border-right: 1px solid rgba(255, 255, 255, 0.08);
+                z-index: 1000;
+            }
+
+            .cust-sidenav .ui.vertical.menu {
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+            }
+
+            .cust-sidenav .ui.vertical.menu .item {
+                color: rgba(226, 232, 240, 0.92) !important;
+                border-radius: 14px !important;
+                margin: 3px 0;
+                font-weight: 800 !important;
+                transition: background 0.14s ease-out, transform 0.14s ease-out;
+            }
+
+            .cust-sidenav .ui.vertical.menu .item:hover {
+                background: rgba(255, 255, 255, 0.08) !important;
+                transform: translateX(1px);
+            }
+
+            .cust-sidenav .ui.vertical.menu .active.item {
+                background: rgba(45, 212, 191, 0.18) !important;
+                color: #ccfbf1 !important;
+                position: relative;
+            }
+
+            .cust-sidenav .ui.vertical.menu .active.item::before {
+                content: "";
+                position: absolute;
+                left: 0;
+                top: 10px;
+                bottom: 10px;
+                width: 3px;
+                border-radius: 999px;
+                background: linear-gradient(180deg, rgba(45, 212, 191, 0.95), rgba(56, 189, 248, 0.95));
+            }
+        }
+
+        /* Hero */
+        .cust-hero.ui.segment {
+            border-radius: 22px;
             border: 1px solid var(--line);
-            border-radius: 16px;
-            box-shadow: 0 8px 18px rgba(21, 101, 192, 0.08);
-            margin-bottom: 12px;
-            overflow: hidden;
-            transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+            background:
+                radial-gradient(circle at top right, rgba(248, 250, 252, 0.50), rgba(248, 250, 252, 0) 42%),
+                radial-gradient(circle at left center, rgba(56, 189, 248, 0.16), rgba(248, 250, 252, 0) 48%),
+                linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.78));
+            box-shadow: var(--shadow);
+            overflow: visible;
+            padding: 14px 14px 12px !important;
         }
 
-        .card:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 14px 28px rgba(59, 130, 246, 0.12);
-            border-color: #d7e4f8;
+        /* Calendar popup can be clipped by overflow contexts; keep it above menus/dimmers. */
+        .cust-hero .ui.calendar .ui.popup {
+            z-index: 2200 !important;
         }
 
-        .topbar {
+        .cust-hero-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 10px;
-            padding: 14px 16px;
-            background: linear-gradient(115deg, rgba(219, 234, 254, .55), rgba(255, 241, 223, .45));
+            gap: 14px;
+            flex-wrap: wrap;
         }
 
-        .title {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--primary);
-        }
-
-        .logout-btn {
-            text-decoration: none;
-            border: 1px solid #ef9a9a;
-            color: var(--danger);
-            border-radius: 999px;
-            padding: 7px 12px;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all .2s ease;
-        }
-
-        .logout-btn:hover {
-            background: #ffebee;
-            border-color: #ef5350;
-        }
-
-        .meta-row {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 8px;
-            padding: 14px 16px;
-        }
-
-        .label-title {
-            color: var(--muted);
-            font-size: 12px;
-            margin-bottom: 3px;
-        }
-
-        .value {
-            font-size: 15px;
-            font-weight: 600;
-        }
-
-        .section-head {
-            margin: 0;
-            padding: 14px 16px;
-            border-bottom: 1px solid var(--line);
-            font-size: 15px;
-            font-weight: 600;
-            color: #374151;
-            background: #f8fbff;
-        }
-
-        .card:nth-of-type(3) .section-head {
-            color: #2e7d32;
-            background: #eefaf0;
-        }
-
-        .card:nth-of-type(4) .section-head {
-            color: #ef6c00;
-            background: #fff6eb;
-        }
-
-        .msg-list {
-            padding: 0 16px;
-        }
-
-        .msg-item {
-            padding: 12px 0;
-            border-bottom: 1px solid var(--line);
-            transition: background-color .2s ease, transform .2s ease;
-        }
-
-        .msg-item:last-child {
-            border-bottom: none;
-        }
-
-        .msg-item:hover {
-            background: #f9fbff;
-            transform: translateX(2px);
-        }
-
-        .msg-text {
-            margin-bottom: 6px;
-            word-break: break-word;
-            font-size: 14px;
-        }
-
-        .msg-meta {
-            font-size: 12px;
-            color: var(--muted);
-            display: flex;
+        .cust-identity {
+            display: inline-flex;
             align-items: center;
+            gap: 12px;
+            min-width: 220px;
+        }
+
+        .cust-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 950;
+            color: rgba(248, 250, 252, 0.98);
+            background:
+                radial-gradient(circle at 25% 20%, rgba(255,255,255,0.30), rgba(255,255,255,0) 46%),
+                linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(45, 212, 191, 0.92));
+            box-shadow: 0 18px 28px rgba(2, 6, 23, 0.16);
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            flex: 0 0 auto;
+            position: relative;
+        }
+
+        .cust-avatar::after {
+            content: "";
+            position: absolute;
+            inset: -2px;
+            border-radius: 20px;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.30), rgba(45, 212, 191, 0.28));
+            z-index: -1;
+        }
+
+        .cust-hero-title {
+            font-size: clamp(1.15rem, 2.7vw, 1.55rem);
+            font-weight: 900;
+            margin: 0;
+            line-height: 1.08;
+        }
+
+        .cust-hero-meta {
+            margin-top: 8px;
+            display: inline-flex;
             gap: 8px;
             flex-wrap: wrap;
         }
 
-        .chip {
-            display: inline-block;
+        .cust-phone-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
             border-radius: 999px;
-            padding: 3px 8px;
-            font-size: 11px;
-            font-weight: 600;
-            border: 1px solid transparent;
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            background: rgba(255, 255, 255, 0.72);
+            color: rgba(2, 6, 23, 0.72);
+            font-weight: 900;
+            line-height: 1;
+        }
+        .cust-phone-pill i.icon { margin: 0 !important; opacity: 0.85; }
+        .cust-phone-pill:hover { background: rgba(255, 255, 255, 0.86); color: rgba(2, 6, 23, 0.82); }
+
+        .cust-meta-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(45, 212, 191, 0.22);
+            background: rgba(45, 212, 191, 0.12);
+            color: rgba(15, 118, 110, 0.95);
+            font-weight: 950;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-size: 0.72rem;
+            line-height: 1;
         }
 
-        .chip.success {
-            color: var(--success);
-            background: #e6f7ea;
-            border-color: #c8e6c9;
-        }
-
-        .chip.warning {
-            color: var(--warning);
-            background: #fff1df;
-            border-color: #ffe0b2;
-        }
-
-        .empty {
-            padding: 14px 0;
-            font-size: 14px;
-            color: var(--muted);
-        }
-
-        .alert {
-            border-radius: 10px;
-            padding: 10px 12px;
-            margin-bottom: 10px;
-            font-size: 13px;
-            border: 1px solid transparent;
-        }
-
-        .alert.success {
-            background: #e8f5e9;
-            border-color: #c8e6c9;
-            color: #1b5e20;
-        }
-
-        .alert.error {
-            background: #ffebee;
-            border-color: #ffcdd2;
-            color: #b71c1c;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 10px;
-            padding: 14px 16px 16px;
-        }
-
-        .input-label {
-            font-size: 12px;
-            color: var(--muted);
-            margin-bottom: 4px;
-            display: block;
-        }
-
-        .text-input {
+        /* OTP banner */
+        .cust-otp-banner {
             width: 100%;
-            border: 1px solid #cfd8e3;
-            border-radius: 10px;
-            padding: 10px 11px;
-            font-size: 14px;
-            outline: none;
-            background: #fff;
-            transition: box-shadow .2s ease, border-color .2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 18px;
+            border: 1px solid rgba(37, 99, 235, 0.18);
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.55), rgba(255,255,255,0) 56%),
+                linear-gradient(135deg, rgba(37, 99, 235, 0.10), rgba(45, 212, 191, 0.10));
+            color: rgba(29, 78, 216, 0.98);
+            box-shadow: 0 14px 26px rgba(2, 6, 23, 0.08);
+        }
+        .cust-otp-banner.is-received {
+            border: 1px solid rgba(16, 185, 129, 0.22);
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.55), rgba(255,255,255,0) 56%),
+                linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(59, 130, 246, 0.06));
         }
 
-        .text-input:focus {
-            border-color: #90caf9;
-            box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.15);
+        .cust-otp-left { min-width: 0; }
+        .cust-otp-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 950;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-size: 0.72rem;
+            color: rgba(30, 64, 175, 0.92);
+            line-height: 1;
+        }
+        .cust-otp-banner.is-received .cust-otp-title { color: rgba(5, 150, 105, 0.92); }
+        .cust-otp-title i.icon { margin: 0 !important; opacity: 0.9; }
+
+        .cust-otp-code {
+            margin-top: 6px;
+            font-weight: 950;
+            font-size: 1.25rem;
+            letter-spacing: 0.14em;
+            color: rgba(2, 6, 23, 0.92);
+            font-variant-numeric: tabular-nums;
+        }
+        .cust-otp-sub {
+            margin-top: 4px;
+            color: rgba(2, 6, 23, 0.62);
+            font-weight: 900;
+            font-size: 0.86rem;
+            letter-spacing: 0.01em;
         }
 
-        .primary-btn {
-            border: 0;
-            border-radius: 999px;
-            padding: 10px 16px;
-            font-size: 13px;
-            font-weight: 600;
-            color: #fff;
-            background: linear-gradient(90deg, #1976d2, #1565c0);
-            cursor: pointer;
-            justify-self: start;
-            transition: transform .2s ease, box-shadow .2s ease;
+        .cust-otp-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+            flex: 0 0 auto;
         }
 
-        .primary-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 10px 20px rgba(25, 118, 210, .24);
-        }
-
-        .secondary-btn {
-            border: 1px solid #90caf9;
-            border-radius: 999px;
-            padding: 8px 14px;
-            font-size: 13px;
-            font-weight: 600;
-            color: #1565c0;
-            background: #e3f2fd;
-            cursor: pointer;
-            transition: all .2s ease;
-        }
-
-        .secondary-btn:hover {
-            background: #d9efff;
-            border-color: #64b5f6;
-        }
-
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(15, 23, 42, 0.45);
-            display: none;
+        .cust-otp-timer {
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            padding: 12px;
-            z-index: 9999;
-        }
-
-        .modal-overlay.show {
-            display: flex;
-        }
-
-        .modal-card {
-            width: 100%;
-            max-width: 420px;
-            background: #fff;
-            border-radius: 12px;
-            border: 1px solid var(--line);
-            box-shadow: 0 18px 34px rgba(15, 23, 42, 0.24);
-            overflow: hidden;
-            animation: modalPop .18s ease-out;
-        }
-
-        @keyframes modalPop {
-            from {opacity: .4; transform: translateY(4px) scale(.99);}
-            to {opacity: 1; transform: translateY(0) scale(1);}
-        }
-
-        .modal-head {
-            margin: 0;
-            padding: 14px 16px;
-            font-size: 15px;
-            font-weight: 600;
-            border-bottom: 1px solid var(--line);
-            background: #f8fbff;
-            color: #374151;
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-            padding: 0 16px 16px;
-        }
-
-        .modal-alert {
-            margin: 12px 16px 0;
-            padding: 10px 12px;
-            border-radius: 8px;
-            font-size: 13px;
-            display: none;
-            border: 1px solid transparent;
-        }
-
-        .modal-alert.success {
-            display: block;
-            background: #e8f5e9;
-            border-color: #c8e6c9;
-            color: #1b5e20;
-        }
-
-        .modal-alert.error {
-            display: block;
-            background: #ffebee;
-            border-color: #ffcdd2;
-            color: #b71c1c;
-        }
-
-        .footer-note {
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(37, 99, 235, 0.16);
+            background: rgba(255, 255, 255, 0.55);
+            color: rgba(30, 64, 175, 0.92);
+            font-weight: 950;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            min-width: 70px;
             text-align: center;
-            font-size: 13px;
-            color: #526072;
-            padding: 8px 0 4px;
-            line-height: 1.6;
-            font-weight: 700;
         }
 
-        @media (min-width: 640px) {
-            .meta-row {
-                grid-template-columns: 1fr 1fr;
+        .cust-otp-details {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .cust-otp-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(15, 23, 42, 0.10);
+            background: rgba(255, 255, 255, 0.62);
+            color: rgba(2, 6, 23, 0.74);
+            font-weight: 900;
+            line-height: 1;
+            white-space: nowrap;
+        }
+        .cust-otp-chip i.icon { margin: 0 !important; opacity: 0.85; }
+
+        .cust-hero-form {
+            margin: 0 !important;
+        }
+
+        .cust-hero-fields {
+            display: grid;
+            grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) auto;
+            gap: 10px;
+            align-items: end;
+            margin: 0 !important;
+        }
+
+        .cust-hero-fields .field {
+            margin: 0 !important;
+        }
+
+        .cust-hero-form label {
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 900;
+            color: rgba(2, 6, 23, 0.58);
+        }
+
+        .cust-hero-form .cust-date-input {
+            height: 40px;
+            border-radius: 14px !important;
+            border: 1px solid rgba(15, 23, 42, 0.12) !important;
+            background: rgba(255, 255, 255, 0.88) !important;
+            font-weight: 850;
+            padding: 10px 2.6em 10px 12px;
+        }
+
+        .cust-apply-btn.ui.button {
+            height: 40px;
+            border-radius: 14px !important;
+            font-weight: 900 !important;
+            margin: 0 !important;
+            white-space: nowrap;
+        }
+
+        .cust-apply-btn i.icon { margin-right: 0.5em; }
+
+        @media (max-width: 520px) {
+            .cust-identity { min-width: 0; }
+            .cust-avatar { width: 42px; height: 42px; border-radius: 16px; }
+            .cust-avatar::after { border-radius: 18px; }
+            .cust-hero-meta { margin-top: 6px; }
+            .cust-hero-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; width: 100%; }
+            .cust-apply-btn i.icon { margin-right: 0; }
+            .cust-apply-text { display: none; }
+            .cust-apply-btn.ui.button { padding-left: 0.9em !important; padding-right: 0.9em !important; }
+
+            .cust-otp-banner { padding: 10px 10px; border-radius: 16px; }
+            .cust-otp-code { font-size: 1.15rem; letter-spacing: 0.12em; }
+            .cust-otp-banner { flex-direction: column; align-items: stretch; gap: 10px; }
+            .cust-otp-right { flex-direction: row; justify-content: space-between; align-items: center; gap: 8px; }
+            .cust-otp-details { justify-content: flex-end; }
+            .cust-otp-details .cust-otp-chip { padding: 6px 8px; }
+            .cust-otp-details .cust-otp-chip i.icon { display: none; }
+        }
+
+        /* Modal actions */
+        #pwdModal .actions.cust-modal-actions {
+            display: flex !important;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 12px;
+        }
+        @media (max-width: 520px) {
+            #pwdModal .actions.cust-modal-actions .button {
+                flex: 1 1 0;
+                text-align: center;
             }
+        }
+
+        /* KPI cards */
+        .cust-kpis {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+            position: relative;
+        }
+
+        @media (max-width: 900px) { .cust-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 380px) { .cust-kpis { grid-template-columns: 1fr; } }
+
+        .cust-kpi {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            background: var(--surface);
+            box-shadow: 0 10px 18px rgba(2, 6, 23, 0.06);
+            padding: 12px 12px 10px;
+        }
+
+        .cust-kpi-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .cust-kpi-label {
+            font-size: 0.76rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 900;
+            color: rgba(2, 6, 23, 0.62);
+        }
+
+        .cust-kpi-value {
+            font-size: 1.12rem;
+            font-weight: 900;
+            margin-top: 5px;
+        }
+
+        .cust-kpi-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .cust-kpi-open .cust-kpi-icon { background: rgba(100, 116, 139, 0.12); color: #334155; }
+        .cust-kpi-debit .cust-kpi-icon { background: rgba(59, 130, 246, 0.12); color: #1d4ed8; }
+        .cust-kpi-credit .cust-kpi-icon { background: rgba(16, 185, 129, 0.12); color: #065f46; }
+        .cust-kpi-close .cust-kpi-icon { background: rgba(245, 158, 11, 0.14); color: #92400e; }
+
+        /* Statement */
+        .cust-statement.ui.segment {
+            border-radius: 22px;
+            border: 1px solid var(--line);
+            background: var(--surface-strong);
+            box-shadow: var(--shadow);
+        }
+
+        /* DataTables: show like cards, keep controls tidy */
+        #LedgerTable thead { display: none; }
+        #LedgerTable { border-collapse: separate !important; border-spacing: 0 10px !important; }
+        #LedgerTable tbody tr { background: transparent !important; }
+        #LedgerTable tbody td { border: none !important; padding: 0 !important; }
+
+        .cust-row-card {
+            background: #fff;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 18px;
+            padding: 12px 12px 10px;
+            box-shadow: 0 10px 18px rgba(2, 6, 23, 0.06);
+        }
+
+        .cust-row-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .cust-row-left { min-width: 0; }
+        .cust-row-right { text-align: right; white-space: nowrap; }
+
+        /* These classes come from PartyLedgerListJson HTML */
+        .pl-date { font-weight: 900; }
+        .pl-time { color: rgba(2, 6, 23, 0.55); font-size: 0.78rem; margin-top: 2px; }
+        .pl-part { line-height: 1.2; }
+        .pl-ref {
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .pl-ref-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 18px;
+            padding: 0 8px;
+            border-radius: 999px;
+            font-size: 0.70rem;
+            font-weight: 950;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            background: rgba(37, 99, 235, 0.10);
+            border: 1px solid rgba(37, 99, 235, 0.14);
+            color: rgba(30, 64, 175, 0.92);
+            line-height: 1;
+        }
+        .pl-ref-val {
+            font-weight: 950;
+            color: rgba(2, 6, 23, 0.70);
+            font-variant-numeric: tabular-nums;
+        }
+        .pl-amt { font-weight: 900; white-space: nowrap; }
+        .pl-amt-in { color: rgba(5, 150, 105, 0.98); }
+        .pl-amt-out { color: rgba(225, 29, 72, 0.98); }
+
+        .pl-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 18px;
+            padding: 0 8px;
+            border-radius: 999px;
+            font-size: 0.70rem;
+            font-weight: 950;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            margin-right: 6px;
+            transform: translateY(-1px);
+        }
+        .pl-chip-dr { background: rgba(16, 185, 129, 0.14); color: rgba(5, 150, 105, 0.98); }
+        .pl-chip-cr { background: rgba(244, 63, 94, 0.14); color: rgba(225, 29, 72, 0.98); }
+
+        .cust-row-bal {
+            margin-top: 6px;
+            color: rgba(2, 6, 23, 0.55);
+            font-weight: 900;
+        }
+
+        /* DataTables controls: custom top bar (keeps Show + Search on one line) */
+        .cust-dt-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: nowrap;
+            margin: 2px 0 10px;
+        }
+        .cust-dt-top .dataTables_length,
+        .cust-dt-top .dataTables_filter {
+            margin: 0 !important;
+        }
+        .cust-dt-top .dataTables_length { flex: 1 1 auto; }
+        .cust-dt-top .dataTables_filter { flex: 1 1 auto; display: flex; justify-content: flex-end; }
+        .cust-dt-top label {
+            margin: 0 !important;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            line-height: 1;
+        }
+        .cust-dt-top .dataTables_filter label { justify-content: flex-end; width: 100%; }
+        .cust-dt-top .dataTables_filter span.ui.input { display: inline-flex; align-items: center; }
+        .cust-dt-top input[type=search] { width: 160px !important; height: 38px; }
+        .cust-dt-top .ui.dropdown.selection { min-height: 38px; }
+
+        /* DataTables bottom (info + pagination) */
+        #LedgerTable_wrapper .cust-dt-bottom.row {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 10px;
+            margin-top: 8px;
+            flex-wrap: nowrap;
+        }
+        #LedgerTable_wrapper .cust-dt-bottom.row > .column {
+            display: flex !important;
+            align-items: center !important;
+        }
+        #LedgerTable_wrapper .cust-dt-bottom.row > .column:first-child { justify-content: flex-start; flex: 1 1 auto; min-width: 0; }
+        #LedgerTable_wrapper .cust-dt-bottom.row > .column:last-child { justify-content: flex-end; flex: 0 0 auto; }
+        #LedgerTable_info { padding-top: 0 !important; margin: 0 !important; white-space: nowrap; }
+        #LedgerTable_paginate { margin: 0 !important; }
+        #LedgerTable_paginate .ui.pagination.menu { flex-wrap: nowrap; }
+
+        @media (max-width: 520px) {
+            .cust-dt-top { gap: 8px; }
+            .cust-dt-top input[type=search] { width: 120px !important; }
+            #LedgerTable_wrapper .cust-dt-bottom.row { flex-wrap: wrap; }
+            #LedgerTable_wrapper .cust-dt-bottom.row > .column { flex: 1 1 100%; }
+            #LedgerTable_wrapper .cust-dt-bottom.row > .column:last-child { justify-content: flex-start; }
+            #LedgerTable_info { text-align: left !important; }
         }
     </style>
 </head>
 <body>
-<div style="flex: 1;">
-    <div class="container-wrap">
-        <div class="card topbar">
-            <h1 class="title">Customer Dashboard</h1>
-            <div style="display:flex;gap:8px;align-items:center;">
-                <button class="secondary-btn" type="button" onclick="openPasswordModal()">Change Password</button>
-                <a class="logout-btn" href="{% url 'homeApp:logout' %}">
-                    Logout
-                </a>
+
+<div class="ui left vertical inverted sidebar menu cust-sidebar" id="custSidebar">
+    <div class="item" style="padding: 14px 14px 10px;">
+        <div class="cust-brand">
+            <img class="cust-logo" alt="Logo" src="{% static 'sw/images/icon-192.png' %}">
+            <div>
+                <div style="font-weight: 900;">zivaBooks</div>
+                <div style="color: rgba(226,232,240,0.7); font-size: 0.78rem; margin-top: 2px;">Customer Portal</div>
             </div>
         </div>
+    </div>
+    <div class="item" style="padding-top: 6px; padding-bottom: 6px;">
+        <div style="color: rgba(226,232,240,0.7); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;">
+            Menu
+        </div>
+    </div>
+    <a class="item active" href="#"><i class="book icon"></i> Ledger</a>
+    <a class="item" href="#" onclick="$('#pwdModal').modal('show'); return false;"><i class="key icon"></i> Change Password</a>
+    <a class="item" href="{% url 'homeApp:logout' %}"><i class="sign out alternate icon"></i> Logout</a>
+</div>
 
-        <div class="card">
-            <div class="meta-row">
+<div class="cust-sidenav">
+    <div class="ui vertical inverted menu">
+        <div class="item" style="padding: 14px 14px 10px;">
+            <div class="cust-brand">
+                <img class="cust-logo" alt="Logo" src="{% static 'sw/images/icon-192.png' %}">
                 <div>
-                    <div class="label-title">Name</div>
-                    <div class="value">{{ party.name|default:"N/A" }}</div>
-                </div>
-                <div>
-                    <div class="label-title">Phone</div>
-                    <div class="value">{{ party.phone|default:"N/A" }}</div>
+                    <div style="font-weight: 900; color: rgba(248,250,252,0.95);">zivaBooks</div>
+                    <div style="color: rgba(226,232,240,0.7); font-size: 0.78rem; margin-top: 2px;">Customer Portal</div>
                 </div>
             </div>
         </div>
-
-        <div class="card">
-            <h2 class="section-head">Latest 10 Payment Messages</h2>
-            <div class="msg-list">
-                {% for item in collection_messages %}
-                    <div class="msg-item">
-                        <div class="msg-text">{{ item.message|default:"N/A" }}</div>
-                        <div class="msg-meta">
-                                <span class="chip success">Success</span>
-
-                            {{ item.datetime|date:"d-m-Y h:i A"|default:"N/A" }}
-                        </div>
-                    </div>
-                {% empty %}
-                    <div class="empty">No collection message records found.</div>
-                {% endfor %}
+        <div class="item" style="padding-top: 6px; padding-bottom: 6px;">
+            <div style="color: rgba(226,232,240,0.7); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;">
+                Menu
             </div>
         </div>
-
-        <div class="card">
-            <h2 class="section-head">Latest 10 Purchase Messages</h2>
-            <div class="msg-list">
-                {% for msg in sales_messages %}
-                    <div class="msg-item">
-                        <div class="msg-text">{{ msg.message|default:"N/A" }}</div>
-                        <div class="msg-meta">
-                             <span class="chip success">Success</span>
-                            {{ msg.datetime|date:"d-m-Y h:i A"|default:"N/A" }}
-                        </div>
-                    </div>
-                {% empty %}
-                    <div class="empty">No sales message records found.</div>
-                {% endfor %}
-            </div>
-        </div>
-
+        <a class="item active" href="#"><i class="book icon"></i> Ledger</a>
+        <a class="item" href="#" onclick="$('#pwdModal').modal('show'); return false;"><i class="key icon"></i> Change Password</a>
+        <a class="item" href="{% url 'homeApp:logout' %}"><i class="sign out alternate icon"></i> Logout</a>
     </div>
 </div>
 
-<div id="passwordModal" class="modal-overlay" onclick="closePasswordModal(event)">
-    <div class="modal-card" onclick="event.stopPropagation()">
-        <h2 class="modal-head">Change Password</h2>
-        <div id="passwordModalAlert" class="modal-alert"></div>
-        <form method="post" action="{% url 'homeApp:customer_change_password' %}" class="form-grid" id="passwordForm">
+<div class="pusher">
+    <div class="ui top fixed menu cust-nav">
+        <div class="left menu">
+            <a class="item cust-mobile-toggle" href="#" onclick="$('#custSidebar').sidebar('toggle'); return false;">
+                <i class="bars icon"></i>
+            </a>
+            <div class="item">
+                <div class="cust-brand">
+                    <img class="cust-logo" alt="Logo" src="{% static 'sw/images/icon-192.png' %}">
+                    <div class="customer-brand-title">zivaBooks</div>
+                    <div class="cust-pill">Ledger</div>
+                </div>
+            </div>
+        </div>
+        <div class="right menu">
+            <div class="ui dropdown item">
+                <i class="user circle icon"></i>
+                {{ party.name|default:"N/A" }}
+                <i class="dropdown icon"></i>
+                <div class="menu">
+                    <a class="item" href="#" onclick="$('#pwdModal').modal('show'); return false;"><i class="key icon"></i> Change Password</a>
+                    <a class="item" href="{% url 'homeApp:logout' %}"><i class="sign out alternate icon"></i> Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="cust-shell">
+        <div class="cust-inner">
+            <div class="ui segment cust-hero">
+                <div class="cust-hero-head">
+                    <div class="cust-identity">
+                        <div class="cust-avatar">{{ party.name|default:"N/A"|slice:":1"|capfirst }}</div>
+                        <div>
+                            <h1 class="cust-hero-title">{{ party.name|default:"N/A"|capfirst }}</h1>
+                            <div class="cust-hero-meta">
+                                {% if party.phone %}
+                                    <a class="cust-phone-pill" href="tel:{{ party.phone }}">
+                                        <i class="phone icon"></i> {{ party.phone }}
+                                    </a>
+                                {% else %}
+                                    <span class="cust-phone-pill"><i class="phone icon"></i> -</span>
+                                {% endif %}
+                                <span class="cust-meta-chip">Customer</span>
+                            </div>
+                        </div>
+                    </div>
+                    <form class="ui mini form cust-hero-form" id="custFilterForm" method="get">
+                        <div class="cust-hero-fields">
+                            <div class="field">
+                                <label>Start</label>
+                                <div class="ui calendar" id="custStartCal">
+                                    <div class="ui right icon input">
+                                        <input type="text" class="cust-date-input" name="startDate" id="startDate" value="{{ startDate }}" placeholder="dd/mm/yyyy" autocomplete="off">
+                                        <i class="calendar alternate outline icon"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>End</label>
+                                <div class="ui calendar" id="custEndCal">
+                                    <div class="ui right icon input">
+                                        <input type="text" class="cust-date-input" name="endDate" id="endDate" value="{{ endDate }}" placeholder="dd/mm/yyyy" autocomplete="off">
+                                        <i class="calendar alternate outline icon"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label style="opacity:0;">Apply</label>
+                                <button class="ui blue mini button cust-apply-btn" id="custApplyBtn" type="submit">
+                                    <i class="filter icon"></i><span class="cust-apply-text">Apply</span>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="custOtpPill" class="cust-otp-banner" style="display:none; margin-top: 12px;">
+                        <div class="cust-otp-left">
+                            <div class="cust-otp-title"><i class="key icon" id="custOtpIcon"></i> <span id="custOtpTitle">Payment OTP</span></div>
+                            <div class="cust-otp-code" id="custOtpCode">------</div>
+                            <div class="cust-otp-sub" id="custOtpSub" style="display:none;"></div>
+                        </div>
+                        <div class="cust-otp-right">
+                            <div class="cust-otp-timer" id="custOtpTimer">0:00</div>
+                            <div class="cust-otp-details" id="custOtpDetails">
+                                <span class="cust-otp-chip" id="custOtpAmt" style="display:none;"><i class="money bill alternate outline icon"></i><span></span></span>
+                                <span class="cust-otp-chip" id="custOtpMode" style="display:none;"><i class="credit card outline icon"></i><span></span></span>
+                                <span class="cust-otp-chip" id="custOtpDate" style="display:none;"><i class="calendar alternate outline icon"></i><span></span></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cust-kpis dimmable">
+                <div class="ui inverted dimmer" id="kpiDimmer">
+                    <div class="ui text loader">Updating</div>
+                </div>
+                <div class="cust-kpi cust-kpi-open">
+                    <div class="cust-kpi-row">
+                        <div>
+                            <div class="cust-kpi-label">Opening</div>
+                            <div class="cust-kpi-value" id="kpiOpening">₹ {{ opening|money }}</div>
+                        </div>
+                        <div class="cust-kpi-icon"><i class="flag outline icon"></i></div>
+                    </div>
+                </div>
+                <div class="cust-kpi cust-kpi-debit">
+                    <div class="cust-kpi-row">
+                        <div>
+                            <div class="cust-kpi-label">Debit</div>
+                            <div class="cust-kpi-value" id="kpiDebit">₹ {{ range_debit|money }}</div>
+                        </div>
+                        <div class="cust-kpi-icon"><i class="arrow up icon"></i></div>
+                    </div>
+                </div>
+                <div class="cust-kpi cust-kpi-credit">
+                    <div class="cust-kpi-row">
+                        <div>
+                            <div class="cust-kpi-label">Credit</div>
+                            <div class="cust-kpi-value" id="kpiCredit">₹ {{ range_credit|money }}</div>
+                        </div>
+                        <div class="cust-kpi-icon"><i class="arrow down icon"></i></div>
+                    </div>
+                </div>
+                <div class="cust-kpi cust-kpi-close">
+                    <div class="cust-kpi-row">
+                        <div>
+                            <div class="cust-kpi-label">Closing</div>
+                            <div class="cust-kpi-value" id="kpiClosing">₹ {{ closing|money }}</div>
+                        </div>
+                        <div class="cust-kpi-icon"><i class="balance scale icon"></i></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui segment cust-statement dimmable" style="margin-top: 12px;">
+                <div class="ui inverted dimmer" id="ledgerDimmer">
+                    <div class="ui text loader">Loading</div>
+                </div>
+                <div class="ui small header" style="margin-top: 0;">Statement</div>
+                <table class="ui table" id="LedgerTable" style="width: 100%;">
+                    <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Particulars</th>
+                        <th>Amount</th>
+                        <th>Balance</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <footer class="cust-footer">
+        <div class="ui center aligned container">
+            <div class="cust-footer-strong">Developed by Ziva Infotech.</div>
+            <div style="margin-top: 4px;">
+                For any related software needs, contact <a href="tel:7005824802">7005824802</a>.
+            </div>
+        </div>
+    </footer>
+</div>
+
+<div class="ui tiny modal" id="pwdModal">
+    <i class="close icon"></i>
+    <div class="header">Change Password</div>
+    <div class="content">
+        <div class="ui tiny message" id="pwdMsg" style="display:none;"></div>
+        <form class="ui tiny form" id="pwdForm" action="{% url 'homeApp:customer_change_password' %}" method="post">
             {% csrf_token %}
-            <div>
-                <label class="input-label">Current Password</label>
-                <input class="text-input" type="password" name="current_password" required maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric">
+            <div class="field">
+                <label>Current Password</label>
+                <input type="password" name="current_password" maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric" required>
             </div>
-            <div>
-                <label class="input-label">New Password (6 digits)</label>
-                <input class="text-input" type="password" name="new_password" required maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric">
+            <div class="field">
+                <label>New Password (6 digits)</label>
+                <input type="password" name="new_password" maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric" required>
             </div>
-            <div>
-                <label class="input-label">Confirm New Password</label>
-                <input class="text-input" type="password" name="confirm_password" required maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric">
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="secondary-btn" onclick="closePasswordModal()">Cancel</button>
-                <button type="submit" class="primary-btn">Update Password</button>
+            <div class="field">
+                <label>Confirm New Password</label>
+                <input type="password" name="confirm_password" maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric" required>
             </div>
         </form>
     </div>
+    <div class="actions cust-modal-actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui blue button" type="button" onclick="submitPwd()">Update</button>
+    </div>
 </div>
 
-<div class="footer-note">
-    Developed by Ziva Infotech.<br>
-    For any related software needs, contact 7005824802.
-</div>
+<script src="{% static 'js/pullToRefresh.js' %}"></script>
+<script src="{% static 'js/waves.js' %}"></script>
 <script>
-    function showPasswordModalAlert(type, text) {
-        var box = document.getElementById('passwordModalAlert');
-        box.className = 'modal-alert ' + type;
-        box.textContent = text;
+    function showPwdMessage(type, text) {
+        var box = $('#pwdMsg');
+        box.removeClass('positive negative').addClass(type === 'success' ? 'positive' : 'negative');
+        box.text(text).show();
     }
 
-    function clearPasswordModalAlert() {
-        var box = document.getElementById('passwordModalAlert');
-        box.className = 'modal-alert';
-        box.textContent = '';
-    }
-
-    function openPasswordModal() {
-        clearPasswordModalAlert();
-        document.getElementById('passwordModal').classList.add('show');
-    }
-
-    function closePasswordModal(event) {
-        if (event && event.target && event.target.id !== 'passwordModal') {
-            return;
-        }
-        clearPasswordModalAlert();
-        document.getElementById('passwordModal').classList.remove('show');
-    }
-
-    document.getElementById('passwordForm').addEventListener('submit', async function (e) {
-        var current = this.current_password.value;
-        var nextPwd = this.new_password.value;
-        var confirmPwd = this.confirm_password.value;
+    async function submitPwd() {
+        var form = document.getElementById('pwdForm');
         var sixDigits = /^[0-9]{6}$/;
-        var form = this;
-
+        var current = form.current_password.value;
+        var nextPwd = form.new_password.value;
+        var confirmPwd = form.confirm_password.value;
         if (!sixDigits.test(current) || !sixDigits.test(nextPwd) || !sixDigits.test(confirmPwd)) {
-            e.preventDefault();
-            showPasswordModalAlert('error', 'All passwords must be exactly 6 digits.');
+            showPwdMessage('error', 'All passwords must be exactly 6 digits.');
             return;
         }
         if (nextPwd !== confirmPwd) {
-            e.preventDefault();
-            showPasswordModalAlert('error', 'New password and confirm password do not match.');
+            showPwdMessage('error', 'New password and confirm password do not match.');
             return;
         }
 
-        e.preventDefault();
-
+        var btn = document.querySelector('#pwdModal .actions button.ui.blue.button');
+        if (btn) btn.classList.add('loading');
         var csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
         var formData = new FormData(form);
-
         try {
             var response = await fetch(form.action, {
                 method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': csrfToken
-                },
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrfToken },
                 body: formData
             });
-
-            var payload = await response.json();
-            if (response.ok && payload.message === 'success') {
-                showPasswordModalAlert('success', payload.success || 'Password changed successfully.');
+            var payload = null;
+            try {
+                payload = await response.json();
+            } catch (e) {
+                payload = null;
+            }
+            if (response.ok && payload && payload.message === 'success') {
+                showPwdMessage('success', payload.success || 'Password changed successfully.');
                 form.reset();
-                setTimeout(function () {
-                    closePasswordModal();
-                }, 900);
+                setTimeout(function () { $('#pwdModal').modal('hide'); }, 900);
                 return;
             }
-
-            showPasswordModalAlert('error', payload.error || 'Unable to update password.');
+            if (response.status === 403) {
+                showPwdMessage('error', 'Security check failed (403). Please refresh the page and try again.');
+                return;
+            }
+            showPwdMessage('error', (payload && (payload.error || payload.detail)) || ('Unable to update password. (' + response.status + ')'));
         } catch (err) {
-            showPasswordModalAlert('error', 'Network error. Please try again.');
+            showPwdMessage('error', 'Network error. Please try again.');
+        } finally {
+            if (btn) btn.classList.remove('loading');
         }
+    }
+
+    $(function () {
+        $('.ui.dropdown').dropdown();
+        $('#pwdModal').modal({ autofocus: false, observeChanges: true });
+        $('#custSidebar').sidebar({ transition: 'overlay' });
+
+        function initCalendar(selector) {
+            $(selector).calendar({
+                monthFirst: false,
+                type: 'date',
+                formatter: {
+                    date: function (date) {
+                        if (!date) return '';
+                        var day = String(date.getDate());
+                        var month = String(date.getMonth() + 1);
+                        var year = date.getFullYear();
+                        return day + '/' + month + '/' + year;
+                    }
+                }
+            });
+        }
+        initCalendar('#custStartCal');
+        initCalendar('#custEndCal');
+
+        function formatMoneyINR(number) {
+            var num = Number(number || 0);
+            if (!isFinite(num)) num = 0;
+            return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function setKpis(payload) {
+            $('#kpiOpening').text('₹ ' + formatMoneyINR(payload.opening));
+            $('#kpiDebit').text('₹ ' + formatMoneyINR(payload.debit));
+            $('#kpiCredit').text('₹ ' + formatMoneyINR(payload.credit));
+            $('#kpiClosing').text('₹ ' + formatMoneyINR(payload.closing));
+        }
+
+        async function refreshKpis() {
+            $('#kpiDimmer').addClass('active');
+            try {
+                var url = "{% url 'homeApp:customer_ledger_kpis' %}" +
+                    '?startDate=' + encodeURIComponent($('#startDate').val() || '') +
+                    '&endDate=' + encodeURIComponent($('#endDate').val() || '');
+                var res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                var payload = await res.json();
+                if (res.ok && payload && payload.message === 'success') {
+                    setKpis(payload);
+                }
+            } catch (e) {
+                // keep existing values
+            } finally {
+                $('#kpiDimmer').removeClass('active');
+            }
+        }
+
+        var ledgerTable = $('#LedgerTable').DataTable({
+            dom: "<'cust-dt-top'<'cust-dt-l'l><'cust-dt-f'f>>rt<'cust-dt-bottom row'<'eight wide column'i><'right aligned eight wide column'p>>",
+            processing: true,
+            serverSide: true,
+            searching: true,
+            ordering: false,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            pageLength: 25,
+            ajax: {
+                url: "{% url 'homeApp:PartyLedgerListJson' %}",
+                data: function (d) {
+                    d.partyId = "{{ party.id }}";
+                    d.startDate = $('#startDate').val();
+                    d.endDate = $('#endDate').val();
+                }
+            },
+            columns: [
+                {
+                    data: 0,
+                    render: function (data, type, row) {
+                        if (type !== 'display') {
+                            return $('<div>').html(row[1]).text() || '';
+                        }
+                        return (
+                            '<div class="cust-row-card">' +
+                            '  <div class="cust-row-top">' +
+                            '    <div class="cust-row-left">' + row[0] + row[1] + '</div>' +
+                            '    <div class="cust-row-right">' +
+                            '      <div>' + row[2] + '</div>' +
+                            '      <div class="cust-row-bal">₹ ' + row[3] + '</div>' +
+                            '    </div>' +
+                            '  </div>' +
+                            '</div>'
+                        );
+                    }
+                },
+                { data: 1, visible: false, searchable: true },
+                { data: 2, visible: false, searchable: false },
+                { data: 3, visible: false, searchable: false }
+            ]
+        });
+
+        $('#LedgerTable').on('processing.dt', function (e, settings, processing) {
+            $('#ledgerDimmer').toggleClass('active', !!processing);
+        });
+
+        $('#custFilterForm').on('submit', function (e) {
+            e.preventDefault();
+            $('#custApplyBtn').addClass('loading');
+            refreshKpis();
+            ledgerTable.ajax.reload(function () {
+                $('#custApplyBtn').removeClass('loading');
+            }, true);
+        });
+
+        // Pull-to-refresh hook (used by `static/js/pullToRefresh.js`).
+        window.onPullToRefresh = function () {
+            return (async function () {
+                await refreshKpis();
+                await new Promise(function (resolve) {
+                    ledgerTable.ajax.reload(function () { resolve(); }, false);
+                });
+                // Also refresh OTP quickly after a manual refresh.
+                if (!otpMuteUntil || Date.now() >= otpMuteUntil) {
+                    otpBackoffMs = 15000;
+                    scheduleOtpPoll(50);
+                }
+            })();
+        };
+
+        function renderOtp(expiresIn) {
+            var mins = Math.floor(expiresIn / 60);
+            var secs = Math.max(0, expiresIn % 60);
+            return mins + ':' + String(secs).padStart(2, '0');
+        }
+
+        var otpExpiresIn = 0;
+        var otpInterval = null;
+        function tickOtp() {
+            if (otpExpiresIn <= 0) {
+                $('#custOtpPill').hide();
+                if (otpInterval) { clearInterval(otpInterval); otpInterval = null; }
+                return;
+            }
+            $('#custOtpTimer').text(renderOtp(otpExpiresIn));
+            otpExpiresIn -= 1;
+        }
+
+        function showOtpReceived(payload) {
+            $('#custOtpPill').addClass('is-received').show();
+            $('#custOtpTitle').text('Payment Received');
+            $('#custOtpIcon').removeClass('key').addClass('check circle');
+            var paymentId = payload.paymentID ? String(payload.paymentID) : '';
+            $('#custOtpCode').text(paymentId ? ('Ref ' + paymentId) : 'Received');
+            $('#custOtpSub').text('OTP verified').show();
+            $('#custOtpTimer').hide();
+        }
+
+        function showOtpActive() {
+            $('#custOtpPill').removeClass('is-received').show();
+            $('#custOtpTitle').text('Payment OTP');
+            $('#custOtpIcon').removeClass('check circle').addClass('key');
+            $('#custOtpSub').hide();
+            $('#custOtpTimer').show();
+        }
+
+        // OTP polling: low-frequency when inactive, faster when active, pause when tab hidden.
+        var otpPollTimer = null;
+        var otpBackoffMs = 15000;
+        var otpBackoffMaxMs = 120000;
+        var otpMuteUntil = 0;
+
+        function scheduleOtpPoll(delayMs) {
+            if (otpPollTimer) clearTimeout(otpPollTimer);
+            otpPollTimer = setTimeout(function () { pollOtp(); }, delayMs);
+        }
+
+        function muteOtpPolling(ms) {
+            otpMuteUntil = Date.now() + ms;
+            if (otpPollTimer) clearTimeout(otpPollTimer);
+            otpPollTimer = setTimeout(function () {
+                otpMuteUntil = 0;
+                otpBackoffMs = 15000;
+                pollOtp();
+            }, ms);
+        }
+
+        async function pollOtp() {
+            if (otpMuteUntil && Date.now() < otpMuteUntil) {
+                scheduleOtpPoll(Math.min(otpMuteUntil - Date.now(), 60000));
+                return;
+            }
+            if (document.visibilityState && document.visibilityState !== 'visible') {
+                scheduleOtpPoll(30000);
+                return;
+            }
+            try {
+                var res = await fetch("{% url 'homeApp:customer_active_collection_otp' %}", {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                });
+                var payload = await res.json();
+                if (!res.ok || !payload || payload.message !== 'success' || !payload.active) {
+                    if (payload && payload.status === 'received') {
+                        // Briefly show "received" state so the customer sees confirmation.
+                        showOtpReceived(payload);
+                        var ttl = Number(payload.status_expires_in || 10);
+                        setTimeout(function () { $('#custOtpPill').fadeOut(200); }, Math.min(10000, ttl * 1000));
+                        // After confirmation, stop hitting the server for a while.
+                        muteOtpPolling(180000);
+                        return;
+                    }
+                    otpExpiresIn = 0;
+                    tickOtp();
+                    // Inactive: poll less often.
+                    otpBackoffMs = Math.min(otpBackoffMs * 2, otpBackoffMaxMs);
+                    scheduleOtpPoll(otpBackoffMs);
+                    return;
+                }
+                otpBackoffMs = 12000;
+                showOtpActive();
+                $('#custOtpCode').text(payload.otp || '');
+                if (payload.amountPaid !== '' && payload.amountPaid !== null && payload.amountPaid !== undefined) {
+                    $('#custOtpAmt').show().find('span').last().text('₹ ' + formatMoneyINR(payload.amountPaid));
+                } else {
+                    $('#custOtpAmt').hide();
+                }
+                if (payload.paymentMode) {
+                    $('#custOtpMode').show().find('span').last().text(String(payload.paymentMode));
+                } else {
+                    $('#custOtpMode').hide();
+                }
+                if (payload.collectDate) {
+                    $('#custOtpDate').show().find('span').last().text(String(payload.collectDate));
+                } else {
+                    $('#custOtpDate').hide();
+                }
+                otpExpiresIn = Number(payload.expires_in || 0);
+                if (otpExpiresIn > 0) {
+                    $('#custOtpPill').show();
+                    tickOtp();
+                    if (!otpInterval) otpInterval = setInterval(tickOtp, 1000);
+                    // Active: still re-check occasionally so it disappears after verification/save.
+                    scheduleOtpPoll(otpBackoffMs);
+                } else {
+                    otpBackoffMs = Math.min(otpBackoffMs * 2, otpBackoffMaxMs);
+                    scheduleOtpPoll(otpBackoffMs);
+                }
+            } catch (e) {
+                // Network hiccup: back off a bit.
+                otpBackoffMs = Math.min(otpBackoffMs * 2, otpBackoffMaxMs);
+                scheduleOtpPoll(otpBackoffMs);
+            }
+        }
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') {
+                // Refresh quickly when user comes back.
+                if (!otpMuteUntil || Date.now() >= otpMuteUntil) {
+                    otpBackoffMs = 15000;
+                    scheduleOtpPoll(400);
+                }
+            }
+        });
+
+        // Initial poll.
+        scheduleOtpPoll(400);
     });
 </script>
 </body>
