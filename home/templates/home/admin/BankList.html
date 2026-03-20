@@ -351,6 +351,13 @@
                                     </div>
 
                                 </div>
+                                <div class="one fields">
+                                    <div class="sixteen wide field">
+                                        <label>Opening Balance</label>
+                                        <input type="number" step="0.01" name="openingBalance" placeholder="Opening Balance"
+                                               id="openingBalance" value="0">
+                                    </div>
+                                </div>
 
 
                             </form>
@@ -419,6 +426,13 @@
                                            id="descriptionEdit">
                                 </div>
 
+                            </div>
+                            <div class="one fields">
+                                <div class="sixteen wide field">
+                                    <label>Opening Balance</label>
+                                    <input type="number" step="0.01" name="openingBalanceEdit" placeholder="Opening Balance"
+                                           id="openingBalanceEdit" value="0">
+                                </div>
                             </div>
 
 
@@ -551,6 +565,7 @@
             var bankName = $('#bankName').val();
             var accountNumber = $('#accountNumber').val();
             var description = $('#description').val();
+            var openingBalance = $('#openingBalance').val();
 
 
             if (bankName === '' || accountNumber === '') {
@@ -569,6 +584,7 @@
                 data.append('bankName', bankName);
                 data.append('accountNumber', accountNumber);
                 data.append('description', description);
+                data.append('openingBalance', openingBalance);
 
 
                 data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);
@@ -732,7 +748,7 @@
             mode = mode || 'edit';
             var viewOnly = mode === 'view';
             $('#userModal').modal('show');
-            $('#bankNameEdit, #accountNumberEdit, #descriptionEdit').prop('disabled', viewOnly);
+            $('#bankNameEdit, #accountNumberEdit, #descriptionEdit, #openingBalanceEdit').prop('disabled', viewOnly);
             $('#userModal .saveBtn').toggle(!viewOnly);
             $('#userModal .saveBtnLoad').hide();
             $('#userModal .js-view-close-btn').toggle(viewOnly);
@@ -744,6 +760,7 @@
                     $('#bankNameEdit').val(response.data['Name']);
                     $('#accountNumberEdit').val(response.data['AccountNumber']);
                     $('#descriptionEdit').val(response.data['Description']);
+                    $('#openingBalanceEdit').val(response.data['OpeningBalance']);
 
 
                 },
@@ -764,6 +781,7 @@ showLoading();
             var bankName = $('#bankNameEdit').val();
             var accountNumber = $('#accountNumberEdit').val();
             var description = $('#descriptionEdit').val();
+            var openingBalance = $('#openingBalanceEdit').val();
 
 
             if (EditId === '' || bankName === '' || accountNumber === '') {
@@ -782,6 +800,7 @@ showLoading();
                 data.append('bankName', bankName);
                 data.append('accountNumber', accountNumber);
                 data.append('description', description);
+                data.append('openingBalance', openingBalance);
                 data.append('EditId', EditId);
                 data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);
 

@@ -21,7 +21,7 @@ from django.views.decorators.cache import cache_page
 from django_datatables_view.base_datatable_view import BaseDatatableView
 from weasyprint import CSS, HTML
 from home.models import *
-from home.books import sync_book_transactions
+from home.books import ensure_bank_account, ensure_books_for_tenant, sync_book_transactions
 from home.otp import (
     OTP_TTL_SECONDS,
     clear_collection_otp,
@@ -381,6 +381,23 @@ def _can_set_order_date(user):
     return user.has_perm('home.can_manage_orders') or user.has_perm('home.can_approve_orders') or user.has_perm('home.can_view_party_credentials')
 def _format_order_number(pk):
     return 'O' + str(int(pk)).zfill(8)
+def _order_status_label(status):
+    status = str(status or '')
+    if status == Order.Status.APPROVED:
+        return '<div class="ui tiny green label">Approved</div>'
+    if status == Order.Status.SUBMITTED:
+        return '<div class="ui tiny orange label">Submitted</div>'
+    if status == Order.Status.DRAFT:
+        return '<div class="ui tiny grey label">Draft</div>'
+    if status == Order.Status.CANCELLED:
+        return '<div class="ui tiny red label">Cancelled</div>'
+    if status == Order.Status.FULFILLED:
+        return '<div class="ui tiny blue label">Fulfilled</div>'
+    return '<div class="ui tiny label">{}</div>'.format(escape(status.title() or 'Unknown'))
+def _collection_verified_label(is_verified):
+    if is_verified:
+        return '<div class="ui tiny green label">Yes</div>'
+    return '<div class="ui tiny grey label">No</div>'
 def _can_edit_order_record(user, order_obj):
     if not user.is_authenticated or order_obj is None:
         return False
@@ -495,7 +512,7 @@ def _collection_list_base_qs(request_or_user):
         'partyID', 'transferredPartyID', 'bankID', 'collectedBy', 'approvedBy'
     ).only(
         'id', 'paymentID', 'paidAmount', 'modeOfPayment', 'detail', 'remark', 'collectionAddress',
-        'collectionDateTime', 'datetime', 'isApproved', 'isTallied', 'chequeDate',
+        'collectionDateTime', 'datetime', 'isApproved', 'isTallied', 'chequeDate', 'otpVerified', 'otpVerifiedOn',
         'partyID__name', 'transferredPartyID__name', 'bankID__name',
         'collectedBy__name', 'approvedBy__name'
     )
@@ -723,12 +740,14 @@ def add_staff_api(request):
             UserStatus = request.POST.get("UserStatus")
             UserPwd = request.POST.get("UserPwd")
             # PartyGroup = request.POST.get("PartyGroup")
-            imageUpload = request.FILES["imageUpload"]
-            imageUploadID = request.FILES["imageUploadID"]
+            imageUpload = request.FILES.get("imageUpload")
+            imageUploadID = request.FILES.get("imageUploadID")
             staff = StaffUser()
             assign_tenant(staff, request)
-            staff.photo = imageUpload
-            staff.idProof = imageUploadID
+            if imageUpload:
+                staff.photo = imageUpload
+            if imageUploadID:
+                staff.idProof = imageUploadID
             staff.name = CompanyUserName
             staff.phone = UserPhoneNo
             staff.email = UserEmail
@@ -1024,12 +1043,21 @@ def add_bank_api(request):
             bankName = request.POST.get("bankName")
             accountNumber = request.POST.get("accountNumber")
             description = request.POST.get("description")
+            openingBalance = request.POST.get("openingBalance")
             obj = Bank()
             assign_tenant(obj, request)
             obj.name = bankName
             obj.accountNumber = accountNumber
             obj.description = description
             obj.save()
+            if obj.tenant_id:
+                bank_account = ensure_bank_account(obj.tenant, obj)
+                bank_account.openingBalance = float(_decimal_from_request(openingBalance))
+                display_name = obj.name or 'Bank'
+                if obj.accountNumber:
+                    display_name = f'{display_name} - {obj.accountNumber}'
+                bank_account.name = display_name
+                bank_account.save(update_fields=['openingBalance', 'name', 'lastUpdatedOn'])
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -1084,12 +1112,18 @@ def get_bank_detail(request):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
     id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, Bank), id=id)
+    bank_account = tenant_qs(request, BookAccount).filter(
+        isDeleted=False,
+        type=BookAccount.Type.BANK,
+        bank=instance,
+    ).only('openingBalance').first()
     # instance = BankDetails.objects.get(companyID_id=company.pk)
     data = {
         'ID': instance.pk,
         'Name': instance.name,
         'AccountNumber': instance.accountNumber,
         'Description': instance.description,
+        'OpeningBalance': str(getattr(bank_account, 'openingBalance', 0.0) or 0.0),
     }
     return JsonResponse({'data': data}, safe=False)
 @transaction.atomic
@@ -1104,11 +1138,20 @@ def edit_bank_api(request):
             name = request.POST.get("bankName")
             accountNumber = request.POST.get("accountNumber")
             description = request.POST.get("description")
+            openingBalance = request.POST.get("openingBalance")
             obj = tenant_qs(request, Bank).select_related().get(id=int(Id))
             obj.name = name
             obj.accountNumber = accountNumber
             obj.description = description
             obj.save()
+            if obj.tenant_id:
+                bank_account = ensure_bank_account(obj.tenant, obj)
+                bank_account.openingBalance = float(_decimal_from_request(openingBalance))
+                display_name = obj.name or 'Bank'
+                if obj.accountNumber:
+                    display_name = f'{display_name} - {obj.accountNumber}'
+                bank_account.name = display_name
+                bank_account.save(update_fields=['openingBalance', 'name', 'lastUpdatedOn'])
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -1780,7 +1823,7 @@ def edit_collection_by_admin_api(request):
         except:
             return JsonResponse({'message': 'error'}, safe=False)
 class CollectionByStaffListJson(BaseDatatableView):
-    order_columns = ['paymentID', 'partyID.name', 'paidAmount', 'modeOfPayment', 'collectionDateTime', 'datetime',
+    order_columns = ['paymentID', 'partyID.name', 'paidAmount', 'otpVerified', 'modeOfPayment', 'collectionDateTime', 'datetime',
                      'bankID.name', 'detail', 'transferredPartyID',
                      'remark',
                      ]
@@ -1830,6 +1873,7 @@ class CollectionByStaffListJson(BaseDatatableView):
                 escape(item.paymentID),
                 escape(item.partyID.name),
                 formatINR(format(item.paidAmount, '.0f')),
+                _collection_verified_label(item.otpVerified),
                 escape(item.modeOfPayment),
                 escape(item.collectionDateTime.strftime('%d-%m-%Y')),
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
@@ -1841,7 +1885,7 @@ class CollectionByStaffListJson(BaseDatatableView):
             ])
         return json_data
 class CollectionByAdminListJson(BaseDatatableView):
-    order_columns = ['paymentID', 'partyID.name', 'paidAmount', 'action', 'modeOfPayment', 'collectedBy.name',
+    order_columns = ['paymentID', 'partyID.name', 'paidAmount', 'action', 'otpVerified', 'modeOfPayment', 'collectedBy.name',
                      'collectionDateTime', 'datetime',
                      'isApproved', 'approvedBy.name', 'bankID.name', 'isTallied', 'detail', 'chequeDate',
                      'transferredPartyID',
@@ -1952,6 +1996,7 @@ class CollectionByAdminListJson(BaseDatatableView):
                 escape(item.partyID.name),
                 formatINR(format(item.paidAmount, '.0f')),
                 action,
+                _collection_verified_label(item.otpVerified),
                 escape(item.modeOfPayment),
                 collectedBy,
                 escape(item.collectionDateTime.strftime('%d-%m-%Y')),
@@ -2241,7 +2286,9 @@ def get_bank_balances_api(request):
     # Bank balances are sensitive; restrict to admin/owner-style access.
     if not request.user.has_perm('home.can_view_party_credentials'):
         return JsonResponse({'message': 'forbidden'}, status=403)
-    bank_required_modes = ['Online', 'Cheque', 'Cheque CC']
+    tenant = get_current_tenant(request)
+    if tenant is not None:
+        ensure_books_for_tenant(tenant)
     banks = list(
         tenant_qs(request, Bank)
         .filter(isDeleted=False)
@@ -2249,38 +2296,32 @@ def get_bank_balances_api(request):
         .order_by('name')
     )
     totals_by_bank = {bank['id']: 0.0 for bank in banks}
-    collection_totals = (
-        tenant_qs(request, Collection)
-        .filter(isDeleted=False, bankID__isnull=False, modeOfPayment__in=bank_required_modes)
-        .values('bankID')
-        .annotate(total=Sum('paidAmount'))
+    account_rows = list(
+        tenant_qs(request, BookAccount)
+        .filter(isDeleted=False, type=BookAccount.Type.BANK, bank__isnull=False)
+        .values('id', 'bank_id', 'openingBalance')
     )
-    for row in collection_totals:
-        totals_by_bank[row['bankID']] = totals_by_bank.get(row['bankID'], 0.0) + float(row['total'] or 0.0)
-    counter_collection_totals = (
-        tenant_qs(request, CollectionCashCounter)
-        .filter(isDeleted=False, bankID__isnull=False, modeOfPayment__in=bank_required_modes)
-        .values('bankID')
-        .annotate(total=Sum('paidAmount'))
-    )
-    for row in counter_collection_totals:
-        totals_by_bank[row['bankID']] = totals_by_bank.get(row['bankID'], 0.0) + float(row['total'] or 0.0)
-    cash_counter_card_totals = (
-        tenant_qs(request, CashCounter)
-        .filter(isDeleted=False, bankID__isnull=False, mode='Card')
-        .values('bankID')
-        .annotate(total=Sum('amount'))
-    )
-    for row in cash_counter_card_totals:
-        totals_by_bank[row['bankID']] = totals_by_bank.get(row['bankID'], 0.0) + float(row['total'] or 0.0)
-    cash_counter_mix_totals = (
-        tenant_qs(request, CashCounter)
-        .filter(isDeleted=False, bankID__isnull=False, mode='Mix')
-        .values('bankID')
-        .annotate(total=Sum('mixCardAmount'))
-    )
-    for row in cash_counter_mix_totals:
-        totals_by_bank[row['bankID']] = totals_by_bank.get(row['bankID'], 0.0) + float(row['total'] or 0.0)
+    tx_totals = {
+        row['account']: row
+        for row in (
+            tenant_qs(request, BookTransaction)
+            .filter(
+                isDeleted=False,
+                account_id__in=[row['id'] for row in account_rows],
+            )
+            .values('account')
+            .annotate(
+                in_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.IN)),
+                out_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.OUT)),
+            )
+        )
+    }
+    for row in account_rows:
+        account_total = float(row['openingBalance'] or 0.0)
+        tx_row = tx_totals.get(row['id'])
+        if tx_row:
+            account_total += float(tx_row.get('in_total') or 0.0) - float(tx_row.get('out_total') or 0.0)
+        totals_by_bank[row['bank_id']] = totals_by_bank.get(row['bank_id'], 0.0) + account_total
     data = []
     for bank in banks:
         data.append({
@@ -2859,7 +2900,6 @@ def get_sales_dashboard_report_api(request):
         'sales_record_count': queryset.count(),
     }
     return JsonResponse({'data': data}, safe=False)
-@cache_page(60 * 5)
 def get_orders_dashboard_report_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'forbidden'}, status=403)
@@ -3421,7 +3461,7 @@ class OrdersByAdminListJson(BaseDatatableView):
             created_by = item.createdBy.name if getattr(item, 'createdBy', None) else '-'
             approved_by = item.approvedBy.name if getattr(item, 'approvedBy', None) else '-'
             approved_on = item.approvedOn.strftime('%d-%m-%Y %I:%M %p') if getattr(item, 'approvedOn', None) else '-'
-            status_label = '<div class="ui tiny green label">Approved</div>' if approved else '<div class="ui tiny orange label">Pending</div>'
+            status_label = _order_status_label(item.status)
             att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
             json_data.append([
                 escape(item.orderNumber or str(item.pk)),
@@ -3490,7 +3530,7 @@ class OrdersByStaffListJson(BaseDatatableView):
                 )
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
             party = item.partyID.name if getattr(item, 'partyID', None) else '-'
-            status_label = '<div class="ui tiny green label">Approved</div>' if approved else '<div class="ui tiny orange label">Pending</div>'
+            status_label = _order_status_label(item.status)
             att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
             json_data.append([
                 escape(item.orderNumber or str(item.pk)),

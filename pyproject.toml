@@ -10,6 +10,8 @@ dependencies = [
     "django-pwa>=2.0.1",
     "django-redis>=6.0.0",
     "django-stdimage>=6.0.2",
+    "psycopg[binary]>=3.2.10",
+    "python-dotenv>=1.2.2",
     "requests>=2.32.5",
     "weasyprint>=68.1",
 ]

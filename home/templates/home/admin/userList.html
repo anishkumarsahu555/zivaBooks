@@ -27,60 +27,107 @@
 {% block body %}
 
     <style>
+        .upload-grid {
+            gap: 0.85rem 1rem;
+        }
+
+        .upload-card {
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            border-radius: 20px;
+            padding: 0.9rem 1rem 1rem;
+            background: linear-gradient(180deg, #ffffff, #fbfdff);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+        }
+
+        .upload-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.65rem;
+        }
+
+        .upload-title {
+            font-size: 0.96rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .upload-hint {
+            margin-top: 0.55rem;
+            color: #64748b;
+            font-size: 0.76rem;
+            line-height: 1.35;
+            text-align: center;
+        }
+
+        .upload-actions {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: nowrap;
+            margin-top: 0.75rem;
+        }
+
+        .upload-remove {
+            border: 0;
+            background: transparent;
+            color: #b45309;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            padding: 0.35rem 0;
+            white-space: nowrap;
+        }
+
+        .upload-remove[disabled] {
+            opacity: 0.35;
+            cursor: default;
+        }
+
+        .upload-input-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            justify-content: center;
+            min-width: 150px;
+            padding: 0.7rem 1rem;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #0f766e, #0f766e 55%, #115e59);
+            color: #fff;
+            font-size: 0.82rem;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 12px 22px rgba(15, 118, 110, 0.18);
+        }
+
         .avatar-upload {
             position: relative;
-            max-width: 115px;
-            margin: 5px auto;
+            max-width: 110px;
+            margin: 0.15rem auto 0;
         }
 
         .avatar-upload .avatar-edit {
-            position: absolute;
-            right: 12px;
-            z-index: 1;
-            top: 10px;
+            position: static;
         }
 
-        .avatar-upload .avatar-edit input {
+        .avatar-upload .avatar-edit input,
+        #imageUpload,
+        #imageUploadID,
+        #imageUploadEdit,
+        #imageUploadIDEdit {
             display: none;
         }
 
-        .avatar-upload .avatar-edit input + label {
-            display: inline-block;
-            width: 25px;
-            height: 25px;
-            margin-bottom: 0;
-            border-radius: 100%;
-            background: #FFFFFF;
-            border: 1px solid transparent;
-            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.12);
-            cursor: pointer;
-            font-weight: normal;
-            transition: all 0.2s ease-in-out;
-        }
-
-        .avatar-upload .avatar-edit input + label:hover {
-            background: #f1f1f1;
-            border-color: #d6d6d6;
-        }
-
-        .avatar-upload .avatar-edit input + label:after {
-            color: #757575;
-            position: absolute;
-            top: 10px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            margin: auto;
-
-        }
-
         .avatar-upload .avatar-preview {
-            width: 100px;
-            height: 100px;
+            width: 96px;
+            height: 96px;
             position: relative;
             border-radius: 100%;
-            border: 6px solid #F8F8F8;
-            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.1);
+            border: 4px solid #f8fafc;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+            overflow: hidden;
         }
 
         .avatar-upload .avatar-preview > div {
@@ -90,6 +137,117 @@
             background-size: cover;
             background-repeat: no-repeat;
             background-position: center;
+        }
+
+        .avatar-upload.is-document {
+            max-width: 126px;
+        }
+
+        .avatar-upload.is-document .avatar-preview {
+            width: 120px;
+            height: 82px;
+            border-radius: 16px;
+        }
+
+        .avatar-upload.is-document .avatar-preview > div {
+            border-radius: 12px;
+            background-size: cover;
+        }
+
+        .ui.tiny.basic.teal.label {
+            margin: 0;
+            border-radius: 999px;
+            font-weight: 800;
+        }
+
+        .cropper-modal .content {
+            padding-top: 0.5rem !important;
+        }
+
+        .cropper-stage-wrap {
+            border-radius: 22px;
+            padding: 1rem;
+            background: linear-gradient(180deg, #f8fafc, #eef2ff);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .cropper-stage {
+            position: relative;
+            width: min(100%, 420px);
+            margin: 0 auto;
+            background:
+                linear-gradient(45deg, rgba(148, 163, 184, 0.12) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.12) 75%),
+                linear-gradient(45deg, rgba(148, 163, 184, 0.12) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.12) 75%);
+            background-size: 18px 18px;
+            background-position: 0 0, 9px 9px;
+            border-radius: 18px;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        .cropper-stage.is-square {
+            aspect-ratio: 1 / 1;
+        }
+
+        .cropper-stage.is-document {
+            aspect-ratio: 4 / 3;
+        }
+
+        .cropper-stage img {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: center;
+            max-width: none;
+            user-select: none;
+            -webkit-user-drag: none;
+            cursor: grab;
+        }
+
+        .cropper-stage.is-dragging img {
+            cursor: grabbing;
+        }
+
+        .cropper-toolbar {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 0.85rem;
+            align-items: end;
+            margin-top: 1rem;
+        }
+
+        .cropper-slider-label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #334155;
+            margin-bottom: 0.45rem;
+        }
+
+        .cropper-toolbar input[type=range] {
+            width: 100%;
+        }
+
+        .cropper-meta {
+            color: #64748b;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            margin-top: 0.85rem;
+        }
+
+        @media (max-width: 767px) {
+            .cropper-toolbar {
+                grid-template-columns: 1fr;
+            }
+
+            .upload-actions {
+                flex-wrap: wrap;
+            }
+
+            .upload-input-label {
+                width: 100%;
+                min-width: 0;
+            }
         }
 
 
@@ -160,57 +318,53 @@
                         <div class="content">
 
                             <form class="ui tiny form" id="addForm">{% csrf_token %}
-                                <div class="two fields required">
+                                <div class="two fields upload-grid">
                                     <div class="eight wide field">
-                                        <label>Photo</label>
-
-                                        <div class="ui" style="width: 100%; text-align: center">
-                                            <div class="ui icon header">
-                                                <div class="inline ">
-
-                                                    <div class="avatar-upload">
-                                                        <div class="avatar-edit">
-                                                            <input type='file' id="imageUpload" name="photo"
-                                                                   accept=".png, .jpg, .jpeg"/>
-                                                            <label for="imageUpload"><i class="edit icon"
-                                                                                        style="font-size: 1rem;padding: 0.4rem"></i>
-                                                            </label>
-                                                        </div>
-                                                        <div class="avatar-preview">
-                                                            <div id="cImg"
-                                                                 style="background-image: url('https://cdn-icons.flaticon.com/png/512/4785/premium/4785452.png?token=exp=1651559899~hmac=8bd1641cd72c54268deafab8b26dd7a9');">
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                        <div class="upload-card">
+                                            <div class="upload-card-head">
+                                                <label class="upload-title">Photo</label>
+                                                <span class="ui tiny basic teal label">Optional</span>
+                                            </div>
+                                            <div class="avatar-upload">
+                                                <div class="avatar-preview">
+                                                    <div id="cImg" style="background-image: url('{% static 'images/default-avatar.svg' %}');"></div>
                                                 </div>
                                             </div>
-
+                                            <div class="upload-actions">
+                                                <div class="avatar-edit">
+                                                    <input type='file' id="imageUpload" accept=".png, .jpg, .jpeg" data-crop-target="photo-add"/>
+                                                    <label class="upload-input-label" for="imageUpload">
+                                                        <i class="crop alternate icon"></i>
+                                                        Choose & Crop
+                                                    </label>
+                                                </div>
+                                                <button class="upload-remove" type="button" data-clear-target="photo-add" disabled>Remove</button>
+                                            </div>
+                                            <div class="upload-hint">Square crop for avatar.</div>
                                         </div>
                                     </div>
                                     <div class="eight wide field">
-                                        <label>ID Proof</label>
-
-                                        <div class="ui" style="width: 100%; text-align: center">
-                                            <div class="ui icon header">
-                                                <div class="inline ">
-
-                                                    <div class="avatar-upload">
-                                                        <div class="avatar-edit">
-                                                            <input type='file' id="imageUploadID" name="photo"
-                                                                   accept=".png, .jpg, .jpeg"/>
-                                                            <label for="imageUploadID"><i class="edit icon"
-                                                                                          style="font-size: 1rem;padding: 0.4rem"></i>
-                                                            </label>
-                                                        </div>
-                                                        <div class="avatar-preview">
-                                                            <div id="cImgID"
-                                                                 style="background-image: url('https://cdn-icons.flaticon.com/png/512/4785/premium/4785452.png?token=exp=1651559899~hmac=8bd1641cd72c54268deafab8b26dd7a9');">
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                        <div class="upload-card">
+                                            <div class="upload-card-head">
+                                                <label class="upload-title">ID Proof</label>
+                                                <span class="ui tiny basic teal label">Optional</span>
+                                            </div>
+                                            <div class="avatar-upload is-document">
+                                                <div class="avatar-preview">
+                                                    <div id="cImgID"></div>
                                                 </div>
                                             </div>
-
+                                            <div class="upload-actions">
+                                                <div class="avatar-edit">
+                                                    <input type='file' id="imageUploadID" accept=".png, .jpg, .jpeg" data-crop-target="proof-add"/>
+                                                    <label class="upload-input-label" for="imageUploadID">
+                                                        <i class="crop alternate icon"></i>
+                                                        Choose & Crop
+                                                    </label>
+                                                </div>
+                                                <button class="upload-remove" type="button" data-clear-target="proof-add" disabled>Remove</button>
+                                            </div>
+                                            <div class="upload-hint">Document crop preview.</div>
                                         </div>
                                     </div>
                                 </div>
@@ -340,57 +494,53 @@
                     <div class="content">
 
                         <form class="ui tiny form" id="EditForm">{% csrf_token %}
-                            <div class="two fields">
-                                <div class="field required">
-                                    <label>Photo </label>
-
-                                    <div class="ui" style="width: 100%; text-align: center">
-                                        <div class="ui icon header">
-                                            <div class="inline ">
-
-                                                <div class="avatar-upload">
-                                                    <div class="avatar-edit">
-                                                        <input type='file' id="imageUploadEdit" name="photo"
-                                                               accept=".png, .jpg, .jpeg"/>
-                                                        <label for="imageUploadEdit"><i class="edit icon"
-                                                                                    style="font-size: 1rem;padding: 0.4rem"></i>
-                                                    </label>
-                                                </div>
-                                                <div class="avatar-preview">
-                                                    <div id="cImgEdit"
-                                                         style="background-image: url('https://cdn-icons.flaticon.com/png/512/4785/premium/4785452.png?token=exp=1651559899~hmac=8bd1641cd72c54268deafab8b26dd7a9');">
-                                                    </div>
-                                                </div>
-                                                </div>
+                            <div class="two fields upload-grid">
+                                <div class="field">
+                                    <div class="upload-card">
+                                        <div class="upload-card-head">
+                                            <label class="upload-title">Photo</label>
+                                            <span class="ui tiny basic teal label">Optional</span>
+                                        </div>
+                                        <div class="avatar-upload">
+                                            <div class="avatar-preview">
+                                                <div id="cImgEdit" style="background-image: url('{% static 'images/default-avatar.svg' %}');"></div>
                                             </div>
                                         </div>
-
+                                        <div class="upload-actions">
+                                            <div class="avatar-edit">
+                                                <input type='file' id="imageUploadEdit" accept=".png, .jpg, .jpeg" data-crop-target="photo-edit"/>
+                                                <label class="upload-input-label" for="imageUploadEdit">
+                                                    <i class="crop alternate icon"></i>
+                                                    Choose & Crop
+                                                </label>
+                                            </div>
+                                            <button class="upload-remove" type="button" data-clear-target="photo-edit" disabled>Remove</button>
+                                        </div>
+                                        <div class="upload-hint">Leave empty to keep current photo.</div>
                                     </div>
                                 </div>
-                                <div class="field required">
-                                    <label>ID Proof</label>
-
-                                    <div class="ui" style="width: 100%; text-align: center">
-                                        <div class="ui icon header">
-                                            <div class="inline ">
-
-                                                <div class="avatar-upload">
-                                                    <div class="avatar-edit">
-                                                        <input type='file' id="imageUploadIDEdit" name="photo"
-                                                               accept=".png, .jpg, .jpeg"/>
-                                                        <label for="imageUploadIDEdit"><i class="edit icon"
-                                                                                          style="font-size: 1rem;padding: 0.4rem"></i>
-                                                        </label>
-                                                    </div>
-                                                    <div class="avatar-preview">
-                                                        <div id="cImgIDEdit"
-                                                             style="background-image: url('https://cdn-icons.flaticon.com/png/512/4785/premium/4785452.png?token=exp=1651559899~hmac=8bd1641cd72c54268deafab8b26dd7a9');">
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                <div class="field">
+                                    <div class="upload-card">
+                                        <div class="upload-card-head">
+                                            <label class="upload-title">ID Proof</label>
+                                            <span class="ui tiny basic teal label">Optional</span>
+                                        </div>
+                                        <div class="avatar-upload is-document">
+                                            <div class="avatar-preview">
+                                                <div id="cImgIDEdit"></div>
                                             </div>
                                         </div>
-
+                                        <div class="upload-actions">
+                                            <div class="avatar-edit">
+                                                <input type='file' id="imageUploadIDEdit" accept=".png, .jpg, .jpeg" data-crop-target="proof-edit"/>
+                                                <label class="upload-input-label" for="imageUploadIDEdit">
+                                                    <i class="crop alternate icon"></i>
+                                                    Choose & Crop
+                                                </label>
+                                            </div>
+                                            <button class="upload-remove" type="button" data-clear-target="proof-edit" disabled>Remove</button>
+                                        </div>
+                                        <div class="upload-hint">Leave empty to keep current ID proof.</div>
                                     </div>
                                 </div>
                             </div>
@@ -494,80 +644,368 @@
             </div>
         </div>
     </div>
+
+    <div class="ui tiny modal cropper-modal" id="imageCropModal">
+        <i class="close icon"></i>
+        <div class="header">Crop Image</div>
+        <div class="content">
+            <div class="cropper-stage-wrap">
+                <div class="cropper-stage is-square" id="cropperStage">
+                    <img id="cropperImage" alt="Crop preview">
+                </div>
+                <div class="cropper-toolbar">
+                    <div>
+                        <label class="cropper-slider-label" for="cropperZoom">Zoom</label>
+                        <input type="range" id="cropperZoom" min="1" max="3" step="0.01" value="1">
+                    </div>
+                    <button class="ui basic button" type="button" id="cropperResetBtn">Reset</button>
+                </div>
+                <div class="cropper-meta">
+                    Drag the image to position it inside the frame. Photo uses a square crop, ID proof uses a document crop.
+                </div>
+            </div>
+        </div>
+        <div class="actions">
+            <div class="ui cancel button">Cancel</div>
+            <button class="ui teal right labeled icon button" type="button" id="cropperApplyBtn">
+                Apply Crop
+                <i class="check icon"></i>
+            </button>
+        </div>
+    </div>
 {% endblock %}
 
 {% block js %}
     <script>
 
         var userTab;
+        var defaultAvatarUrl = "{% static 'images/default-avatar.svg' %}";
+        var uploadTargets = {
+            'photo-add': {inputId: 'imageUpload', previewId: 'cImg', type: 'photo', fallbackUrl: defaultAvatarUrl, outputName: 'staff-photo.jpg'},
+            'proof-add': {inputId: 'imageUploadID', previewId: 'cImgID', type: 'document', fallbackUrl: '', outputName: 'staff-id-proof.jpg'},
+            'photo-edit': {inputId: 'imageUploadEdit', previewId: 'cImgEdit', type: 'photo', fallbackUrl: defaultAvatarUrl, outputName: 'staff-photo.jpg'},
+            'proof-edit': {inputId: 'imageUploadIDEdit', previewId: 'cImgIDEdit', type: 'document', fallbackUrl: '', outputName: 'staff-id-proof.jpg'}
+        };
+        var croppedFiles = {};
+        var cropState = {
+            targetKey: null,
+            imageSrc: null,
+            imageElement: null,
+            naturalWidth: 0,
+            naturalHeight: 0,
+            minScale: 1,
+            zoomValue: 1,
+            x: 0,
+            y: 0,
+            applied: false,
+            parentModalSelector: null,
+            previousFile: null,
+            previousPreviewUrl: '',
+            dragging: false,
+            dragStartX: 0,
+            dragStartY: 0,
+            dragOriginX: 0,
+            dragOriginY: 0
+        };
 
-        function readURLPhoto(input) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function (e) {
-                    $('#cImg').css('background-image', 'url(' + e.target.result + ')');
-                    $('#cImg').hide();
-                    $('#cImg').fadeIn(650);
-                }
-                reader.readAsDataURL(input.files[0]);
+        function setPreviewImage(previewId, imageUrl) {
+            var $preview = $('#' + previewId);
+            if (imageUrl) {
+                $preview.css('background-image', 'url(' + imageUrl + ')');
+                $preview.css('background-color', 'transparent');
+            } else {
+                $preview.css('background-image', 'none');
+                $preview.css('background-color', '#e2e8f0');
             }
         }
 
-        $("#imageUpload").change(function () {
-            readURLPhoto(this);
+        function syncFileInput(inputId, file) {
+            var input = document.getElementById(inputId);
+            if (!input) {
+                return;
+            }
+            if (!file) {
+                input.value = '';
+                return;
+            }
+            try {
+                if (typeof DataTransfer === 'undefined') {
+                    return;
+                }
+                var dataTransfer = new DataTransfer();
+                dataTransfer.items.add(file);
+                input.files = dataTransfer.files;
+            } catch (error) {
+                return;
+            }
+        }
+
+        function updateRemoveButton(targetKey) {
+            $('[data-clear-target="' + targetKey + '"]').prop('disabled', !croppedFiles[targetKey]);
+        }
+
+        function resetUploadTarget(targetKey) {
+            var target = uploadTargets[targetKey];
+            if (!target) {
+                return;
+            }
+            delete croppedFiles[targetKey];
+            syncFileInput(target.inputId, null);
+            setPreviewImage(target.previewId, target.fallbackUrl);
+            updateRemoveButton(targetKey);
+        }
+
+        function resetAddUploads() {
+            resetUploadTarget('photo-add');
+            resetUploadTarget('proof-add');
+        }
+
+        function prepareEditUploads(photoUrl, proofUrl) {
+            uploadTargets['photo-edit'].fallbackUrl = photoUrl || defaultAvatarUrl;
+            uploadTargets['proof-edit'].fallbackUrl = proofUrl || '';
+            resetUploadTarget('photo-edit');
+            resetUploadTarget('proof-edit');
+        }
+
+        function openCropper(targetKey, file) {
+            if (!file) {
+                return;
+            }
+            if (!file.type || file.type.indexOf('image/') !== 0) {
+                $('body').toast({class: 'orange', message: 'Please choose an image file.'});
+                resetUploadTarget(targetKey);
+                return;
+            }
+
+            var target = uploadTargets[targetKey];
+            var reader = new FileReader();
+            cropState.parentModalSelector = $('#userModal').hasClass('active') ? '#userModal' : '#myModalUser';
+            cropState.previousFile = croppedFiles[targetKey] || null;
+            cropState.previousPreviewUrl = $('#' + target.previewId).css('background-image');
+            cropState.applied = false;
+            reader.onload = function (e) {
+                var previewImage = document.getElementById('cropperImage');
+                var stage = document.getElementById('cropperStage');
+                var img = new Image();
+                img.onload = function () {
+                    cropState.targetKey = targetKey;
+                    cropState.imageSrc = e.target.result;
+                    cropState.naturalWidth = img.naturalWidth;
+                    cropState.naturalHeight = img.naturalHeight;
+                    cropState.imageElement = previewImage;
+                    cropState.x = 0;
+                    cropState.y = 0;
+                    cropState.zoomValue = 1;
+
+                    stage.classList.toggle('is-square', target.type === 'photo');
+                    stage.classList.toggle('is-document', target.type !== 'photo');
+
+                    previewImage.src = e.target.result;
+                    $('#cropperZoom').val(1);
+                    $('#imageCropModal').modal('show');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function renderCropperImage() {
+            if (!cropState.imageElement) {
+                return;
+            }
+            var scale = cropState.minScale * cropState.zoomValue;
+            cropState.imageElement.style.transform =
+                'translate(-50%, -50%) translate(' + cropState.x + 'px, ' + cropState.y + 'px) scale(' + scale + ')';
+        }
+
+        function clampCropPosition() {
+            var stage = document.getElementById('cropperStage');
+            var stageRect = stage.getBoundingClientRect();
+            var scale = cropState.minScale * cropState.zoomValue;
+            var scaledWidth = cropState.naturalWidth * scale;
+            var scaledHeight = cropState.naturalHeight * scale;
+            var limitX = Math.max(0, (scaledWidth - stageRect.width) / 2);
+            var limitY = Math.max(0, (scaledHeight - stageRect.height) / 2);
+            cropState.x = Math.min(limitX, Math.max(-limitX, cropState.x));
+            cropState.y = Math.min(limitY, Math.max(-limitY, cropState.y));
+        }
+
+        function applyCrop() {
+            var stage = document.getElementById('cropperStage');
+            var target = uploadTargets[cropState.targetKey];
+            if (!target || !cropState.imageSrc) {
+                return;
+            }
+            var stageRect = stage.getBoundingClientRect();
+            var scale = cropState.minScale * cropState.zoomValue;
+            var renderWidth = cropState.naturalWidth * scale;
+            var renderHeight = cropState.naturalHeight * scale;
+            var left = (stageRect.width / 2) + cropState.x - (renderWidth / 2);
+            var top = (stageRect.height / 2) + cropState.y - (renderHeight / 2);
+
+            var canvas = document.createElement('canvas');
+            canvas.width = target.type === 'photo' ? 600 : 800;
+            canvas.height = target.type === 'photo' ? 600 : 600;
+
+            var img = new Image();
+            img.onload = function () {
+                var ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                var scaleX = canvas.width / stageRect.width;
+                var scaleY = canvas.height / stageRect.height;
+                ctx.drawImage(
+                    img,
+                    left * scaleX,
+                    top * scaleY,
+                    renderWidth * scaleX,
+                    renderHeight * scaleY
+                );
+                canvas.toBlob(function (blob) {
+                    if (!blob) {
+                        $('body').toast({class: 'error', message: 'Image crop failed.'});
+                        return;
+                    }
+                    var croppedFile = new File([blob], target.outputName, {type: 'image/jpeg'});
+                    croppedFiles[cropState.targetKey] = croppedFile;
+                    syncFileInput(target.inputId, croppedFile);
+                    setPreviewImage(target.previewId, URL.createObjectURL(croppedFile));
+                    updateRemoveButton(cropState.targetKey);
+                    cropState.applied = true;
+                    $('#imageCropModal').modal('hide');
+                }, 'image/jpeg', 0.9);
+            };
+            img.src = cropState.imageSrc;
+        }
+
+        function appendFileIfPresent(formData, targetKey, fieldName) {
+            if (croppedFiles[targetKey]) {
+                formData.append(fieldName, croppedFiles[targetKey]);
+                return;
+            }
+            var input = document.getElementById(uploadTargets[targetKey].inputId);
+            if (input && input.files && input.files[0]) {
+                formData.append(fieldName, input.files[0]);
+            }
+        }
+
+        $(document).on('change', '#imageUpload, #imageUploadID, #imageUploadEdit, #imageUploadIDEdit', function () {
+            var targetKey = $(this).data('crop-target');
+            if (this.files && this.files[0]) {
+                openCropper(targetKey, this.files[0]);
+            }
         });
 
-        function readURLPhotoID(input) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function (e) {
-                    $('#cImgID').css('background-image', 'url(' + e.target.result + ')');
-                    $('#cImgID').hide();
-                    $('#cImgID').fadeIn(650);
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        $("#imageUploadID").change(function () {
-            readURLPhotoID(this);
+        $(document).on('click', '[data-clear-target]', function () {
+            resetUploadTarget($(this).data('clear-target'));
         });
 
-        function readURLPhotoEdit(input) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function (e) {
-                    $('#cImgEdit').css('background-image', 'url(' + e.target.result + ')');
-                    $('#cImgEdit').hide();
-                    $('#cImgEdit').fadeIn(650);
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        $("#imageUploadEdit").change(function () {
-            readURLPhotoEdit(this);
+        $('#cropperZoom').on('input', function () {
+            cropState.zoomValue = parseFloat(this.value || 1);
+            clampCropPosition();
+            renderCropperImage();
         });
 
-        function readURLPhotoIDEdit(input) {
-            if (input.files && input.files[0]) {
-                var reader = new FileReader();
-                reader.onload = function (e) {
-                    $('#cImgIDEdit').css('background-image', 'url(' + e.target.result + ')');
-                    $('#cImgIDEdit').hide();
-                    $('#cImgIDEdit').fadeIn(650);
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
+        $('#cropperResetBtn').on('click', function () {
+            cropState.x = 0;
+            cropState.y = 0;
+            cropState.zoomValue = 1;
+            $('#cropperZoom').val(1);
+            renderCropperImage();
+        });
 
-        $("#imageUploadIDEdit").change(function () {
-            readURLPhotoIDEdit(this);
+        $('#cropperApplyBtn').on('click', function () {
+            applyCrop();
+        });
+
+        $('#cropperStage').on('mousedown touchstart', function (event) {
+            if (!cropState.imageElement) {
+                return;
+            }
+            var point = event.type === 'touchstart' ? event.originalEvent.touches[0] : event;
+            cropState.dragging = true;
+            cropState.dragStartX = point.clientX;
+            cropState.dragStartY = point.clientY;
+            cropState.dragOriginX = cropState.x;
+            cropState.dragOriginY = cropState.y;
+            $(this).addClass('is-dragging');
+        });
+
+        $(document).on('mousemove touchmove', function (event) {
+            if (!cropState.dragging) {
+                return;
+            }
+            var point = event.type === 'touchmove' ? event.originalEvent.touches[0] : event;
+            cropState.x = cropState.dragOriginX + (point.clientX - cropState.dragStartX);
+            cropState.y = cropState.dragOriginY + (point.clientY - cropState.dragStartY);
+            clampCropPosition();
+            renderCropperImage();
+        });
+
+        $(document).on('mouseup touchend touchcancel', function () {
+            cropState.dragging = false;
+            $('#cropperStage').removeClass('is-dragging');
+        });
+
+        $('#imageCropModal').modal({
+            autofocus: false,
+            allowMultiple: true,
+            closable: false,
+            detachable: false,
+            onVisible: function () {
+                if (!cropState.imageElement) {
+                    return;
+                }
+                var stage = document.getElementById('cropperStage');
+                var stageRect = stage.getBoundingClientRect();
+                if (!stageRect.width || !stageRect.height) {
+                    return;
+                }
+                cropState.minScale = Math.min(
+                    stageRect.width / cropState.naturalWidth,
+                    stageRect.height / cropState.naturalHeight
+                );
+                cropState.x = 0;
+                cropState.y = 0;
+                cropState.zoomValue = 1;
+                $('#cropperZoom').val(1);
+                clampCropPosition();
+                renderCropperImage();
+            },
+            onHidden: function () {
+                if (cropState.targetKey && !cropState.applied) {
+                    if (cropState.previousFile) {
+                        croppedFiles[cropState.targetKey] = cropState.previousFile;
+                        syncFileInput(uploadTargets[cropState.targetKey].inputId, cropState.previousFile);
+                    } else {
+                        delete croppedFiles[cropState.targetKey];
+                        syncFileInput(uploadTargets[cropState.targetKey].inputId, null);
+                    }
+                    var restored = cropState.previousPreviewUrl && cropState.previousPreviewUrl !== 'none'
+                        ? cropState.previousPreviewUrl.replace(/^url\(["']?/, '').replace(/["']?\)$/, '')
+                        : uploadTargets[cropState.targetKey].fallbackUrl;
+                    setPreviewImage(uploadTargets[cropState.targetKey].previewId, restored);
+                    updateRemoveButton(cropState.targetKey);
+                }
+                cropState.dragging = false;
+                $('#cropperStage').removeClass('is-dragging');
+                if (cropState.parentModalSelector && !$(cropState.parentModalSelector).hasClass('active')) {
+                    $(cropState.parentModalSelector).modal({
+                        autofocus: false,
+                        allowMultiple: true,
+                        detachable: false
+                    }).modal('show');
+                }
+            }
         });
 
         function showUserModal() {
-            $('#myModalUser').modal('show');
             myOwnReset();
+            $('#myModalUser').modal({
+                autofocus: false,
+                allowMultiple: true,
+                detachable: false
+            }).modal('show');
         }
 
         function EditUser() {
@@ -576,8 +1014,6 @@
 
         function addUser() {
             showLoading();
-            var imageUpload = document.getElementById("imageUpload").files[0];
-            var imageUploadID = document.getElementById("imageUploadID").files[0];
             var CompanyUserName = $('#CompanyUserName').val();
             var UserPhoneNo = $('#UserPhoneNo').val();
             var UserEmail = $('#UserEmail').val();
@@ -589,12 +1025,12 @@
             {#var PartyGroup = $('#PartyGroup').val();#}
 
 
-            if (CompanyUserName === '' || UserPhoneNo === '' || imageUpload === undefined || imageUploadID === undefined ||
+            if (CompanyUserName === '' || UserPhoneNo === '' ||
                 UserAddress === '' || UserPwd === '' || ConfirmPwd === '' || UserGroup === '' || UserStatus === '') {
                 $('body')
                     .toast({
                         class: 'orange',
-                        message: 'User Name, Phone Number, Photo, Address ... are required !. Also ensure that password is matched'
+                        message: 'User name, phone number, address, group, status, and password are required.'
                     })
                 ;
                 hideLoading();
@@ -603,8 +1039,8 @@
                 var csrfmiddlewaretoken = $("input[name='csrfmiddlewaretoken']").val();
 
                 data = new FormData();
-                data.append('imageUpload', imageUpload);
-                data.append('imageUploadID', imageUploadID);
+                appendFileIfPresent(data, 'photo-add', 'imageUpload');
+                appendFileIfPresent(data, 'proof-add', 'imageUploadID');
                 data.append('CompanyUserName', CompanyUserName);
                 data.append('UserPhoneNo', UserPhoneNo);
                 data.append('UserEmail', UserEmail);
@@ -650,6 +1086,7 @@
 
                                 userTab.ajax.reload(null, false);
                                 $('#addForm').trigger('reset');
+                                resetAddUploads();
                                 $('#myModalUser').modal('toggle');
                                 hideLoading();
                             } else {
@@ -784,7 +1221,11 @@
 
         function GetUserDetails(id) {
             myOwnReset();
-            $('#userModal').modal('show');
+            $('#userModal').modal({
+                autofocus: false,
+                allowMultiple: true,
+                detachable: false
+            }).modal('show');
             $.ajax({
                 type: 'get',
                 url: '{% url "homeApp:get_staff_user_detail"%}?id=' + id,
@@ -797,12 +1238,11 @@
                     $('#UserEmailEdit').val(response.data['UserEmail']);
                     $('#UserAddressEdit').val(response.data['UserAddress']);
                     $('#UserGroupEdit').val(response.data['UserGroup']).change();
-                    {#$('#PartyGroupEdit').val(response.data['PartyGroup']).change();#}
-                    $('#UserStatusEdit').val(response.data['IsActive']).change();
-                    $('#cImgEdit').css('background-image', 'url(' + response.data['ImgUrl'] + ')');
-                    $('#cImgIDEdit').css('background-image', 'url(' + response.data['IDUrl'] + ')');
-                    $('#UserPwdEdit').val(response.data['UserPassword']);
-                    $('#ConfirmPwdEdit').val(response.data['UserPassword']);
+                {#$('#PartyGroupEdit').val(response.data['PartyGroup']).change();#}
+                $('#UserStatusEdit').val(response.data['IsActive']).change();
+                prepareEditUploads(response.data['ImgUrl'], response.data['IDUrl']);
+                $('#UserPwdEdit').val(response.data['UserPassword']);
+                $('#ConfirmPwdEdit').val(response.data['UserPassword']);
 
 
                 },
@@ -819,8 +1259,6 @@
 
         function editUser() {
            showLoading();
-            var imageUpload = document.getElementById("imageUploadEdit").files[0];
-            var imageUploadID = document.getElementById("imageUploadIDEdit").files[0];
             var EditUserId = $('#EditUserId').val();
             var CompanyUserName = $('#CompanyUserNameEdit').val();
             var UserPhoneNo = $('#UserPhoneNoEdit').val();
@@ -838,7 +1276,7 @@
                 $('body')
                     .toast({
                         class: 'orange',
-                        message: 'User Name, Phone Number, Photo, Address ... are required !. Also ensure that password is matched'
+                        message: 'User name, phone number, address, group, status, and password are required.'
                     })
                 ;
                 hideLoading();
@@ -855,8 +1293,8 @@
                 data.append('UserGroup', UserGroup);
                 data.append('UserStatus', UserStatus);
                 data.append('UserPwd', UserPwd);
-                data.append('imageUpload', imageUpload);
-                data.append('imageUploadID', imageUploadID);
+                appendFileIfPresent(data, 'photo-edit', 'imageUpload');
+                appendFileIfPresent(data, 'proof-edit', 'imageUploadID');
                 {#data.append('PartyGroup', PartyGroup);#}
 
 
@@ -895,6 +1333,7 @@
 
                                 userTab.ajax.reload(null, false);
                                 $('#EditForm').trigger('reset');
+                                prepareEditUploads('', '');
                                 $('#userModal').modal('toggle');
                                 hideLoading();
                             } else {
@@ -927,23 +1366,15 @@
         }
 
 $(document).ready(function(){
-  $('.ui.form')
-  .form({
-    fields: {
-      fileInput:{
-        identifier: 'name',
-        rules: [
-          {
-            type : 'empty'
-          }
-        ]
-      }
-    }
-  });
+    prepareEditUploads('', '');
+    resetAddUploads();
 });
 
 function myOwnReset(){
-  $('.ui.form').form('reset');
+    $('#addForm').trigger('reset');
+    $('#EditForm').trigger('reset');
+    resetAddUploads();
+    prepareEditUploads('', '');
 }
     </script>
 

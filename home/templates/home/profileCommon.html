@@ -1,0 +1,787 @@
+{% extends base_template %}
+{% load static %}
+
+{% block title %}
+    <title>My Profile</title>
+{% endblock %}
+
+{% block css %}
+    <style>
+        :root {
+            --profile-ink: #0f172a;
+            --profile-slate: #475569;
+            --profile-line: rgba(15, 23, 42, 0.08);
+            --profile-surface: rgba(255, 255, 255, 0.92);
+            --profile-accent: #0f766e;
+            --profile-accent-soft: rgba(15, 118, 110, 0.12);
+            --profile-warm: #c2410c;
+            --profile-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+        }
+
+        .profile-shell {
+            padding: 14px;
+        }
+
+        .profile-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 28px;
+            padding: 18px 20px;
+            color: #f8fafc;
+            background:
+                radial-gradient(circle at top left, rgba(251, 191, 36, 0.24), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.20), transparent 34%),
+                linear-gradient(135deg, #0f172a 0%, #123b45 55%, #7c2d12 100%);
+            box-shadow: var(--profile-shadow);
+        }
+
+        .profile-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 32%),
+                linear-gradient(300deg, rgba(255, 255, 255, 0.05), transparent 24%);
+            pointer-events: none;
+        }
+
+        .profile-hero-grid {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.9fr);
+            gap: 12px;
+            align-items: end;
+        }
+
+        .profile-kicker {
+            font-size: 0.78rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: rgba(248, 250, 252, 0.72);
+            margin-bottom: 6px;
+        }
+
+        .profile-title {
+            font-size: clamp(1.55rem, 3vw, 2.3rem);
+            font-weight: 900;
+            line-height: 1;
+            margin: 0;
+            letter-spacing: -0.03em;
+        }
+
+        .profile-subtitle {
+            margin-top: 8px;
+            max-width: 620px;
+            color: rgba(248, 250, 252, 0.84);
+            font-size: 0.88rem;
+            line-height: 1.45;
+        }
+
+        .profile-hero-actions {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .profile-action-btn {
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            border-radius: 999px !important;
+            padding: 10px 14px !important;
+            font-weight: 800 !important;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.12) !important;
+            color: #fff !important;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+        }
+
+        .profile-grid {
+            margin-top: 18px;
+            display: grid;
+            grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
+            gap: 18px;
+        }
+
+        .profile-card {
+            background: var(--profile-surface);
+            border: 1px solid var(--profile-line);
+            border-radius: 24px;
+            box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+            overflow: hidden;
+        }
+
+        .profile-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding: 18px 20px 0;
+        }
+
+        .profile-card-title {
+            font-size: 0.92rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--profile-slate);
+        }
+
+        .profile-card-body {
+            padding: 18px 20px 20px;
+        }
+
+        .identity-panel {
+            position: relative;
+            padding: 24px;
+            background:
+                radial-gradient(circle at top center, rgba(15, 118, 110, 0.16), transparent 30%),
+                linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 1));
+        }
+
+        .identity-panel::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 94px;
+            background:
+                linear-gradient(135deg, rgba(15, 118, 110, 0.14), rgba(251, 191, 36, 0.14)),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.4), transparent);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+            pointer-events: none;
+        }
+
+        .identity-panel > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .identity-avatar-wrap {
+            display: flex;
+            align-items: flex-end;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .identity-avatar {
+            width: 104px;
+            height: 104px;
+            border-radius: 28px;
+            object-fit: cover;
+            border: 4px solid rgba(255, 255, 255, 0.72);
+            box-shadow: 0 20px 32px rgba(15, 23, 42, 0.14);
+            background: #e2e8f0;
+        }
+
+        .identity-copy {
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+
+        .identity-overline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 11px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.06);
+            color: var(--profile-slate);
+            font-size: 0.72rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .identity-name {
+            font-size: 1.8rem;
+            font-weight: 900;
+            color: var(--profile-ink);
+            line-height: 1;
+            margin: 0 0 6px;
+            letter-spacing: -0.03em;
+        }
+
+        .identity-handle {
+            color: var(--profile-slate);
+            font-size: 0.95rem;
+            margin: 0 0 12px;
+        }
+
+        .chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .profile-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            background: rgba(15, 23, 42, 0.05);
+            color: var(--profile-ink);
+        }
+
+        .profile-chip.is-accent {
+            background: var(--profile-accent-soft);
+            color: var(--profile-accent);
+        }
+
+        .profile-chip.is-warm {
+            background: rgba(194, 65, 12, 0.10);
+            color: var(--profile-warm);
+        }
+
+        .profile-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .profile-list-row {
+            display: grid;
+            grid-template-columns: 18px minmax(84px, 110px) minmax(0, 1fr);
+            gap: 10px;
+            align-items: start;
+            color: var(--profile-ink);
+        }
+
+        .profile-list-row i.icon {
+            margin: 2px 0 0 !important;
+            color: var(--profile-accent);
+        }
+
+        .profile-list-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--profile-slate);
+            font-weight: 800;
+        }
+
+        .profile-list-value {
+            font-size: 0.95rem;
+            font-weight: 700;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .meta-card {
+            border-radius: 18px;
+            border: 1px solid var(--profile-line);
+            background: #fff;
+            padding: 16px;
+        }
+
+        .meta-label {
+            color: var(--profile-slate);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+
+        .meta-value {
+            color: var(--profile-ink);
+            font-size: 1.02rem;
+            font-weight: 900;
+            line-height: 1.35;
+            word-break: break-word;
+        }
+
+        .spotlight-card {
+            border-radius: 20px;
+            padding: 18px;
+            color: #f8fafc;
+            background:
+                radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 34%),
+                linear-gradient(135deg, #134e4a, #0f172a);
+        }
+
+        .spotlight-card .meta-label,
+        .spotlight-card .meta-value {
+            color: inherit;
+        }
+
+        .doc-frame {
+            width: min(100%, 260px);
+            margin: 0 auto;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--profile-line);
+            background: #e2e8f0;
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .doc-frame img {
+            width: 100%;
+            max-height: 150px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .doc-link-row {
+            margin-top: 12px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .doc-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.86rem;
+            font-weight: 800;
+            color: var(--profile-accent);
+        }
+
+        .doc-empty {
+            text-align: center;
+            color: var(--profile-slate);
+            font-weight: 700;
+            padding: 30px;
+        }
+
+        .modal-note {
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: var(--profile-slate);
+        }
+
+        @media (max-width: 1100px) {
+            .profile-hero-grid,
+            .profile-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .profile-hero-actions {
+                justify-content: flex-start;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .profile-shell {
+                padding: 0;
+            }
+
+            .profile-hero {
+                border-radius: 0 0 26px 26px;
+                padding: 12px 16px 16px;
+                margin-left: -0.75rem;
+                margin-right: -0.75rem;
+            }
+
+            .identity-avatar-wrap {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .identity-copy {
+                width: 100%;
+            }
+
+            .identity-avatar {
+                width: 86px;
+                height: 86px;
+                border-radius: 22px;
+            }
+
+            .identity-name {
+                font-size: 1.45rem;
+            }
+
+            .identity-handle {
+                font-size: 0.88rem;
+                margin-bottom: 10px;
+            }
+
+            .identity-overline {
+                margin-bottom: 10px;
+            }
+
+            .chip-row {
+                gap: 7px;
+            }
+
+            .profile-chip {
+                width: 100%;
+                justify-content: flex-start;
+                border-radius: 14px;
+                padding: 10px 12px;
+            }
+
+            .profile-grid {
+                margin-top: 0;
+                gap: 12px;
+            }
+
+            .profile-card {
+                border-radius: 20px;
+                margin: 0 8px;
+            }
+
+            .meta-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .meta-card {
+                border-radius: 16px;
+                padding: 14px;
+            }
+
+            .profile-list {
+                gap: 14px;
+            }
+
+            .profile-list-row {
+                grid-template-columns: 18px 1fr;
+                gap: 8px 10px;
+            }
+
+            .profile-list-label {
+                grid-column: 2;
+                font-size: 0.68rem;
+                margin-top: -2px;
+            }
+
+            .profile-list-value {
+                grid-column: 2;
+                font-size: 0.92rem;
+                margin-top: -6px;
+            }
+
+            .profile-card-body,
+            .identity-panel {
+                padding: 18px;
+            }
+
+            .profile-card-header {
+                padding: 16px 18px 0;
+            }
+
+            .profile-title {
+                font-size: 1.45rem;
+                line-height: 1.02;
+            }
+
+            .profile-subtitle {
+                font-size: 0.8rem;
+                line-height: 1.4;
+                margin-top: 6px;
+            }
+
+            .profile-action-btn {
+                width: 100%;
+                justify-content: center;
+                padding: 10px 12px !important;
+            }
+
+            .profile-hero-actions {
+                width: 100%;
+            }
+
+            .spotlight-card {
+                padding: 16px;
+            }
+
+            .doc-frame {
+                width: min(100%, 220px);
+                min-height: 132px;
+                border-radius: 16px;
+            }
+
+            .doc-frame img {
+                max-height: 132px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .profile-hero {
+                padding: 10px 14px 14px;
+            }
+
+            .profile-card {
+                margin: 0 6px;
+            }
+
+            .profile-card-body,
+            .identity-panel {
+                padding: 16px;
+            }
+
+            .identity-avatar {
+                width: 78px;
+                height: 78px;
+            }
+
+            .identity-name {
+                font-size: 1.32rem;
+            }
+
+            .profile-chip {
+                font-size: 0.74rem;
+            }
+
+            .meta-value {
+                font-size: 0.95rem;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="profile-shell">
+        <section class="profile-hero">
+            <div class="profile-hero-grid">
+                <div>
+                    <div class="profile-kicker">Workspace Identity</div>
+                    <h1 class="profile-title">My Profile</h1>
+                    <div class="profile-subtitle">
+                        Your staff profile, access context, and identity details in one place.
+                    </div>
+                </div>
+                <div class="profile-hero-actions">
+                    <button class="ui button profile-action-btn" type="button" onclick="showUserModal()">
+                        <i class="shield alternate icon"></i>
+                        Change Password
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section class="profile-grid">
+            <div class="profile-card">
+                <div class="identity-panel">
+                    <div class="identity-avatar-wrap">
+                        {% if instance.photo %}
+                            <img
+                                class="identity-avatar"
+                                src="{{ instance.photo.thumbnail.url }}"
+                                alt="{{ instance.name|default:'Profile' }}"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        {% else %}
+                            <img class="identity-avatar" src="{% static 'images/default-avatar.svg' %}" alt="Default profile">
+                        {% endif %}
+                        <div class="identity-copy">
+                            <div class="identity-overline">
+                                <i class="id badge outline icon"></i>
+                                Staff Identity
+                            </div>
+                            <h2 class="identity-name">{{ instance.name|default:"Unnamed Staff"|capfirst }}</h2>
+                            <p class="identity-handle">@{{ instance.user_ID.username|default:instance.username|default:request.user.username }}</p>
+                            <div class="chip-row">
+                                <span class="profile-chip is-accent">
+                                    <i class="user icon"></i>
+                                    {{ instance.staffGroup.name|default:instance.group|default:"Unassigned Group"|capfirst }}
+                                </span>
+                                <span class="profile-chip {% if instance.isActive == 'Active' %}is-accent{% else %}is-warm{% endif %}">
+                                    <i class="circle icon"></i>
+                                    {{ instance.isActive|default:"Unknown" }}
+                                </span>
+                                {% if instance.partyGroupID %}
+                                    <span class="profile-chip">
+                                        <i class="users icon"></i>
+                                        {{ instance.partyGroupID.name|capfirst }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-list">
+                        <div class="profile-list-row">
+                            <i class="phone icon"></i>
+                            <div class="profile-list-label">Phone</div>
+                            <div class="profile-list-value">{{ instance.phone|default:"Not set" }}</div>
+                        </div>
+                        <div class="profile-list-row">
+                            <i class="mail icon"></i>
+                            <div class="profile-list-label">Email</div>
+                            <div class="profile-list-value">{{ instance.email|default:"Not set" }}</div>
+                        </div>
+                        <div class="profile-list-row">
+                            <i class="map marker alternate icon"></i>
+                            <div class="profile-list-label">Address</div>
+                            <div class="profile-list-value">{{ instance.address|default:"Not set"|capfirst }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="profile-card">
+                <div class="profile-card-header">
+                    <div class="profile-card-title">Profile Details</div>
+                </div>
+                <div class="profile-card-body">
+                    <div class="meta-grid">
+                        <div class="meta-card spotlight-card">
+                            <div class="meta-label">Login Username</div>
+                            <div class="meta-value">{{ instance.user_ID.username|default:instance.username|default:request.user.username }}</div>
+                        </div>
+                        <div class="meta-card">
+                            <div class="meta-label">Staff Group</div>
+                            <div class="meta-value">{{ instance.staffGroup.name|default:instance.group|default:"Not assigned"|capfirst }}</div>
+                        </div>
+                        <div class="meta-card">
+                            <div class="meta-label">Party Group</div>
+                            <div class="meta-value">{{ instance.partyGroupID.name|default:"Not assigned"|capfirst }}</div>
+                        </div>
+                        <div class="meta-card">
+                            <div class="meta-label">Profile Created</div>
+                            <div class="meta-value">{{ instance.datetime|date:"d M Y, h:i A" }}</div>
+                        </div>
+                        <div class="meta-card">
+                            <div class="meta-label">Last Updated</div>
+                            <div class="meta-value">{{ instance.lastUpdatedOn|date:"d M Y, h:i A" }}</div>
+                        </div>
+                        <div class="meta-card">
+                            <div class="meta-label">Legacy Username</div>
+                            <div class="meta-value">{{ instance.username|default:"Not set" }}</div>
+                        </div>
+                    </div>
+
+                    <div class="profile-card-header" style="padding-left: 0; padding-right: 0; margin-top: 18px;">
+                        <div class="profile-card-title">Identity Proof</div>
+                    </div>
+                    <div class="doc-frame">
+                        {% if instance.idProof %}
+                            <img
+                                src="{{ instance.idProof.thumbnail.url }}"
+                                alt="ID proof"
+                                loading="lazy"
+                                decoding="async"
+                            >
+                        {% else %}
+                            <div class="doc-empty">
+                                <i class="id card outline huge icon"></i>
+                                <div style="margin-top: 12px;">No ID proof uploaded.</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    {% if instance.idProof %}
+                        <div class="doc-link-row">
+                            <a class="doc-link" href="{{ instance.idProof.url }}" target="_blank" rel="noopener noreferrer">
+                                <i class="external alternate icon"></i>
+                                Open full image
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="ui tiny modal" id="myModalUser">
+        <i class="close icon"></i>
+        <div class="header">Change Password</div>
+        <div class="content">
+            <form class="ui tiny form" id="addForm">{% csrf_token %}
+                <div class="one required fields">
+                    <div class="sixteen wide field">
+                        <label>New Password</label>
+                        <input type="password" name="NewPassword" placeholder="New Password" id="newPassword">
+                    </div>
+                </div>
+                <div class="one required fields">
+                    <div class="sixteen wide field">
+                        <label>Confirm Password</label>
+                        <input type="password" name="confirmPassword" placeholder="Confirm Password" id="confirmPassword">
+                    </div>
+                </div>
+                <div class="modal-note">Use at least 8 characters.</div>
+            </form>
+
+            <div class="actions" style="padding-top: 20px; padding-bottom: 20px; float: right;">
+                <div class="ui cancel button">Cancel</div>
+                <button class="ui right labeled icon button green saveBtn" onclick="changePassword()">
+                    Update Password
+                    <i class="checkmark icon"></i>
+                </button>
+                <button style="display: none" class="ui right labeled icon button green saveBtnLoad">
+                    Saving ...
+                    <i class="checkmark icon"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script>
+        function showUserModal() {
+            $('#myModalUser').modal('show');
+        }
+
+        function changePassword() {
+            showLoading();
+            var pass = $('#newPassword').val();
+            var passc = $('#confirmPassword').val();
+
+            if (pass === '' || passc === '') {
+                $('body').toast({class: 'orange', message: '* fields are required.'});
+                hideLoading();
+                return;
+            }
+
+            if (pass !== passc) {
+                $('body').toast({class: 'orange', message: 'Password not matched.'});
+                hideLoading();
+                return;
+            }
+
+            if (pass.length < 8) {
+                $('body').toast({class: 'orange', message: 'Password should be at least 8 characters long.'});
+                hideLoading();
+                return;
+            }
+
+            var csrfmiddlewaretoken = $("input[name='csrfmiddlewaretoken']").val();
+            var data = new FormData();
+            data.append('password', pass);
+            data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);
+
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:change_password_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: 'Password changed Successfully.'});
+                        $('#addForm').trigger('reset');
+                        $('#myModalUser').modal('toggle');
+                    } else {
+                        $('body').toast({class: 'error', message: 'An error occurred !'});
+                    }
+                    hideLoading();
+                    return response;
+                },
+                error: function () {
+                    $('body').toast({class: 'error', message: 'An error occurred !'});
+                    hideLoading();
+                }
+            });
+        }
+    </script>
+{% endblock %}

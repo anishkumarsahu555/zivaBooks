@@ -704,15 +704,17 @@ def user_logout(request):
 def my_profile(request):
     instance = get_object_or_404(tenant_qs(request, StaffUser), user_ID_id=request.user.pk)
     context = {
-        'instance': instance
+        'instance': instance,
+        'base_template': 'home/admin/index.html',
     }
-    return render(request, 'home/admin/profileAdmin.html', context)
+    return render(request, 'home/profileCommon.html', context)
 def my_profile_collection(request):
     instance = get_object_or_404(tenant_qs(request, StaffUser), user_ID_id=request.user.pk)
     context = {
-        'instance': instance
+        'instance': instance,
+        'base_template': 'home/collection/indexCollection.html',
     }
-    return render(request, 'home/collection/profile.html', context)
+    return render(request, 'home/profileCommon.html', context)
 def postLogin(request):
     if request.method == 'POST':
         username = request.POST.get('userName')

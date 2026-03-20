@@ -75,6 +75,7 @@
                                 <th>PaymentID</th>
                                 <th>Party Name</th>
                                 <th>Amount</th>
+                                <th>Verified</th>
                                 <th>Collection Mode</th>
                                 <th>Collection Date</th>
                                 <th>Added On</th>
@@ -181,7 +182,7 @@
             buttons: [{
                 extend: 'excel',
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6, 7,8,9]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
                 }
             }
                 {% comment %}      , {
@@ -195,17 +196,18 @@
                 {"name": "paymentID", "targets": 0, "orderable": true},
                 {"name": "partyID.name", "targets": 1, "orderable": true},
                 {"name": "paidAmount", "targets": 2, "orderable": true,"className": "dt-body-right"},
-                {"name": "modeOfPayment", "targets": 3, "orderable": true},
-                {"name": "collectionDateTime", "targets": 4, "orderable": true},
-                {"name": "datetime", "targets": 5, "orderable": true},
-                {"name": "bankID.name", "targets": 6, "orderable": true},
-                {"name": "detail", "targets": 7, "orderable": true},
-                {"name": "transferredPartyID", "targets": 8, "orderable": true},
-                {"name": "remark", "targets": 9, "orderable": true},
-                {"name": "action", "targets": 10, "orderable": false},
+                {"name": "otpVerified", "targets": 3, "orderable": true},
+                {"name": "modeOfPayment", "targets": 4, "orderable": true},
+                {"name": "collectionDateTime", "targets": 5, "orderable": true},
+                {"name": "datetime", "targets": 6, "orderable": true},
+                {"name": "bankID.name", "targets": 7, "orderable": true},
+                {"name": "detail", "targets": 8, "orderable": true},
+                {"name": "transferredPartyID", "targets": 9, "orderable": true},
+                {"name": "remark", "targets": 10, "orderable": true},
+                {"name": "action", "targets": 11, "orderable": false},
 
             ],
-            aaSorting: [[4, 'desc']],
+            aaSorting: [[5, 'desc']],
             "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
             "pageLength": 10,
             "processing": true,

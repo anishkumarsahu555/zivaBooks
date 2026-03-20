@@ -42,4 +42,6 @@ build/
 .env.*
 !.env.example
 
-migrations
+home/migrations-old
+migrations-old
+.env.example
