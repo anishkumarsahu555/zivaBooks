@@ -205,6 +205,10 @@ class StaffGroupPermissionCatalogTests(SeededTenantMixin, TestCase):
                     'add_bank',
                     'change_bank',
                     'delete_bank',
+                    'view_invoiceseries',
+                    'add_invoiceseries',
+                    'change_invoiceseries',
+                    'delete_invoiceseries',
                     'view_auditlog',
                     'add_auditlog',
                     'change_auditlog',
@@ -256,6 +260,9 @@ class StaffGroupPermissionCatalogTests(SeededTenantMixin, TestCase):
         self.assertContains(response, 'Books Viewer')
         self.assertContains(response, 'Books Admin')
         self.assertContains(response, 'Books Editor')
+        self.assertContains(response, 'Invoice Series Admin')
+        self.assertContains(response, 'Invoice Series Manager')
+        self.assertContains(response, 'Invoice Series Viewer')
         self.assertContains(response, 'Attendance Admin')
         self.assertContains(response, 'Attendance Manager')
         self.assertContains(response, 'Orders Admin')

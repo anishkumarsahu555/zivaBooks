@@ -90,33 +90,10 @@
                             <div class="two fields">
                                 <div class="eight wide field required">
                                     <label>Invoice Number</label>
-
-                                    <div class="ui left labeled  input">
-                                        <div class="ui dropdown teal label" id="invoiceSeries">
-                                            <div class="text" id="invoiceSeriesSelect">{{ series }}</div>
-                                            <i class="dropdown icon"></i>
-                                            <div class="menu">
-                                                <div class="item">BCS</div>
-                                                <div class="item">BCS1</div>
-                                                <div class="item">BSS</div>
-                                                <div class="item">ND</div>
-                                            </div>
-                                        </div>
-                                        <input type="number" placeholder="Invoice Number" id="invoiceNo"
-                                               name="invoiceNo" value="{{ number }}">
-                                        <div class="ui dropdown blue label" id="invoiceYear">
-                                            <div class="text" id="invoiceYearSelect">{{ year }}</div>
-                                            <i class="dropdown icon"></i>
-                                            <div class="menu">
-                                                <div class="item">25-26</div>
-                                                <div class="item">24-25</div>
-                                                <div class="item">23-24</div>
-                                                <div class="item">22-23</div>
-                                            </div>
-                                        </div>
-
+                                    <input type="text" id="invoiceNo" value="{{ invoice_display }}" readonly>
+                                    <div class="ui mini grey text" style="margin-top: 6px;">
+                                        Invoice numbers stay locked after creation.
                                     </div>
-
                                 </div>
 
 
@@ -252,9 +229,6 @@
                 return;
             }
             showLoading();
-            var invoiceSeriesSelect = $('#invoiceSeriesSelect').html();
-            var invoiceNo = $('#invoiceNo').val();
-            var invoiceYearSelect = $('#invoiceYearSelect').html();
             var colDate = $('#colDate').val();
             var party = $('#party').val();
             var amount = $('#amount').val();
@@ -264,7 +238,7 @@
 
             debugger;
 
-            if (ID === '' || party === '' || invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || colDate === '' || amount === ''
+            if (ID === '' || party === '' || colDate === '' || amount === ''
             ) {
                 $('body')
                     .toast({
@@ -275,9 +249,6 @@
                 hideLoading();
             } else {
                 data = new FormData();
-                data.append('invoiceSeriesSelect', invoiceSeriesSelect);
-                data.append('invoiceNo', invoiceNo);
-                data.append('invoiceYearSelect', invoiceYearSelect);
                 data.append('colDate', colDate);
                 data.append('party', party);
                 data.append('amount', amount);

@@ -23,6 +23,34 @@
         .currency {
             padding: 4px 6px !important;
         }
+
+        .invoice-chip-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .invoice-chip {
+            border: 1px solid rgba(15, 118, 110, 0.18);
+            background: #f8fffe;
+            color: #0f766e;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .invoice-chip.active {
+            background: #0f766e;
+            color: #fff;
+            border-color: #0f766e;
+        }
     </style>
 {% endblock %}
 
@@ -64,17 +92,13 @@
                                             <div class="eight wide field required">
                                                 <label>Invoice Number</label>
                                                 <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesCash">
-                                                        <div class="text" id="invoiceSeriesSelectCash">BCS</div>
+                                                    <div class="ui selection dropdown teal label" id="invoiceSeriesCash">
+                                                        <input type="hidden" id="invoiceSeriesIdCash" name="invoiceSeriesIdCash">
+                                                        <div class="default text">Select Series</div>
                                                         <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
+                                                        <div class="menu"></div>
                                                     </div>
-                                                    <input type="number" placeholder="Invoice Number" id="invoiceNoCash"
+                                                    <input type="text" placeholder="Invoice Number" id="invoiceNoCash"
                                                            name="invoiceNoCash">
                                                     <div class="ui dropdown blue label" id="invoiceYearCash">
                                                         <div class="text" id="invoiceYearSelectCash">25-26</div>
@@ -88,6 +112,8 @@
                                                     </div>
 
                                                 </div>
+                                                <input type="hidden" id="requestedInvoiceNumberCash" name="requestedInvoiceNumberCash">
+                                                <div class="invoice-chip-wrap" id="invoiceChipWrapCash"></div>
 
                                             </div>
                                             <div class="eight wide field required">
@@ -100,8 +126,15 @@
                                             </div>
 
                                         </div>
-                                        <div class="one  fields">
-                                            <div class="sixteen wide field">
+                                        <div class="two fields">
+                                            <div class="eight wide field">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyCash"
+                                                        name="partyCash">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="eight wide field">
                                                 <label>Remark</label>
                                                 <textarea name="remarkCash" id="remarkCash" placeholder="Any Remark"
                                                           rows="1"></textarea>
@@ -120,17 +153,13 @@
                                             <div class="eight wide field required">
                                                 <label>Invoice Number</label>
                                                 <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesCredit">
-                                                        <div class="text" id="invoiceSeriesSelectCredit">BCS</div>
+                                                    <div class="ui selection dropdown teal label" id="invoiceSeriesCredit">
+                                                        <input type="hidden" id="invoiceSeriesIdCredit" name="invoiceSeriesIdCredit">
+                                                        <div class="default text">Select Series</div>
                                                         <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
+                                                        <div class="menu"></div>
                                                     </div>
-                                                    <input type="number" placeholder="Invoice Number"
+                                                    <input type="text" placeholder="Invoice Number"
                                                            id="invoiceNoCredit"
                                                            name="invoiceNoCredit">
                                                     <div class="ui dropdown blue label" id="invoiceYearCredit">
@@ -145,6 +174,8 @@
                                                     </div>
 
                                                 </div>
+                                                <input type="hidden" id="requestedInvoiceNumberCredit" name="requestedInvoiceNumberCredit">
+                                                <div class="invoice-chip-wrap" id="invoiceChipWrapCredit"></div>
 
                                             </div>
                                             <div class="eight wide field required">
@@ -182,17 +213,13 @@
                                             <div class="eight wide field required">
                                                 <label>Invoice Number</label>
                                                 <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesCard">
-                                                        <div class="text" id="invoiceSeriesSelectCard">BCS</div>
+                                                    <div class="ui selection dropdown teal label" id="invoiceSeriesCard">
+                                                        <input type="hidden" id="invoiceSeriesIdCard" name="invoiceSeriesIdCard">
+                                                        <div class="default text">Select Series</div>
                                                         <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
+                                                        <div class="menu"></div>
                                                     </div>
-                                                    <input type="number" placeholder="Invoice Number" id="invoiceNoCard"
+                                                    <input type="text" placeholder="Invoice Number" id="invoiceNoCard"
                                                            name="invoiceNoCard">
                                                     <div class="ui dropdown blue label" id="invoiceYearCard">
                                                         <div class="text" id="invoiceYearSelectCard">25-26</div>
@@ -206,6 +233,8 @@
                                                     </div>
 
                                                 </div>
+                                                <input type="hidden" id="requestedInvoiceNumberCard" name="requestedInvoiceNumberCard">
+                                                <div class="invoice-chip-wrap" id="invoiceChipWrapCard"></div>
 
                                             </div>
                                             <div class="eight wide field required">
@@ -218,8 +247,15 @@
                                             </div>
 
                                         </div>
-                                        <div class="two  fields">
-                                            <div class=" field required">
+                                        <div class="three fields">
+                                            <div class="six wide field">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyCard"
+                                                        name="partyCard">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="five wide field required">
                                                 <label>Bank </label>
                                                 <select class="ui dropdown search fluid " id="bankCard">
                                                     <option value="">Select Bank</option>
@@ -229,7 +265,7 @@
                                                     {% endfor %}
                                                 </select>
                                             </div>
-                                            <div class="field">
+                                            <div class="five wide field">
                                                 <label>Remark</label>
                                                 <textarea name="remarkCard" id="remarkCard" placeholder="Any Remark"
                                                           rows="1"></textarea>
@@ -243,21 +279,17 @@
                             <div class="ui row  ">
                                 <div class="content">
                                     <form class="ui  small form " id="addFormMix" name="addFormMix">{% csrf_token %}
-                                        <div class="four fields">
+                                        <div class="three fields">
                                             <div class="five wide field required">
                                                 <label>Invoice Number</label>
                                                 <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesMix">
-                                                        <div class="text" id="invoiceSeriesSelectMix">BCS</div>
+                                                    <div class="ui selection dropdown teal label" id="invoiceSeriesMix">
+                                                        <input type="hidden" id="invoiceSeriesIdMix" name="invoiceSeriesIdMix">
+                                                        <div class="default text">Select Series</div>
                                                         <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
+                                                        <div class="menu"></div>
                                                     </div>
-                                                    <input type="number" placeholder="Invoice Number" id="invoiceNoMix"
+                                                    <input type="text" placeholder="Invoice Number" id="invoiceNoMix"
                                                            name="invoiceNoMix">
                                                     <div class="ui dropdown blue label" id="invoiceYearMix">
                                                         <div class="text" id="invoiceYearSelectMix">25-26</div>
@@ -271,6 +303,8 @@
                                                     </div>
 
                                                 </div>
+                                                <input type="hidden" id="requestedInvoiceNumberMix" name="requestedInvoiceNumberMix">
+                                                <div class="invoice-chip-wrap" id="invoiceChipWrapMix"></div>
 
                                             </div>
                                             <div class="four wide field required">
@@ -289,7 +323,16 @@
                                                        placeholder="Amount"
                                                        onkeyup="toIndianCurrency()">
                                             </div>
-                                            <div class=" three wide field required">
+                                        </div>
+                                        <div class="three fields">
+                                            <div class="six wide field required">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyMix"
+                                                        name="partyMix">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="four wide field required">
                                                 <label>Bank </label>
                                                 <select class="ui dropdown search fluid " id="bankMix">
                                                     <option value="">Select Bank</option>
@@ -299,11 +342,7 @@
                                                     {% endfor %}
                                                 </select>
                                             </div>
-
-                                        </div>
-                                        <div class="one  fields">
-
-                                            <div class="sixteen wide field">
+                                            <div class="six wide field">
                                                 <label>Remark</label>
                                                 <textarea name="remarkMix" id="remarkMix" placeholder="Any Remark"
                                                           rows="1"></textarea>
@@ -500,17 +539,13 @@
                                             <div class="eight wide field required">
                                                 <label>Invoice Number</label>
                                                 <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesReturn">
-                                                        <div class="text" id="invoiceSeriesSelectReturn">BCS</div>
+                                                    <div class="ui selection dropdown teal label" id="invoiceSeriesReturn">
+                                                        <input type="hidden" id="invoiceSeriesIdReturn" name="invoiceSeriesIdReturn">
+                                                        <div class="default text">Select Series</div>
                                                         <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
+                                                        <div class="menu"></div>
                                                     </div>
-                                                    <input type="number" placeholder="Invoice Number"
+                                                    <input type="text" placeholder="Invoice Number"
                                                            id="invoiceNoReturn"
                                                            name="invoiceNoReturn">
                                                     <div class="ui dropdown blue label" id="invoiceYearReturn">
@@ -525,6 +560,8 @@
                                                     </div>
 
                                                 </div>
+                                                <input type="hidden" id="requestedInvoiceNumberReturn" name="requestedInvoiceNumberReturn">
+                                                <div class="invoice-chip-wrap" id="invoiceChipWrapReturn"></div>
 
                                             </div>
                                             <div class="eight wide field required">
@@ -536,8 +573,15 @@
                                             </div>
 
                                         </div>
-                                        <div class="one  fields">
-                                            <div class="sixteen wide field">
+                                        <div class="two fields">
+                                            <div class="eight wide field">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyReturn"
+                                                        name="partyReturn">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="eight wide field">
                                                 <label>Remark</label>
                                                 <textarea name="remarkReturn" id="remarkReturn" placeholder="Any Remark"
                                                           rows="1"></textarea>
@@ -717,27 +761,48 @@
 
         function resetForm() {
             $('#addForm' + mode).trigger('reset');
+            $('#invoiceNo' + mode).val('');
+            $('#requestedInvoiceNumber' + mode).val('');
+            $('#invoiceChipWrap' + mode).html('');
+            $('#invoiceSeries' + mode).dropdown('clear');
             toIndianCurrency();
+            $('#partyCash').dropdown('clear');
             $('#partyCredit').dropdown('clear');
+            $('#partyCard').dropdown('clear');
             $('#partyCollection').dropdown('clear');
             $('#partyAdvance').dropdown('clear');
+            $('#partyMix').dropdown('clear');
+            $('#partyReturn').dropdown('clear');
             $('#bank' + mode).dropdown('clear');
+            loadCashCounterInvoiceSeries();
         }
 
         function getPartyList() {
             let response = JSON.parse(localStorage.getItem('response'))
 
+            $('#partyCash').html('');
             $('#partyCredit').html('');
+            $('#partyCard').html('');
             $('#partyCollection').html('');
             $('#partyAdvance').html('');
+            $('#partyMix').html('');
+            $('#partyReturn').html('');
+            $('#partyCash').append(' <option value="">Search By Party Name</option>');
             $('#partyCredit').append(' <option value="">Search By Party Name</option>');
+            $('#partyCard').append(' <option value="">Search By Party Name</option>');
             $('#partyCollection').append(' <option value="">Search By Party Name</option>');
             $('#partyAdvance').append(' <option value="">Search By Party Name</option>');
+            $('#partyMix').append(' <option value="">Search By Party Name</option>');
+            $('#partyReturn').append(' <option value="">Search By Party Name</option>');
             var j;
             for (j = 0; j < response.data.length; j++) {
+                $('#partyCash').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
                 $('#partyCredit').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                $('#partyCard').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
                 $('#partyCollection').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
                 $('#partyAdvance').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                $('#partyMix').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                $('#partyReturn').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
 
             }
 
@@ -745,9 +810,9 @@
 
         function salesSave() {
             showLoading();
-            let invoiceSeriesSelect = $('#invoiceSeriesSelect' + mode).html();
+            let invoiceSeriesId = $('#invoiceSeries' + mode).dropdown('get value');
             let invoiceNo = $('#invoiceNo' + mode).val();
-            let invoiceYearSelect = $('#invoiceYearSelect' + mode).html();
+            let requestedInvoiceNumber = $('#requestedInvoiceNumber' + mode).val();
             let party = $('#party' + mode).val();
             let amount = $('#amount' + mode).val();
             let remark = $('#remark' + mode).val();
@@ -758,7 +823,7 @@
             let canSave = false;
 
             if (mode === 'Cash') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === ''
+                if (invoiceSeriesId === '' || invoiceNo === '' || amount === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -775,7 +840,7 @@
 
 
             } else if (mode === 'Card') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === '' || bank === ''
+                if (invoiceSeriesId === '' || invoiceNo === '' || amount === '' || bank === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -790,7 +855,7 @@
                     canSave = true
                 }
             } else if (mode === 'Credit') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === '' || party === ''
+                if (invoiceSeriesId === '' || invoiceNo === '' || amount === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -805,7 +870,7 @@
                     canSave = true
                 }
             } else if (mode === 'Mix') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amountMixCard === '' || amountMixCash === '' || bank === ''
+                if (invoiceSeriesId === '' || invoiceNo === '' || amountMixCard === '' || amountMixCash === '' || bank === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -835,7 +900,7 @@
                     canSave = true
                 }
             } else if (mode === 'Return') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === ''
+                if (invoiceSeriesId === '' || invoiceNo === '' || amount === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -882,9 +947,8 @@
             }
             if (canSave === true) {
                 data = new FormData();
-                data.append('invoiceSeriesSelect', invoiceSeriesSelect);
-                data.append('invoiceNo', invoiceNo);
-                data.append('invoiceYearSelect', invoiceYearSelect);
+                data.append('invoiceSeriesId', invoiceSeriesId);
+                data.append('requestedInvoiceNumber', requestedInvoiceNumber);
                 data.append('party', party);
                 data.append('amount', amount);
                 data.append('remark', remark);
@@ -908,7 +972,7 @@
                             $('body')
                                 .toast({
                                     class: 'success',
-                                    message: mode + ' detail added Successfully.'
+                                    message: mode + ' detail added successfully.'
                                 });
 
                             hideLoading();
@@ -919,7 +983,7 @@
                             $('body')
                                 .toast({
                                     class: 'error',
-                                    message: 'An error occurred !'
+                                    message: response.error || 'An error occurred !'
                                 })
                             ;
                             hideLoading();
@@ -927,11 +991,11 @@
 
                         return response;
                     },
-                    error: function () {
+                    error: function (xhr) {
                         $('body')
                             .toast({
                                 class: 'error',
-                                message: 'An error occurred !'
+                                message: (xhr.responseJSON && xhr.responseJSON.error) || 'An error occurred !'
                             })
                         ;
                         hideLoading();
@@ -943,6 +1007,92 @@
             }
 
         }
+
+        function loadCashCounterInvoiceSeries() {
+            const invoiceModes = ['Cash', 'Credit', 'Card', 'Mix', 'Return'];
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:invoice_series_suggestions_api' %}",
+                data: {module: 'cash_counter'},
+                success: function (response) {
+                    invoiceModes.forEach(function (modeName) {
+                        const dropdown = $('#invoiceSeries' + modeName);
+                        const menu = dropdown.find('.menu');
+                        menu.html('');
+                        $('#invoiceNo' + modeName).prop('readonly', true);
+                        $('#requestedInvoiceNumber' + modeName).val('');
+                        $('#invoiceChipWrap' + modeName).html('');
+                        $('#invoiceYear' + modeName).hide();
+
+                        if (response.message !== 'success' || !response.data.length) {
+                            dropdown.dropdown('clear');
+                            $('#invoiceNo' + modeName).val('');
+                            return;
+                        }
+
+                        response.data.forEach(function (item) {
+                            menu.append(
+                                '<div class="item" data-value="' + item.id + '" data-next-number="' + item.nextNumber + '" data-upcoming=\'' + JSON.stringify(item.upcomingNumbers || []) + '\'>' +
+                                item.seriesCode + '<span class="description">Next ' + item.invoiceNumber + '</span></div>'
+                            );
+                        });
+
+                        dropdown.dropdown({
+                            fullTextSearch: true,
+                            onChange: function (value, text, $choice) {
+                                if (!$choice || !$choice.length) {
+                                    $('#invoiceNo' + modeName).val('');
+                                    $('#requestedInvoiceNumber' + modeName).val('');
+                                    $('#invoiceChipWrap' + modeName).html('');
+                                    return;
+                                }
+                                $('#invoiceNo' + modeName).val($choice.data('next-number'));
+                                renderCashCounterInvoiceChips(modeName, $choice.data('upcoming') || []);
+                            }
+                        });
+                        dropdown.dropdown('refresh');
+
+                        const preferred = response.data.find(function (item) { return item.isDefault; }) || response.data[0];
+                        dropdown.dropdown('set selected', String(preferred.id));
+                    });
+                },
+                error: function () {
+                    invoiceModes.forEach(function (modeName) {
+                        $('#invoiceNo' + modeName).val('');
+                        $('#requestedInvoiceNumber' + modeName).val('');
+                        $('#invoiceChipWrap' + modeName).html('');
+                    });
+                }
+            });
+        }
+
+        function renderCashCounterInvoiceChips(modeName, upcomingNumbers) {
+            const wrap = $('#invoiceChipWrap' + modeName);
+            wrap.html('');
+            if (!upcomingNumbers.length) {
+                $('#requestedInvoiceNumber' + modeName).val('');
+                wrap.append('<div class="ui tiny grey label">No unused invoices available.</div>');
+                return;
+            }
+            upcomingNumbers.forEach(function (item, index) {
+                const chip = $('<button type="button" class="invoice-chip"></button>');
+                chip.text(item.invoiceNumber);
+                if (index === 0) {
+                    chip.addClass('active');
+                    $('#requestedInvoiceNumber' + modeName).val(item.sequenceNumber);
+                    $('#invoiceNo' + modeName).val(item.displayNumber);
+                }
+                chip.on('click', function () {
+                    wrap.find('.invoice-chip').removeClass('active');
+                    chip.addClass('active');
+                    $('#requestedInvoiceNumber' + modeName).val(item.sequenceNumber);
+                    $('#invoiceNo' + modeName).val(item.displayNumber);
+                });
+                wrap.append(chip);
+            });
+        }
+
+        $(loadCashCounterInvoiceSeries());
 
 
     </script>

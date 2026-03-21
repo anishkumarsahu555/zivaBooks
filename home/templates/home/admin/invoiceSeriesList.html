@@ -1,0 +1,393 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/4.1.0/css/fixedColumns.dataTables.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.1.0/js/dataTables.fixedColumns.min.js"></script>
+{% endblock %}
+
+{% block title %}
+    <title>Invoice Series</title>
+{% endblock %}
+
+{% block body %}
+    <style>
+        #UserTable_length { left: 20px; position: absolute; }
+        #UserTable_filter { width: 50%; float: right; }
+        .dt-buttons { position: absolute; left: 174px; }
+        input[type=search] { width: 100px !important; }
+    </style>
+
+    <div class="ui right aligned basic grid">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div class="item active">Invoice Series</div>
+                <div style="position: absolute; right: 1.5rem; top: 18px;">
+                    {% if invoice_series_capabilities.can_add %}
+                        <button class="ui green mini plus button right" onclick="showUserModal()">
+                            <i class="plus square outline icon"></i>
+                            Add Invoice Series
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="UserTable" style="margin-top: 5px; width: 100%">
+                <thead>
+                <tr>
+                    <th>Module</th>
+                    <th>Series</th>
+                    <th>Range</th>
+                    <th>Next Invoice</th>
+                    <th>Padding</th>
+                    <th>Status</th>
+                    <th>Default</th>
+                    <th>Added On</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <div class="ui modal" id="myModalUser">
+                <i class="close icon"></i>
+                <div class="header">Add Invoice Series</div>
+                <div class="content">
+                    <form class="ui tiny form" id="addForm">{% csrf_token %}
+                        <div class="two required fields">
+                            <div class="field">
+                                <label>Module</label>
+                                <select class="ui dropdown" id="module">
+                                    <option value="">Select Module</option>
+                                    <option value="sales">Sales</option>
+                                    <option value="cash_counter">Cash Counter</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Series Code</label>
+                                <input type="text" id="seriesCode" placeholder="Example: BCS">
+                            </div>
+                        </div>
+                        <div class="two fields">
+                            <div class="field">
+                                <label>Name</label>
+                                <input type="text" id="name" placeholder="Optional label">
+                            </div>
+                            <div class="field">
+                                <label>Padding Length</label>
+                                <input type="number" id="paddingLength" min="1" value="4">
+                            </div>
+                        </div>
+                        <div class="three required fields">
+                            <div class="field">
+                                <label>Start Number</label>
+                                <input type="number" id="startNumber" min="1" value="1">
+                            </div>
+                            <div class="field">
+                                <label>End Number</label>
+                                <input type="number" id="endNumber" min="1" value="9999">
+                            </div>
+                            <div class="field">
+                                <label>Preview</label>
+                                <input type="text" id="previewAdd" readonly placeholder="BCS0001">
+                            </div>
+                        </div>
+                        <div class="inline fields">
+                            <div class="field">
+                                <div class="ui checkbox">
+                                    <input type="checkbox" id="isActive" checked>
+                                    <label>Active</label>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <div class="ui checkbox">
+                                    <input type="checkbox" id="isDefault">
+                                    <label>Default for module</label>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="actions" style="padding-top: 20px; padding-bottom: 20px; float: right">
+                        <div class="ui cancel button">Cancel</div>
+                        <button class="ui right labeled icon button green saveBtn" onclick="addUser()">Submit<i class="checkmark icon"></i></button>
+                        <button style="display:none" class="ui right labeled icon button teal saveBtnLoad">Saving ....<i class="checkmark icon"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui basic modal custom" id="deleteUser">
+                <div class="ui icon header"><i class="archive icon"></i>Invoice Series will be deleted</div>
+                <div class="content"><p style="text-align: center">The series will be deleted. Continue?</p></div>
+                <div class="actions">
+                    <div class="ui red basic cancel inverted button"><i class="remove icon"></i>No</div>
+                    <input type="hidden" id="UserID">
+                    <div class="ui green ok inverted button" onclick="deleteUser()"><i class="checkmark icon"></i>Yes</div>
+                </div>
+            </div>
+
+            <div class="ui modal" id="userModal">
+                <i class="close icon"></i>
+                <div class="header">Edit Invoice Series</div>
+                <div class="content">
+                    <form class="ui tiny form" id="EditForm">{% csrf_token %}
+                        <div class="two required fields">
+                            <div class="field">
+                                <label>Module</label>
+                                <select class="ui dropdown" id="moduleEdit">
+                                    <option value="">Select Module</option>
+                                    <option value="sales">Sales</option>
+                                    <option value="cash_counter">Cash Counter</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Series Code</label>
+                                <input type="text" id="seriesCodeEdit">
+                            </div>
+                        </div>
+                        <div class="two fields">
+                            <div class="field">
+                                <label>Name</label>
+                                <input type="text" id="nameEdit">
+                            </div>
+                            <div class="field">
+                                <label>Padding Length</label>
+                                <input type="number" id="paddingLengthEdit" min="1">
+                            </div>
+                        </div>
+                        <div class="three required fields">
+                            <div class="field">
+                                <label>Start Number</label>
+                                <input type="number" id="startNumberEdit" min="1">
+                            </div>
+                            <div class="field">
+                                <label>End Number</label>
+                                <input type="number" id="endNumberEdit" min="1">
+                            </div>
+                            <div class="field">
+                                <label>Preview</label>
+                                <input type="text" id="previewEdit" readonly>
+                            </div>
+                        </div>
+                        <div class="inline fields">
+                            <div class="field">
+                                <div class="ui checkbox">
+                                    <input type="checkbox" id="isActiveEdit">
+                                    <label>Active</label>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <div class="ui checkbox">
+                                    <input type="checkbox" id="isDefaultEdit">
+                                    <label>Default for module</label>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="EditId">
+                    </form>
+                    <div class="actions" style="padding-top: 20px; padding-bottom: 20px; float: right">
+                        <div class="ui cancel button">Cancel</div>
+                        <button class="ui right labeled icon button green saveBtn" onclick="editUser()">Update<i class="checkmark icon"></i></button>
+                        <button class="ui right labeled icon button teal js-view-close-btn" type="button" style="display:none" onclick="$('#userModal').modal('hide')">Close<i class="check icon"></i></button>
+                        <button style="display:none" class="ui right labeled icon button teal saveBtnLoad">Saving ....<i class="checkmark icon"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script>
+        $('.ui.dropdown').dropdown({fullTextSearch: true});
+        $('.ui.checkbox').checkbox();
+
+        function updatePreview(prefix, editMode) {
+            const code = $('#' + prefix + 'seriesCode').val() || '';
+            const start = $('#' + prefix + 'startNumber').val() || '0';
+            const padding = parseInt($('#' + prefix + 'paddingLength').val() || '0', 10);
+            const target = editMode ? '#previewEdit' : '#previewAdd';
+            $(target).val(code ? code.toUpperCase() + String(start).padStart(Math.max(padding, String(start).length), '0') : '');
+        }
+
+        $('#seriesCode, #startNumber, #paddingLength').on('input', function () { updatePreview('', false); });
+        $('#seriesCodeEdit, #startNumberEdit, #paddingLengthEdit').on('input', function () { updatePreview('', true); });
+
+        function showUserModal() {
+            $('#addForm').trigger('reset');
+            $('#isActive').prop('checked', true);
+            $('#isDefault').prop('checked', false);
+            $('.ui.checkbox').checkbox('refresh');
+            updatePreview('', false);
+            $('#myModalUser').modal('show');
+        }
+
+        function formPayload(isEdit) {
+            const suffix = isEdit ? 'Edit' : '';
+            const data = new FormData();
+            data.append('module', $('#module' + suffix).val());
+            data.append('seriesCode', $('#seriesCode' + suffix).val());
+            data.append('name', $('#name' + suffix).val());
+            data.append('startNumber', $('#startNumber' + suffix).val());
+            data.append('endNumber', $('#endNumber' + suffix).val());
+            data.append('paddingLength', $('#paddingLength' + suffix).val());
+            data.append('isActive', $('#isActive' + suffix).is(':checked'));
+            data.append('isDefault', $('#isDefault' + suffix).is(':checked'));
+            if (isEdit) {
+                data.append('EditId', $('#EditId').val());
+            }
+            return data;
+        }
+
+        function showError(response) {
+            const message = response && response.error ? response.error : 'An error occurred !';
+            $('body').toast({class: 'error', message: message});
+        }
+
+        function addUser() {
+            showLoading();
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:add_invoice_series_api" %}',
+                data: formPayload(false),
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: 'Invoice series added successfully.'});
+                        userTab.ajax.reload(null, false);
+                        $('#myModalUser').modal('hide');
+                    } else {
+                        showError(response);
+                    }
+                    hideLoading();
+                },
+                error: function (xhr) {
+                    showError(xhr.responseJSON || {});
+                    hideLoading();
+                }
+            });
+        }
+
+        userTab = $('#UserTable').DataTable({
+            dom: 'Blfrtip',
+            scrollY: '350px',
+            scrollX: true,
+            stateSave: true,
+            fixedColumns: {left: 1, right: 1},
+            buttons: [{extend: 'excel', exportOptions: {columns: [0,1,2,3,4,5,6,7]}}],
+            columnDefs: [
+                {name: 'module', targets: 0, orderable: true},
+                {name: 'seriesCode', targets: 1, orderable: true},
+                {name: 'range', targets: 2, orderable: false},
+                {name: 'nextInvoice', targets: 3, orderable: false},
+                {name: 'paddingLength', targets: 4, orderable: true},
+                {name: 'isActive', targets: 5, orderable: true},
+                {name: 'isDefault', targets: 6, orderable: true},
+                {name: 'datetime', targets: 7, orderable: true},
+                {name: 'action', targets: 8, orderable: false}
+            ],
+            aaSorting: [[0, 'asc'], [1, 'asc']],
+            lengthMenu: [[10,25,50,100,-1], [10,25,50,100,'All']],
+            pageLength: 10,
+            processing: true,
+            serverSide: true,
+            ajax: "{% url 'homeApp:InvoiceSeriesListJson' %}"
+        });
+
+        function delUser(id) {
+            $('#deleteUser').modal('show');
+            $('#UserID').val(id);
+        }
+
+        function deleteUser() {
+            const formdata = new FormData();
+            formdata.append('userID', $('#UserID').val());
+            $.ajax({
+                url: "{% url 'homeApp:delete_invoice_series_api' %}",
+                type: "post",
+                data: formdata,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: 'Invoice series deleted successfully.'});
+                        userTab.ajax.reload(null, false);
+                    } else {
+                        showError(response);
+                    }
+                },
+                error: function (xhr) { showError(xhr.responseJSON || {}); }
+            });
+        }
+
+        function GetUserDetails(id, mode) {
+            mode = mode || 'edit';
+            const viewOnly = mode === 'view';
+            $('#userModal').modal('show');
+            $('#EditForm input, #EditForm select').prop('disabled', viewOnly);
+            $('#userModal .saveBtn').toggle(!viewOnly);
+            $('#userModal .saveBtnLoad').hide();
+            $('#userModal .js-view-close-btn').toggle(viewOnly);
+            $.ajax({
+                type: 'get',
+                url: '{% url "homeApp:get_invoice_series_detail" %}?id=' + id,
+                success: function (response) {
+                    const data = response.data;
+                    $('#EditId').val(data.ID);
+                    $('#moduleEdit').val(data.ModuleValue).change();
+                    $('#seriesCodeEdit').val(data.SeriesCode);
+                    $('#nameEdit').val(data.Name);
+                    $('#startNumberEdit').val(data.StartNumber);
+                    $('#endNumberEdit').val(data.EndNumber);
+                    $('#paddingLengthEdit').val(data.PaddingLength);
+                    $('#isActiveEdit').prop('checked', data.IsActive);
+                    $('#isDefaultEdit').prop('checked', data.IsDefault);
+                    $('.ui.checkbox').checkbox('refresh');
+                    updatePreview('', true);
+                },
+                error: function () { showError({}); }
+            });
+        }
+
+        function editUser() {
+            showLoading();
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:edit_invoice_series_api" %}',
+                data: formPayload(true),
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: 'Invoice series updated successfully.'});
+                        userTab.ajax.reload(null, false);
+                        $('#userModal').modal('hide');
+                    } else {
+                        showError(response);
+                    }
+                    hideLoading();
+                },
+                error: function (xhr) {
+                    showError(xhr.responseJSON || {});
+                    hideLoading();
+                }
+            });
+        }
+    </script>
+{% endblock %}

@@ -34,6 +34,7 @@ urlpatterns = [
     path('party_group_list/', party_group_list, name='party_group_list'),
     path('party_list/', party_list, name='party_list'),
     path('bank_list/', bank_list, name='bank_list'),
+    path('invoice_series_list/', invoice_series_list, name='invoice_series_list'),
 
     # Admin Collection
     path('take_collection/', take_collection, name='take_collection'),
@@ -71,6 +72,11 @@ urlpatterns = [
     path('api/delete_bank/', delete_bank, name='delete_bank'),
     path('api/get_bank_detail/', get_bank_detail, name='get_bank_detail'),
     path('api/edit_bank_api/', edit_bank_api, name='edit_bank_api'),
+    path('api/add_invoice_series_api/', add_invoice_series_api, name='add_invoice_series_api'),
+    path('api/InvoiceSeriesListJson/', InvoiceSeriesListJson.as_view(), name='InvoiceSeriesListJson'),
+    path('api/get_invoice_series_detail/', get_invoice_series_detail, name='get_invoice_series_detail'),
+    path('api/edit_invoice_series_api/', edit_invoice_series_api, name='edit_invoice_series_api'),
+    path('api/delete_invoice_series_api/', delete_invoice_series_api, name='delete_invoice_series_api'),
 
     # api party
     path('api/add_party_api/', add_party_api, name='add_party_api'),
@@ -101,6 +107,7 @@ urlpatterns = [
     path('api/get_party_dashboard_report_api/', get_party_dashboard_report_api, name='get_party_dashboard_report_api'),
     path('api/get_bank_dashboard_report_api/', get_bank_dashboard_report_api, name='get_bank_dashboard_report_api'),
     path('api/get_bank_balances_api/', get_bank_balances_api, name='get_bank_balances_api'),
+    path('api/invoice_series_suggestions_api/', invoice_series_suggestions_api, name='invoice_series_suggestions_api'),
     path('api/add_book_manual_tx_api/', add_book_manual_tx_api, name='add_book_manual_tx_api'),
     path('api/transfer_books_api/', transfer_books_api, name='transfer_books_api'),
     path('api/transfer_cash_to_bank_api/', transfer_cash_to_bank_api, name='transfer_cash_to_bank_api'),

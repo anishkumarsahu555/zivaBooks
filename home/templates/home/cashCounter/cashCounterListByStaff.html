@@ -802,7 +802,7 @@
             formdata.append('userID', id);
 
             $.ajax({
-                url: "{% url 'homeApp:send_message_sales' %}",
+                url: "{% url 'homeApp:approve_collection' %}",
                 type: "post",
                 data: formdata,
                 contentType: false,
@@ -814,18 +814,19 @@
                         $('body')
                             .toast({
                                 class: 'success',
-                                message: response.detail || 'Sale approved successfully.'
+                                message: 'Collection approved successfully.'
                             })
                         ;
 
                         $('#imgModal').modal('hide');
+                        collectionTab.ajax.reload(null, false);
                         userTab.ajax.reload(null, false);
                         hideLoading();
                     } else {
                         $('body')
                             .toast({
                                 class: 'error',
-                                message: response.detail || 'Unable to approve sale.'
+                                message: response.detail || 'Unable to approve collection.'
                             })
                         ;
                         hideLoading();

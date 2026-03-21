@@ -114,6 +114,17 @@ def _admin_sections(user):
             ]),
         },
         {
+            'title': 'Billing',
+            'items': _filter_items(user, [
+                _nav_item('Invoice Series', 'homeApp:invoice_series_list', 'hashtag', (
+                    'home.view_invoiceseries',
+                    'home.add_invoiceseries',
+                    'home.change_invoiceseries',
+                    'home.delete_invoiceseries',
+                )),
+            ]),
+        },
+        {
             'title': 'Cash Counter',
             'items': _filter_items(user, [
                 _nav_item("Today's Cash Counter", 'homeApp:cash_counter', 'calendar check', 'home.can_manage_cash_counter'),
@@ -455,6 +466,17 @@ def build_sidebar_sections(request_or_user):
                 _nav_item('Sales List', 'homeApp:sales_list', 'clipboard list', (
                     'home.can_manage_sales',
                     'home.can_approve_sales',
+                )),
+            ]),
+        },
+        {
+            'title': 'Billing',
+            'items': _filter_items(request_or_user, [
+                _nav_item('Invoice Series', 'homeApp:invoice_series_list', 'hashtag', (
+                    'home.view_invoiceseries',
+                    'home.add_invoiceseries',
+                    'home.change_invoiceseries',
+                    'home.delete_invoiceseries',
                 )),
             ]),
         },

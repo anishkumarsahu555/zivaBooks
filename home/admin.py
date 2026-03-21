@@ -6,6 +6,7 @@ from django.contrib.auth.models import Group, Permission
 
 # Register your models here.
 from .models import *
+from .permission_bundles import tenant_permission_bundle_definitions
 from .tenancy import ensure_membership
 
 
@@ -22,6 +23,14 @@ def _tenant_admin_group_name(tenant):
     return f'{tenant.slug}:Tenant Admin'
 
 
+def _tenant_bundle_choices():
+    return [(bundle['key'], bundle['label']) for bundle in tenant_permission_bundle_definitions()]
+
+
+def _tenant_bundle_permissions():
+    return {bundle['key']: bundle['permissions'] for bundle in tenant_permission_bundle_definitions()}
+
+
 class TenantAdminForm(forms.ModelForm):
     tenant_admin_user = forms.ModelChoiceField(
         queryset=User.objects.order_by('username'),
@@ -35,6 +44,13 @@ class TenantAdminForm(forms.ModelForm):
         widget=FilteredSelectMultiple('Tenant modules and permissions', is_stacked=False),
         help_text='Selected permissions decide which modules this tenant admin can access.',
         label='Tenant admin permissions',
+    )
+    preset_bundles = forms.MultipleChoiceField(
+        choices=_tenant_bundle_choices(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text='Use these module presets first, then fine-tune the raw permission list below if needed.',
+        label='Tenant admin permission presets',
     )
 
     class Meta:
@@ -52,9 +68,39 @@ class TenantAdminForm(forms.ModelForm):
                 self.initial['tenant_admin_user'] = membership.user_id
             group = Group.objects.filter(name=_tenant_admin_group_name(self.instance)).first()
             if group:
-                self.initial['admin_permissions'] = list(
+                selected_permission_ids = list(
                     group.permissions.filter(id__in=self.fields['admin_permissions'].queryset).values_list('id', flat=True)
                 )
+                self.initial['admin_permissions'] = selected_permission_ids
+                selected_perm_names = {
+                    f'{permission.content_type.app_label}.{permission.codename}'
+                    for permission in group.permissions.select_related('content_type')
+                }
+                self.initial['preset_bundles'] = [
+                    bundle['key']
+                    for bundle in tenant_permission_bundle_definitions()
+                    if set(bundle['permissions']).issubset(selected_perm_names)
+                ]
+
+    def clean_admin_permissions(self):
+        permissions = list(self.cleaned_data.get('admin_permissions') or [])
+        selected_bundle_keys = self.cleaned_data.get('preset_bundles') or []
+        bundle_permission_map = _tenant_bundle_permissions()
+        extra_perm_names = set()
+        for bundle_key in selected_bundle_keys:
+            extra_perm_names.update(bundle_permission_map.get(bundle_key, []))
+        if extra_perm_names:
+            bundle_permissions = list(
+                Permission.objects.select_related('content_type').filter(
+                    content_type__app_label='home',
+                    codename__in=[name.split('.', 1)[1] for name in extra_perm_names if name.startswith('home.')],
+                )
+            )
+            existing_ids = {permission.pk for permission in permissions}
+            for permission in bundle_permissions:
+                if permission.pk not in existing_ids:
+                    permissions.append(permission)
+        return permissions
 
     @staticmethod
     def _permission_label(permission):
@@ -155,7 +201,7 @@ admin.site.register(WhatsappMessageStatus, MessageStatusAdmin)
 
 
 class SalesAdmin(admin.ModelAdmin):
-    list_display = ['tenant', 'partyID', 'paymentID', 'buildDate', 'invoiceNumber', 'amount', 'remark', 'createdBy', 'datetime',
+    list_display = ['tenant', 'partyID', 'paymentID', 'buildDate', 'invoiceSeries', 'invoiceSequenceNumber', 'invoiceNumber', 'amount', 'remark', 'createdBy', 'datetime',
                     'lastUpdatedOn', 'isDeleted']
 
 
@@ -163,7 +209,7 @@ admin.site.register(Sales, SalesAdmin)
 
 
 class CashCounterAdmin(admin.ModelAdmin):
-    list_display = ['tenant', 'counterID', 'partyID', 'invoiceNumber', 'mode', 'amount', 'mixCashAmount', 'mixCardAmount',
+    list_display = ['tenant', 'counterID', 'partyID', 'invoiceSeries', 'invoiceSequenceNumber', 'invoiceNumber', 'mode', 'amount', 'mixCashAmount', 'mixCardAmount',
                     'remark', 'createdBy', 'entryDate', 'datetime',
                     'lastUpdatedOn', 'isDeleted']
 
@@ -177,8 +223,8 @@ class TenantAdmin(admin.ModelAdmin):
             'fields': ('name', 'slug', 'isActive'),
         }),
         ('Tenant Admin Access', {
-            'fields': ('tenant_admin_user', 'admin_permissions'),
-            'description': 'Assign the tenant admin and decide which modules this tenant can access.',
+            'fields': ('tenant_admin_user', 'preset_bundles', 'admin_permissions'),
+            'description': 'Assign the tenant admin, choose permission presets, then review the raw tenant admin permissions below.',
         }),
     )
 
@@ -241,5 +287,12 @@ class BookTransactionAdmin(admin.ModelAdmin):
     search_fields = ['narration', 'transferId', 'party__name', 'account__name']
 
 
+class InvoiceSeriesAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'module', 'seriesCode', 'startNumber', 'endNumber', 'nextNumber', 'paddingLength', 'isActive', 'isDefault']
+    list_filter = ['module', 'isActive', 'isDefault']
+    search_fields = ['tenant__name', 'seriesCode', 'name']
+
+
 admin.site.register(BookAccount, BookAccountAdmin)
 admin.site.register(BookTransaction, BookTransactionAdmin)
+admin.site.register(InvoiceSeries, InvoiceSeriesAdmin)

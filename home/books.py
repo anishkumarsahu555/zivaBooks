@@ -246,13 +246,22 @@ def sync_cash_counter_entry(entry: CashCounter) -> None:
     tx_datetime = entry.entryDate or entry.datetime
     created_by = entry.createdBy
     party = entry.partyID
-    narration = f'Cash Counter {entry.counterID or entry.pk} ({entry.mode})'
+    invoice_ref = entry.invoiceNumber or 'No Invoice'
+    counter_ref = entry.counterID or 'No Counter ID'
+    narration = f'Cash Counter - {invoice_ref} ({entry.mode}) - {counter_ref}'
     if entry.remark:
         narration = f'{narration} - {entry.remark}'
 
     cash_account = ensure_default_cash_account(tenant)
 
-    # Default: no posting (e.g., Credit/Advance/Collection are not cash/bank movements by default).
+    # Cash Counter -> Books mapping:
+    # Cash    -> cashbook IN
+    # Credit  -> no cashbook/bankbook posting
+    # Card    -> bankbook IN
+    # Mix     -> cash part to cashbook IN, card part to bankbook IN
+    # Return  -> cashbook OUT
+    # Expense -> cashbook OUT
+    # Advance/Collection continue to follow the existing legacy posting rules below.
     if entry.mode == 'Cash':
         _upsert_book_transaction(
             tenant=tenant,
@@ -267,6 +276,9 @@ def sync_cash_counter_entry(entry: CashCounter) -> None:
             party=party,
             created_by=created_by,
         )
+        return
+
+    if entry.mode == 'Credit':
         return
 
     if entry.mode == 'Advance':

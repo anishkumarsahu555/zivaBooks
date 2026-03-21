@@ -23,6 +23,21 @@
         .currency {
             padding: 4px 6px !important;
         }
+
+        .readonly-invoice {
+            background: #f8fafc !important;
+            color: #1f2937 !important;
+            font-weight: 700;
+        }
+
+        .invoice-lock-note {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 0.78rem;
+        }
     </style>
 {% endblock %}
 
@@ -46,7 +61,7 @@
                             <a class="item {% if obj.mode == 'Credit' %} active {% endif %}" data-tab="credit"
                                onclick="selectTab('Credit')">Credit</a>
                             <a class="item {% if obj.mode == 'Card' %} active {% endif %}" data-tab="card"
-                               onclick="selectTab('Card')">Card</a>
+                               onclick="selectTab('Card')">Card/Online</a>
                             <a class="item {% if obj.mode == 'Mix' %} active {% endif %}" data-tab="mix"
                                onclick="selectTab('Mix')">Mix</a>
                             {#                            <a class="item {% if obj.mode == 'Collection' %} active {% endif %}" data-tab="collection"#}
@@ -65,32 +80,11 @@
                                         <div class="two fields">
                                             <div class="eight wide field required">
                                                 <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesCash">
-                                                        <div class="text" id="invoiceSeriesSelectCash">BCS</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
-                                                    </div>
-                                                    <input type="number" placeholder="Invoice Number" id="invoiceNoCash"
-                                                           name="invoiceNoCash">
-                                                    <div class="ui dropdown blue label" id="invoiceYearCash">
-                                                        <div class="text" id="invoiceYearSelectCash">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
-                                                        </div>
-                                                    </div>
-
+                                                <div class="ui input">
+                                                    <input type="text" placeholder="Invoice Number" id="invoiceNoCash"
+                                                           name="invoiceNoCash" class="readonly-invoice" readonly>
                                                 </div>
-
+                                                <div class="invoice-lock-note"><i class="lock icon"></i>Invoice is locked after creation.</div>
                                             </div>
                                             <div class="eight wide field required">
                                                 <label>Amount (₹ <a class="ui violet label currency"
@@ -102,8 +96,15 @@
                                             </div>
 
                                         </div>
-                                        <div class="one  fields">
-                                            <div class="sixteen wide field">
+                                        <div class="two fields">
+                                            <div class="eight wide field">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyCash"
+                                                        name="partyCash">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="eight wide field">
                                                 <label>Remark</label>
                                                 <textarea name="remarkCash" id="remarkCash" placeholder="Any Remark"
                                                           rows="1"></textarea>
@@ -121,33 +122,12 @@
                                         <div class="two fields">
                                             <div class="eight wide field required">
                                                 <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesCredit">
-                                                        <div class="text" id="invoiceSeriesSelectCredit">BCS</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
-                                                    </div>
-                                                    <input type="number" placeholder="Invoice Number"
+                                                <div class="ui input">
+                                                    <input type="text" placeholder="Invoice Number"
                                                            id="invoiceNoCredit"
-                                                           name="invoiceNoCredit">
-                                                    <div class="ui dropdown blue label" id="invoiceYearCredit">
-                                                        <div class="text" id="invoiceYearSelectCredit">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
-                                                        </div>
-                                                    </div>
-
+                                                           name="invoiceNoCredit" class="readonly-invoice" readonly>
                                                 </div>
-
+                                                <div class="invoice-lock-note"><i class="lock icon"></i>Invoice is locked after creation.</div>
                                             </div>
                                             <div class="eight wide field required">
                                                 <label>Amount (₹ <a class="ui violet label currency" id="moneyCredit">0.0</a>
@@ -183,32 +163,11 @@
                                         <div class="two fields">
                                             <div class="eight wide field required">
                                                 <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesCard">
-                                                        <div class="text" id="invoiceSeriesSelectCard">BCS</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
-                                                    </div>
-                                                    <input type="number" placeholder="Invoice Number" id="invoiceNoCard"
-                                                           name="invoiceNoCard">
-                                                    <div class="ui dropdown blue label" id="invoiceYearCard">
-                                                        <div class="text" id="invoiceYearSelectCard">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
-                                                        </div>
-                                                    </div>
-
+                                                <div class="ui input">
+                                                    <input type="text" placeholder="Invoice Number" id="invoiceNoCard"
+                                                           name="invoiceNoCard" class="readonly-invoice" readonly>
                                                 </div>
-
+                                                <div class="invoice-lock-note"><i class="lock icon"></i>Invoice is locked after creation.</div>
                                             </div>
                                             <div class="eight wide field required">
                                                 <label>Amount (₹ <a class="ui violet label currency"
@@ -220,8 +179,15 @@
                                             </div>
 
                                         </div>
-                                        <div class="two  fields">
-                                            <div class=" field required">
+                                        <div class="three fields">
+                                            <div class="six wide field">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyCard"
+                                                        name="partyCard">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="five wide field required">
                                                 <label>Bank </label>
                                                 <select class="ui dropdown search fluid " id="bankCard">
                                                     <option value="">Select Bank</option>
@@ -232,7 +198,7 @@
                                                 </select>
                                             </div>
 
-                                            <div class="field">
+                                            <div class="five wide field">
                                                 <label>Remark</label>
                                                 <textarea name="remarkCard" id="remarkCard" placeholder="Any Remark"
                                                           rows="1"></textarea>
@@ -246,35 +212,14 @@
                             <div class="ui row  ">
                                 <div class="content">
                                     <form class="ui  small form " id="addFormMix" name="addFormMix">{% csrf_token %}
-                                        <div class="four fields">
+                                        <div class="three fields">
                                             <div class="five wide field required">
                                                 <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesMix">
-                                                        <div class="text" id="invoiceSeriesSelectMix">BCS</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
-                                                    </div>
-                                                    <input type="number" placeholder="Invoice Number" id="invoiceNoMix"
-                                                           name="invoiceNoMix">
-                                                    <div class="ui dropdown blue label" id="invoiceYearMix">
-                                                        <div class="text" id="invoiceYearSelectMix">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
-                                                        </div>
-                                                    </div>
-
+                                                <div class="ui input">
+                                                    <input type="text" placeholder="Invoice Number" id="invoiceNoMix"
+                                                           name="invoiceNoMix" class="readonly-invoice" readonly>
                                                 </div>
-
+                                                <div class="invoice-lock-note"><i class="lock icon"></i>Invoice is locked after creation.</div>
                                             </div>
                                             <div class="four wide field required">
                                                 <label>Amount Cash (₹ <a class="ui violet label currency"
@@ -292,7 +237,16 @@
                                                        placeholder="Amount"
                                                        onkeyup="toIndianCurrency()">
                                             </div>
-                                            <div class=" field required">
+                                        </div>
+                                        <div class="three fields">
+                                            <div class="six wide field required">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyMix"
+                                                        name="partyMix">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="four wide field required">
                                                 <label>Bank </label>
                                                 <select class="ui dropdown search fluid " id="bankMix">
                                                     <option value="">Select Bank</option>
@@ -302,11 +256,7 @@
                                                     {% endfor %}
                                                 </select>
                                             </div>
-
-                                        </div>
-                                        <div class="one  fields">
-
-                                            <div class="sixteen wide field">
+                                            <div class="six wide field">
                                                 <label>Remark</label>
                                                 <textarea name="remarkMix" id="remarkMix" placeholder="Any Remark"
                                                           rows="1"></textarea>
@@ -361,33 +311,12 @@
                                         <div class="two fields">
                                             <div class="eight wide field required">
                                                 <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
-                                                    <div class="ui dropdown teal label" id="invoiceSeriesReturn">
-                                                        <div class="text" id="invoiceSeriesSelectReturn">BCS</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">BCS</div>
-                                                            <div class="item">BCS1</div>
-                                                            <div class="item">BSS</div>
-                                                            <div class="item">ND</div>
-                                                        </div>
-                                                    </div>
-                                                    <input type="number" placeholder="Invoice Number"
+                                                <div class="ui input">
+                                                    <input type="text" placeholder="Invoice Number"
                                                            id="invoiceNoReturn"
-                                                           name="invoiceNoReturn">
-                                                    <div class="ui dropdown blue label" id="invoiceYearReturn">
-                                                        <div class="text" id="invoiceYearSelectReturn">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
-                                                        </div>
-                                                    </div>
-
+                                                           name="invoiceNoReturn" class="readonly-invoice" readonly>
                                                 </div>
-
+                                                <div class="invoice-lock-note"><i class="lock icon"></i>Invoice is locked after creation.</div>
                                             </div>
                                             <div class="eight wide field required">
                                                 <label>Amount (₹ <a class="ui violet label currency" id="moneyReturn">0.0</a>
@@ -398,8 +327,15 @@
                                             </div>
 
                                         </div>
-                                        <div class="one  fields">
-                                            <div class="sixteen wide field">
+                                        <div class="two fields">
+                                            <div class="eight wide field">
+                                                <label>Party Name</label>
+                                                <select class="ui clearable search dropdown" id="partyReturn"
+                                                        name="partyReturn">
+                                                    <option value="">Search By Party Name</option>
+                                                </select>
+                                            </div>
+                                            <div class="eight wide field">
                                                 <label>Remark</label>
                                                 <textarea name="remarkReturn" id="remarkReturn" placeholder="Any Remark"
                                                           rows="1"></textarea>
@@ -584,25 +520,41 @@
         function resetForm() {
             $('#addForm' + mode).trigger('reset');
             toIndianCurrency();
+            $('#partyCash').dropdown('clear');
             $('#partyCredit').dropdown('clear');
+            $('#partyCard').dropdown('clear');
             $('#partyCollection').dropdown('clear');
             $('#partyAdvance').dropdown('clear');
+            $('#partyMix').dropdown('clear');
+            $('#partyReturn').dropdown('clear');
         }
 
         function getPartyList() {
             let response = JSON.parse(localStorage.getItem('response'))
 
+            $('#partyCash').html('');
             $('#partyCredit').html('');
+            $('#partyCard').html('');
             $('#partyCollection').html('');
             $('#partyAdvance').html('');
+            $('#partyMix').html('');
+            $('#partyReturn').html('');
+            $('#partyCash').append(' <option value="">Search By Party Name</option>');
             $('#partyCredit').append(' <option value="">Search By Party Name</option>');
+            $('#partyCard').append(' <option value="">Search By Party Name</option>');
             $('#partyCollection').append(' <option value="">Search By Party Name</option>');
             $('#partyAdvance').append(' <option value="">Search By Party Name</option>');
+            $('#partyMix').append(' <option value="">Search By Party Name</option>');
+            $('#partyReturn').append(' <option value="">Search By Party Name</option>');
             var j;
             for (j = 0; j < response.data.length; j++) {
+                $('#partyCash').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
                 $('#partyCredit').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                $('#partyCard').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
                 $('#partyCollection').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
                 $('#partyAdvance').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                $('#partyMix').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                $('#partyReturn').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
 
             }
 
@@ -610,9 +562,7 @@
 
         function salesSave() {
             showLoading();
-            let invoiceSeriesSelect = $('#invoiceSeriesSelect' + mode).html();
             let invoiceNo = $('#invoiceNo' + mode).val();
-            let invoiceYearSelect = $('#invoiceYearSelect' + mode).html();
             let party = $('#party' + mode).val();
             let amount = $('#amount' + mode).val();
             let remark = $('#remark' + mode).val();
@@ -622,12 +572,11 @@
             let amountMixCash = $('#amountCash' + mode).val();
             let amountMixCard = $('#amountCard' + mode).val();
             let editID = $('#editID').val();
-            debugger;
 
             let canSave = false;
 
             if (mode === 'Cash') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === ''
+                if (invoiceNo === '' || amount === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -644,7 +593,7 @@
 
 
             } else if (mode === 'Card') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === '' || bank === ''
+                if (invoiceNo === '' || amount === '' || bank === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -659,7 +608,7 @@
                     canSave = true
                 }
             } else if (mode === 'Credit') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === '' || party === ''
+                if (invoiceNo === '' || amount === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -674,7 +623,7 @@
                     canSave = true
                 }
             } else if (mode === 'Mix') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amountMixCard === '' || amountMixCash === '' || bank === ''
+                if (invoiceNo === '' || amountMixCard === '' || amountMixCash === '' || bank === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -704,7 +653,7 @@
                     canSave = true
                 }
             } else if (mode === 'Return') {
-                if (invoiceSeriesSelect === '' || invoiceNo === '' || invoiceYearSelect === '' || amount === ''
+                if (invoiceNo === '' || amount === '' || party === ''
                 ) {
                     $('body')
                         .toast({
@@ -751,9 +700,6 @@
             }
             if (canSave === true) {
                 data = new FormData();
-                data.append('invoiceSeriesSelect', invoiceSeriesSelect);
-                data.append('invoiceNo', invoiceNo);
-                data.append('invoiceYearSelect', invoiceYearSelect);
                 data.append('party', party);
                 data.append('amount', amount);
                 data.append('remark', remark);
@@ -789,7 +735,7 @@
                             $('body')
                                 .toast({
                                     class: 'error',
-                                    message: 'An error occurred !'
+                                    message: response.error || 'An error occurred !'
                                 })
                             ;
                             hideLoading();
@@ -797,11 +743,11 @@
 
                         return response;
                     },
-                    error: function () {
+                    error: function (xhr) {
                         $('body')
                             .toast({
                                 class: 'error',
-                                message: 'An error occurred !'
+                                message: (xhr.responseJSON && xhr.responseJSON.error) || 'An error occurred !'
                             })
                         ;
                         hideLoading();
@@ -817,23 +763,14 @@
         $(loadDetail());
 
         function loadDetail() {
-            debugger;
-
-
-            setTimeout(function () {
-                $('#amount{{ obj.mode }}').val('{{ obj.amount }}');
-                $('#remark{{ obj.mode }}').val('{{ obj.remark }}');
-                $('#invoiceSeriesSelect{{ obj.mode }}').html('{{ series }}');
-                $('#invoiceNo{{ obj.mode }}').val('{{ number }}');
-                $('#invoiceYearSelect{{ obj.mode }}').html('{{ year }}');
-                $('#amountCash{{ obj.mode }}').val({{ obj.mixCashAmount }});
-                $('#amountCard{{ obj.mode }}').val({{ obj.mixCardAmount }});
-                $('#party{{ obj.mode }}').val("{{obj.partyID.pk}}").change();
-                $('#bank{{ obj.mode }}').val("{{obj.bankID.pk}}").change();
-
-
-            }, 2000);
-
+            $('#amount{{ obj.mode }}').val('{{ obj.amount }}');
+            $('#remark{{ obj.mode }}').val('{{ obj.remark|default_if_none:"" }}');
+            $('#invoiceNo{{ obj.mode }}').val('{{ invoice_display|default_if_none:"" }}');
+            $('#amountCash{{ obj.mode }}').val({{ obj.mixCashAmount }});
+            $('#amountCard{{ obj.mode }}').val({{ obj.mixCardAmount }});
+            $('#party{{ obj.mode }}').val("{{ obj.partyID.pk|default_if_none:'' }}").change();
+            $('#bank{{ obj.mode }}').val("{{ obj.bankID.pk|default_if_none:'' }}").change();
+            toIndianCurrency();
         }
 
 

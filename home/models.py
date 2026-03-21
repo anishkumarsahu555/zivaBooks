@@ -466,6 +466,8 @@ class Sales(TenantOwnedModel):
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sales')
     partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL)
     paymentID = models.CharField(max_length=200, blank=True, null=True)
+    invoiceSeries = models.ForeignKey('InvoiceSeries', blank=True, null=True, on_delete=models.SET_NULL, related_name='sales')
+    invoiceSequenceNumber = models.PositiveIntegerField(blank=True, null=True)
     invoiceNumber = models.CharField(max_length=200, default='Cash')
     amount = models.FloatField(default=0.0)
     remark = models.CharField(max_length=500, blank=True, null=True)
@@ -498,6 +500,8 @@ class CashCounter(TenantOwnedModel):
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='cash_counters')
     partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL)
     counterID = models.CharField(max_length=200, blank=True, null=True)
+    invoiceSeries = models.ForeignKey('InvoiceSeries', blank=True, null=True, on_delete=models.SET_NULL, related_name='cash_counters')
+    invoiceSequenceNumber = models.PositiveIntegerField(blank=True, null=True)
     invoiceNumber = models.CharField(max_length=200, blank=True, null=True)
     mode = models.CharField(max_length=200, blank=True, null=True)
     amount = models.FloatField(default=0.0)
@@ -560,6 +564,36 @@ class CollectionCashCounter(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'datetime'], name='ccollection_tenant_dt_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'collectedBy'], name='ccollection_tenant_staff_idx'),
             models.Index(fields=['tenant', 'paymentID'], name='ccollection_tenant_payid_idx'),
+        ]
+
+
+class InvoiceSeries(TenantOwnedModel):
+    class Module(models.TextChoices):
+        SALES = 'sales', 'Sales'
+        CASH_COUNTER = 'cash_counter', 'Cash Counter'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='invoice_series')
+    module = models.CharField(max_length=40, choices=Module.choices)
+    name = models.CharField(max_length=200, blank=True, null=True)
+    seriesCode = models.CharField(max_length=40)
+    startNumber = models.PositiveIntegerField(default=1)
+    endNumber = models.PositiveIntegerField(default=9999)
+    nextNumber = models.PositiveIntegerField(default=1)
+    paddingLength = models.PositiveIntegerField(default=4)
+    isActive = models.BooleanField(default=True)
+    isDefault = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f'{self.get_module_display()} - {self.seriesCode}'
+
+    class Meta:
+        verbose_name_plural = 'Invoice Series'
+        constraints = [
+            models.UniqueConstraint(fields=['tenant', 'module', 'seriesCode'], name='unique_invoice_series_per_module'),
+        ]
+        indexes = [
+            models.Index(fields=['tenant', 'module', 'isActive'], name='invser_tenant_active_idx'),
+            models.Index(fields=['tenant', 'module', 'isDefault'], name='invser_tenant_default_idx'),
         ]
 
 

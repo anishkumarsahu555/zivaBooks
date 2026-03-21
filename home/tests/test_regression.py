@@ -240,7 +240,7 @@ class SalesEditLockTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         sale.refresh_from_db()
-        self.assertEqual(sale.invoiceNumber, "A/2/2026")
+        self.assertEqual(sale.invoiceNumber, "A/1/2026")
         self.assertEqual(sale.amount, 20.0)
 
         sale.isApproved = True
@@ -512,4 +512,3 @@ class CollectionOtpEndToEndTests(TestCase):
         collection = Collection.objects.filter(tenant=tenant, partyID=party, collectedBy=staff_profile).order_by("-id").first()
         self.assertIsNotNone(collection)
         self.assertTrue(collection.otpVerified)
-

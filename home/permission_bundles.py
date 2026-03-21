@@ -66,6 +66,17 @@ TENANT_PERMISSION_BUNDLE_DEFS = [
         ],
     },
     {
+        'key': 'tenant_invoice_series',
+        'label': 'Enable Invoice Series',
+        'description': 'Manage invoice series ranges, padding, and defaults for sales and cash counter.',
+        'permissions': [
+            'home.view_invoiceseries',
+            'home.add_invoiceseries',
+            'home.change_invoiceseries',
+            'home.delete_invoiceseries',
+        ],
+    },
+    {
         'key': 'tenant_messages',
         'label': 'Enable Messages',
         'description': 'Access message history records.',

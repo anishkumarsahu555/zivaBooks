@@ -39,6 +39,10 @@ from home.audit import log_audit_event, snapshot_instance
 User = get_user_model()
 BASE_URL_WHATSAPP = "https://bot.betablaster.in/api/"
 DEFAULT_AVATAR_URL = "/static/images/default-avatar.svg"
+INVOICE_MODULE_MODEL_MAP = {
+    InvoiceSeries.Module.SALES: Sales,
+    InvoiceSeries.Module.CASH_COUNTER: CashCounter,
+}
 DEFAULT_GROUP_PERMISSION_MAP = {
     'Owner': '__all__',
     'Admin': '__all__',
@@ -287,6 +291,218 @@ def formatINR(number):
     s, *d = str(number).partition(".")
     r = ",".join([s[x - 2:x] for x in range(-3, -len(s), -2)][::-1] + [s[-3:]])
     return "".join([r] + d)
+def _invoice_series_queryset(request_or_user, module):
+    return tenant_qs(request_or_user, InvoiceSeries).filter(
+        isDeleted=False,
+        module=module,
+        isActive=True,
+    ).order_by('-isDefault', 'seriesCode', 'id')
+def _invoice_model_for_module(module):
+    return INVOICE_MODULE_MODEL_MAP[module]
+def _format_invoice_number(series, sequence_number):
+    return f'{series.seriesCode}{str(sequence_number).zfill(series.paddingLength)}'
+def _next_invoice_number_for_series(series, *, exclude_instance=None):
+    return _next_invoice_numbers_for_series(series, limit=1, exclude_instance=exclude_instance)[0]
+def _next_invoice_numbers_for_series(series, limit=150, *, exclude_instance=None):
+    return _available_invoice_numbers_for_series(series, limit=limit, exclude_instance=exclude_instance, from_next_only=True)
+def _available_invoice_numbers_for_series(series, limit=150, *, exclude_instance=None, from_next_only=False):
+    model = _invoice_model_for_module(series.module)
+    used_numbers = set(
+        model.objects.filter(
+            tenant=series.tenant,
+            isDeleted=False,
+            invoiceSeries=series,
+        ).exclude(
+            pk=getattr(exclude_instance, 'pk', None)
+        ).values_list('invoiceSequenceNumber', flat=True)
+    )
+    numbers = []
+    candidate = max(series.nextNumber, series.startNumber) if from_next_only else series.startNumber
+    while candidate <= series.endNumber and len(numbers) < limit:
+        if candidate not in used_numbers:
+            numbers.append(candidate)
+        candidate += 1
+    if not numbers:
+        raise ValueError('Invoice series exhausted.')
+    return numbers
+def _reserve_invoice_number(request_or_user, module, series_id, *, exclude_instance=None, preferred_number=None):
+    series = _invoice_series_queryset(request_or_user, module).select_for_update().get(pk=int(series_id))
+    available_numbers = _available_invoice_numbers_for_series(series, limit=150, exclude_instance=exclude_instance)
+    if preferred_number is not None:
+        preferred_number = int(preferred_number)
+        if preferred_number not in available_numbers:
+            raise ValueError('Selected invoice number is no longer available.')
+        sequence_number = preferred_number
+    else:
+        sequence_number = available_numbers[0]
+    if series.nextNumber <= sequence_number:
+        series.nextNumber = sequence_number + 1
+        series.save(update_fields=['nextNumber', 'lastUpdatedOn'])
+    return series, sequence_number, _format_invoice_number(series, sequence_number)
+def _invoice_series_payload_for_module(request, module):
+    payload = []
+    for series in _invoice_series_queryset(request, module):
+        try:
+            next_number = _next_invoice_number_for_series(series)
+        except ValueError:
+            continue
+        payload.append({
+            'id': series.pk,
+            'seriesCode': series.seriesCode,
+            'nextNumber': str(next_number).zfill(series.paddingLength),
+            'invoiceNumber': _format_invoice_number(series, next_number),
+            'upcomingNumbers': [
+                {
+                    'sequenceNumber': number,
+                    'displayNumber': str(number).zfill(series.paddingLength),
+                    'invoiceNumber': _format_invoice_number(series, number),
+                }
+                for number in _available_invoice_numbers_for_series(series, limit=150)
+            ],
+            'rangeLabel': f'{str(series.startNumber).zfill(series.paddingLength)} - {str(series.endNumber).zfill(series.paddingLength)}',
+            'isDefault': series.isDefault,
+        })
+    return payload
+def _invoice_series_payload_obj(series):
+    try:
+        next_sequence = _next_invoice_number_for_series(series)
+        next_invoice = _format_invoice_number(series, next_sequence)
+    except ValueError:
+        next_sequence = None
+        next_invoice = 'Exhausted'
+    return {
+        'ID': series.pk,
+        'Name': series.name or '',
+        'Module': series.get_module_display(),
+        'ModuleValue': series.module,
+        'SeriesCode': series.seriesCode,
+        'StartNumber': series.startNumber,
+        'EndNumber': series.endNumber,
+        'NextNumber': series.nextNumber,
+        'PaddingLength': series.paddingLength,
+        'NextInvoice': next_invoice,
+        'IsActive': series.isActive,
+        'IsDefault': series.isDefault,
+        'RangeLabel': f'{str(series.startNumber).zfill(series.paddingLength)} - {str(series.endNumber).zfill(series.paddingLength)}',
+    }
+def _normalize_bool(raw):
+    return str(raw).strip().lower() in {'1', 'true', 'yes', 'on'}
+def _validate_invoice_series_form(request, *, instance=None):
+    name = (request.POST.get('name') or '').strip()
+    module = (request.POST.get('module') or '').strip()
+    series_code = (request.POST.get('seriesCode') or '').strip().upper()
+    start_number = int(request.POST.get('startNumber') or 0)
+    end_number = int(request.POST.get('endNumber') or 0)
+    padding_length = int(request.POST.get('paddingLength') or 0)
+    is_active = _normalize_bool(request.POST.get('isActive'))
+    is_default = _normalize_bool(request.POST.get('isDefault'))
+
+    if module not in INVOICE_MODULE_MODEL_MAP:
+        raise ValueError('Please select a valid module.')
+    if not series_code:
+        raise ValueError('Series code is required.')
+    if start_number <= 0 or end_number <= 0:
+        raise ValueError('Start and end numbers must be positive.')
+    if start_number > end_number:
+        raise ValueError('Start number cannot be greater than end number.')
+    if padding_length < len(str(end_number)):
+        raise ValueError('Padding length must fit the end number.')
+
+    qs = tenant_qs(request, InvoiceSeries).filter(
+        isDeleted=False,
+        module=module,
+        seriesCode=series_code,
+    )
+    if instance is not None:
+        qs = qs.exclude(pk=instance.pk)
+    if qs.exists():
+        raise ValueError('Series code already exists for this module.')
+
+    next_number = start_number if instance is None else instance.nextNumber
+    if next_number < start_number:
+        next_number = start_number
+    if next_number > end_number + 1:
+        raise ValueError('Next number is outside the configured range.')
+    return {
+        'name': name,
+        'module': module,
+        'seriesCode': series_code,
+        'startNumber': start_number,
+        'endNumber': end_number,
+        'nextNumber': next_number,
+        'paddingLength': padding_length,
+        'isActive': is_active,
+        'isDefault': is_default,
+    }
+def _apply_invoice_series_default(series):
+    if series.isDefault:
+        InvoiceSeries.objects.filter(
+            isDeleted=False,
+            tenant=series.tenant,
+            module=series.module,
+            isDefault=True,
+        ).exclude(pk=series.pk).update(isDefault=False)
+def invoice_series_suggestions_api(request):
+    if request.method != 'GET':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    module = (request.GET.get('module') or '').strip()
+    if module not in INVOICE_MODULE_MODEL_MAP:
+        return JsonResponse({'message': 'error', 'error': 'Invalid module.'}, status=400)
+    return JsonResponse({'message': 'success', 'data': _invoice_series_payload_for_module(request, module)}, safe=False)
+@transaction.atomic
+def add_invoice_series_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_add_invoice_series(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        payload = _validate_invoice_series_form(request)
+        series = InvoiceSeries()
+        assign_tenant(series, request)
+        for key, value in payload.items():
+            setattr(series, key, value)
+        series.save()
+        _apply_invoice_series_default(series)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+@transaction.atomic
+def edit_invoice_series_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_edit_invoice_series(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        edit_id = request.POST.get('EditId')
+        series = tenant_qs(request, InvoiceSeries).get(pk=int(edit_id), isDeleted=False)
+        payload = _validate_invoice_series_form(request, instance=series)
+        for key, value in payload.items():
+            setattr(series, key, value)
+        series.save()
+        _apply_invoice_series_default(series)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+@transaction.atomic
+def delete_invoice_series_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_delete_invoice_series(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        series_id = request.POST.get('userID')
+        series = tenant_qs(request, InvoiceSeries).get(pk=int(series_id), isDeleted=False)
+        series.isDeleted = True
+        series.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error'}, safe=False)
 def _decimal_from_request(value, default='0'):
     try:
         return Decimal(str(value).strip())
@@ -420,6 +636,12 @@ def _can_edit_bank(user):
     return user.has_perm('home.change_bank') or _can_view_party_credentials(user)
 def _can_delete_bank(user):
     return user.has_perm('home.delete_bank') or _can_view_party_credentials(user)
+def _can_add_invoice_series(user):
+    return user.has_perm('home.add_invoiceseries')
+def _can_edit_invoice_series(user):
+    return user.has_perm('home.change_invoiceseries')
+def _can_delete_invoice_series(user):
+    return user.has_perm('home.delete_invoiceseries')
 def _can_review_collections(user):
     return user.has_perm('home.can_approve_collection')
 def _can_auto_approve_collections(user):
@@ -1213,6 +1435,58 @@ def get_bank_detail(request):
         'OpeningBalance': str(getattr(bank_account, 'openingBalance', 0.0) or 0.0),
     }
     return JsonResponse({'data': data}, safe=False)
+class InvoiceSeriesListJson(BaseDatatableView):
+    order_columns = ['module', 'seriesCode', 'startNumber', 'nextNumber', 'paddingLength', 'isActive', 'isDefault', 'datetime']
+    def get_initial_queryset(self):
+        if not getattr(self.request, 'user', None) or not self.request.user.is_authenticated:
+            return InvoiceSeries.objects.none()
+        if not _has_any_permission(self.request.user, 'home.view_invoiceseries', 'home.add_invoiceseries', 'home.change_invoiceseries', 'home.delete_invoiceseries'):
+            return InvoiceSeries.objects.none()
+        return tenant_qs(self.request, InvoiceSeries).filter(isDeleted=False).only(
+            'id', 'name', 'module', 'seriesCode', 'startNumber', 'endNumber', 'nextNumber', 'paddingLength', 'isActive', 'isDefault', 'datetime'
+        )
+    def filter_queryset(self, qs):
+        search = self.request.GET.get('search[value]', None)
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(module__icontains=search) | Q(seriesCode__icontains=search))
+        return qs
+    def prepare_results(self, qs):
+        json_data = []
+        for item in qs:
+            payload = _invoice_series_payload_obj(item)
+            can_edit = _can_edit_invoice_series(self.request.user)
+            can_delete = _can_delete_invoice_series(self.request.user)
+            if can_edit:
+                action = '''<button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','edit')" class="ui circular facebook icon button green"><i class="pen icon"></i></button>'''.format(item.pk)
+            else:
+                action = '''<button data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="GetUserDetails('{}','view')" class="ui circular teal icon button"><i class="eye icon"></i></button>'''.format(item.pk)
+            if can_delete:
+                action += ''' <button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk)
+            status = '''<div class="ui tiny green label">Active</div>''' if item.isActive else '''<div class="ui tiny grey label">Inactive</div>'''
+            default = '''<div class="ui tiny blue label">Default</div>''' if item.isDefault else '-'
+            json_data.append([
+                escape(payload['Module']),
+                escape(payload['SeriesCode']),
+                escape(payload['RangeLabel']),
+                escape(payload['NextInvoice']),
+                escape(str(payload['PaddingLength'])),
+                status,
+                default,
+                escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
+                action,
+            ])
+        return json_data
+def get_invoice_series_detail(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.view_invoiceseries', 'home.add_invoiceseries', 'home.change_invoiceseries', 'home.delete_invoiceseries'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        series_id = request.GET.get('id')
+        series = tenant_qs(request, InvoiceSeries).get(pk=int(series_id), isDeleted=False)
+        return JsonResponse({'data': _invoice_series_payload_obj(series)}, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error'}, safe=False)
 @transaction.atomic
 def edit_bank_api(request):
     if request.method == 'POST':
@@ -2235,8 +2509,12 @@ def approve_collection(request):
         return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
     try:
         id = request.POST.get("userID")
-        obj = tenant_qs(request, Collection).select_related().get(pk=int(id))
         user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
+        is_counter_collection = isinstance(id, str) and id.startswith('c')
+        if is_counter_collection:
+            obj = tenant_qs(request, CollectionCashCounter).select_related().get(pk=int(id[1:]))
+        else:
+            obj = tenant_qs(request, Collection).select_related().get(pk=int(id))
         obj.isApproved = True
         obj.approvedBy_id = user.pk
         obj.approvedOn = timezone.now()
@@ -4100,9 +4378,8 @@ def generate_order_pdf(request):
 def add_sales_by_admin_api(request):
     if request.method == 'POST':
         try:
-            invoiceSeriesSelect = request.POST.get("invoiceSeriesSelect")
-            invoiceNo = request.POST.get("invoiceNo")
-            invoiceYearSelect = request.POST.get("invoiceYearSelect")
+            invoiceSeriesId = request.POST.get("invoiceSeriesId")
+            requestedInvoiceNumber = request.POST.get("requestedInvoiceNumber")
             colDate = request.POST.get("colDate")
             party = request.POST.get("party")
             amount = request.POST.get("amount")
@@ -4112,7 +4389,15 @@ def add_sales_by_admin_api(request):
             obj = Sales()
             assign_tenant(obj, request)
             obj.partyID_id = cus.pk
-            obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
+            series, sequence_number, invoice_number = _reserve_invoice_number(
+                request,
+                InvoiceSeries.Module.SALES,
+                invoiceSeriesId,
+                preferred_number=requestedInvoiceNumber or None,
+            )
+            obj.invoiceSeries = series
+            obj.invoiceSequenceNumber = sequence_number
+            obj.invoiceNumber = invoice_number
             obj.amount = float(amount)
             obj.remark = remark
             obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y')
@@ -4132,9 +4417,9 @@ def add_sales_by_admin_api(request):
             #         send_message(obj.partyID.phone, msg, obj.partyID.name)
             # except:
             #     pass
-            return JsonResponse({'message': 'success'}, safe=False)
-        except:
-            return JsonResponse({'message': 'error'}, safe=False)
+            return JsonResponse({'message': 'success', 'invoiceNumber': obj.invoiceNumber}, safe=False)
+        except Exception as exc:
+            return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 class SalesByAdminListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID.name', 'invoiceNumber', 'amount', 'action', 'buildDate', 'createdBy.name',
                      'isApproved', 'approvedBy.name',
@@ -4330,9 +4615,6 @@ def update_sales_by_admin_api(request):
         if not request.user.is_authenticated:
             return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
         try:
-            invoiceSeriesSelect = request.POST.get("invoiceSeriesSelect")
-            invoiceNo = request.POST.get("invoiceNo")
-            invoiceYearSelect = request.POST.get("invoiceYearSelect")
             colDate = request.POST.get("colDate")
             party = request.POST.get("party")
             amount = request.POST.get("amount")
@@ -4345,15 +4627,14 @@ def update_sales_by_admin_api(request):
             if not _can_edit_sales_record(request.user, obj):
                 return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
             obj.partyID_id = cus.pk
-            obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
             obj.amount = float(amount)
             obj.remark = remark
             obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y')
             obj.save()
             sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
-        except:
-            return JsonResponse({'message': 'error'}, safe=False)
+        except Exception as exc:
+            return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 @transaction.atomic
 def send_message_sales(request):
     if request.method != 'POST':
@@ -4448,9 +4729,8 @@ def enable_tally_post_api(request):
 def add_cash_counter_entry_api(request):
     if request.method == 'POST':
         try:
-            invoiceSeriesSelect = request.POST.get("invoiceSeriesSelect")
-            invoiceNo = request.POST.get("invoiceNo")
-            invoiceYearSelect = request.POST.get("invoiceYearSelect")
+            invoiceSeriesId = request.POST.get("invoiceSeriesId")
+            requestedInvoiceNumber = request.POST.get("requestedInvoiceNumber")
             party = request.POST.get("party")
             amount = request.POST.get("amount")
             remark = request.POST.get("remark")
@@ -4461,21 +4741,38 @@ def add_cash_counter_entry_api(request):
             mode = request.POST.get("mode")
             obj = CashCounter()
             assign_tenant(obj, request)
-            if mode == "Credit" or mode == "Collection" or mode == "Advance":
+            if mode in {"Cash", "Credit", "Card", "Collection", "Advance", "Mix", "Return"}:
                 c = str(party).split('@')
                 cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
                 obj.partyID_id = cus.pk
+            else:
+                obj.partyID = None
             if mode == "Cash" or mode == "Mix" or mode == "Card" or mode == "Credit" or mode == "Return":
-                obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
+                series, sequence_number, invoice_number = _reserve_invoice_number(
+                    request,
+                    InvoiceSeries.Module.CASH_COUNTER,
+                    invoiceSeriesId,
+                    preferred_number=requestedInvoiceNumber or None,
+                )
+                obj.invoiceSeries = series
+                obj.invoiceSequenceNumber = sequence_number
+                obj.invoiceNumber = invoice_number
             if mode == "Mix":
                 obj.mixCashAmount = float(amountMixCash)
                 obj.mixCardAmount = float(amountMixCard)
+                obj.amount = 0.0
             else:
                 obj.amount = float(amount)
+                obj.mixCashAmount = 0.0
+                obj.mixCardAmount = 0.0
             if mode == "Expense":
                 obj.expenseType = expenseType
+            else:
+                obj.expenseType = ''
             if mode == "Card" or mode == "Mix":
                 obj.bankID_id = int(bank)
+            else:
+                obj.bankID = None
             obj.mode = mode
             obj.remark = remark
             obj.entryDate = datetime.now()
@@ -4486,9 +4783,9 @@ def add_cash_counter_entry_api(request):
             obj.save()
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
-            return JsonResponse({'message': 'success'}, safe=False)
-        except:
-            return JsonResponse({'message': 'error'}, safe=False)
+            return JsonResponse({'message': 'success', 'invoiceNumber': obj.invoiceNumber}, safe=False)
+        except Exception as exc:
+            return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 class CashCounterByStaffListJson(BaseDatatableView):
     order_columns = ['counterID', 'invoiceNumber', 'amount', 'createdBy.name',
                      'datetime', 'remark'
@@ -5109,9 +5406,6 @@ def delete_cash_counter(request):
 def update_cash_counter_by_admin_api(request):
     if request.method == 'POST':
         try:
-            invoiceSeriesSelect = request.POST.get("invoiceSeriesSelect")
-            invoiceNo = request.POST.get("invoiceNo")
-            invoiceYearSelect = request.POST.get("invoiceYearSelect")
             party = request.POST.get("party")
             amount = request.POST.get("amount")
             remark = request.POST.get("remark")
@@ -5122,20 +5416,27 @@ def update_cash_counter_by_admin_api(request):
             editID = request.POST.get("editID")
             bank = request.POST.get("bank")
             obj = tenant_qs(request, CashCounter).get(pk=int(editID))
-            if mode == "Credit" or mode == "Collection" or mode == "Advance":
+            if mode in {"Cash", "Credit", "Card", "Collection", "Advance", "Mix", "Return"}:
                 cus = tenant_qs(request, Party).select_related().get(pk=int(party))
                 obj.partyID_id = cus.pk
-            if mode == "Cash" or mode == "Mix" or mode == "Card" or mode == "Credit" or mode == "Return":
-                obj.invoiceNumber = invoiceSeriesSelect + '/' + invoiceNo + '/' + invoiceYearSelect
+            else:
+                obj.partyID = None
             if mode == "Mix":
                 obj.mixCashAmount = float(amountMixCash)
                 obj.mixCardAmount = float(amountMixCard)
+                obj.amount = 0.0
             else:
                 obj.amount = float(amount)
+                obj.mixCashAmount = 0.0
+                obj.mixCardAmount = 0.0
             if mode == "Expense":
                 obj.expenseType = expenseType
+            else:
+                obj.expenseType = ''
             if mode == "Card" or mode == "Mix":
                 obj.bankID_id = int(bank)
+            else:
+                obj.bankID = None
             obj.mode = mode
             obj.remark = remark
             obj.entryDate = datetime.now()
@@ -5145,8 +5446,8 @@ def update_cash_counter_by_admin_api(request):
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
-        except:
-            return JsonResponse({'message': 'error'}, safe=False)
+        except Exception as exc:
+            return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 def generate_cash_counter_report(request):
     cDate = request.GET.get('cDate')
     staffID = request.GET.get('staffID')
@@ -5288,6 +5589,9 @@ def add_collection_from_cash_counter_api(request):
             obj.longitude = lng
             user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.collectedBy_id = user.pk
+            obj.isApproved = True
+            obj.approvedBy_id = user.pk
+            obj.approvedOn = timezone.now()
             try:
                 # obj.collectionAddress = deduct_location_balance(lat, lng)
                 obj.collectionAddress = "From Shop Counter"
@@ -5346,15 +5650,14 @@ class CashCounterCollectionListJson(BaseDatatableView):
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
+            action_parts = []
+            if _can_review_collections(self.request.user) and not item.isApproved:
+                action_parts.append('''<button data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConfirmationModal('c{}')" class="ui circular facebook icon button purple"><i class="check circle icon"></i></button>'''.format(item.pk))
             if _can_manage_cash_counter_records(self.request.user):
-                action = '''
-                  <a href="/edit_cash_counter_collection/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
-                    <i class="pen icon"></i>
-                  </a>
-                  <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('c{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                    <i class="trash alternate icon"></i>
-                  </button>'''.format(item.pk, item.pk),
-            else:
+                action_parts.append('''<a href="/edit_cash_counter_collection/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
+                action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick ="delUser('c{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
+            action = ''.join(action_parts)
+            if not action:
                 action = '''<div class="ui tiny label">
                   Denied
                 </div>'''

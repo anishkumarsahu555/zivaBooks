@@ -543,6 +543,45 @@ STAFF_GROUP_PRESET_DEFS = [
         ],
     },
     {
+        'key': 'invoice_series_admin',
+        'label': 'Invoice Series Admin',
+        'description': 'Full invoice-series administration.',
+        'permissions': [
+            'home.view_invoiceseries',
+            'home.add_invoiceseries',
+            'home.change_invoiceseries',
+            'home.delete_invoiceseries',
+        ],
+    },
+    {
+        'key': 'invoice_series_manager',
+        'label': 'Invoice Series Manager',
+        'description': 'Manage invoice series without delete access.',
+        'permissions': [
+            'home.view_invoiceseries',
+            'home.add_invoiceseries',
+            'home.change_invoiceseries',
+        ],
+    },
+    {
+        'key': 'invoice_series_editor',
+        'label': 'Invoice Series Editor',
+        'description': 'Create and update invoice series.',
+        'permissions': [
+            'home.view_invoiceseries',
+            'home.add_invoiceseries',
+            'home.change_invoiceseries',
+        ],
+    },
+    {
+        'key': 'invoice_series_viewer',
+        'label': 'Invoice Series Viewer',
+        'description': 'Read-only access to invoice series.',
+        'permissions': [
+            'home.view_invoiceseries',
+        ],
+    },
+    {
         'key': 'messages_admin',
         'label': 'Messages Admin',
         'description': 'Full access to message history records.',
@@ -1149,6 +1188,17 @@ def bank_list(request):
         'can_view_bank_balances': request.user.has_perm('home.view_bank') or can_view_credentials,
     }
     return render(request, 'home/admin/BankList.html', context)
+@permission_required_any('home.view_invoiceseries', 'home.add_invoiceseries', 'home.change_invoiceseries', 'home.delete_invoiceseries')
+@is_activated()
+def invoice_series_list(request):
+    context = {
+        'invoice_series_capabilities': {
+            'can_add': request.user.has_perm('home.add_invoiceseries'),
+            'can_edit': request.user.has_perm('home.change_invoiceseries'),
+            'can_delete': request.user.has_perm('home.delete_invoiceseries'),
+        },
+    }
+    return render(request, 'home/admin/invoiceSeriesList.html', context)
 @permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials')
 @is_activated()
 def party_list(request):
@@ -1672,13 +1722,9 @@ def edit_sales(request, id=None):
     if not admin_like:
         if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
             return redirect('homeApp:my_sales_list')
-    invoice = obj.invoiceNumber
-    splitVoice = invoice.split('/')
     context = {
         'obj': obj,
-        'series': splitVoice[0],
-        'number': splitVoice[1],
-        'year': splitVoice[2],
+        'invoice_display': obj.invoiceNumber,
         'sales_edit_readonly': bool(obj.isApproved and not admin_like),
         'sales_return_url': reverse('homeApp:sales_list') if admin_like else reverse('homeApp:my_sales_list'),
     }
@@ -1802,24 +1848,11 @@ def my_cash_counter_list(request):
 def edit_cash_counter(request, id=None):
     obj = get_object_or_404(tenant_qs(request, CashCounter), pk=id)
     banks = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
-    invoice = obj.invoiceNumber
-    try:
-        splitVoice = invoice.split('/')
-        context = {
-            'obj': obj,
-            'series': splitVoice[0],
-            'number': splitVoice[1],
-            'year': splitVoice[2],
-            'banks': banks
-        }
-    except:
-        context = {
-            'obj': obj,
-            'series': "",
-            'number': "",
-            'year': "",
-            'banks': banks
-        }
+    context = {
+        'obj': obj,
+        'invoice_display': obj.invoiceNumber or "",
+        'banks': banks
+    }
     return render(request, 'home/cashCounter/editCashCounter.html', context)
 @permission_required_any('home.can_manage_cash_counter', 'home.view_collectioncashcounter', 'home.add_collectioncashcounter', 'home.change_collectioncashcounter')
 def cash_counter_collection(request):

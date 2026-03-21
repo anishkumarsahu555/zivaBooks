@@ -146,39 +146,19 @@ def _postings_for_cash_counter(obj: CashCounter) -> Tuple[_Posting, ...]:
         return tuple()
 
     mode = (obj.mode or "").strip()
-    credit_modes = {"Cash", "Collection", "Card"}
-    debit_modes = {"Return", "Advance"}
+    credit_modes = {"Collection", "Credit"}
+    debit_modes = {"Advance"}
 
     if mode == "Mix":
-        amount = _safe_float(obj.mixCashAmount) + _safe_float(obj.mixCardAmount)
-        if amount <= 0:
-            return tuple()
-        particulars = "Cash Counter (Mix)"
-        if obj.invoiceNumber:
-            particulars += f' - {obj.invoiceNumber}'
-        if obj.remark:
-            particulars += f' - {obj.remark}'
-        return (
-            _Posting(
-                party_id=obj.partyID_id,
-                tx_datetime=_tx_dt_for(obj, fallback_field="entryDate"),
-                particulars=particulars,
-                debit=0.0,
-                credit=amount,
-                source=PartyLedgerEntry.Source.CASH_COUNTER,
-                reference=obj.invoiceNumber or None,
-                component="mix",
-                created_by_id=obj.createdBy_id,
-            ),
-        )
+        return tuple()
 
     amount = _safe_float(obj.amount)
     if amount <= 0:
         return tuple()
 
-    particulars = f'Cash Counter ({mode or "Entry"})'
-    if obj.invoiceNumber:
-        particulars += f' - {obj.invoiceNumber}'
+    invoice_ref = obj.invoiceNumber or 'No Invoice'
+    counter_ref = obj.counterID or 'No Counter ID'
+    particulars = f'Cash Counter - {invoice_ref} ({mode or "Entry"}) - {counter_ref}'
     if obj.remark:
         particulars += f' - {obj.remark}'
 
