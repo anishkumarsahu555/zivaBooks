@@ -116,6 +116,47 @@
             grid-template-columns: minmax(0, 1fr) auto;
         }
 
+        .role-guide {
+            background: #ffffff;
+            border: 1px solid #dce7f3;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+
+        .role-guide-title {
+            color: #0f172a;
+            font-size: 0.76rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .role-guide-grid {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+
+        .role-guide-item {
+            background: #f8fbff;
+            border: 1px solid #dbeafe;
+            border-radius: 12px;
+            padding: 8px;
+        }
+
+        .role-guide-label {
+            color: #1d4ed8;
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .role-guide-copy {
+            color: #475569;
+            font-size: 0.7rem;
+            line-height: 1.4;
+        }
+
         .preset-helper {
             color: #475569;
             font-size: 0.74rem;
@@ -151,6 +192,18 @@
             border-color: #a5f3fc;
             color: #0f766e;
             font-weight: 700;
+        }
+
+        .preset-panel .ui.dropdown .label.bundle-label {
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.48em 0.78em;
+        }
+
+        .preset-panel .ui.dropdown .label.bundle-label {
+            background: #eff6ff;
+            color: #1d4ed8;
         }
 
         .permission-search {
@@ -459,6 +512,10 @@
                 width: 100%;
             }
 
+            .role-guide-grid {
+                grid-template-columns: 1fr;
+            }
+
             .permission-module-main,
             .permission-module-actions {
                 min-width: 0;
@@ -561,6 +618,31 @@
                     <div class="group-form-card-body">
                         <div class="preset-panel">
                             <div class="preset-panel-header">Preset Bundles</div>
+                            <div class="role-guide">
+                                <div class="role-guide-title">Role Guide</div>
+                                <div class="role-guide-grid">
+                                    <div class="role-guide-item">
+                                        <div class="role-guide-label">Viewer</div>
+                                        <div class="role-guide-copy">Read-only access. Can open and review records but not change them.</div>
+                                    </div>
+                                    <div class="role-guide-item">
+                                        <div class="role-guide-label">Editor</div>
+                                        <div class="role-guide-copy">Can create and update records, but usually no delete or approval rights.</div>
+                                    </div>
+                                    <div class="role-guide-item">
+                                        <div class="role-guide-label">Manager</div>
+                                        <div class="role-guide-copy">Broader operational control, including workflow/report access, but usually limited delete rights.</div>
+                                    </div>
+                                    <div class="role-guide-item">
+                                        <div class="role-guide-label">Admin</div>
+                                        <div class="role-guide-copy">Full module control, including delete and higher-level permissions where available.</div>
+                                    </div>
+                                    <div class="role-guide-item">
+                                        <div class="role-guide-label">Operator</div>
+                                        <div class="role-guide-copy">Task-focused access for day-to-day entry work in modules like attendance or cash counter.</div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="preset-grid">
                                 <select class="ui fluid multiple search dropdown" id="permissionPreset" multiple>
                                     {% for preset in permission_presets %}
@@ -573,10 +655,10 @@
                                 </button>
                             </div>
                             <div class="preset-helper">
-                                Choose one or more bundles. Applying them merges all included permissions, then you can fine-tune manually.
+                                Choose one or more role bundles. Applying them merges all included permissions, then you can fine-tune manually.
                             </div>
                             <div class="preset-description" id="presetDescription">
-                                Select one or more bundles to compose the final permission set.
+                                Select one or more role bundles to compose the final permission set.
                             </div>
                             <div class="preset-preview" id="presetPreview"></div>
                         </div>
@@ -650,6 +732,13 @@
     {{ permission_presets|json_script:"permission-presets-data" }}
     <script>
         var permissionPresets = JSON.parse(document.getElementById('permission-presets-data').textContent);
+
+        function decoratePresetLabels() {
+            var dropdown = $('#permissionPreset').closest('.ui.dropdown');
+            dropdown.find('.label').each(function () {
+                $(this).addClass('bundle-label');
+            });
+        }
 
         function togglePermissionBody(header) {
             var module = $(header).closest('.permission-module');
@@ -759,6 +848,7 @@
             });
             openRelevantModules();
             refreshSelectedPreview();
+            decoratePresetLabels();
             $('body').toast({class: 'success', message: presets.length + ' bundle(s) applied.'});
         }
 
@@ -807,7 +897,13 @@
         });
         $('#permissionPreset').dropdown({
             clearable: true,
-            fullTextSearch: 'exact'
+            fullTextSearch: 'exact',
+            onAdd: function () {
+                setTimeout(decoratePresetLabels, 0);
+            },
+            onRemove: function () {
+                setTimeout(decoratePresetLabels, 0);
+            }
         });
         $('#permissionPreset').on('change', refreshPresetPreview);
         $('.permission-check').each(function () {
@@ -817,5 +913,6 @@
         openRelevantModules();
         refreshSelectedPreview();
         refreshPresetPreview();
+        decoratePresetLabels();
     </script>
 {% endblock %}

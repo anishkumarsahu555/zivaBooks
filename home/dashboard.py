@@ -2,6 +2,8 @@ from datetime import date
 
 from django.urls import reverse
 
+from .navigation import _effective_permission_names
+
 
 def _build_license_message(tenant):
     try:
@@ -35,27 +37,30 @@ SECTION_TONES = {
     'Attendance': 'violet',
     'Banks': 'aqua',
     'Message History': 'rose',
+    'Audit': 'slate',
     'Profile': 'slate',
 }
 
 
-def _has_any_perm(user, perm_names):
-    return any(user.has_perm(perm_name) for perm_name in perm_names)
+def _has_any_perm(request_or_user, perm_names):
+    effective_permissions = _effective_permission_names(request_or_user)
+    return any(perm_name in effective_permissions for perm_name in perm_names)
 
 
-def _is_admin_like(user):
-    return _has_any_perm(user, [
+def _is_admin_like(request_or_user):
+    return _has_any_perm(request_or_user, [
         'home.can_manage_staff',
         'home.can_manage_staff_groups',
-        'home.can_manage_parties',
-        'home.can_view_party_credentials',
         'home.can_approve_collection',
-        'home.can_view_audit_logs',
+        'home.can_manage_sales',
+        'home.can_manage_orders',
+        'home.can_manage_cash_counter',
+        'home.can_manage_books',
     ])
 
 
-def _can_filter_cash_counter(user):
-    return _has_any_perm(user, [
+def _can_filter_cash_counter(request_or_user):
+    return _has_any_perm(request_or_user, [
         'home.can_manage_cash_counter',
         'home.can_view_party_credentials',
         'home.can_approve_collection',
@@ -71,6 +76,7 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             'action_sections': [],
             'license_message': '',
         }
+    effective_permissions = _effective_permission_names(request)
 
     display_name = (
         getattr(staff_user, 'name', None)
@@ -150,10 +156,10 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             },
         ],
     }]
-    if _is_admin_like(user):
+    if _is_admin_like(request):
         metric_groups.append({
             'title': 'Control Center',
-            'subtitle': 'Tenant-wide visibility across people, collections, and sales.',
+            'subtitle': 'Tenant-wide visibility across operational modules assigned to this user.',
             'tone': 'ocean',
             'endpoint': reverse('homeApp:get_admin_dashboard_report_api'),
             'cards': [
@@ -205,7 +211,7 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             ],
         })
 
-    if _has_any_perm(user, ['home.add_collection', 'home.view_collection', 'home.change_collection']) and not _is_admin_like(user):
+    if _has_any_perm(request, ['home.add_collection', 'home.view_collection', 'home.change_collection']) and not _is_admin_like(request):
         metric_groups.append({
             'title': 'My Collections',
             'subtitle': 'Personal collection activity for the current user.',
@@ -251,14 +257,14 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             ],
         })
 
-    if _has_any_perm(user, ['home.view_cashcounter', 'home.view_collectioncashcounter', 'home.can_manage_cash_counter']):
+    if _has_any_perm(request, ['home.view_cashcounter', 'home.view_collectioncashcounter', 'home.can_manage_cash_counter']):
         metric_groups.append({
             'title': 'Cash Counter',
             'subtitle': 'Counter activity shown in the scope available to this user.',
             'tone': 'berry',
             'endpoint': reverse(
                 'homeApp:get_cash_counter_dashboard_report_admin_api'
-                if _can_filter_cash_counter(user)
+                if _can_filter_cash_counter(request)
                 else 'homeApp:get_cash_counter_dashboard_report_api'
             ),
             'cards': [
@@ -322,7 +328,7 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             ],
         })
 
-    if _has_any_perm(user, ['home.can_manage_parties', 'home.can_view_party_credentials']):
+    if _has_any_perm(request, ['home.can_manage_parties', 'home.can_view_party_credentials']):
         metric_groups.append({
             'title': 'Parties',
             'subtitle': 'Party coverage and assignment health in this tenant.',
@@ -377,6 +383,7 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             ],
         })
 
+    if _has_any_perm(request, ['home.view_bank', 'home.add_bank', 'home.change_bank', 'home.delete_bank', 'home.can_view_party_credentials']):
         metric_groups.append({
             'title': 'Banks',
             'subtitle': 'Bank coverage and usage across collections.',
@@ -399,7 +406,7 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
                     'description': 'Banks referenced in collection entries.',
                     'icon': 'linkify',
                     'action_label': 'Open Collections',
-                    'action_url': reverse('homeApp:collection_list') if user.has_perm('home.view_collection') else reverse('homeApp:bank_list'),
+                    'action_url': reverse('homeApp:collection_list') if 'home.view_collection' in effective_permissions else reverse('homeApp:bank_list'),
                 },
                 {
                     'id': 'dashboard-bank-with-account',
@@ -422,7 +429,7 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             ],
         })
 
-    if _has_any_perm(user, ['home.view_sales', 'home.add_sales', 'home.change_sales', 'home.can_manage_sales']):
+    if _has_any_perm(request, ['home.view_sales', 'home.add_sales', 'home.change_sales', 'home.can_manage_sales']):
         metric_groups.append({
             'title': 'Sales Overview',
             'subtitle': 'Sales performance in the scope available to this user.',
@@ -463,15 +470,15 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
                     'description': 'Total number of accessible sales entries.',
                     'icon': 'clipboard list',
                     'action_label': 'Add Sale',
-                    'action_url': reverse('homeApp:add_sales') if user.has_perm('home.add_sales') else reverse('homeApp:my_sales_list'),
+                    'action_url': reverse('homeApp:add_sales') if 'home.add_sales' in effective_permissions else reverse('homeApp:my_sales_list'),
                 },
             ],
         })
 
-    if _has_any_perm(user, ['home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders', 'home.can_approve_orders']):
+    if _has_any_perm(request, ['home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders', 'home.can_approve_orders']):
         orders_list_url = (
             reverse('homeApp:orders_list')
-            if _has_any_perm(user, ['home.can_manage_orders', 'home.can_view_party_credentials'])
+            if _has_any_perm(request, ['home.can_manage_orders', 'home.can_view_party_credentials'])
             else reverse('homeApp:my_orders_list')
         )
         metric_groups.append({
@@ -513,13 +520,13 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
                     'label': 'Orders Records',
                     'description': 'Total number of accessible order entries.',
                     'icon': 'folder open',
-                    'action_label': 'Add Order' if user.has_perm('home.add_order') else 'Open Orders',
-                    'action_url': reverse('homeApp:add_order') if user.has_perm('home.add_order') else orders_list_url,
+                    'action_label': 'Add Order' if 'home.add_order' in effective_permissions else 'Open Orders',
+                    'action_url': reverse('homeApp:add_order') if 'home.add_order' in effective_permissions else orders_list_url,
                 },
             ],
         })
 
-    if _has_any_perm(user, ['home.view_attendance', 'home.add_attendance', 'home.change_attendance']):
+    if _has_any_perm(request, ['home.view_attendance', 'home.add_attendance', 'home.change_attendance']):
         metric_groups.append({
             'title': 'Attendance',
             'subtitle': 'Attendance state and current month activity for this user.',
@@ -571,3 +578,4 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
         'action_sections': action_sections,
         'license_message': getattr(request, 'dashboard_license_message', '') or _build_license_message(tenant),
     }
+    effective_permissions = _effective_permission_names(request)

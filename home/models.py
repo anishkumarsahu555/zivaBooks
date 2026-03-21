@@ -96,6 +96,9 @@ class AuditLog(TimeStampedModel):
         CREATE = 'create', 'Create'
         UPDATE = 'update', 'Update'
         DELETE = 'delete', 'Delete'
+        APPROVE = 'approve', 'Approve'
+        TRANSFER = 'transfer', 'Transfer'
+        PASSWORD_CHANGE = 'password_change', 'Password Change'
 
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, related_name='audit_logs')
     object_id = models.PositiveBigIntegerField()

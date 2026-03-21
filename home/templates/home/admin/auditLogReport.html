@@ -1,0 +1,456 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/4.1.0/css/fixedColumns.dataTables.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.1.0/js/dataTables.fixedColumns.min.js"></script>
+{% endblock %}
+
+{% block title %}
+    <title>Audit Report</title>
+{% endblock %}
+
+{% block body %}
+<style>
+    .audit-table-wrap {
+        overflow-x: auto;
+    }
+
+    .audit-json {
+        margin: 0;
+        padding: 14px;
+        border-radius: 16px;
+        background: #0f172a;
+        color: #e2e8f0;
+        font-size: 0.8rem;
+        line-height: 1.6;
+        max-height: 320px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .audit-compare-wrap {
+        border: 1px solid #e5edf5;
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .audit-compare-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.86rem;
+    }
+
+    .audit-compare-table thead th {
+        background: #f8fbff;
+        color: #334155;
+        font-weight: 800;
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid #e5edf5;
+    }
+
+    .audit-compare-table tbody td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #eef3f8;
+        vertical-align: top;
+        word-break: break-word;
+    }
+
+    .audit-compare-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .audit-compare-key {
+        width: 22%;
+        color: #0f172a;
+        font-weight: 700;
+    }
+
+    .audit-compare-from {
+        width: 39%;
+        color: #9f1239;
+        background: rgba(244, 63, 94, 0.04);
+    }
+
+    .audit-compare-to {
+        width: 39%;
+        color: #0f766e;
+        background: rgba(20, 184, 166, 0.05);
+    }
+
+    .audit-empty-state {
+        padding: 16px;
+        color: #64748b;
+        font-size: 0.86rem;
+    }
+
+       #AuditTable_length {
+            left: 20px;
+            position: absolute;
+        }
+
+        #AuditTable_filter {
+            float: right;
+        }
+
+        .dt-buttons {
+            position: absolute;
+            left: 174px;
+        }
+
+    input[type=search] {
+        width: 100px !important;
+    }
+
+    @media (max-width: 767px) {
+        .audit-json {
+            padding: 10px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            max-height: 220px;
+        }
+
+        #AuditTable_wrapper {
+            margin-top: 4px;
+        }
+    }
+</style>
+
+<div class="audit-shell">
+    <div class="ui left aligned basic grid">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user">
+                    Audit Report
+                </div>
+                {% if audit_can_export %}
+                    <div style="position: absolute;right: 1.5rem;top: 18px;">
+                        <button class="ui teal mini button" type="button" onclick="exportAuditCsv()">
+                            <i class="download icon"></i>
+                            Export CSV
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="ui tab active" data-tab="user">
+                <div class="row" style="padding-left: 5px; padding-right: 5px">
+                    <div class="">
+                        <div class="ui form">
+                            <form class="ui tiny form audit-form" onsubmit="return false;">
+                                <div class="fields">
+                                    <div class="three wide field">
+                                        <label for="auditSearch">Keyword Search</label>
+                                        <input type="text" id="auditSearch" placeholder="Search object, actor, action, or changed data">
+                                    </div>
+                                    <div class="two wide field">
+                                        <label for="auditAction">Action</label>
+                                        <select class="ui fluid selection dropdown" id="auditAction">
+                                            <option value="">All actions</option>
+                                            {% for value, label in audit_actions %}
+                                                <option value="{{ value }}">{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="three wide field">
+                                        <label for="auditActor">Actor</label>
+                                        <select class="ui fluid search selection dropdown" id="auditActor">
+                                            <option value="">All actors</option>
+                                            {% for item in audit_actors %}
+                                                <option value="{{ item.actor_id }}">{{ item.actor__username }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="three wide field">
+                                        <label for="auditContentType">Model</label>
+                                        <select class="ui fluid selection dropdown" id="auditContentType">
+                                            <option value="">All models</option>
+                                            {% for item in audit_content_types %}
+                                                <option value="{{ item.content_type_id }}">{{ item.content_type__model|title }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="four wide field">
+                                        <label>Date Range</label>
+                                        <div class="two fields" style="margin-bottom: 0;">
+                                            <div class="field">
+                                                <div class="ui calendar" id="auditDateFromCal">
+                                                    <div class="ui input left icon">
+                                                        <input type="text" id="auditDateFrom" placeholder="Start date">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="field">
+                                                <div class="ui calendar" id="auditDateToCal">
+                                                    <div class="ui input left icon">
+                                                        <input type="text" id="auditDateTo" placeholder="End date">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="fields">
+                                    <div class="eight wide field">
+                                        <label>&nbsp;</label>
+                                        <div style="color: #64748b; font-size: 0.82rem;">
+                                            Press Enter in keyword search or use Apply Filters to refresh the timeline.
+                                        </div>
+                                    </div>
+                                    <div class="eight wide field" style="text-align: right;">
+                                        <label>&nbsp;</label>
+                                        <button class="ui basic button" type="button" onclick="resetAuditFilters()">Reset</button>
+                                        <button class="ui green button" type="button" onclick="reloadAuditTable()">
+                                            <i class="filter icon"></i>
+                                            Apply Filters
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="wide">
+                        <div class="audit-table-wrap">
+                            <table class="ui unstackable tiny sortable celled very compact table" id="AuditTable" style="margin-top: 5px; width: 100%">
+                                <thead>
+                                <tr>
+                                    <th>Datetime</th>
+                                    <th>Actor</th>
+                                    <th>Model</th>
+                                    <th>Action</th>
+                                    <th>Object</th>
+                                    <th>Object ID</th>
+                                    <th>Changed Fields</th>
+                                    <th>Detail</th>
+                                </tr>
+                                </thead>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="ui large modal" id="auditDetailModal">
+    <i class="close icon"></i>
+    <div class="header">Audit Detail</div>
+    <div class="content">
+        <div class="ui stackable two column grid">
+            <div class="column">
+                <div class="ui segments">
+                    <div class="ui segment"><strong>Datetime:</strong> <span id="auditDetailDatetime">-</span></div>
+                    <div class="ui segment"><strong>Actor:</strong> <span id="auditDetailActor">-</span></div>
+                    <div class="ui segment"><strong>Model:</strong> <span id="auditDetailModel">-</span></div>
+                    <div class="ui segment"><strong>Action:</strong> <span id="auditDetailAction">-</span></div>
+                    <div class="ui segment"><strong>Object:</strong> <span id="auditDetailObject">-</span></div>
+                </div>
+            </div>
+            <div class="column">
+                <div class="ui top attached secondary segment"><strong>Changes Comparison</strong></div>
+                <div class="audit-compare-wrap">
+                    <table class="audit-compare-table" id="auditCompareTable" style="display: none;">
+                        <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th>Previous</th>
+                            <th>Current</th>
+                        </tr>
+                        </thead>
+                        <tbody id="auditCompareTableBody"></tbody>
+                    </table>
+                    <div class="audit-empty-state" id="auditCompareEmpty">No field-level comparison is available for this audit event.</div>
+                </div>
+            </div>
+        </div>
+        <div class="ui top attached secondary segment" style="margin-top: 12px;"><strong>Raw Changes</strong></div>
+        <pre class="audit-json" id="auditDetailChanges">{}</pre>
+        <div class="ui top attached secondary segment" style="margin-top: 12px;"><strong>Snapshot</strong></div>
+        <pre class="audit-json" id="auditDetailSnapshot">{}</pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+    var auditTable;
+
+    function toIsoDate(value) {
+        if (!value) {
+            return '';
+        }
+        var parts = value.split('/');
+        if (parts.length !== 3) {
+            return value;
+        }
+        var day = parts[0].padStart(2, '0');
+        var month = parts[1].padStart(2, '0');
+        var year = parts[2];
+        return year + '-' + month + '-' + day;
+    }
+
+    function currentAuditFilters() {
+        return {
+            keyword: $('#auditSearch').val(),
+            action: $('#auditAction').val(),
+            actor: $('#auditActor').val(),
+            content_type: $('#auditContentType').val(),
+            date_from: toIsoDate($('#auditDateFrom').val()),
+            date_to: toIsoDate($('#auditDateTo').val())
+        };
+    }
+
+    function reloadAuditTable() {
+        auditTable.ajax.reload();
+    }
+
+    function resetAuditFilters() {
+        $('#auditSearch').val('');
+        $('#auditAction').val('').change();
+        $('#auditActor').val('').change();
+        $('#auditContentType').val('').change();
+        $('#auditDateFrom').val('');
+        $('#auditDateTo').val('');
+        reloadAuditTable();
+    }
+
+    function exportAuditCsv() {
+        var params = $.param(currentAuditFilters());
+        window.location = '{% url "homeApp:export_audit_log_csv" %}?' + params;
+    }
+
+    function formatAuditCompareValue(value) {
+        if (value === null || value === undefined || value === '') {
+            return '<span style="color:#94a3b8;">-</span>';
+        }
+        if (typeof value === 'object') {
+            return $('<div>').text(JSON.stringify(value)).html();
+        }
+        return $('<div>').text(String(value)).html();
+    }
+
+    function renderAuditComparison(changes) {
+        var $tbody = $('#auditCompareTableBody');
+        $tbody.empty();
+        var entries = Object.entries(changes || {});
+        var compareRows = entries.filter(function (entry) {
+            var value = entry[1];
+            return value && typeof value === 'object' && ('from' in value || 'to' in value);
+        });
+
+        if (!compareRows.length) {
+            $('#auditCompareTable').hide();
+            $('#auditCompareEmpty').show();
+            return;
+        }
+
+        compareRows.forEach(function (entry) {
+            var key = entry[0];
+            var value = entry[1] || {};
+            $tbody.append(
+                '<tr>' +
+                '<td class="audit-compare-key">' + $('<div>').text(key).html() + '</td>' +
+                '<td class="audit-compare-from">' + formatAuditCompareValue(value.from) + '</td>' +
+                '<td class="audit-compare-to">' + formatAuditCompareValue(value.to) + '</td>' +
+                '</tr>'
+            );
+        });
+
+        $('#auditCompareEmpty').hide();
+        $('#auditCompareTable').show();
+    }
+
+    function openAuditDetail(url, id) {
+        $.ajax({
+            type: 'get',
+            url: url + '?id=' + id,
+            success: function (response) {
+                var data = response.data || {};
+                $('#auditDetailDatetime').text(data.datetime || '-');
+                $('#auditDetailActor').text(data.actor || '-');
+                $('#auditDetailModel').text(data.model || '-');
+                $('#auditDetailAction').text(data.action || '-');
+                $('#auditDetailObject').text((data.object_repr || '-') + ' (#' + (data.object_id || '-') + ')');
+                renderAuditComparison(data.changes || {});
+                $('#auditDetailChanges').text(data.changes_pretty || '{}');
+                $('#auditDetailSnapshot').text(data.snapshot_pretty || '{}');
+                $('#auditDetailModal').modal('show');
+            },
+            error: function () {
+                $('body').toast({class: 'error', message: 'Unable to load audit detail.'});
+            }
+        });
+    }
+
+    $(document).ready(function () {
+        $('.ui.dropdown').dropdown({ fullTextSearch: true });
+        $('#auditDateFromCal').calendar({
+            monthFirst: false,
+            type: 'date',
+            formatter: {
+                date: function (date) {
+                    if (!date) return '';
+                    return date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
+                }
+            }
+        });
+        $('#auditDateToCal').calendar({
+            monthFirst: false,
+            type: 'date',
+            formatter: {
+                date: function (date) {
+                    if (!date) return '';
+                    return date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
+                }
+            }
+        });
+
+        auditTable = $('#AuditTable').DataTable({
+            processing: true,
+            serverSide: true,
+             "scrollX": true,
+            pageLength: 15,
+            lengthMenu: [[15, 30, 100, -1], [15, 30, 100, 'All']],
+            aaSorting: [[0, 'desc']],
+            ajax: {
+                url: '{% url "homeApp:AuditLogListJson" %}',
+                data: function (d) {
+                    $.extend(d, currentAuditFilters());
+                }
+            },
+            columnDefs: [
+                {"name": "datetime", "targets": 0},
+                {"name": "actor__username", "targets": 1},
+                {"name": "content_type__model", "targets": 2},
+                {"name": "action", "targets": 3},
+                {"name": "object_repr", "targets": 4},
+                {"name": "object_id", "targets": 5},
+                {"targets": 7, "orderable": false}
+            ],
+            initComplete: function () {
+                $('#AuditTable_length').show();
+            }
+        });
+
+        $('#auditSearch').on('keyup', function (event) {
+            if (event.key === 'Enter') {
+                reloadAuditTable();
+            }
+        });
+    });
+</script>
+{% endblock %}

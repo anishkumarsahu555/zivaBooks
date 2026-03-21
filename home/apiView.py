@@ -1,7 +1,9 @@
 import threading
+import csv
 from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
+import json
 import requests
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
@@ -17,6 +19,7 @@ from django.urls import reverse
 from django.utils.crypto import get_random_string
 from django.utils.html import escape
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.views.decorators.cache import cache_page
 from django_datatables_view.base_datatable_view import BaseDatatableView
 from weasyprint import CSS, HTML
@@ -32,6 +35,7 @@ from home.otp import (
 )
 from home.party_ledger import sync_party_ledger_entries_for_object
 from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_qs
+from home.audit import log_audit_event, snapshot_instance
 User = get_user_model()
 BASE_URL_WHATSAPP = "https://bot.betablaster.in/api/"
 DEFAULT_AVATAR_URL = "/static/images/default-avatar.svg"
@@ -288,23 +292,31 @@ def _decimal_from_request(value, default='0'):
         return Decimal(str(value).strip())
     except (InvalidOperation, AttributeError):
         return Decimal(default)
-def _permission_catalog():
-    hidden_content_types = {
-        ('activation', 'ecomvalidity'),
-        ('activation', 'validity'),
-        ('home', 'auditlog'),
-        ('home', 'geolocationpackage'),
-        ('home', 'tenant'),
-        ('home', 'tenantmembership'),
-        ('home', 'whatsappmessage'),
-        ('home', 'whatsappmessagestatus'),
-    }
-    permission_groups = defaultdict(list)
-    for permission in Permission.objects.select_related('content_type').exclude(
+def _tenant_admin_group_name(tenant):
+    tenant_slug = getattr(tenant, 'slug', 'tenant')
+    return f'{tenant_slug}:Tenant Admin'
+def _assignable_permissions(request_or_user=None):
+    user = getattr(request_or_user, 'user', request_or_user)
+    queryset = Permission.objects.select_related('content_type').exclude(
         content_type__app_label__in=['admin', 'auth', 'contenttypes', 'sessions']
-    ).order_by('content_type__app_label', 'content_type__model', 'name'):
-        if (permission.content_type.app_label, permission.content_type.model) in hidden_content_types:
-            continue
+    ).order_by('content_type__app_label', 'content_type__model', 'name')
+    tenant = get_current_tenant(request_or_user)
+    if tenant is not None:
+        tenant_admin_group = Group.objects.filter(name=_tenant_admin_group_name(tenant)).first()
+        if tenant_admin_group is not None:
+            allowed_ids = set(tenant_admin_group.permissions.values_list('id', flat=True))
+            return [permission for permission in queryset if permission.id in allowed_ids]
+        return []
+    if not getattr(user, 'is_authenticated', False):
+        return []
+    allowed = set(user.get_all_permissions())
+    return [
+        permission for permission in queryset
+        if f'{permission.content_type.app_label}.{permission.codename}' in allowed
+    ]
+def _permission_catalog(request_or_user=None):
+    permission_groups = defaultdict(list)
+    for permission in _assignable_permissions(request_or_user):
         module = permission.content_type.model.replace('_', ' ').title()
         if permission.codename.startswith('can_'):
             module = 'Custom ' + module
@@ -328,6 +340,74 @@ def _can_edit_party(user):
     return user.has_perm('home.change_party') or _can_view_party_credentials(user)
 def _can_delete_party(user):
     return user.has_perm('home.delete_party') or _can_view_party_credentials(user)
+def _tenant_audit_log_queryset(request):
+    tenant = get_current_tenant(request)
+    if tenant is None:
+        return AuditLog.objects.none()
+    tenant_content_type = ContentType.objects.get_for_model(Tenant)
+    return AuditLog.objects.select_related('content_type', 'actor').filter(
+        Q(snapshot__tenant=tenant.pk) |
+        Q(content_type=tenant_content_type, object_id=tenant.pk)
+    )
+def _apply_audit_log_filters(request, qs):
+    search = (request.GET.get('search[value]') or '').strip()
+    keyword = (request.GET.get('keyword') or '').strip()
+    action = (request.GET.get('action') or '').strip()
+    actor_id = (request.GET.get('actor') or '').strip()
+    content_type_id = (request.GET.get('content_type') or '').strip()
+    date_from = parse_date((request.GET.get('date_from') or '').strip())
+    date_to = parse_date((request.GET.get('date_to') or '').strip())
+
+    if action:
+        qs = qs.filter(action=action)
+    if actor_id.isdigit():
+        qs = qs.filter(actor_id=int(actor_id))
+    if content_type_id.isdigit():
+        qs = qs.filter(content_type_id=int(content_type_id))
+    if date_from:
+        qs = qs.filter(datetime__date__gte=date_from)
+    if date_to:
+        qs = qs.filter(datetime__date__lte=date_to)
+    if search:
+        qs = qs.filter(
+            Q(object_repr__icontains=search) |
+            Q(action__icontains=search) |
+            Q(actor__username__icontains=search) |
+            Q(content_type__model__icontains=search) |
+            Q(changes__icontains=search) |
+            Q(snapshot__icontains=search)
+        )
+    if keyword:
+        qs = qs.filter(
+            Q(object_repr__icontains=keyword) |
+            Q(action__icontains=keyword) |
+            Q(actor__username__icontains=keyword) |
+            Q(content_type__model__icontains=keyword) |
+            Q(changes__icontains=keyword) |
+            Q(snapshot__icontains=keyword)
+        )
+    return qs
+def _audit_log_detail_payload(log):
+    dt_display = _format_audit_datetime(log.datetime)
+    snapshot = log.snapshot or {}
+    changes = log.changes or {}
+    return {
+        'id': log.pk,
+        'datetime': dt_display,
+        'action': log.get_action_display(),
+        'actor': getattr(log.actor, 'username', 'System'),
+        'model': log.content_type.model.replace('_', ' ').title(),
+        'object_id': log.object_id,
+        'object_repr': log.object_repr,
+        'changes': changes,
+        'changes_pretty': json.dumps(changes, indent=2, ensure_ascii=True),
+        'snapshot': snapshot,
+        'snapshot_pretty': json.dumps(snapshot, indent=2, ensure_ascii=True),
+    }
+def _format_audit_datetime(value):
+    if timezone.is_naive(value):
+        return value.strftime('%d-%m-%Y %I:%M %p')
+    return timezone.localtime(value).strftime('%d-%m-%Y %I:%M %p')
 def _can_add_party_group(user):
     return user.has_perm('home.add_partygroup') or _can_view_party_credentials(user)
 def _can_edit_party_group(user):
@@ -341,11 +421,13 @@ def _can_edit_bank(user):
 def _can_delete_bank(user):
     return user.has_perm('home.delete_bank') or _can_view_party_credentials(user)
 def _can_review_collections(user):
-    return _has_any_permission(user, 'home.can_approve_collection', 'home.can_view_party_credentials')
+    return user.has_perm('home.can_approve_collection')
 def _can_auto_approve_collections(user):
-    return user.has_perm('home.can_view_party_credentials')
+    return user.has_perm('home.can_approve_collection')
 def _can_manage_sales(user):
-    return _has_any_permission(user, 'home.can_manage_sales', 'home.can_approve_sales')
+    return user.has_perm('home.can_manage_sales')
+def _can_approve_sales(user):
+    return user.has_perm('home.can_approve_sales')
 def _has_sales_access(user):
     return _has_any_permission(user, 'home.can_manage_sales', 'home.can_approve_sales', 'home.view_sales', 'home.add_sales', 'home.change_sales')
 def _can_manage_cash_counter_records(user):
@@ -360,9 +442,9 @@ def _can_filter_all_cash_counter(user):
         'home.can_approve_collection',
     )
 def _can_filter_all_sales(user):
-    return _is_admin_like(user) or _can_manage_sales(user)
+    return _is_admin_like(user) or _can_manage_sales(user) or _can_approve_sales(user)
 def _can_edit_sales(user):
-    return user.has_perm('home.change_sales') or _can_manage_sales(user) or user.has_perm('home.can_view_party_credentials')
+    return user.has_perm('home.change_sales') or _can_manage_sales(user) or _can_approve_sales(user) or user.has_perm('home.can_view_party_credentials')
 def _can_delete_sales(user):
     return user.has_perm('home.can_view_party_credentials')
 def _can_manage_orders(user):
@@ -376,7 +458,7 @@ def _can_edit_order(user):
 def _can_delete_order(user):
     return user.has_perm('home.delete_order') or user.has_perm('home.can_view_party_credentials')
 def _can_approve_orders(user):
-    return user.has_perm('home.can_approve_orders') or user.has_perm('home.can_manage_orders') or user.has_perm('home.can_view_party_credentials')
+    return user.has_perm('home.can_approve_orders')
 def _can_set_order_date(user):
     return user.has_perm('home.can_manage_orders') or user.has_perm('home.can_approve_orders') or user.has_perm('home.can_view_party_credentials')
 def _format_order_number(pk):
@@ -437,7 +519,7 @@ def _can_edit_sales_record(user, sale_obj):
         return False
     if sale_obj is None:
         return False
-    admin_like = _can_manage_sales(user) or user.has_perm('home.can_view_party_credentials')
+    admin_like = _can_manage_sales(user) or _can_approve_sales(user) or user.has_perm('home.can_view_party_credentials')
     if sale_obj.isApproved and not admin_like:
         return False
     if admin_like:
@@ -584,6 +666,10 @@ def add_staff_group_api(request):
             permission_ids = request.POST.getlist("permission_ids[]") or request.POST.getlist("permission_ids")
             if not name:
                 return JsonResponse({'message': 'error', 'error': 'Group name is required.'}, safe=False)
+            allowed_permission_ids = {str(permission.id) for permission in _assignable_permissions(request)}
+            invalid_permission_ids = [permission_id for permission_id in permission_ids if permission_id not in allowed_permission_ids]
+            if invalid_permission_ids:
+                return JsonResponse({'message': 'error', 'error': 'You can only assign permissions allowed for your tenant admin access.'}, safe=False)
             obj = StaffGroup()
             assign_tenant(obj, request)
             obj.name = name
@@ -641,23 +727,11 @@ class StaffGroupListJson(BaseDatatableView):
 def get_staff_group_detail(request):
     group_id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, StaffGroup), id=group_id)
-    hidden_content_types = {
-        ('activation', 'ecomvalidity'),
-        ('activation', 'validity'),
-        ('home', 'auditlog'),
-        ('home', 'geolocationpackage'),
-        ('home', 'tenant'),
-        ('home', 'tenantmembership'),
-        ('home', 'whatsappmessage'),
-        ('home', 'whatsappmessagestatus'),
-    }
+    visible_permission_ids = {permission.id for permission in _assignable_permissions(request)}
     permissions = list(
         instance.djangoGroup.permissions.select_related('content_type').order_by('content_type__model', 'name')
     ) if instance.djangoGroup_id else []
-    permissions = [
-        permission for permission in permissions
-        if (permission.content_type.app_label, permission.content_type.model) not in hidden_content_types
-    ]
+    permissions = [permission for permission in permissions if permission.id in visible_permission_ids]
     permission_ids = [permission.id for permission in permissions]
     permission_details = [
         {
@@ -689,7 +763,7 @@ def get_staff_group_detail(request):
     }
     return JsonResponse({'data': data, 'permission_catalog': {
         module: [{'id': perm.id, 'name': perm.name, 'codename': perm.codename} for perm in perms]
-        for module, perms in _permission_catalog().items()
+        for module, perms in _permission_catalog(request).items()
     }}, safe=False)
 @transaction.atomic
 def edit_staff_group_api(request):
@@ -701,6 +775,10 @@ def edit_staff_group_api(request):
             permission_ids = request.POST.getlist("permission_ids[]") or request.POST.getlist("permission_ids")
             if not name:
                 return JsonResponse({'message': 'error', 'error': 'Group name is required.'}, safe=False)
+            allowed_permission_ids = {str(permission.id) for permission in _assignable_permissions(request)}
+            invalid_permission_ids = [permission_id for permission_id in permission_ids if permission_id not in allowed_permission_ids]
+            if invalid_permission_ids:
+                return JsonResponse({'message': 'error', 'error': 'You can only assign permissions allowed for your tenant admin access.'}, safe=False)
             obj = tenant_qs(request, StaffGroup).get(id=int(group_id))
             obj.name = name
             obj.description = description
@@ -881,6 +959,7 @@ def edit_staff_api(request):
             UserPwd = request.POST.get("UserPwd")
             # PartyGroup = request.POST.get("PartyGroup")
             staff = tenant_qs(request, StaffUser).select_related().get(pk=int(EditUserId))
+            old_password = staff.userPassword
             try:
                 imageUpload = request.FILES["imageUpload"]
                 staff.photo = imageUpload
@@ -913,6 +992,14 @@ def edit_staff_api(request):
             else:
                 new_user.is_active = False
             new_user.save()
+            if UserPwd and UserPwd != old_password:
+                log_audit_event(
+                    staff,
+                    AuditLog.Action.PASSWORD_CHANGE,
+                    actor=request.user,
+                    changes={'userPassword': {'from': '***', 'to': '***'}},
+                    snapshot=snapshot_instance(staff),
+                )
             ensure_membership(new_user, staff.tenant, TenantMembership.Role.STAFF)
             _sync_staff_user_group_membership(staff)
             return JsonResponse({'message': 'success'}, safe=False)
@@ -1936,7 +2023,7 @@ class CollectionByAdminListJson(BaseDatatableView):
         for item in qs:
             if _can_auto_approve_collections(self.request.user):
                 action = '''<button  data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "showConfirmationModal('{}')" class="ui circular facebook icon button purple">
-                   <i class="whatsapp icon"></i>
+                   <i class="check circle icon"></i>
                   </button>
                   <a href="/edit_collection/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
@@ -2064,7 +2151,7 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
         for item in qs:
             if _can_auto_approve_collections(self.request.user):
                 action = '''<button  data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick = "showConfirmationModal('{}')" class="ui circular facebook icon button purple">
-                   <i class="whatsapp icon"></i>
+                   <i class="check circle icon"></i>
                   </button>
                   <a href="/edit_collection/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
@@ -2140,34 +2227,49 @@ def delete_collection(request):
             return JsonResponse({'message': 'error'}, safe=False)
 @transaction.atomic
 def approve_collection(request):
-    if request.method == 'POST':
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_review_collections(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        id = request.POST.get("userID")
+        obj = tenant_qs(request, Collection).select_related().get(pk=int(id))
+        user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
+        obj.isApproved = True
+        obj.approvedBy_id = user.pk
+        obj.approvedOn = timezone.now()
+        obj.save()
+        log_audit_event(
+            obj,
+            AuditLog.Action.APPROVE,
+            actor=request.user,
+            changes={
+                'isApproved': {'from': False, 'to': True},
+                'approvedBy_id': {'from': None, 'to': user.pk},
+                'approvedOn': {'from': None, 'to': obj.approvedOn.isoformat() if obj.approvedOn else None},
+            },
+            snapshot=snapshot_instance(obj),
+        )
         try:
-            id = request.POST.get("userID")
-            obj = tenant_qs(request, Collection).select_related().get(pk=int(id))
-            user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
-            obj.isApproved = True
-            obj.approvedBy_id = user.pk
-            obj.approvedOn = timezone.now()
-            obj.save()
+            sync_party_ledger_entries_for_object(obj)
+        except Exception:
+            pass
+        try:
+            msg = "Sir, Your Payment has been received by {} Rs.{}/- on Dt.{} ag. Ref. No. {}, Kindly confirm the same. If you have any query Please feel free to contact on this no. 7005607770. Thanks, BSS".format(
+                obj.modeOfPayment, obj.paidAmount, str(obj.collectionDateTime.strftime('%d-%m-%Y')), obj.paymentID)
             try:
-                sync_party_ledger_entries_for_object(obj)
-            except Exception:
-                pass
-            try:
-                msg = "Sir, Your Payment has been received by {} Rs.{}/- on Dt.{} ag. Ref. No. {}, Kindly confirm the same. If you have any query Please feel free to contact on this no. 7005607770. Thanks, BSS".format(
-                    obj.modeOfPayment, obj.paidAmount, str(obj.collectionDateTime.strftime('%d-%m-%Y')), obj.paymentID)
-                # send_whatsapp_message(obj.partyID.phone, msg)
-                try:
-                    numbers = str(obj.partyID.phone).split('.')
-                    for n in numbers:
-                        send_message(n, msg, obj.partyID.name)
-                except:
-                    send_message(obj.partyID.phone, msg, obj.partyID.name)
+                numbers = str(obj.partyID.phone).split('.')
+                for n in numbers:
+                    send_message(n, msg, obj.partyID.name)
             except:
-                pass
-            return JsonResponse({'message': 'success'}, safe=False)
+                send_message(obj.partyID.phone, msg, obj.partyID.name)
         except:
-            return JsonResponse({'message': 'error'}, safe=False)
+            pass
+        return JsonResponse({'message': 'success'}, safe=False)
+    except:
+        return JsonResponse({'message': 'error'}, safe=False)
 @transaction.atomic
 def change_password_api(request):
     if request.method == 'POST':
@@ -2179,6 +2281,13 @@ def change_password_api(request):
             user = User.objects.select_related().get(pk=request.user.pk)
             user.set_password(password)
             user.save()
+            log_audit_event(
+                data,
+                AuditLog.Action.PASSWORD_CHANGE,
+                actor=request.user,
+                changes={'userPassword': {'from': '***', 'to': '***'}},
+                snapshot=snapshot_instance(data),
+            )
             user = authenticate(request, username=user.username, password=password)
             if user is not None:
                 login(request, user)
@@ -2441,6 +2550,19 @@ def transfer_books_api(request):
     in_tx.source = BookTransaction.Source.TRANSFER
     in_tx.transferId = transfer_id
     in_tx.save()
+    log_audit_event(
+        out_tx,
+        AuditLog.Action.TRANSFER,
+        actor=request.user,
+        changes={
+            'transferId': transfer_id,
+            'fromAccount': str(from_account),
+            'toAccount': str(to_account),
+            'amount': amount_value,
+            'note': note or 'Transfer',
+        },
+        snapshot=snapshot_instance(out_tx),
+    )
     return JsonResponse({'message': 'success'}, safe=False)
 @transaction.atomic
 def transfer_cash_to_bank_api(request):
@@ -2513,6 +2635,20 @@ def transfer_cash_to_bank_api(request):
     in_tx.source = BookTransaction.Source.TRANSFER
     in_tx.transferId = transfer_id
     in_tx.save()
+    log_audit_event(
+        in_tx,
+        AuditLog.Action.TRANSFER,
+        actor=request.user,
+        changes={
+            'transferId': transfer_id,
+            'fromAccount': str(from_account),
+            'toAccount': str(to_account),
+            'bank': bank.name,
+            'amount': amount_value,
+            'note': note or 'Transfer',
+        },
+        snapshot=snapshot_instance(in_tx),
+    )
     return JsonResponse({'message': 'success'}, safe=False)
 def get_book_tx_detail_api(request):
     if not request.user.is_authenticated:
@@ -3248,6 +3384,74 @@ class MessageListJson(BaseDatatableView):
                 status,
             ])
         return json_data
+class AuditLogListJson(BaseDatatableView):
+    order_columns = ['datetime', 'actor__username', 'content_type__model', 'action', 'object_repr', 'object_id']
+    def get_initial_queryset(self):
+        if not request_user_has_audit_access(self.request.user):
+            return AuditLog.objects.none()
+        return _tenant_audit_log_queryset(self.request).only(
+            'id', 'datetime', 'action', 'object_id', 'object_repr',
+            'changes', 'snapshot', 'actor__username', 'content_type__model',
+        )
+    def filter_queryset(self, qs):
+        return _apply_audit_log_filters(self.request, qs)
+    def prepare_results(self, qs):
+        data = []
+        for item in qs:
+            actor = escape(item.actor.username) if item.actor_id else 'System'
+            model_name = escape(item.content_type.model.replace('_', ' ').title())
+            action_label = escape(item.get_action_display())
+            changes_count = len(item.changes or {})
+            detail_btn = (
+                '<button class="ui tiny teal basic button" type="button" onclick="openAuditDetail(\'{}\', {})">'
+                '<i class="eye icon"></i>View</button>'
+            ).format(reverse('homeApp:get_audit_log_detail_api'), item.pk)
+            data.append([
+                escape(_format_audit_datetime(item.datetime)),
+                actor,
+                model_name,
+                action_label,
+                escape(item.object_repr),
+                escape(str(item.object_id)),
+                escape(str(changes_count)),
+                detail_btn,
+            ])
+        return data
+def request_user_has_audit_access(user):
+    return _has_any_permission(user, 'home.can_view_audit_logs', 'home.can_view_party_credentials')
+def get_audit_log_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not request_user_has_audit_access(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    audit_id = request.GET.get('id')
+    if not str(audit_id).isdigit():
+        return JsonResponse({'message': 'invalid'}, status=400, safe=False)
+    obj = get_object_or_404(_tenant_audit_log_queryset(request), pk=int(audit_id))
+    return JsonResponse({'data': _audit_log_detail_payload(obj)}, safe=False)
+def export_audit_log_csv(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.can_export_audit_logs', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    qs = _apply_audit_log_filters(request, _tenant_audit_log_queryset(request)).order_by('-datetime')
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="audit-log-report.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['Datetime', 'Actor', 'Model', 'Action', 'Object ID', 'Object', 'Changes', 'Snapshot'])
+    for item in qs:
+        payload = _audit_log_detail_payload(item)
+        writer.writerow([
+            payload['datetime'],
+            payload['actor'],
+            payload['model'],
+            payload['action'],
+            payload['object_id'],
+            payload['object_repr'],
+            payload['changes_pretty'],
+            payload['snapshot_pretty'],
+        ])
+    return response
 # ----------------------Orders-----------------
 @transaction.atomic
 def add_order_api(request):
@@ -3375,6 +3579,17 @@ def approve_order(request):
         if staff:
             obj.approvedBy_id = staff.pk
         obj.save(update_fields=['status', 'approvedOn', 'approvedBy', 'lastUpdatedOn'])
+        log_audit_event(
+            obj,
+            AuditLog.Action.APPROVE,
+            actor=request.user,
+            changes={
+                'status': {'from': 'submitted', 'to': Order.Status.APPROVED},
+                'approvedBy_id': {'from': None, 'to': getattr(staff, 'pk', None)},
+                'approvedOn': {'from': None, 'to': obj.approvedOn.isoformat() if obj.approvedOn else None},
+            },
+            snapshot=snapshot_instance(obj),
+        )
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception:
         return JsonResponse({'message': 'error'}, safe=False)
@@ -3438,7 +3653,7 @@ class OrdersByAdminListJson(BaseDatatableView):
             action_parts = []
             if can_approve and not approved:
                 action_parts.append(
-                    '''<button data-inverted="" data-tooltip="Approve" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showApproveOrderModal('{}')" class="ui circular purple icon button"><i class="check icon"></i></button>'''.format(item.pk)
+                    '''<button data-inverted="" data-tooltip="Approve" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showApproveOrderModal('{}')" class="ui circular purple icon button"><i class="check circle icon"></i></button>'''.format(item.pk)
                 )
             # Always provide a detail page.
             action_parts.append(
@@ -3649,8 +3864,8 @@ class SalesByAdminListJson(BaseDatatableView):
         json_data = []
         for item in qs:
             action_parts = []
-            if _can_manage_sales(self.request.user):
-                action_parts.append('''<button data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConfirmationModal('{}')" class="ui circular facebook icon button purple"><i class="whatsapp icon"></i></button>'''.format(item.pk))
+            if _can_approve_sales(self.request.user):
+                action_parts.append('''<button data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConfirmationModal('{}')" class="ui circular facebook icon button purple"><i class="check circle icon"></i></button>'''.format(item.pk))
             if _can_edit_sales(self.request.user):
                 action_parts.append('''<a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
             if _can_delete_sales(self.request.user):
@@ -3726,11 +3941,11 @@ class SalesByStaffListJson(BaseDatatableView):
         json_data = []
         for item in qs:
             action_parts = []
-            if _can_manage_sales(self.request.user):
-                action_parts.append('''<button data-inverted="" data-tooltip="Send Message" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConfirmationModal('{}')" class="ui circular facebook icon button purple"><i class="whatsapp icon"></i></button>'''.format(item.pk))
+            if _can_approve_sales(self.request.user):
+                action_parts.append('''<button data-inverted="" data-tooltip="Send Message" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConfirmationModal('{}')" class="ui circular facebook icon button purple"><i class="paper plane icon"></i></button>'''.format(item.pk))
             # Staff can only update sales before approval; after approval the edit page becomes read-only.
             if _can_edit_sales(self.request.user):
-                if item.isApproved and not (_can_manage_sales(self.request.user) or self.request.user.has_perm('home.can_view_party_credentials')):
+                if item.isApproved and not (_can_manage_sales(self.request.user) or _can_approve_sales(self.request.user) or self.request.user.has_perm('home.can_view_party_credentials')):
                     action_parts.append('<div class="ui tiny orange label">Approved</div>')
                 else:
                     action_parts.append('''<a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
@@ -3834,34 +4049,46 @@ def update_sales_by_admin_api(request):
             return JsonResponse({'message': 'error'}, safe=False)
 @transaction.atomic
 def send_message_sales(request):
-    if request.method == 'POST':
-        if not request.user.is_authenticated:
-            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-        if not _can_manage_sales(request.user) and not request.user.has_perm('home.can_view_party_credentials'):
-            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'detail': 'Invalid request method.'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized', 'detail': 'Please login to approve sales.'}, status=401, safe=False)
+    if not _can_approve_sales(request.user):
+        return JsonResponse({'message': 'forbidden', 'detail': 'You do not have permission to approve sales.'}, status=403, safe=False)
+    try:
+        id = request.POST.get("userID")
+        obj = tenant_qs(request, Sales).select_related().get(pk=int(id))
+        if obj.isApproved:
+            return JsonResponse({'message': 'success', 'detail': 'Sale is already approved.'}, safe=False)
+        user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
+        obj.isApproved = True
+        obj.approvedBy_id = user.pk
+        obj.save()
+        log_audit_event(
+            obj,
+            AuditLog.Action.APPROVE,
+            actor=request.user,
+            changes={
+                'isApproved': {'from': False, 'to': True},
+                'approvedBy_id': {'from': None, 'to': user.pk},
+            },
+            snapshot=snapshot_instance(obj),
+        )
+        sync_party_ledger_entries_for_object(obj)
         try:
-            id = request.POST.get("userID")
-            obj = tenant_qs(request, Sales).select_related().get(pk=int(id))
-            user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
-            obj.isApproved = True
-            obj.approvedBy_id = user.pk
-            obj.save()
-            sync_party_ledger_entries_for_object(obj)
+            msg = "Your sale has been approved. Bill No. {} Dt. {} Amt. Rs. {}. Please contact 7005607770 if you have any questions. Thanks, BSS".format(
+                obj.invoiceNumber, obj.buildDate.strftime('%d-%m-%Y'), obj.amount)
             try:
-                msg = "Your order has been dispatched Ag. Bill No. {} Dt. {} Amt. Rs. {}, Please confirm received the material. If you have any queries about your order, Please feel free contact on this no 7005607770. Thanks, BSS".format(
-                    obj.invoiceNumber, obj.buildDate.strftime('%d-%m-%Y'), obj.amount)
-                # send_whatsapp_message(obj.partyID.phone, msg)
-                try:
-                    numbers = str(obj.partyID.phone).split('.')
-                    for n in numbers:
-                        send_message(n, msg, obj.partyID.name)
-                except:
-                    send_message(obj.partyID.phone, msg, obj.partyID.name)
+                numbers = str(obj.partyID.phone).split('.')
+                for n in numbers:
+                    send_message(n, msg, obj.partyID.name)
             except:
-                pass
-            return JsonResponse({'message': 'success'}, safe=False)
+                send_message(obj.partyID.phone, msg, obj.partyID.name)
         except:
-            return JsonResponse({'message': 'error'}, safe=False)
+            pass
+        return JsonResponse({'message': 'success', 'detail': 'Sale approved successfully.'}, safe=False)
+    except:
+        return JsonResponse({'message': 'error', 'detail': 'Unable to approve sale.'}, safe=False)
 @transaction.atomic
 def re_send_message_sales(request):
     if request.method == 'POST':

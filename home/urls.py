@@ -153,7 +153,11 @@ urlpatterns = [
 
     # message List
     path('message_list/', message_list, name='message_list'),
+    path('audit-report/', audit_log_report, name='audit_log_report'),
     path('api/MessageListJson/', MessageListJson.as_view(), name='MessageListJson'),
+    path('api/AuditLogListJson/', AuditLogListJson.as_view(), name='AuditLogListJson'),
+    path('api/get_audit_log_detail_api/', get_audit_log_detail_api, name='get_audit_log_detail_api'),
+    path('api/export_audit_log_csv/', export_audit_log_csv, name='export_audit_log_csv'),
     path('api/re_send_message_sales/', re_send_message_sales, name='re_send_message_sales'),
     path('api/enable_tally_post_api/', enable_tally_post_api, name='enable_tally_post_api'),
 

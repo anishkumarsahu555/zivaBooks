@@ -1,4 +1,7 @@
+from django.contrib.auth.models import Group
 from django.urls import reverse
+
+from .tenancy import get_current_tenant
 
 
 ADMIN_LIKE_PERMS = {
@@ -11,8 +14,48 @@ ADMIN_LIKE_PERMS = {
 }
 
 
-def _has_any_perm(user, perm_names):
-    return any(user.has_perm(perm_name) for perm_name in perm_names)
+def _tenant_admin_group_name(tenant):
+    tenant_slug = getattr(tenant, 'slug', 'tenant')
+    return f'{tenant_slug}:Tenant Admin'
+
+
+def _all_permission_names(user):
+    if not getattr(user, 'is_authenticated', False):
+        return set()
+    return set(user.get_all_permissions())
+
+
+def _effective_permission_names(request_or_user):
+    user = getattr(request_or_user, 'user', request_or_user)
+    if not getattr(user, 'is_authenticated', False):
+        return set()
+    cached = getattr(user, '_tenant_effective_perm_cache', None)
+    if cached is not None:
+        return cached
+
+    user_permissions = _all_permission_names(user)
+    tenant = get_current_tenant(request_or_user)
+    if tenant is None:
+        user._tenant_effective_perm_cache = user_permissions
+        return user_permissions
+
+    tenant_admin_group = Group.objects.filter(name=_tenant_admin_group_name(tenant)).first()
+    if tenant_admin_group is None:
+        user._tenant_effective_perm_cache = set()
+        return user._tenant_effective_perm_cache
+
+    tenant_permissions = {
+        f'{permission.content_type.app_label}.{permission.codename}'
+        for permission in tenant_admin_group.permissions.select_related('content_type')
+    }
+    effective_permissions = tenant_permissions if user.is_superuser else user_permissions & tenant_permissions
+    user._tenant_effective_perm_cache = effective_permissions
+    return effective_permissions
+
+
+def _has_any_perm(request_or_user, perm_names):
+    effective_permissions = _effective_permission_names(request_or_user)
+    return any(perm_name in effective_permissions for perm_name in perm_names)
 
 
 def _nav_item(label, url_name, icon, perm=None):
@@ -24,16 +67,17 @@ def _nav_item(label, url_name, icon, perm=None):
     }
 
 
-def _perm_match(user, perm):
+def _perm_match(request_or_user, perm):
+    effective_permissions = _effective_permission_names(request_or_user)
     if perm is None:
         return True
     if isinstance(perm, (list, tuple, set)):
-        return any(user.has_perm(name) for name in perm)
-    return user.has_perm(perm)
+        return any(name in effective_permissions for name in perm)
+    return perm in effective_permissions
 
 
-def _filter_items(user, items):
-    return [item for item in items if _perm_match(user, item.get('perm'))]
+def _filter_items(request_or_user, items):
+    return [item for item in items if _perm_match(request_or_user, item.get('perm'))]
 
 
 def _admin_sections(user):
@@ -92,9 +136,8 @@ def _admin_sections(user):
                     'home.view_attendance',
                 )),
                 _nav_item('Attendance Report', 'homeApp:attendance_report_admin', 'calendar alternate', (
-                    'home.can_manage_staff',
-                    'home.can_view_party_credentials',
-                    'home.can_approve_collection',
+                    'home.can_view_all_attendance',
+                    'home.can_view_attendance_reports',
                 )),
             ]),
         },
@@ -111,9 +154,19 @@ def _admin_sections(user):
             'title': 'Message History',
             'items': _filter_items(user, [
                 _nav_item('Message List', 'homeApp:message_list', 'comment dots outline', (
-                    'home.can_manage_sales',
+                    'home.view_whatsappmessagestatus',
+                    'home.add_whatsappmessagestatus',
+                    'home.change_whatsappmessagestatus',
+                    'home.delete_whatsappmessagestatus',
+                )),
+            ]),
+        },
+        {
+            'title': 'Audit',
+            'items': _filter_items(user, [
+                _nav_item('Audit Report', 'homeApp:audit_log_report', 'history', (
                     'home.can_view_audit_logs',
-                    'home.can_approve_collection',
+                    'home.can_export_audit_logs',
                 )),
             ]),
         },
@@ -328,11 +381,19 @@ def _customer_sections(user):
     return [section for section in sections if section['items']]
 
 
-def build_sidebar_sections(user):
+def build_sidebar_sections(request_or_user):
+    user = getattr(request_or_user, 'user', request_or_user)
     if not getattr(user, 'is_authenticated', False):
         return []
-    is_admin_like = _has_any_perm(user, ADMIN_LIKE_PERMS)
+    is_admin_like = _has_any_perm(request_or_user, ADMIN_LIKE_PERMS)
     party_admin_perms = ('home.can_manage_parties', 'home.can_view_party_credentials')
+    bank_perms = (
+        'home.view_bank',
+        'home.add_bank',
+        'home.change_bank',
+        'home.delete_bank',
+        'home.can_view_party_credentials',
+    )
 
     sections = [
         {
@@ -343,22 +404,27 @@ def build_sidebar_sections(user):
         },
         {
             'title': 'Staff',
-            'items': _filter_items(user, [
+            'items': _filter_items(request_or_user, [
                 _nav_item('Staff Groups', 'homeApp:staff_group_list', 'users cog', 'home.can_manage_staff_groups'),
                 _nav_item('Staff List', 'homeApp:user_list', 'user tie', 'home.can_manage_staff'),
             ]),
         },
         {
             'title': 'Party',
-            'items': _filter_items(user, [
+            'items': _filter_items(request_or_user, [
                 _nav_item('Party Group List', 'homeApp:party_group_list', 'user friends', party_admin_perms),
                 _nav_item('Party List', 'homeApp:party_list', 'address book', party_admin_perms),
-                _nav_item('Bank List', 'homeApp:bank_list', 'university', party_admin_perms),
+            ]),
+        },
+        {
+            'title': 'Banks',
+            'items': _filter_items(request_or_user, [
+                _nav_item('Bank List', 'homeApp:bank_list', 'university', bank_perms),
             ]),
         },
         {
             'title': 'Collections',
-            'items': _filter_items(user, [
+            'items': _filter_items(request_or_user, [
                 _nav_item('Take Collection', 'homeApp:add_collection', 'hand holding usd', 'home.add_collection'),
                 _nav_item('My Collections', 'homeApp:my_collection', 'book', (
                     'home.view_collection',
@@ -367,21 +433,18 @@ def build_sidebar_sections(user):
                 )),
                 _nav_item('Collection List', 'homeApp:collection_list', 'clipboard list', (
                     'home.can_approve_collection',
-                    'home.can_view_party_credentials',
                 )),
                 _nav_item('Cheque Reminder List', 'homeApp:cheque_reminder_list', 'bell', (
                     'home.can_approve_collection',
-                    'home.can_view_party_credentials',
                 )),
                 _nav_item('Take Collection (Admin)', 'homeApp:take_collection', 'hand holding usd', (
                     'home.can_approve_collection',
-                    'home.can_view_party_credentials',
                 )),
             ]),
         },
         {
             'title': 'Sales',
-            'items': _filter_items(user, [
+            'items': _filter_items(request_or_user, [
                 _nav_item('Add Sale', 'homeApp:add_sales', 'shopping cart', 'home.add_sales'),
                 _nav_item('My Sales List', 'homeApp:my_sales_list', 'book', (
                     'home.view_sales',
@@ -391,13 +454,13 @@ def build_sidebar_sections(user):
                 )),
                 _nav_item('Sales List', 'homeApp:sales_list', 'clipboard list', (
                     'home.can_manage_sales',
-                    'home.can_view_party_credentials',
+                    'home.can_approve_sales',
                 )),
             ]),
         },
         {
             'title': 'Orders',
-            'items': _filter_items(user, [
+            'items': _filter_items(request_or_user, [
                 _nav_item('Add Order', 'homeApp:add_order', 'clipboard outline', 'home.add_order'),
                 _nav_item('My Orders List', 'homeApp:my_orders_list', 'list alternate outline', (
                     'home.view_order',
@@ -407,13 +470,13 @@ def build_sidebar_sections(user):
                 )),
                 _nav_item('Orders List', 'homeApp:orders_list', 'clipboard list', (
                     'home.can_manage_orders',
-                    'home.can_view_party_credentials',
+                    'home.can_approve_orders',
                 )),
             ]),
         },
         {
             'title': 'Cash Counter',
-            'items': _filter_items(user, [
+            'items': _filter_items(request_or_user, [
                 _nav_item("Today's Cash Counter", 'homeApp:cash_counter', 'calendar check', (
                     'home.can_manage_cash_counter',
                     'home.add_cashcounter',
@@ -431,26 +494,26 @@ def build_sidebar_sections(user):
                     'home.view_cashcounter',
                     'home.view_collectioncashcounter',
                 )),
-                _nav_item('Cashbook', 'homeApp:cashbook', 'book', (
-                    'home.can_manage_cash_counter',
-                    'home.view_cashcounter',
-                    'home.can_view_party_credentials',
-                )),
-                _nav_item('Bankbook', 'homeApp:bankbook', 'university', 'home.can_view_party_credentials'),
+            ]),
+        },
+        {
+            'title': 'Books',
+            'items': _filter_items(request_or_user, [
+                _nav_item('Cashbook', 'homeApp:cashbook', 'book', 'home.can_manage_books'),
+                _nav_item('Bankbook', 'homeApp:bankbook', 'university', 'home.can_manage_books'),
             ]),
         },
         {
             'title': 'Attendance',
-            'items': _filter_items(user, [
+            'items': _filter_items(request_or_user, [
                 _nav_item("Today's Attendance", 'homeApp:add_attendance', 'calendar check', (
                     'home.add_attendance',
                     'home.view_attendance',
                     'home.change_attendance',
                 )),
                 _nav_item('Attendance Report', 'homeApp:attendance_report_admin', 'calendar alternate', (
-                    'home.can_manage_staff',
-                    'home.can_view_party_credentials',
-                    'home.can_approve_collection',
+                    'home.can_view_all_attendance',
+                    'home.can_view_attendance_reports',
                 )),
                 _nav_item('Attendance Report (Mine)', 'homeApp:attendance_report', 'calendar alternate outline', (
                     'home.view_attendance',
@@ -461,11 +524,21 @@ def build_sidebar_sections(user):
         },
         {
             'title': 'Message History',
-            'items': _filter_items(user, [
+            'items': _filter_items(request_or_user, [
                 _nav_item('Message List', 'homeApp:message_list', 'comment dots outline', (
-                    'home.can_manage_sales',
+                    'home.view_whatsappmessagestatus',
+                    'home.add_whatsappmessagestatus',
+                    'home.change_whatsappmessagestatus',
+                    'home.delete_whatsappmessagestatus',
+                )),
+            ]),
+        },
+        {
+            'title': 'Audit',
+            'items': _filter_items(request_or_user, [
+                _nav_item('Audit Report', 'homeApp:audit_log_report', 'history', (
                     'home.can_view_audit_logs',
-                    'home.can_approve_collection',
+                    'home.can_export_audit_logs',
                 )),
             ]),
         },

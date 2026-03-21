@@ -1,0 +1,64 @@
+{% extends base_template %}
+
+{% block title %}
+    <title>Access Denied</title>
+{% endblock %}
+
+{% block css %}
+    <style>
+        .denied-shell {
+            min-height: calc(100vh - 120px);
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+
+        .denied-card {
+            width: min(100%, 560px);
+            background: #ffffff;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+            padding: 28px;
+            text-align: center;
+        }
+
+        .denied-icon {
+            width: 68px;
+            height: 68px;
+            margin: 0 auto 16px;
+            border-radius: 20px;
+            display: grid;
+            place-items: center;
+            background: rgba(239, 68, 68, 0.12);
+            color: #dc2626;
+            font-size: 28px;
+        }
+
+        .denied-title {
+            margin: 0 0 10px;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .denied-copy {
+            margin: 0;
+            color: #475569;
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="denied-shell">
+        <div class="denied-card">
+            <div class="denied-icon">
+                <i class="lock icon"></i>
+            </div>
+            <h1 class="denied-title">Access Denied</h1>
+            <p class="denied-copy">{{ access_denied_message }}</p>
+        </div>
+    </div>
+{% endblock %}

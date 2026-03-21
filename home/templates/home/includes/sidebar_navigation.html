@@ -1,15 +1,17 @@
 {% if sidebar_sections %}
     {% for section in sidebar_sections %}
-        <div class="item">
-            <div class="header">{{ section.title }}</div>
-            <div class="menu">
-                {% for item in section.items %}
-                    <a class="item" href="{{ item.url }}">
-                        <div><i class="{{ item.icon }} icon"></i>{{ item.label }}</div>
-                    </a>
-                {% endfor %}
+        {% if section.items %}
+            <div class="item">
+                <div class="header">{{ section.title }}</div>
+                <div class="menu">
+                    {% for item in section.items %}
+                        <a class="item" href="{{ item.url }}">
+                            <div><i class="{{ item.icon }} icon"></i>{{ item.label }}</div>
+                        </a>
+                    {% endfor %}
+                </div>
             </div>
-        </div>
+        {% endif %}
     {% endfor %}
 {% endif %}
 

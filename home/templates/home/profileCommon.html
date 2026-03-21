@@ -584,14 +584,14 @@
                         <div class="identity-copy">
                             <div class="identity-overline">
                                 <i class="id badge outline icon"></i>
-                                Staff Identity
+                                {{ profile_identity_label|default:"Staff Identity" }}
                             </div>
                             <h2 class="identity-name">{{ instance.name|default:"Unnamed Staff"|capfirst }}</h2>
                             <p class="identity-handle">@{{ instance.user_ID.username|default:instance.username|default:request.user.username }}</p>
                             <div class="chip-row">
                                 <span class="profile-chip is-accent">
                                     <i class="user icon"></i>
-                                    {{ instance.staffGroup.name|default:instance.group|default:"Unassigned Group"|capfirst }}
+                                    {{ profile_role_label|default:"Workspace User"|capfirst }}
                                 </span>
                                 <span class="profile-chip {% if instance.isActive == 'Active' %}is-accent{% else %}is-warm{% endif %}">
                                     <i class="circle icon"></i>
@@ -638,12 +638,12 @@
                             <div class="meta-value">{{ instance.user_ID.username|default:instance.username|default:request.user.username }}</div>
                         </div>
                         <div class="meta-card">
-                            <div class="meta-label">Staff Group</div>
-                            <div class="meta-value">{{ instance.staffGroup.name|default:instance.group|default:"Not assigned"|capfirst }}</div>
+                            <div class="meta-label">Access Role</div>
+                            <div class="meta-value">{{ profile_role_label|default:"Workspace User"|capfirst }}</div>
                         </div>
                         <div class="meta-card">
                             <div class="meta-label">Party Group</div>
-                            <div class="meta-value">{{ instance.partyGroupID.name|default:"Not assigned"|capfirst }}</div>
+                            <div class="meta-value">{% if instance.partyGroupID %}{{ instance.partyGroupID.name|capfirst }}{% else %}Not assigned{% endif %}</div>
                         </div>
                         <div class="meta-card">
                             <div class="meta-label">Profile Created</div>

@@ -814,7 +814,7 @@
                         $('body')
                             .toast({
                                 class: 'success',
-                                message: 'Message sent Successfully.'
+                                message: response.detail || 'Sale approved successfully.'
                             })
                         ;
 
@@ -825,7 +825,7 @@
                         $('body')
                             .toast({
                                 class: 'error',
-                                message: 'An error occurred !'
+                                message: response.detail || 'Unable to approve sale.'
                             })
                         ;
                         hideLoading();
@@ -837,7 +837,7 @@
                     $('body')
                         .toast({
                             class: 'error',
-                            message: 'An error occurred !'
+                            message: 'Unable to approve sale.'
                         })
                     ;
                     hideLoading();
