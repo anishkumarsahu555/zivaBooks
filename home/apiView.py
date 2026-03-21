@@ -2447,6 +2447,117 @@ def _parse_books_date(value):
         return datetime.strptime(value, '%d/%m/%Y').date()
     except Exception:
         return None
+def _cashbook_export_account(request):
+    account_id = request.GET.get('account') or request.GET.get('accountId')
+    if account_id and str(account_id).isdigit():
+        return tenant_qs(request, BookAccount).filter(
+            isDeleted=False,
+            pk=int(account_id),
+            type=BookAccount.Type.CASH,
+        ).first()
+    tenant = get_current_tenant(request)
+    if tenant:
+        ensure_books_for_tenant(tenant)
+    return tenant_qs(request, BookAccount).filter(
+        isDeleted=False,
+        type=BookAccount.Type.CASH,
+    ).order_by('-isDefault', 'name').first()
+def _bankbook_export_account(request):
+    bank_id = request.GET.get('bank')
+    tenant = get_current_tenant(request)
+    if tenant:
+        ensure_books_for_tenant(tenant)
+    accounts = tenant_qs(request, BookAccount).filter(
+        isDeleted=False,
+        type=BookAccount.Type.BANK,
+    ).select_related('bank').order_by('name')
+    if bank_id and str(bank_id).isdigit():
+        selected_bank = tenant_qs(request, Bank).filter(isDeleted=False, pk=int(bank_id)).first()
+        if selected_bank:
+            return accounts.filter(bank=selected_bank).first()
+    return accounts.first()
+def _can_access_cashbook(user):
+    return _has_any_permission(user, 'home.can_manage_cash_counter', 'home.can_view_party_credentials', 'home.can_manage_books')
+def _can_access_bankbook(user):
+    return user.has_perm('home.can_view_party_credentials') or user.has_perm('home.can_manage_books')
+def _cashbook_statement_rows(request, account, start_date, end_date):
+    base_qs = tenant_qs(request, BookTransaction).filter(isDeleted=False, account=account)
+    prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+        in_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.IN)),
+        out_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.OUT)),
+    )
+    opening = float(account.openingBalance or 0.0) + float(prior['in_total'] or 0.0) - float(prior['out_total'] or 0.0)
+    qs = (
+        base_qs
+        .filter(txDateTime__date__range=[start_date, end_date])
+        .select_related('party', 'account')
+        .order_by('txDateTime', 'id')
+    )
+    balance = opening
+    total_in = 0.0
+    total_out = 0.0
+    rows = []
+    for item in qs:
+        in_amt = float(item.amount or 0.0) if item.direction == BookTransaction.Direction.IN else 0.0
+        out_amt = float(item.amount or 0.0) if item.direction == BookTransaction.Direction.OUT else 0.0
+        balance += in_amt - out_amt
+        total_in += in_amt
+        total_out += out_amt
+        rows.append({
+            'date': item.txDateTime,
+            'particulars': (item.narration or '-').strip() or '-',
+            'party': item.party.name if item.party_id else '-',
+            'receipt': in_amt,
+            'payment': out_amt,
+            'balance': balance,
+            'source': item.get_source_display(),
+        })
+    return {
+        'opening': opening,
+        'rows': rows,
+        'total_in': total_in,
+        'total_out': total_out,
+        'closing': balance,
+    }
+def _bankbook_statement_rows(request, account, start_date, end_date):
+    base_qs = tenant_qs(request, BookTransaction).filter(isDeleted=False, account=account)
+    prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+        in_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.IN)),
+        out_total=Sum('amount', filter=Q(direction=BookTransaction.Direction.OUT)),
+    )
+    opening = float(account.openingBalance or 0.0) + float(prior['in_total'] or 0.0) - float(prior['out_total'] or 0.0)
+    qs = (
+        base_qs
+        .filter(txDateTime__date__range=[start_date, end_date])
+        .select_related('party', 'account', 'account__bank')
+        .order_by('txDateTime', 'id')
+    )
+    balance = opening
+    total_in = 0.0
+    total_out = 0.0
+    rows = []
+    for item in qs:
+        in_amt = float(item.amount or 0.0) if item.direction == BookTransaction.Direction.IN else 0.0
+        out_amt = float(item.amount or 0.0) if item.direction == BookTransaction.Direction.OUT else 0.0
+        balance += in_amt - out_amt
+        total_in += in_amt
+        total_out += out_amt
+        rows.append({
+            'date': item.txDateTime,
+            'particulars': (item.narration or '-').strip() or '-',
+            'party': item.party.name if item.party_id else '-',
+            'receipt': in_amt,
+            'payment': out_amt,
+            'balance': balance,
+            'source': item.get_source_display(),
+        })
+    return {
+        'opening': opening,
+        'rows': rows,
+        'total_in': total_in,
+        'total_out': total_out,
+        'closing': balance,
+    }
 @transaction.atomic
 def add_book_manual_tx_api(request):
     if request.method != 'POST':
@@ -2748,6 +2859,79 @@ def _format_money_compact(value):
     if abs(val - int(val)) < 1e-9:
         return formatINR(format(int(val), '.0f'))
     return formatINR(format(val, '.2f'))
+def generate_cashbook_pdf(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_access_cashbook(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    account = _cashbook_export_account(request)
+    if account is None:
+        return JsonResponse({'message': 'not_found'}, status=404, safe=False)
+    start_date = _parse_books_date(request.GET.get('startDate')) or datetime.today().date()
+    end_date = _parse_books_date(request.GET.get('endDate')) or start_date
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    statement = _cashbook_statement_rows(request, account, start_date, end_date)
+    tenant = get_current_tenant(request)
+    context = {
+        'tenant': tenant,
+        'account': account,
+        'start_date': start_date,
+        'end_date': end_date,
+        'opening': statement['opening'],
+        'rows': statement['rows'],
+        'total_in': statement['total_in'],
+        'total_out': statement['total_out'],
+        'closing': statement['closing'],
+        'generated_on': timezone.now(),
+    }
+    response = HttpResponse(content_type="application/pdf")
+    safe_name = (account.name or f'cashbook-{account.pk}').replace('/', '-')
+    response['Content-Disposition'] = f'attachment; filename=cashbook-{safe_name}.pdf'
+    html = render_to_string("home/books/cashbookPDF.html", context)
+    base_url = request.build_absolute_uri('/')
+    HTML(string=html, base_url=base_url).write_pdf(
+        response,
+        stylesheets=[CSS(string='@page { size: A4 portrait; margin: 1cm 0.75cm 1.1cm; }')]
+    )
+    return response
+def generate_bankbook_pdf(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_access_bankbook(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    account = _bankbook_export_account(request)
+    if account is None:
+        return JsonResponse({'message': 'not_found'}, status=404, safe=False)
+    start_date = _parse_books_date(request.GET.get('startDate')) or datetime.today().date()
+    end_date = _parse_books_date(request.GET.get('endDate')) or start_date
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    statement = _bankbook_statement_rows(request, account, start_date, end_date)
+    tenant = get_current_tenant(request)
+    context = {
+        'tenant': tenant,
+        'account': account,
+        'bank': getattr(account, 'bank', None),
+        'start_date': start_date,
+        'end_date': end_date,
+        'opening': statement['opening'],
+        'rows': statement['rows'],
+        'total_in': statement['total_in'],
+        'total_out': statement['total_out'],
+        'closing': statement['closing'],
+        'generated_on': timezone.now(),
+    }
+    response = HttpResponse(content_type="application/pdf")
+    safe_name = (account.name or f'bankbook-{account.pk}').replace('/', '-')
+    response['Content-Disposition'] = f'attachment; filename=bankbook-{safe_name}.pdf'
+    html = render_to_string("home/books/bankbookPDF.html", context)
+    base_url = request.build_absolute_uri('/')
+    HTML(string=html, base_url=base_url).write_pdf(
+        response,
+        stylesheets=[CSS(string='@page { size: A4 portrait; margin: 1cm 0.75cm 1.1cm; }')]
+    )
+    return response
 class BookTransactionListJson(BaseDatatableView):
     """
     Server-side DataTables list for BookTransaction.

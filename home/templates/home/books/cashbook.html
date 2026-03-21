@@ -213,7 +213,7 @@
 {% endblock %}
 
 {% block body %}
-    <div class="ui basic grid books-shell right aligned" style="padding-top: 8px">
+    <div class="ui basic grid books-shell left aligned" style="padding-top: 8px">
         <div class="sixteen wide column">
             <div class="ui pointing secondary menu">
                 <div class="item active">Cashbook</div>
@@ -279,8 +279,21 @@
                             <h2>{{ account.name }}</h2>
                             <div class="books-header-sub">Running balance with receipts/payments.</div>
                         </div>
-                        <div class="books-pill">
-                            {{ startDate }} → {{ endDate }}
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div class="books-pill">
+                                {{ startDate }} → {{ endDate }}
+                            </div>
+                            <a
+                                class="ui circular tiny blue icon button"
+                                id="cashbookPdfLink"
+                                href="{% url 'homeApp:generate_cashbook_pdf' %}?account={{ account.id }}&startDate={{ startDate|urlencode }}&endDate={{ endDate|urlencode }}"
+                                data-inverted=""
+                                data-tooltip="Download statement"
+                                data-position="bottom center"
+                                data-variation="mini"
+                            >
+                                <i class="file pdf outline icon"></i>
+                            </a>
                         </div>
                     </div>
 
@@ -495,6 +508,16 @@
         initCalendar('#manualDateCal');
         initCalendar('#editDateCal');
         initCalendar('#transferDateCal');
+
+        function updateCashbookPdfLink() {
+            var baseUrl = "{% url 'homeApp:generate_cashbook_pdf' %}";
+            var accountId = encodeURIComponent(($('select[name="account"]').val() || '{{ account.id|default:"" }}'));
+            var startDate = encodeURIComponent($('#startDate').val() || '');
+            var endDate = encodeURIComponent($('#endDate').val() || '');
+            $('#cashbookPdfLink').attr('href', baseUrl + '?account=' + accountId + '&startDate=' + startDate + '&endDate=' + endDate);
+        }
+        updateCashbookPdfLink();
+        $('select[name="account"], #startDate, #endDate').on('change keyup', updateCashbookPdfLink);
 
         function saveManual() {
             var accountId = $('#manualAccountId').val();

@@ -1,0 +1,228 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 1cm 0.75cm 1.1cm;
+            @bottom-right {
+                content: "Page " counter(page);
+                font-size: 10px;
+                color: #444;
+            }
+        }
+
+        body {
+            font-family: sans-serif;
+            font-size: 10px;
+            color: #111;
+        }
+
+        .statement-head {
+            text-align: center;
+            margin-bottom: 14px;
+        }
+
+        .statement-title {
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 4px;
+        }
+
+        .statement-subtitle {
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .account-name {
+            font-size: 19px;
+            font-weight: 800;
+            margin-top: 12px;
+        }
+
+        .period {
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .summary {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 10px;
+        }
+
+        .summary td {
+            border: 1px solid #cfcfcf;
+            padding: 5px 7px;
+        }
+
+        .summary .label {
+            width: 18%;
+            font-weight: 700;
+            background: #f5f5f5;
+        }
+
+        .summary .value {
+            width: 32%;
+            text-align: right;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        table.statement-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .statement-table col.col-date { width: 28mm; }
+        .statement-table col.col-particulars { width: 55mm; }
+        .statement-table col.col-party { width: 34mm; }
+        .statement-table col.col-receipt { width: 19mm; }
+        .statement-table col.col-payment { width: 19mm; }
+        .statement-table col.col-balance { width: 21mm; }
+        .statement-table col.col-source { width: 22mm; }
+
+        .statement-table thead {
+            display: table-header-group;
+        }
+
+        .statement-table th {
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            padding: 4px 5px;
+            font-size: 10px;
+            text-align: left;
+        }
+
+        .statement-table th.num {
+            text-align: right;
+        }
+
+        .statement-table td {
+            padding: 3px 4px;
+            vertical-align: top;
+            border-bottom: 1px dotted #d8d8d8;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .num {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .opening-row td,
+        .closing-row td,
+        .totals-row td {
+            font-weight: 700;
+            border-bottom: 1px solid #444;
+        }
+
+        .opening-row td,
+        .closing-row td {
+            background: #fafafa;
+        }
+
+        .footer-note {
+            margin-top: 10px;
+            font-size: 10px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="statement-head">
+        <div class="statement-title">{{ tenant.name|default:"zivaBooks" }}</div>
+        <div class="statement-subtitle">Bankbook Statement</div>
+        <div class="account-name">{% if bank %}{{ bank.name }}{% else %}{{ account.name|default:"Bankbook" }}{% endif %}</div>
+        <div class="period">
+            {% if bank and bank.accountNumber %}
+                Account No.: {{ bank.accountNumber }}<br>
+            {% endif %}
+            Ledger period: {{ start_date|date:"j-M-y" }} to {{ end_date|date:"j-M-y" }}<br>
+            Generated on {{ generated_on|date:"d-m-Y h:i A" }}
+        </div>
+    </div>
+
+    <table class="summary">
+        <tr>
+            <td class="label">Opening</td>
+            <td class="value">{{ opening|floatformat:2 }}</td>
+            <td class="label">Receipt</td>
+            <td class="value">{{ total_in|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td class="label">Payment</td>
+            <td class="value">{{ total_out|floatformat:2 }}</td>
+            <td class="label">Closing</td>
+            <td class="value">{{ closing|floatformat:2 }}</td>
+        </tr>
+    </table>
+
+    <table class="statement-table">
+        <colgroup>
+            <col class="col-date">
+            <col class="col-particulars">
+            <col class="col-party">
+            <col class="col-receipt">
+            <col class="col-payment">
+            <col class="col-balance">
+            <col class="col-source">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>Date/Time</th>
+                <th>Particulars</th>
+                <th>Party</th>
+                <th class="num">Receipt</th>
+                <th class="num">Payment</th>
+                <th class="num">Balance</th>
+                <th>Source</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="opening-row">
+                <td>{{ start_date|date:"d-M-y" }}</td>
+                <td colspan="4">Opening Balance</td>
+                <td class="num">{{ opening|floatformat:2 }}</td>
+                <td>-</td>
+            </tr>
+            {% for row in rows %}
+                <tr>
+                    <td>{{ row.date|date:"d-M-y h:i A" }}</td>
+                    <td>{{ row.particulars }}</td>
+                    <td>{{ row.party }}</td>
+                    <td class="num">{% if row.receipt %}{{ row.receipt|floatformat:2 }}{% else %}-{% endif %}</td>
+                    <td class="num">{% if row.payment %}{{ row.payment|floatformat:2 }}{% else %}-{% endif %}</td>
+                    <td class="num">{{ row.balance|floatformat:2 }}</td>
+                    <td>{{ row.source }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td>{{ start_date|date:"d-M-y" }}</td>
+                    <td colspan="6">No bankbook entries found for this date range.</td>
+                </tr>
+            {% endfor %}
+            <tr class="totals-row">
+                <td colspan="3">Period Totals</td>
+                <td class="num">{{ total_in|floatformat:2 }}</td>
+                <td class="num">{{ total_out|floatformat:2 }}</td>
+                <td class="num">{{ closing|floatformat:2 }}</td>
+                <td>-</td>
+            </tr>
+            <tr class="closing-row">
+                <td>{{ end_date|date:"d-M-y" }}</td>
+                <td colspan="4">Closing Balance</td>
+                <td class="num">{{ closing|floatformat:2 }}</td>
+                <td>-</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="footer-note">This is a system-generated bankbook statement.</div>
+</body>
+</html>

@@ -277,8 +277,21 @@
                             <h2>{% if bank %}{{ bank.name }}{% else %}Bankbook{% endif %}</h2>
                             <div class="books-header-sub">Bank ledger with running balance.</div>
                         </div>
-                        <div class="books-pill">
-                            {{ startDate }} → {{ endDate }}
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <div class="books-pill">
+                                {{ startDate }} → {{ endDate }}
+                            </div>
+                            <a
+                                class="ui circular tiny blue icon button"
+                                id="bankbookPdfLink"
+                                href="{% url 'homeApp:generate_bankbook_pdf' %}?bank={{ bank.id|default:'' }}&startDate={{ startDate|urlencode }}&endDate={{ endDate|urlencode }}"
+                                data-inverted=""
+                                data-tooltip="Download statement"
+                                data-position="bottom center"
+                                data-variation="mini"
+                            >
+                                <i class="file pdf outline icon"></i>
+                            </a>
                         </div>
                     </div>
 
@@ -492,6 +505,16 @@
         initCalendar('#manualDateCal');
         initCalendar('#editDateCal');
         initCalendar('#transferDateCal');
+
+        function updateBankbookPdfLink() {
+            var baseUrl = "{% url 'homeApp:generate_bankbook_pdf' %}";
+            var bankId = encodeURIComponent(($('select[name="bank"]').val() || '{{ bank.id|default:"" }}'));
+            var startDate = encodeURIComponent($('#startDate').val() || '');
+            var endDate = encodeURIComponent($('#endDate').val() || '');
+            $('#bankbookPdfLink').attr('href', baseUrl + '?bank=' + bankId + '&startDate=' + startDate + '&endDate=' + endDate);
+        }
+        updateBankbookPdfLink();
+        $('select[name="bank"], #startDate, #endDate').on('change keyup', updateBankbookPdfLink);
 
         function saveManual() {
             var accountId = $('#manualAccountId').val();
