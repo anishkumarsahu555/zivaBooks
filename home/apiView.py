@@ -2870,22 +2870,98 @@ def _parse_ddmmyyyy_api(value, default=None):
         return datetime.strptime(value, '%Y-%m-%d').date()
     except Exception:
         return default
+def _customer_visible_party_ledger_qs_for_request(request, qs):
+    approved_collection_ids = tenant_qs(request, Collection).filter(
+        isDeleted=False,
+        isApproved=True,
+    ).values('id')
+    approved_counter_collection_ids = tenant_qs(request, CollectionCashCounter).filter(
+        isDeleted=False,
+        isApproved=True,
+    ).values('id')
+    return qs.filter(
+        Q(source=PartyLedgerEntry.Source.SALES) |
+        (Q(source=PartyLedgerEntry.Source.COLLECTION) & Q(source_object_id__in=approved_collection_ids)) |
+        (Q(source=PartyLedgerEntry.Source.COUNTER_COLLECTION) & Q(source_object_id__in=approved_counter_collection_ids))
+    )
+def _party_ledger_export_party(request, party_id):
+    if request.user.has_perm('home.can_manage_parties') or request.user.has_perm('home.can_view_party_credentials'):
+        return tenant_qs(request, Party).filter(isDeleted=False, pk=int(party_id)).only(
+            'id', 'name', 'address', 'openingBalance', 'tenant_id'
+        ).first()
+    return tenant_qs(request, Party).filter(isDeleted=False, userID_id=request.user.pk).only(
+        'id', 'name', 'address', 'openingBalance', 'tenant_id'
+    ).first()
+def _party_ledger_voucher_type(item, is_customer_view=False):
+    if item.source == PartyLedgerEntry.Source.SALES:
+        return 'Purchase' if is_customer_view else 'Sales'
+    if item.source in (PartyLedgerEntry.Source.COLLECTION, PartyLedgerEntry.Source.COUNTER_COLLECTION):
+        return 'Payment'
+    if item.source == PartyLedgerEntry.Source.CASH_COUNTER:
+        return 'Cash Counter'
+    if item.source == PartyLedgerEntry.Source.TRANSFER:
+        return 'Transfer'
+    return 'Manual'
+def _party_ledger_voucher_number(item):
+    if item.reference:
+        return str(item.reference)
+    if item.transferId:
+        return str(item.transferId)
+    if item.source_object_id:
+        return str(item.source_object_id)
+    return '-'
+def _party_ledger_statement_rows(request, party, start_date, end_date, is_customer_view=False):
+    base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
+    if is_customer_view:
+        base_qs = _customer_visible_party_ledger_qs_for_request(request, base_qs)
+    prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+        debit_total=Sum('debit'),
+        credit_total=Sum('credit'),
+    )
+    opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
+    qs = base_qs.filter(txDateTime__date__range=[start_date, end_date]).order_by('txDateTime', 'id')
+    balance = opening
+    total_debit = 0.0
+    total_credit = 0.0
+    rows = []
+    for item in qs:
+        debit = float(item.debit or 0.0)
+        credit = float(item.credit or 0.0)
+        balance += debit - credit
+        total_debit += debit
+        total_credit += credit
+        particulars = (item.particulars or '').strip()
+        if ' - ' in particulars:
+            parts = [p for p in particulars.split(' - ') if p]
+            particulars = parts[0] if parts else particulars
+        if is_customer_view:
+            if particulars.startswith('Sale'):
+                particulars = 'Purchase' + particulars[len('Sale'):]
+            if particulars.startswith('Counter Collection'):
+                particulars = 'Payment' + particulars[len('Counter Collection'):]
+            if particulars.startswith('Collection'):
+                particulars = 'Payment' + particulars[len('Collection'):]
+            particulars = particulars.replace('(Collection)', '(Payment)')
+        rows.append({
+            'date': item.txDateTime.date(),
+            'particulars': particulars or '-',
+            'voucher_type': _party_ledger_voucher_type(item, is_customer_view=is_customer_view),
+            'voucher_no': _party_ledger_voucher_number(item),
+            'debit': debit,
+            'credit': credit,
+            'balance': balance,
+        })
+    return {
+        'opening': opening,
+        'rows': rows,
+        'total_debit': total_debit,
+        'total_credit': total_credit,
+        'closing': balance,
+    }
 class PartyLedgerListJson(BaseDatatableView):
     order_columns = ['txDateTime', 'particulars', 'txDateTime', 'txDateTime']
     def _customer_visible_party_ledger_qs(self, qs):
-        approved_collection_ids = tenant_qs(self.request, Collection).filter(
-            isDeleted=False,
-            isApproved=True,
-        ).values('id')
-        approved_counter_collection_ids = tenant_qs(self.request, CollectionCashCounter).filter(
-            isDeleted=False,
-            isApproved=True,
-        ).values('id')
-        return qs.filter(
-            Q(source=PartyLedgerEntry.Source.SALES) |
-            (Q(source=PartyLedgerEntry.Source.COLLECTION) & Q(source_object_id__in=approved_collection_ids)) |
-            (Q(source=PartyLedgerEntry.Source.COUNTER_COLLECTION) & Q(source_object_id__in=approved_counter_collection_ids))
-        )
+        return _customer_visible_party_ledger_qs_for_request(self.request, qs)
     def _resolve_party(self):
         party_id = self.request.GET.get('partyId')
         if not party_id or not str(party_id).isdigit():
@@ -3022,6 +3098,53 @@ class PartyLedgerListJson(BaseDatatableView):
                 formatINR(format(balance, '.2f')),
             ])
         return json_data
+def generate_party_ledger_pdf(request, party_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.view_party', 'home.can_manage_parties', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    party = _party_ledger_export_party(request, party_id)
+    if not party:
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    is_customer_view = TenantMembership.objects.filter(
+        user=request.user,
+        role=TenantMembership.Role.PARTY,
+    ).exists()
+    today = datetime.today().date()
+    start_date = _parse_ddmmyyyy_api(request.GET.get('startDate'), today)
+    end_date = _parse_ddmmyyyy_api(request.GET.get('endDate'), today)
+    if end_date and start_date and end_date < start_date:
+        start_date, end_date = end_date, start_date
+    statement = _party_ledger_statement_rows(
+        request,
+        party,
+        start_date,
+        end_date,
+        is_customer_view=is_customer_view,
+    )
+    tenant = get_current_tenant(request)
+    context = {
+        'tenant': tenant,
+        'party': party,
+        'start_date': start_date,
+        'end_date': end_date,
+        'opening': statement['opening'],
+        'rows': statement['rows'],
+        'total_debit': statement['total_debit'],
+        'total_credit': statement['total_credit'],
+        'closing': statement['closing'],
+        'generated_on': timezone.now(),
+    }
+    response = HttpResponse(content_type="application/pdf")
+    safe_party_name = (party.name or f'party-{party.pk}').replace('/', '-')
+    response['Content-Disposition'] = f'attachment; filename=party-ledger-{safe_party_name}.pdf'
+    html = render_to_string("home/party/partyLedgerPDF.html", context)
+    base_url = request.build_absolute_uri('/')
+    HTML(string=html, base_url=base_url).write_pdf(
+        response,
+        stylesheets=[CSS(string='@page { size: A4 portrait; margin: 1cm 0.75cm 1.1cm; }')]
+    )
+    return response
 @cache_page(60 * 5)
 def get_sales_dashboard_report_api(request):
     today = datetime.today().date()

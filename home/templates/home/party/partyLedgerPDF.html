@@ -1,0 +1,240 @@
+{% load formatting %}
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 1cm 0.75cm 1.1cm;
+            @bottom-right {
+                content: "Page " counter(page);
+                font-size: 10px;
+                color: #444;
+            }
+        }
+
+        body {
+            font-family: sans-serif;
+            font-size: 10px;
+            color: #111;
+        }
+
+        .sheet {
+            width: 100%;
+        }
+
+        .statement-head {
+            text-align: center;
+            margin-bottom: 14px;
+        }
+
+        .statement-title {
+            font-size: 24px;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 4px;
+        }
+
+        .statement-subtitle {
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .party-name {
+            font-size: 19px;
+            font-weight: 800;
+            margin-top: 12px;
+        }
+
+        .party-meta {
+            font-size: 12px;
+            line-height: 1.35;
+            margin-top: 4px;
+        }
+
+        .period {
+            margin-top: 12px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .summary {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 10px;
+        }
+
+        .summary td {
+            border: 1px solid #cfcfcf;
+            padding: 5px 7px;
+        }
+
+        .summary .label {
+            width: 18%;
+            font-weight: 700;
+            background: #f5f5f5;
+        }
+
+        .summary .value {
+            width: 32%;
+            text-align: right;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        table.statement-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .statement-table col.col-date { width: 18mm; }
+        .statement-table col.col-particulars { width: 62mm; }
+        .statement-table col.col-type { width: 24mm; }
+        .statement-table col.col-vch { width: 24mm; }
+        .statement-table col.col-debit { width: 19mm; }
+        .statement-table col.col-credit { width: 19mm; }
+        .statement-table col.col-balance { width: 21mm; }
+
+        .statement-table thead {
+            display: table-header-group;
+        }
+
+        .statement-table th {
+            border-top: 1px solid #444;
+            border-bottom: 1px solid #444;
+            padding: 4px 5px;
+            font-size: 10px;
+            text-align: left;
+        }
+
+        .statement-table th.num {
+            text-align: right;
+        }
+
+        .statement-table td {
+            padding: 3px 4px;
+            vertical-align: top;
+            border-bottom: 1px dotted #d8d8d8;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .num {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .particulars {
+            font-weight: 600;
+        }
+
+        .opening-row td,
+        .closing-row td,
+        .totals-row td {
+            font-weight: 700;
+            border-bottom: 1px solid #444;
+        }
+
+        .opening-row td,
+        .closing-row td {
+            background: #fafafa;
+        }
+
+        .footer-note {
+            margin-top: 10px;
+            font-size: 10px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="sheet">
+        <div class="statement-head">
+            <div class="statement-title">{{ tenant.name|default:"zivaBooks" }}</div>
+            <div class="statement-subtitle">Party Ledger Statement</div>
+            <div class="party-name">{{ party.name|default:"Party" }}</div>
+            <div class="party-meta">
+                {% if party.address %}{{ party.address }}<br>{% endif %}
+                Ledger period: {{ start_date|date:"j-M-y" }} to {{ end_date|date:"j-M-y" }}
+            </div>
+            <div class="period">Generated on {{ generated_on|date:"d-m-Y h:i A" }}</div>
+        </div>
+
+        <table class="summary">
+            <tr>
+                <td class="label">Opening</td>
+                <td class="value">{{ opening|floatformat:2 }}</td>
+                <td class="label">Debit</td>
+                <td class="value">{{ total_debit|floatformat:2 }}</td>
+            </tr>
+            <tr>
+                <td class="label">Credit</td>
+                <td class="value">{{ total_credit|floatformat:2 }}</td>
+                <td class="label">Closing</td>
+                <td class="value">{{ closing|floatformat:2 }}</td>
+            </tr>
+        </table>
+
+        <table class="statement-table">
+            <colgroup>
+                <col class="col-date">
+                <col class="col-particulars">
+                <col class="col-type">
+                <col class="col-vch">
+                <col class="col-debit">
+                <col class="col-credit">
+                <col class="col-balance">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Particulars</th>
+                    <th>Vch Type</th>
+                    <th>Vch No.</th>
+                    <th class="num">Debit</th>
+                    <th class="num">Credit</th>
+                    <th class="num">Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="opening-row">
+                    <td>{{ start_date|date:"d-M-y" }}</td>
+                    <td colspan="5">Opening Balance</td>
+                    <td class="num">{{ opening|floatformat:2 }}</td>
+                </tr>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.date|date:"d-M-y" }}</td>
+                        <td class="particulars">{{ row.particulars }}</td>
+                        <td>{{ row.voucher_type }}</td>
+                        <td>{{ row.voucher_no }}</td>
+                        <td class="num">{% if row.debit %}{{ row.debit|floatformat:2 }}{% else %}-{% endif %}</td>
+                        <td class="num">{% if row.credit %}{{ row.credit|floatformat:2 }}{% else %}-{% endif %}</td>
+                        <td class="num">{{ row.balance|floatformat:2 }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td>{{ start_date|date:"d-M-y" }}</td>
+                        <td colspan="6">No ledger entries found for this date range.</td>
+                    </tr>
+                {% endfor %}
+                <tr class="totals-row">
+                    <td colspan="4">Period Totals</td>
+                    <td class="num">{{ total_debit|floatformat:2 }}</td>
+                    <td class="num">{{ total_credit|floatformat:2 }}</td>
+                    <td class="num">{{ closing|floatformat:2 }}</td>
+                </tr>
+                <tr class="closing-row">
+                    <td>{{ end_date|date:"d-M-y" }}</td>
+                    <td colspan="5">Closing Balance</td>
+                    <td class="num">{{ closing|floatformat:2 }}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="footer-note">This is a system-generated ledger statement.</div>
+    </div>
+</body>
+</html>

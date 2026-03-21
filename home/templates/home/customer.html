@@ -111,10 +111,18 @@
         }
 
         .cust-logo {
+            display: block;
             width: 30px;
             height: 30px;
             border-radius: 10px;
             box-shadow: 0 10px 18px rgba(2, 6, 23, 0.25);
+        }
+
+        .customer-brand-title {
+            display: inline-flex;
+            align-items: center;
+            line-height: 1;
+            font-weight: 900;
         }
 
         .cust-pill {
@@ -939,7 +947,20 @@
                 <div class="ui inverted dimmer" id="ledgerDimmer">
                     <div class="ui text loader">Loading</div>
                 </div>
-                <div class="ui small header" style="margin-top: 0;">Statement</div>
+                <div class="ui small header" style="margin-top: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                    <span>Statement</span>
+                    <a
+                        class="ui circular tiny blue icon button"
+                        id="customerLedgerPdfLink"
+                        href="{% url 'homeApp:generate_party_ledger_pdf' party.id %}?startDate={{ startDate|urlencode }}&endDate={{ endDate|urlencode }}"
+                        data-inverted=""
+                        data-tooltip="Download statement"
+                        data-position="left center"
+                        data-variation="mini"
+                    >
+                        <i class="file pdf outline icon"></i>
+                    </a>
+                </div>
                 <table class="ui table" id="LedgerTable" style="width: 100%;">
                     <thead>
                     <tr>
@@ -1073,6 +1094,15 @@
         }
         initCalendar('#custStartCal');
         initCalendar('#custEndCal');
+
+        function updateCustomerLedgerPdfLink() {
+            var baseUrl = "{% url 'homeApp:generate_party_ledger_pdf' party.id %}";
+            var startDate = encodeURIComponent($('#startDate').val() || '');
+            var endDate = encodeURIComponent($('#endDate').val() || '');
+            $('#customerLedgerPdfLink').attr('href', baseUrl + '?startDate=' + startDate + '&endDate=' + endDate);
+        }
+        updateCustomerLedgerPdfLink();
+        $('#startDate, #endDate').on('change keyup', updateCustomerLedgerPdfLink);
 
         function formatMoneyINR(number) {
             var num = Number(number || 0);

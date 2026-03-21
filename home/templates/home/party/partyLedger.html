@@ -120,6 +120,19 @@
             <div class="ui pointing secondary menu">
                 <div class="item active">{{ party.name|capfirst }} Ledger</div>
                 <div class="right menu">
+                    <div class="item">
+                        <a
+                            class="ui circular tiny blue icon button"
+                            id="ledgerPdfLink"
+                            href="{% url 'homeApp:generate_party_ledger_pdf' party.id %}?startDate={{ startDate|urlencode }}&endDate={{ endDate|urlencode }}"
+                            data-inverted=""
+                            data-tooltip="Download statement"
+                            data-position="bottom center"
+                            data-variation="mini"
+                        >
+                            <i class="file pdf outline icon"></i>
+                        </a>
+                    </div>
                     {% if not is_party_user %}
                         <a class="item" href="{% url 'homeApp:party_list' %}"><i class="arrow left icon"></i> Party List</a>
                     {% endif %}
@@ -232,6 +245,15 @@
         }
         initCalendar('#startDateCal');
         initCalendar('#endDateCal');
+
+        function updateLedgerPdfLink() {
+            var baseUrl = "{% url 'homeApp:generate_party_ledger_pdf' party.id %}";
+            var startDate = encodeURIComponent($('#startDate').val() || '');
+            var endDate = encodeURIComponent($('#endDate').val() || '');
+            $('#ledgerPdfLink').attr('href', baseUrl + '?startDate=' + startDate + '&endDate=' + endDate);
+        }
+        updateLedgerPdfLink();
+        $('#startDate, #endDate').on('change keyup', updateLedgerPdfLink);
 
         var isMobileLedger = window.matchMedia && window.matchMedia("(max-width: 520px)").matches;
 

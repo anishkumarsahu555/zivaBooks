@@ -77,6 +77,7 @@ urlpatterns = [
     path('api/generate_party_users_api/', generate_party_users_api, name='generate_party_users_api'),
     path('api/PartyListJson/', PartyListJson.as_view(), name='PartyListJson'),
     path('api/PartyLedgerListJson/', PartyLedgerListJson.as_view(), name='PartyLedgerListJson'),
+    path('api/generate_party_ledger_pdf/<int:party_id>/', generate_party_ledger_pdf, name='generate_party_ledger_pdf'),
     path('api/get_party_detail/', get_party_detail, name='get_party_detail'),
     path('api/edit_party_api/', edit_party_api, name='edit_party_api'),
     path('api/delete_party/', delete_party, name='delete_party'),
