@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.urls import path
 
 from .apiView import *
@@ -227,3 +228,10 @@ urlpatterns = [
     path('party-ledger/<int:party_id>/', party_ledger, name='party_ledger'),
 
 ]
+
+if settings.DEBUG:
+    urlpatterns += [
+        path('dev/preview/403/', preview_403, name='preview_403'),
+        path('dev/preview/404/', preview_404, name='preview_404'),
+        path('dev/preview/500/', preview_500, name='preview_500'),
+    ]

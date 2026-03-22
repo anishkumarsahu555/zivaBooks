@@ -1032,12 +1032,66 @@ def permission_required_any(*perm_names):
             message = 'Access denied. This URL is not enabled for the current tenant permissions.'
             if request.headers.get('x-requested-with') == 'XMLHttpRequest':
                 return JsonResponse({'message': 'error', 'error': message}, status=403)
-            return render(request, 'home/accessDenied.html', {
-                'base_template': 'home/baseIndex.html',
-                'access_denied_message': message,
-            }, status=403)
+            return custom_permission_denied(request, exception=None, message=message)
         return wrapper
     return decorator
+
+
+def custom_permission_denied(request, exception=None, message=None):
+    return render(
+        request,
+        '403.html',
+        {
+            'error_title': 'Access Denied',
+            'error_code': '403',
+            'error_message': message or 'You do not have permission to access this page.',
+        },
+        status=403,
+    )
+
+
+def custom_page_not_found(request, exception):
+    return render(
+        request,
+        '404.html',
+        {
+            'error_title': 'Page Not Found',
+            'error_code': '404',
+            'error_message': 'The page you are looking for does not exist or may have moved.',
+        },
+        status=404,
+    )
+
+
+def custom_server_error(request):
+    return render(
+        request,
+        '500.html',
+        {
+            'error_title': 'Server Error',
+            'error_code': '500',
+            'error_message': 'Something went wrong on the server. Please try again shortly.',
+        },
+        status=500,
+    )
+
+
+def preview_403(request):
+    return custom_permission_denied(
+        request,
+        message='Preview of the custom 403 page for tenant or permission-denied states.',
+    )
+
+
+def preview_404(request):
+    return custom_page_not_found(
+        request,
+        exception=Exception('Preview'),
+    )
+
+
+def preview_500(request):
+    return custom_server_error(request)
 @ensure_csrf_cookie
 def loginPage(request):
     # if not request.user.is_authenticated:

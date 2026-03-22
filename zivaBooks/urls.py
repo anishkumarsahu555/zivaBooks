@@ -26,6 +26,10 @@ urlpatterns = [
 
 ]
 
+handler403 = 'home.views.custom_permission_denied'
+handler404 = 'home.views.custom_page_not_found'
+handler500 = 'home.views.custom_server_error'
+
 
 if settings.DEBUG:
     urlpatterns = urlpatterns + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

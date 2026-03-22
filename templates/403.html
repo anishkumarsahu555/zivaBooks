@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ error_title }}</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(15, 23, 42, 0.08), transparent 24%),
+                #f8fafc;
+            color: #0f172a;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+        }
+
+        .error-card {
+            width: min(100%, 560px);
+            background: rgba(255, 255, 255, 0.96);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 28px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.1);
+            padding: 32px;
+        }
+
+        .error-code {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 72px;
+            height: 40px;
+            border-radius: 999px;
+            background: rgba(239, 68, 68, 0.12);
+            color: #dc2626;
+            font-size: 0.95rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+        }
+
+        h1 {
+            margin: 18px 0 10px;
+            font-size: 2rem;
+            line-height: 1.05;
+            letter-spacing: -0.04em;
+        }
+
+        p {
+            margin: 0;
+            color: #475569;
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .actions {
+            margin-top: 24px;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border: 0;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            min-height: 46px;
+            padding: 0 18px;
+            font-weight: 700;
+        }
+
+        .btn-primary {
+            background: #0f766e;
+            color: #ecfeff;
+        }
+
+        .btn-secondary {
+            background: rgba(15, 23, 42, 0.06);
+            color: #0f172a;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <div class="error-code">{{ error_code|default:"403" }}</div>
+        <h1>{{ error_title|default:"Access Denied" }}</h1>
+        <p>{{ error_message|default:"You do not have permission to access this page." }}</p>
+        <div class="actions">
+            <a class="btn btn-primary" href="/">Go To Login</a>
+            <a class="btn btn-secondary" href="javascript:history.back()">Go Back</a>
+        </div>
+    </div>
+</body>
+</html>
