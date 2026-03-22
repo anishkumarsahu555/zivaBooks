@@ -1658,6 +1658,7 @@ def staff_home(request):
 @permission_required_any('home.add_attendance', 'home.view_attendance', 'home.change_attendance')
 def add_attendance(request):
     if request.user.is_authenticated:
+        tenant = get_current_tenant(request)
         try:
             instance = tenant_qs(request, Attendance).get(
                 datetime__icontains=datetime.today().date(),
@@ -1671,7 +1672,8 @@ def add_attendance(request):
             instance.save()
         context = {
             'obj': instance,
-            'date': datetime.today().date()
+            'date': datetime.today().date(),
+            'showAttendanceLocationFeature': bool(getattr(tenant, 'enableAttendanceLocationMaps', False)),
         }
         return render(request, 'home/addTodayAttendance.html', context)
     else:
@@ -1695,7 +1697,9 @@ def attendance_report_admin(request):
 # ----------------------------- Sales ----------------------
 @permission_required_any('home.add_sales')
 def add_sales(request):
-    return render(request, 'home/sales/addSales.html')
+    return render(request, 'home/sales/addSales.html', {
+        'banks': tenant_qs(request, Bank).filter(isDeleted=False).order_by('name'),
+    })
 @is_activated()
 @permission_required_any('home.can_manage_sales', 'home.view_sales', 'home.change_sales')
 def sales_list(request):
@@ -1727,6 +1731,7 @@ def edit_sales(request, id=None):
         'invoice_display': obj.invoiceNumber,
         'sales_edit_readonly': bool(obj.isApproved and not admin_like),
         'sales_return_url': reverse('homeApp:sales_list') if admin_like else reverse('homeApp:my_sales_list'),
+        'banks': tenant_qs(request, Bank).filter(isDeleted=False).order_by('name'),
     }
     return render(request, 'home/sales/editSales.html', context)
 # ----------------------------- Orders ----------------------

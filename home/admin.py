@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.utils.html import format_html
 
 # Register your models here.
 from .models import *
@@ -186,8 +187,93 @@ admin.site.register(WhatsappMessage, MessageAdmin)
 
 
 class AttendanceAdmin(admin.ModelAdmin):
-    list_display = ['tenant', 'staffID', 'isLogIn', 'loginDateTime', 'login_remark', 'isLogOut', 'logoutDateTime',
-                    'logout_remark', 'datetime', 'lastUpdatedOn', 'isDeleted']
+    list_display = [
+        'tenant',
+        'staffID',
+        'isLogIn',
+        'loginDateTime',
+        'isLogOut',
+        'logoutDateTime',
+        'login_photo_preview',
+        'logout_photo_preview',
+        'datetime',
+        'isDeleted',
+    ]
+    list_filter = ['tenant', 'isLogIn', 'isLogOut', 'isDeleted', 'datetime']
+    search_fields = ['staffID__name', 'staffID__phone', 'login_remark', 'logout_remark', 'login_location', 'logout_location']
+    date_hierarchy = 'datetime'
+    readonly_fields = [
+        'datetime',
+        'lastUpdatedOn',
+        'login_photo_preview_large',
+        'logout_photo_preview_large',
+    ]
+    fieldsets = (
+        (None, {
+            'fields': ('tenant', 'staffID', 'registerType', 'isDeleted'),
+        }),
+        ('Login', {
+            'fields': (
+                'isLogIn',
+                'loginDateTime',
+                'login_latitude',
+                'login_longitude',
+                'login_location',
+                'login_remark',
+                'loginPhoto',
+                'login_photo_preview_large',
+            ),
+        }),
+        ('Logout', {
+            'fields': (
+                'isLogOut',
+                'logoutDateTime',
+                'logout_latitude',
+                'logout_longitude',
+                'logout_location',
+                'logout_remark',
+                'logoutPhoto',
+                'logout_photo_preview_large',
+            ),
+        }),
+        ('Audit', {
+            'fields': ('datetime', 'lastUpdatedOn'),
+        }),
+    )
+
+    @staticmethod
+    def _preview(image_field, width=44, height=44):
+        if not image_field:
+            return '-'
+        image_url = getattr(getattr(image_field, 'thumbnail', None), 'url', None) or getattr(image_field, 'url', None)
+        if not image_url:
+            return '-'
+        return format_html(
+            '<img src="{}" style="width:{}px;height:{}px;object-fit:cover;border-radius:10px;border:1px solid rgba(15,23,42,.08);" />',
+            image_url,
+            width,
+            height,
+        )
+
+    def login_photo_preview(self, obj):
+        return self._preview(obj.loginPhoto)
+
+    login_photo_preview.short_description = 'Login Photo'
+
+    def logout_photo_preview(self, obj):
+        return self._preview(obj.logoutPhoto)
+
+    logout_photo_preview.short_description = 'Logout Photo'
+
+    def login_photo_preview_large(self, obj):
+        return self._preview(obj.loginPhoto, width=160, height=160)
+
+    login_photo_preview_large.short_description = 'Login Photo Preview'
+
+    def logout_photo_preview_large(self, obj):
+        return self._preview(obj.logoutPhoto, width=160, height=160)
+
+    logout_photo_preview_large.short_description = 'Logout Photo Preview'
 
 
 admin.site.register(Attendance, AttendanceAdmin)
@@ -216,11 +302,11 @@ class CashCounterAdmin(admin.ModelAdmin):
 
 class TenantAdmin(admin.ModelAdmin):
     form = TenantAdminForm
-    list_display = ['name', 'slug', 'isActive', 'datetime', 'lastUpdatedOn']
+    list_display = ['name', 'slug', 'isActive', 'enableAttendanceLocationMaps', 'datetime', 'lastUpdatedOn']
 
     fieldsets = (
         (None, {
-            'fields': ('name', 'slug', 'isActive'),
+            'fields': ('name', 'slug', 'isActive', 'enableAttendanceLocationMaps'),
         }),
         ('Tenant Admin Access', {
             'fields': ('tenant_admin_user', 'preset_bundles', 'admin_permissions'),
@@ -293,6 +379,46 @@ class InvoiceSeriesAdmin(admin.ModelAdmin):
     search_fields = ['tenant__name', 'seriesCode', 'name']
 
 
+class JournalEntryAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'reference', 'source', 'entryDateTime', 'createdBy', 'line_count', 'isDeleted']
+    list_filter = ['source', 'isDeleted', 'tenant']
+    search_fields = ['reference', 'narration', 'createdBy__name']
+    readonly_fields = ['datetime', 'lastUpdatedOn']
+
+    @staticmethod
+    def line_count(obj):
+        return obj.lines.filter(isDeleted=False).count()
+
+    line_count.short_description = 'Lines'
+
+
+class JournalLineAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'journal_reference', 'source', 'entryDateTime', 'lineNo', 'accountType', 'bookAccount', 'party', 'debit', 'credit', 'component', 'isDeleted']
+    list_filter = ['accountType', 'isDeleted', 'tenant']
+    search_fields = ['note', 'journalEntry__reference', 'party__name', 'bookAccount__name', 'journalEntry__narration']
+    readonly_fields = ['datetime', 'lastUpdatedOn']
+
+    @staticmethod
+    def journal_reference(obj):
+        return obj.journalEntry.reference or f'Journal#{obj.journalEntry_id}'
+
+    journal_reference.short_description = 'Journal Ref'
+
+    @staticmethod
+    def source(obj):
+        return obj.journalEntry.get_source_display()
+
+    source.short_description = 'Source'
+
+    @staticmethod
+    def entryDateTime(obj):
+        return obj.journalEntry.entryDateTime
+
+    entryDateTime.short_description = 'Entry Date'
+
+
 admin.site.register(BookAccount, BookAccountAdmin)
 admin.site.register(BookTransaction, BookTransactionAdmin)
 admin.site.register(InvoiceSeries, InvoiceSeriesAdmin)
+admin.site.register(JournalEntry, JournalEntryAdmin)
+admin.site.register(JournalLine, JournalLineAdmin)

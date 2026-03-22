@@ -6,6 +6,7 @@ from typing import Optional
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 
+from .journal import sync_journal_entries_for_object
 from .models import (
     Bank,
     BookAccount,
@@ -14,6 +15,7 @@ from .models import (
     Collection,
     CollectionCashCounter,
     Party,
+    Sales,
     StaffUser,
     Tenant,
 )
@@ -383,15 +385,119 @@ def sync_cash_counter_entry(entry: CashCounter) -> None:
     # Other modes intentionally do not post to books.
 
 
+@transaction.atomic
+def sync_sales_entry(entry: Sales) -> None:
+    if entry.pk is None:
+        return
+    _delete_book_transactions_for_source(entry)
+    if entry.isDeleted or not getattr(entry, 'isApproved', False):
+        return
+
+    tenant = entry.tenant
+    if tenant is None:
+        return
+
+    ensure_books_for_tenant(tenant)
+
+    tx_datetime = entry.approvedOn or entry.datetime
+    created_by = entry.createdBy
+    party = entry.partyID
+    mode = (entry.modeOfPayment or Sales.Mode.CASH).strip()
+    invoice_ref = entry.invoiceNumber or 'No Invoice'
+    payment_ref = entry.paymentID or 'No Payment ID'
+    narration = f'Sales - {invoice_ref} ({mode}) - {payment_ref}'
+    if entry.remark:
+        narration = f'{narration} - {entry.remark}'
+
+    cash_account = ensure_default_cash_account(tenant)
+
+    if mode == Sales.Mode.CREDIT:
+        return
+
+    if mode == Sales.Mode.CASH:
+        _upsert_book_transaction(
+            tenant=tenant,
+            account=cash_account,
+            source_instance=entry,
+            source='sales',
+            component=None,
+            direction=BookTransaction.Direction.IN,
+            amount=entry.amount,
+            tx_datetime=tx_datetime,
+            narration=narration,
+            party=party,
+            created_by=created_by,
+        )
+        return
+
+    if mode == Sales.Mode.ONLINE:
+        if not entry.bankID_id:
+            return
+        bank_account = ensure_bank_account(tenant, entry.bankID)
+        _upsert_book_transaction(
+            tenant=tenant,
+            account=bank_account,
+            source_instance=entry,
+            source='sales',
+            component=None,
+            direction=BookTransaction.Direction.IN,
+            amount=entry.amount,
+            tx_datetime=tx_datetime,
+            narration=narration,
+            party=party,
+            created_by=created_by,
+        )
+        return
+
+    if mode == Sales.Mode.MIX:
+        if not entry.bankID_id:
+            return
+        bank_account = ensure_bank_account(tenant, entry.bankID)
+        _upsert_book_transaction(
+            tenant=tenant,
+            account=cash_account,
+            source_instance=entry,
+            source='sales',
+            component='cash',
+            direction=BookTransaction.Direction.IN,
+            amount=entry.mixCashAmount,
+            tx_datetime=tx_datetime,
+            narration=narration,
+            party=party,
+            created_by=created_by,
+        )
+        _upsert_book_transaction(
+            tenant=tenant,
+            account=bank_account,
+            source_instance=entry,
+            source='sales',
+            component='bank',
+            direction=BookTransaction.Direction.IN,
+            amount=entry.mixOnlineAmount,
+            tx_datetime=tx_datetime,
+            narration=narration,
+            party=party,
+            created_by=created_by,
+        )
+        return
+
+
 def sync_book_transactions(instance) -> None:
     if isinstance(instance, Collection):
         sync_collection_entry(instance)
+        sync_journal_entries_for_object(instance)
         return
     if isinstance(instance, CollectionCashCounter):
         sync_counter_collection_entry(instance)
+        sync_journal_entries_for_object(instance)
         return
     if isinstance(instance, CashCounter):
         sync_cash_counter_entry(instance)
+        sync_journal_entries_for_object(instance)
+        return
+    if isinstance(instance, Sales):
+        sync_sales_entry(instance)
+        sync_journal_entries_for_object(instance)
         return
 
 
@@ -405,3 +511,5 @@ def backfill_books_for_tenant(tenant: Tenant) -> None:
         sync_counter_collection_entry(entry)
     for entry in CashCounter.objects.filter(tenant=tenant):
         sync_cash_counter_entry(entry)
+    for entry in Sales.objects.filter(tenant=tenant):
+        sync_sales_entry(entry)

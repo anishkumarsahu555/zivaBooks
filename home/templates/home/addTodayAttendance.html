@@ -5,10 +5,390 @@
     <title>Attendance</title>
 {% endblock %}
 {% block css %}
+    {% if showAttendanceLocationFeature %}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+    {% endif %}
+    <style>
+        .attendance-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
 
+        .attendance-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1rem;
+        }
+
+        .attendance-card {
+            border: 1px solid rgba(15, 23, 42, 0.09);
+            border-radius: 18px;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at top right, rgba(45, 212, 191, 0.09), transparent 35%),
+                linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(248, 250, 252, 1));
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+        }
+
+        .attendance-card-body {
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .attendance-card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .attendance-card-title {
+            margin: 0;
+            font-size: 1.55rem;
+            line-height: 1.1;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.03em;
+        }
+
+        .attendance-card-copy {
+            margin-top: 0.2rem;
+            color: rgba(15, 23, 42, 0.66);
+            font-size: 0.93rem;
+            line-height: 1.4;
+        }
+
+        .attendance-status-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 999px;
+            margin-top: 0.3rem;
+            flex: 0 0 auto;
+            background: #f59e0b;
+            box-shadow: 0 0 0 6px rgba(245, 158, 11, 0.14);
+        }
+
+        .attendance-status-dot.is-complete {
+            background: #10b981;
+            box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.14);
+        }
+
+        .attendance-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.6rem;
+        }
+
+        .attendance-meta-card {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 14px;
+            padding: 0.7rem 0.8rem;
+            background: rgba(255, 255, 255, 0.88);
+            min-width: 0;
+        }
+
+        .attendance-meta-label {
+            font-size: 0.68rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: rgba(15, 23, 42, 0.46);
+            font-weight: 700;
+            margin-bottom: 0.28rem;
+        }
+
+        .attendance-meta-value {
+            font-size: 0.92rem;
+            line-height: 1.35;
+            color: #0f172a;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .attendance-meta-value.is-muted {
+            color: rgba(15, 23, 42, 0.55);
+        }
+
+        .attendance-map-block {
+            margin-top: 0;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 16px;
+            padding: 0.7rem;
+            background: rgba(255, 255, 255, 0.84);
+        }
+
+        .attendance-map-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 0.45rem;
+        }
+
+        .attendance-map-title {
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+        }
+
+        .attendance-location-details {
+            margin-top: 0.55rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+
+        .attendance-location-address {
+            font-size: 0.9rem;
+            line-height: 1.45;
+            color: #0f172a;
+            font-weight: 600;
+            word-break: break-word;
+        }
+
+        .attendance-location-coords {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            width: fit-content;
+            max-width: 100%;
+            border-radius: 999px;
+            padding: 0.38rem 0.68rem;
+            background: rgba(15, 118, 110, 0.08);
+            color: #0f766e;
+            font-size: 0.78rem;
+            font-weight: 700;
+            word-break: break-all;
+        }
+
+        .attendance-photo-label {
+            margin-top: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.55rem;
+            font-weight: 700;
+            color: #0f766e;
+        }
+
+        .attendance-photo-thumb {
+            margin-top: 0;
+            width: 86px;
+            height: 86px;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+            background: #f8fafc;
+        }
+
+        .attendance-photo-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .attendance-capture-box {
+            margin-top: 1rem;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 18px;
+            padding: 1rem;
+            background: linear-gradient(180deg, rgba(247, 250, 252, 0.9), rgba(255, 255, 255, 1));
+        }
+
+        .attendance-capture-grid {
+            display: grid;
+            grid-template-columns: 220px 1fr;
+            gap: 1rem;
+            align-items: start;
+        }
+
+        .attendance-camera-stage,
+        .attendance-camera-preview {
+            width: 200px;
+            height: 200px;
+            border-radius: 20px;
+            overflow: hidden;
+            background: #e2e8f0;
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+        }
+
+        .attendance-camera-stage video,
+        .attendance-camera-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .attendance-camera-preview {
+            display: none;
+        }
+
+        .attendance-camera-preview.is-visible {
+            display: block;
+        }
+
+        .attendance-camera-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            min-width: 0;
+        }
+
+        .attendance-camera-hint {
+            color: rgba(15, 23, 42, 0.62);
+            font-size: 0.95rem;
+            line-height: 1.45;
+        }
+
+        .attendance-camera-status {
+            min-height: 1.25rem;
+            color: #0f766e;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .attendance-camera-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+        }
+
+        .attendance-photo-panel {
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 16px;
+            padding: 0.7rem 0.8rem;
+            background: rgba(255, 255, 255, 0.84);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .attendance-map-frame {
+            width: 100%;
+            height: 150px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-radius: 14px;
+            overflow: hidden;
+            background: #e2e8f0;
+        }
+
+        .attendance-map-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .attendance-map-link {
+            margin-top: 0.35rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-weight: 600;
+            font-size: 0.88rem;
+        }
+
+        .attendance-action {
+            margin-top: auto !important;
+            border-radius: 0 !important;
+            min-height: 50px !important;
+            font-size: 1.1rem !important;
+            font-weight: 800 !important;
+            letter-spacing: -0.02em;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+        }
+
+        .attendance-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            padding-left: 0.25rem;
+        }
+
+        .attendance-location-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: linear-gradient(135deg, #0f766e, #14b8a6);
+            color: #ecfeff;
+            border-radius: 999px;
+            padding: 0.6rem 0.85rem;
+            font-size: 0.88rem;
+            font-weight: 700;
+            box-shadow: 0 10px 22px rgba(20, 184, 166, 0.2);
+        }
+
+        .attendance-location-pill .detail {
+            color: inherit;
+        }
+
+        @media (max-width: 767px) {
+            .attendance-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .attendance-card-body {
+                padding: 0.9rem;
+            }
+
+            .attendance-card-title {
+                font-size: 1.35rem;
+            }
+
+            .attendance-meta-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .attendance-capture-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .attendance-camera-stage,
+            .attendance-camera-preview {
+                margin: 0 auto;
+            }
+
+            .attendance-camera-meta {
+                text-align: center;
+            }
+
+            .attendance-camera-actions {
+                justify-content: center;
+            }
+
+            .attendance-photo-panel {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .attendance-toolbar {
+                align-items: stretch;
+            }
+
+            .attendance-location-pill {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
 {% endblock %}
 {% block body %}
-    <div class="ui left aligned basic  grid">
+    <div class="ui left aligned basic grid attendance-shell">
         <div class="sixteen wide column">
             <div class="ui  pointing secondary menu">
                 <div style="cursor: pointer;" class="item active" data-tab="user"
@@ -17,89 +397,250 @@
             </div>
 
             <div class="ui tab " data-tab="user">
-                <div style=" position: absolute;right: 1.5rem;top: 18px;">
-
-                </div>
-                <div class="row" style="padding-left: 5px; padding-right: 5px">
-                    <div class="ui two cloumn cards grid">
-                        <div class="ui fluid card">
-                            <div class="content">
-                                <div class="header">Log-In</div>
-                                <div class="description">
-                                    This will record the Login time .
-                                </div>
-                                {% if obj.isLogIn == True %}
-                                <div class="sub-header">
-                                    <div class="ui purple label">
-                                        <i class="clock outline icon"></i>
-                                        <a class="detail">{{ obj.loginDateTime }}</a>
+                <div class="attendance-grid">
+                    <div class="attendance-card">
+                        <div class="attendance-card-body">
+                            <div class="attendance-card-head">
+                                <div>
+                                    <h2 class="attendance-card-title">Log-In</h2>
+                                    <div class="attendance-card-copy">
+                                        {% if showAttendanceLocationFeature %}
+                                        Capture the start of the day with timestamp, location, map, and photo in one place.
+                                        {% else %}
+                                        Capture the start of the day with timestamp and photo in one place.
+                                        {% endif %}
                                     </div>
                                 </div>
-                                 <div class="sub-header" style="margin-top: 5px">
-                                    <div class="ui primary label">
-                                        <i class="map marker icon"></i>
-                                        <a class="detail">{{ obj.login_location }}</a>
-                                    </div>
+                                <span class="attendance-status-dot {% if obj.isLogIn == True %}is-complete{% endif %}"></span>
+                            </div>
+                            {% if obj.isLogIn == True %}
+                            <div class="attendance-meta-grid">
+                                <div class="attendance-meta-card">
+                                    <div class="attendance-meta-label">Time</div>
+                                    <div class="attendance-meta-value">{{ obj.loginDateTime|date:"F j, Y, g:i a" }}</div>
                                 </div>
-                                <div class="sub-header" style="margin-top: 5px">
-                                    <div class="ui violet label">
-                                        <i class="receipt icon"></i>
-                                        <a class="detail">{{ obj.login_remark }}</a>
+                                {% if showAttendanceLocationFeature %}
+                                    <div class="attendance-meta-card">
+                                        <div class="attendance-meta-label">Location</div>
+                                        <div
+                                            id="loginLocationSummary"
+                                            class="attendance-meta-value {% if not obj.login_location %}is-muted{% endif %}"
+                                            data-lat="{{ obj.login_latitude|default:'' }}"
+                                            data-lng="{{ obj.login_longitude|default:'' }}"
+                                            data-needs-reverse="{% if not obj.login_location and obj.login_latitude and obj.login_longitude and obj.login_latitude != '0.0' and obj.login_longitude != '0.0' %}true{% else %}false{% endif %}">
+                                            {% if obj.login_location %}
+                                                {{ obj.login_location }}
+                                            {% elif obj.login_latitude and obj.login_longitude and obj.login_latitude != '0.0' and obj.login_longitude != '0.0' %}
+                                                {{ obj.login_latitude }}, {{ obj.login_longitude }}
+                                            {% else %}
+                                                Location unavailable
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                </div>
                                 {% endif %}
+                                <div class="attendance-meta-card" style="grid-column: 1 / -1;">
+                                    <div class="attendance-meta-label">Remark</div>
+                                    <div class="attendance-meta-value {% if not obj.login_remark %}is-muted{% endif %}">
+                                        {{ obj.login_remark|default:"No remark added" }}
+                                    </div>
+                                </div>
                             </div>
-                            <div class="ui green button {% if obj.isLogIn == True %} disabled {% endif %}"
-                                 onclick="showUserModal('Login')">
-                                <i class="add icon"></i>
-                                Login
+                            {% if showAttendanceLocationFeature and obj.login_latitude and obj.login_longitude and obj.login_latitude != '0.0' and obj.login_longitude != '0.0' %}
+                            <div class="attendance-map-block">
+                                <div class="attendance-map-head">
+                                    <div class="attendance-map-title">Login Location</div>
+                                </div>
+                                <div class="attendance-map-frame">
+                                    <div
+                                        id="loginAttendanceMap"
+                                        class="attendance-map-canvas"
+                                        data-lat="{{ obj.login_latitude }}"
+                                        data-lng="{{ obj.login_longitude }}">
+                                    </div>
+                                </div>
+                                <div class="attendance-location-details">
+                                    <div
+                                        id="loginLocationAddress"
+                                        class="attendance-location-address"
+                                        data-lat="{{ obj.login_latitude }}"
+                                        data-lng="{{ obj.login_longitude }}"
+                                        data-needs-reverse="{% if not obj.login_location %}true{% else %}false{% endif %}">
+                                        {% if obj.login_location %}
+                                            {{ obj.login_location }}
+                                        {% else %}
+                                            Reverse geolocation unavailable. Showing captured coordinates.
+                                        {% endif %}
+                                    </div>
+                                    <div class="attendance-location-coords">
+                                        <i class="crosshairs icon"></i>
+                                        {{ obj.login_latitude }}, {{ obj.login_longitude }}
+                                    </div>
+                                </div>
+                                <a class="attendance-map-link" target="_blank" rel="noopener noreferrer"
+                                   href="https://www.openstreetmap.org/?mlat={{ obj.login_latitude }}&mlon={{ obj.login_longitude }}#map=18/{{ obj.login_latitude }}/{{ obj.login_longitude }}">
+                                    <i class="external alternate icon"></i>
+                                    Open Login Location
+                                </a>
                             </div>
+                            {% endif %}
+                            {% if obj.loginPhoto %}
+                            <div class="attendance-photo-panel">
+                                <div>
+                                    <div class="attendance-photo-label">
+                                        <i class="camera icon"></i>
+                                        Login Photo
+                                    </div>
+                                    <div class="attendance-card-copy" style="margin-top: 0.45rem;">
+                                        Attendance image captured at login.
+                                    </div>
+                                </div>
+                                <div class="attendance-photo-thumb">
+                                    <img src="{{ obj.loginPhoto.medium.url }}" alt="Login photo">
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% else %}
+                            <div class="attendance-meta-card">
+                                <div class="attendance-meta-label">Status</div>
+                                <div class="attendance-meta-value is-muted">Login is still pending for today.</div>
+                            </div>
+                            {% endif %}
                         </div>
-                        <div class="card">
-                            <div class="content">
-                                <div class="header">Log-Out</div>
-                                <div class="description">
-                                    This will record the Logout time .
-                                </div>
-                                 {% if obj.isLogOut == True %}
-                                <div class="sub-header">
-                                    <div class="ui purple label">
-                                        <i class="clock outline icon"></i>
-                                        <a class="detail">{{ obj.logoutDateTime }}</a>
+                        <div class="ui green button attendance-action {% if obj.isLogIn == True %} disabled {% endif %}"
+                             onclick="showUserModal('Login')">
+                            <i class="add icon"></i>
+                            Login
+                        </div>
+                    </div>
+                    <div class="attendance-card">
+                        <div class="attendance-card-body">
+                            <div class="attendance-card-head">
+                                <div>
+                                    <h2 class="attendance-card-title">Log-Out</h2>
+                                    <div class="attendance-card-copy">
+                                        {% if showAttendanceLocationFeature %}
+                                        Record the end of the day with the same proof trail and map context.
+                                        {% else %}
+                                        Record the end of the day with the same proof trail.
+                                        {% endif %}
                                     </div>
                                 </div>
-                                 <div class="sub-header" style="margin-top: 5px">
-                                    <div class="ui primary label">
-                                        <i class="map marker icon"></i>
-                                        <a class="detail">{{ obj.logout_location }}</a>
-                                    </div>
+                                <span class="attendance-status-dot {% if obj.isLogOut == True %}is-complete{% endif %}"></span>
+                            </div>
+                            {% if obj.isLogOut == True %}
+                            <div class="attendance-meta-grid">
+                                <div class="attendance-meta-card">
+                                    <div class="attendance-meta-label">Time</div>
+                                    <div class="attendance-meta-value">{{ obj.logoutDateTime|date:"F j, Y, g:i a" }}</div>
                                 </div>
-                                <div class="sub-header" style="margin-top: 5px">
-                                    <div class="ui violet label">
-                                        <i class="receipt icon"></i>
-                                        <a class="detail">{{ obj.logout_remark }}</a>
+                                {% if showAttendanceLocationFeature %}
+                                    <div class="attendance-meta-card">
+                                        <div class="attendance-meta-label">Location</div>
+                                        <div
+                                            id="logoutLocationSummary"
+                                            class="attendance-meta-value {% if not obj.logout_location %}is-muted{% endif %}"
+                                            data-lat="{{ obj.logout_latitude|default:'' }}"
+                                            data-lng="{{ obj.logout_longitude|default:'' }}"
+                                            data-needs-reverse="{% if not obj.logout_location and obj.logout_latitude and obj.logout_longitude and obj.logout_latitude != '0.0' and obj.logout_longitude != '0.0' %}true{% else %}false{% endif %}">
+                                            {% if obj.logout_location %}
+                                                {{ obj.logout_location }}
+                                            {% elif obj.logout_latitude and obj.logout_longitude and obj.logout_latitude != '0.0' and obj.logout_longitude != '0.0' %}
+                                                {{ obj.logout_latitude }}, {{ obj.logout_longitude }}
+                                            {% else %}
+                                                Location unavailable
+                                            {% endif %}
+                                        </div>
                                     </div>
-                                </div>
                                 {% endif %}
+                                <div class="attendance-meta-card" style="grid-column: 1 / -1;">
+                                    <div class="attendance-meta-label">Remark</div>
+                                    <div class="attendance-meta-value {% if not obj.logout_remark %}is-muted{% endif %}">
+                                        {{ obj.logout_remark|default:"No remark added" }}
+                                    </div>
+                                </div>
                             </div>
-                            <div class="ui teal button {% if obj.isLogOut == True %} disabled {% endif %}" onclick="showUserModal('Logout')">
-                                <i class="add icon"></i>
-                                Logout
+                            {% if showAttendanceLocationFeature and obj.logout_latitude and obj.logout_longitude and obj.logout_latitude != '0.0' and obj.logout_longitude != '0.0' %}
+                            <div class="attendance-map-block">
+                                <div class="attendance-map-head">
+                                    <div class="attendance-map-title">Logout Location</div>
+                                </div>
+                                <div class="attendance-map-frame">
+                                    <div
+                                        id="logoutAttendanceMap"
+                                        class="attendance-map-canvas"
+                                        data-lat="{{ obj.logout_latitude }}"
+                                        data-lng="{{ obj.logout_longitude }}">
+                                    </div>
+                                </div>
+                                <div class="attendance-location-details">
+                                    <div
+                                        id="logoutLocationAddress"
+                                        class="attendance-location-address"
+                                        data-lat="{{ obj.logout_latitude }}"
+                                        data-lng="{{ obj.logout_longitude }}"
+                                        data-needs-reverse="{% if not obj.logout_location %}true{% else %}false{% endif %}">
+                                        {% if obj.logout_location %}
+                                            {{ obj.logout_location }}
+                                        {% else %}
+                                            Reverse geolocation unavailable. Showing captured coordinates.
+                                        {% endif %}
+                                    </div>
+                                    <div class="attendance-location-coords">
+                                        <i class="crosshairs icon"></i>
+                                        {{ obj.logout_latitude }}, {{ obj.logout_longitude }}
+                                    </div>
+                                </div>
+                                <a class="attendance-map-link" target="_blank" rel="noopener noreferrer"
+                                   href="https://www.openstreetmap.org/?mlat={{ obj.logout_latitude }}&mlon={{ obj.logout_longitude }}#map=18/{{ obj.logout_latitude }}/{{ obj.logout_longitude }}">
+                                    <i class="external alternate icon"></i>
+                                    Open Logout Location
+                                </a>
                             </div>
+                            {% endif %}
+                            {% if obj.logoutPhoto %}
+                            <div class="attendance-photo-panel">
+                                <div>
+                                    <div class="attendance-photo-label">
+                                        <i class="camera icon"></i>
+                                        Logout Photo
+                                    </div>
+                                    <div class="attendance-card-copy" style="margin-top: 0.45rem;">
+                                        Attendance image captured at logout.
+                                    </div>
+                                </div>
+                                <div class="attendance-photo-thumb">
+                                    <img src="{{ obj.logoutPhoto.medium.url }}" alt="Logout photo">
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% else %}
+                            <div class="attendance-meta-card">
+                                <div class="attendance-meta-label">Status</div>
+                                <div class="attendance-meta-value is-muted">Logout is still pending for today.</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="ui teal button attendance-action {% if obj.isLogOut == True %} disabled {% endif %}" onclick="showUserModal('Logout')">
+                            <i class="add icon"></i>
+                            Logout
                         </div>
                     </div>
                 </div>
-
             </div>
 
         </div>
-        <div style="margin-left: 20px;" class="ui label teal" data-variation="mini" data-inverted=""
-             data-tooltip="Location"
-             data-position="bottom center">
-            <i class="map marked alternate icon"></i>
-
-            <a class="detail"><span id="htmlLat">0.0</span>,<span id="htmlLong">0.0</span> </a>
-        </div>
+        {% if showAttendanceLocationFeature %}
+            <div class="attendance-toolbar">
+                <div class="attendance-location-pill" data-tooltip="Location" data-position="bottom center">
+                    <i class="map marked alternate icon"></i>
+                    <span class="detail"><span id="htmlLat">Pending</span>, <span id="htmlLong">Pending</span></span>
+                </div>
+                <button type="button" class="ui basic teal button" onclick="getLocation(true)">
+                    <i class="crosshairs icon"></i>
+                    Refresh Location
+                </button>
+            </div>
+        {% endif %}
     </div>
 
 
@@ -119,9 +660,40 @@
                         <input type="text" name="remark" placeholder="Remark" id="remark">
                         <input type="hidden" id="stat">
                     </div>
-
                 </div>
-
+                <div class="attendance-capture-box">
+                    <div class="attendance-capture-grid">
+                        <div class="attendance-camera-stage" id="attendanceCameraStage">
+                            <video id="attendanceCamera" autoplay playsinline muted></video>
+                        </div>
+                        <div class="attendance-camera-meta">
+                            <div>
+                                <div class="ui teal basic label">
+                                    <i class="camera icon"></i>
+                                    200 x 200 photo
+                                </div>
+                            </div>
+                            <div class="attendance-camera-hint">
+                                If camera access is available, a square attendance photo will be captured before submit. If camera access is blocked, attendance still saves normally.
+                            </div>
+                            <div class="attendance-camera-actions">
+                                <button class="ui basic teal button" type="button" onclick="captureAttendancePhoto()">
+                                    <i class="camera icon"></i>
+                                    Capture Photo
+                                </button>
+                                <button class="ui basic button" type="button" onclick="restartAttendanceCamera()">
+                                    <i class="redo icon"></i>
+                                    Retry Camera
+                                </button>
+                            </div>
+                            <div class="attendance-camera-status" id="attendanceCameraStatus"></div>
+                        </div>
+                    </div>
+                    <div class="attendance-camera-preview" id="attendancePreviewWrap">
+                        <img id="attendancePreview" alt="Attendance preview">
+                    </div>
+                    <canvas id="attendanceCanvas" width="200" height="200" style="display:none;"></canvas>
+                </div>
 
             </form>
 
@@ -138,8 +710,8 @@
             </div>
         </div>
     </div>
-    <input type="hidden" id="lat" value="24.809611">
-    <input type="hidden" id="lng" value="93.935577">
+    <input type="hidden" id="lat" value="">
+    <input type="hidden" id="lng" value="">
     <input type="hidden" id="loc" value="N/A">
 
     <p id="demo"></p>
@@ -147,16 +719,190 @@
 
 
 {% block js %}
+    {% if showAttendanceLocationFeature %}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    {% endif %}
     <script>
+        var attendanceCameraStream = null;
+        var attendancePhotoBlob = null;
 
-        function showUserModal(status) {
-            $('#myModalUser').modal('show');
-            $('.statusL').html("" + status);
-            $("#stat").val(status);
+        function initAttendanceMap(elementId) {
+            {% if not showAttendanceLocationFeature %}
+            return;
+            {% endif %}
+            const node = document.getElementById(elementId);
+            if (!node || typeof L === 'undefined') {
+                return;
+            }
+
+            const lat = parseFloat(node.dataset.lat || '');
+            const lng = parseFloat(node.dataset.lng || '');
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                return;
+            }
+
+            const map = L.map(node, {
+                zoomControl: true,
+                scrollWheelZoom: false,
+                dragging: true,
+                attributionControl: true
+            }).setView([lat, lng], 16);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            L.marker([lat, lng]).addTo(map);
+
+            setTimeout(function () {
+                map.invalidateSize();
+            }, 180);
         }
 
-        function takeAttendance() {
-            showLoading();
+        async function resolveAttendanceAddress(summaryId, addressId) {
+            {% if not showAttendanceLocationFeature %}
+            return;
+            {% endif %}
+            const summaryNode = document.getElementById(summaryId);
+            const addressNode = document.getElementById(addressId);
+            const sourceNode = addressNode || summaryNode;
+            if (!sourceNode || sourceNode.dataset.needsReverse !== 'true') {
+                return;
+            }
+
+            const lat = parseFloat(sourceNode.dataset.lat || '');
+            const lng = parseFloat(sourceNode.dataset.lng || '');
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' +
+                    encodeURIComponent(lat) +
+                    '&lon=' +
+                    encodeURIComponent(lng) +
+                    '&zoom=18&addressdetails=1',
+                    {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    }
+                );
+                if (!response.ok) {
+                    throw new Error('Reverse geocode failed');
+                }
+                const payload = await response.json();
+                const label = payload.display_name || (lat + ', ' + lng);
+                if (summaryNode) {
+                    summaryNode.textContent = label;
+                    summaryNode.classList.remove('is-muted');
+                    summaryNode.dataset.needsReverse = 'false';
+                }
+                if (addressNode) {
+                    addressNode.textContent = label;
+                    addressNode.dataset.needsReverse = 'false';
+                }
+            } catch (error) {
+                if (summaryNode) {
+                    summaryNode.textContent = lat + ', ' + lng;
+                }
+                if (addressNode) {
+                    addressNode.textContent = 'Showing captured coordinates because reverse geolocation is unavailable right now.';
+                }
+            }
+        }
+
+        function showUserModal(status) {
+            getLocation(true).then(function (locationReady) {
+                if (!locationReady) {
+                    $('body')
+                        .toast({
+                            class: 'error',
+                            message: 'Live location is required before taking attendance.'
+                        });
+                    return;
+                }
+                $('#myModalUser').modal('show');
+                $('.statusL').html("" + status);
+                $("#stat").val(status);
+                resetAttendanceCameraUi();
+                startAttendanceCamera();
+            });
+        }
+
+        function stopAttendanceCamera() {
+            if (attendanceCameraStream) {
+                attendanceCameraStream.getTracks().forEach(function (track) {
+                    track.stop();
+                });
+                attendanceCameraStream = null;
+            }
+            $('#attendanceCamera').get(0).srcObject = null;
+        }
+
+        function resetAttendanceCameraUi() {
+            attendancePhotoBlob = null;
+            $('#attendancePreview').attr('src', '');
+            $('#attendancePreviewWrap').removeClass('is-visible');
+            $('#attendanceCameraStatus').text('');
+        }
+
+        async function startAttendanceCamera() {
+            stopAttendanceCamera();
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                $('#attendanceCameraStatus').text('Camera capture is not supported on this device.');
+                return;
+            }
+            try {
+                attendanceCameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 480 },
+                        height: { ideal: 480 }
+                    },
+                    audio: false
+                });
+                const video = $('#attendanceCamera').get(0);
+                video.srcObject = attendanceCameraStream;
+                $('#attendanceCameraStatus').text('Camera ready. Capture a square photo before submit.');
+            } catch (error) {
+                $('#attendanceCameraStatus').text('Camera access was not granted. Attendance can still be submitted.');
+            }
+        }
+
+        function restartAttendanceCamera() {
+            resetAttendanceCameraUi();
+            startAttendanceCamera();
+        }
+
+        function captureAttendancePhoto() {
+            const video = $('#attendanceCamera').get(0);
+            if (!video || !video.videoWidth || !video.videoHeight) {
+                $('#attendanceCameraStatus').text('Camera is not ready yet.');
+                return false;
+            }
+
+            const canvas = $('#attendanceCanvas').get(0);
+            const context = canvas.getContext('2d');
+            const sourceSize = Math.min(video.videoWidth, video.videoHeight);
+            const offsetX = (video.videoWidth - sourceSize) / 2;
+            const offsetY = (video.videoHeight - sourceSize) / 2;
+
+            context.clearRect(0, 0, 200, 200);
+            context.drawImage(video, offsetX, offsetY, sourceSize, sourceSize, 0, 0, 200, 200);
+
+            canvas.toBlob(function (blob) {
+                attendancePhotoBlob = blob;
+                $('#attendancePreview').attr('src', canvas.toDataURL('image/jpeg', 0.92));
+                $('#attendancePreviewWrap').addClass('is-visible');
+                $('#attendanceCameraStatus').text('Photo captured and ready to submit.');
+            }, 'image/jpeg', 0.92);
+            return true;
+        }
+
+        function submitAttendanceRequest() {
             var remark = $('#remark').val();
             var stat = $('#stat').val();
             var lat = $('#lat').val();
@@ -169,6 +915,9 @@
             data.append('lat', lat);
             data.append('lng', lng);
             data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);
+            if (attendancePhotoBlob) {
+                data.append('photo', attendancePhotoBlob, stat.toLowerCase() + '-attendance.jpg');
+            }
             $.ajax({
                 type: 'post',
                 url: '{% url "homeApp:add_attendance_api" %}',
@@ -187,13 +936,14 @@
 
                         $('#addForm').trigger('reset');
                         $('#myModalUser').modal('toggle');
+                        stopAttendanceCamera();
                         hideLoading();
                         location.reload();
                     } else {
                         $('body')
                             .toast({
                                 class: 'error',
-                                message: 'An error occurred !'
+                                message: response.error || 'An error occurred !'
                             })
                         ;
                         hideLoading();
@@ -218,36 +968,97 @@
 
         }
 
+        async function takeAttendance() {
+            const locationReady = await getLocation(true);
+            if (!locationReady) {
+                $('body')
+                    .toast({
+                        class: 'error',
+                        message: 'Live location is required before submitting attendance.'
+                    })
+                ;
+                return;
+            }
+            showLoading();
+            if (!attendancePhotoBlob && attendanceCameraStream) {
+                captureAttendancePhoto();
+                await new Promise(function (resolve) {
+                    setTimeout(resolve, 180);
+                });
+            }
+            submitAttendanceRequest();
+        }
+
+        $('#myModalUser').modal({
+            onHidden: function () {
+                stopAttendanceCamera();
+                resetAttendanceCameraUi();
+                $('#addForm').trigger('reset');
+            }
+        });
+
         var x = document.getElementById("demo");
         var options = {
             enableHighAccuracy: true,
-            timeout: 10000,
+            timeout: 15000,
             maximumAge: 0
         };
 
-        function getLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(showPosition, showError);
-            } else {
-                x.innerHTML = "Geolocation is not supported by this browser.";
+        function hasCapturedLocation() {
+            const lat = ($('#lat').val() || '').trim();
+            const lng = ($('#lng').val() || '').trim();
+            return lat !== '' && lng !== '' && lat !== '0.0' && lng !== '0.0';
+        }
+
+        function getLocation(forceRefresh) {
+            if (!forceRefresh && hasCapturedLocation()) {
+                return Promise.resolve(true);
             }
+
+            if (!navigator.geolocation) {
+                x.innerHTML = "Geolocation is not supported by this browser.";
+                return Promise.resolve(false);
+            }
+
+            {% if showAttendanceLocationFeature %}
+            $('#htmlLat').html('Fetching');
+            $('#htmlLong').html('Fetching');
+            {% endif %}
+
+            return new Promise(function (resolve) {
+                navigator.geolocation.getCurrentPosition(function (position) {
+                    showPosition(position);
+                    resolve(true);
+                }, function (error) {
+                    showError(error);
+                    resolve(false);
+                }, options);
+            });
         }
 
         function showPosition(position) {
             $('#lat').val(position.coords.latitude);
             $('#lng').val(position.coords.longitude);
+            {% if showAttendanceLocationFeature %}
             $('#htmlLat').html(position.coords.latitude);
             $('#htmlLong').html(position.coords.longitude);
+            {% endif %}
             console.log(position)
 
 
         }
 
         function showError(error) {
+            $('#lat').val('');
+            $('#lng').val('');
+            {% if showAttendanceLocationFeature %}
+            $('#htmlLat').html('Missing');
+            $('#htmlLong').html('Missing');
+            {% endif %}
             switch (error.code) {
                 case error.PERMISSION_DENIED:
                     x.innerHTML = "User denied the request for Geolocation."
-                    alert("Please Allow location service request to take collections.")
+                    alert("Please allow location access to take attendance.")
                     break;
                 case error.POSITION_UNAVAILABLE:
                     x.innerHTML = "Location information is unavailable."
@@ -261,16 +1072,26 @@
             }
         }
 
-        $(getLocation());
-        navigator.permissions.query({name: 'geolocation'}).then(function (result) {
-            console.log(result);
-            {% comment %}       if (result.state === 'granted') {
-                       $('#saveBtn').prop('disabled', false);
-                   } else {
-                       $('#saveBtn').prop('disabled', true);
-                   }{% endcomment %}
-            // Don't do anything if the permission was denied.
+        $(document).ready(function () {
+            getLocation(true);
+            {% if showAttendanceLocationFeature %}
+            initAttendanceMap('loginAttendanceMap');
+            initAttendanceMap('logoutAttendanceMap');
+            resolveAttendanceAddress('loginLocationSummary', 'loginLocationAddress');
+            resolveAttendanceAddress('logoutLocationSummary', 'logoutLocationAddress');
+            {% endif %}
         });
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({name: 'geolocation'}).then(function (result) {
+                console.log(result);
+                {% comment %}       if (result.state === 'granted') {
+                           $('#saveBtn').prop('disabled', false);
+                       } else {
+                           $('#saveBtn').prop('disabled', true);
+                       }{% endcomment %}
+            }).catch(function () {
+            });
+        }
 
 
     </script>

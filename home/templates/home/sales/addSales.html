@@ -6,97 +6,166 @@
 {% endblock %}
 {% block css %}
     <style>
-        .avatar-upload {
-            position: relative;
-            max-width: 115px;
-            margin: 5px auto;
-        }
-
-        .avatar-upload .avatar-edit {
-            position: absolute;
-            right: 12px;
-            z-index: 1;
-            top: 10px;
-        }
-
-        .avatar-upload .avatar-edit input {
-            display: none;
-        }
-
-        .avatar-upload .avatar-edit input + label {
-            display: inline-block;
-            width: 25px;
-            height: 25px;
-            margin-bottom: 0;
-            border-radius: 100%;
-            background: #FFFFFF;
-            border: 1px solid transparent;
-            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.12);
-            cursor: pointer;
-            font-weight: normal;
-            transition: all 0.2s ease-in-out;
-        }
-
-        .avatar-upload .avatar-edit input + label:hover {
-            background: #f1f1f1;
-            border-color: #d6d6d6;
-        }
-
-        .avatar-upload .avatar-edit input + label:after {
-            color: #757575;
-            position: absolute;
-            top: 10px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            margin: auto;
-
-        }
-
-        .avatar-upload .avatar-preview {
-            width: 100px;
-            height: 100px;
-            position: relative;
-            border-radius: 100%;
-            border: 6px solid #F8F8F8;
-            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.1);
-        }
-
-        .avatar-upload .avatar-preview > div {
-            width: 100%;
-            height: 100%;
-            border-radius: 100%;
-            background-size: cover;
-            background-repeat: no-repeat;
-            background-position: center;
-        }
-
-        .invoice-chip-wrap {
+        .ui.form .invoice-chip-wrap {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
             margin-top: 10px;
-            max-height: 140px;
+            max-height: 120px;
             overflow-y: auto;
             padding-right: 4px;
         }
 
-        .invoice-chip {
-            border: 1px solid rgba(15, 118, 110, 0.18);
-            background: #f8fffe;
-            color: #0f766e;
+        .ui.form .invoice-chip {
+            border: 1px solid rgba(15, 118, 110, 0.18) !important;
+            background: #f8fffe !important;
+            color: #0f766e !important;
             border-radius: 999px;
             padding: 6px 10px;
             font-size: 0.78rem;
             font-weight: 700;
             line-height: 1;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: none !important;
         }
 
-        .invoice-chip.active {
+        .ui.form .invoice-chip.active {
+            background: #0f766e !important;
+            color: #fff !important;
+            border-color: #0f766e !important;
+        }
+
+        .ui.form .invoice-picker {
+            width: 100%;
+        }
+
+        .ui.form .invoice-picker .ui.left.labeled.input {
+            width: 100%;
+        }
+
+        .ui.form .invoice-picker #invoiceSeries.ui.selection.dropdown {
+            min-width: 225px !important;
+            width: 225px !important;
+            background: #18b3ae !important;
+            color: #fff !important;
+            border-color: #18b3ae !important;
+            border-top-right-radius: 0 !important;
+            border-bottom-right-radius: 0 !important;
+            font-weight: 700 !important;
+            box-shadow: none !important;
+        }
+
+        .ui.form .invoice-picker #invoiceSeries > .text,
+        .ui.form .invoice-picker #invoiceSeries > .dropdown.icon,
+        .ui.form .invoice-picker #invoiceSeries .default.text,
+        .ui.form .invoice-picker #invoiceSeries .menu > .item,
+        .ui.form .invoice-picker #invoiceSeries .menu > .item .description {
+            color: inherit;
+        }
+
+        .ui.form .invoice-picker #invoiceSeries > .text,
+        .ui.form .invoice-picker #invoiceSeries > .dropdown.icon,
+        .ui.form .invoice-picker #invoiceSeries .default.text {
+            color: #fff !important;
+        }
+
+        .ui.form .invoice-picker #invoiceNo {
+            flex: 1 1 auto !important;
+            width: calc(100% - 225px) !important;
+            font-size: 1rem !important;
+            font-weight: 700 !important;
+            color: #1f2937 !important;
+            background: #fff !important;
+            border-left: 0 !important;
+            box-shadow: none !important;
+        }
+
+        @media only screen and (max-width: 767px) {
+            .ui.form .invoice-chip-wrap {
+                gap: 8px;
+                max-height: none;
+            }
+
+            .ui.form .invoice-chip {
+                padding: 6px 10px;
+                font-size: 0.78rem;
+            }
+
+            .ui.form .invoice-picker #invoiceSeries.ui.selection.dropdown {
+                min-width: 150px !important;
+                width: 150px !important;
+            }
+
+            .ui.form .invoice-picker #invoiceNo {
+                width: calc(100% - 150px) !important;
+            }
+        }
+
+        .sales-mode-menu {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            margin-bottom: 14px;
+        }
+
+        .sales-mode-chip {
+            border: 1px solid #d4e7e6;
+            background: #fff;
+            color: #0f766e;
+            border-radius: 999px;
+            padding: 9px 14px;
+            font-size: 0.86rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .sales-mode-chip.active {
             background: #0f766e;
             color: #fff;
             border-color: #0f766e;
+        }
+
+        .sales-mobile-stack .field {
+            margin-bottom: 0.95rem;
+        }
+
+        .sales-mode-panel {
+            padding: 1rem;
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 14px;
+            background: #fbfffe;
+        }
+
+        .sales-mode-note {
+            margin: -2px 0 12px;
+            font-size: 0.82rem;
+            color: #5f6b7a;
+        }
+
+        @media only screen and (max-width: 767px) {
+            .ui.row.teal.stacked.segment.padded {
+                padding: 1rem !important;
+            }
+
+            .sales-mode-menu {
+                margin-bottom: 12px;
+            }
+
+            .sales-mode-chip {
+                padding: 8px 12px;
+                font-size: 0.8rem;
+            }
+
+            .sales-mode-panel {
+                padding: 0.9rem;
+                border-radius: 12px;
+            }
         }
 
     </style>
@@ -115,69 +184,99 @@
                 <div class="ui row teal stacked segment padded">
                     <div class="content">
 
-                        <form class="ui  small form " id="addForm">{% csrf_token %}
-                            <div class="two fields">
-                                <div class="eight wide field required">
-                                    <label>Invoice Number</label>
+                        <form class="ui small form sales-mobile-stack" id="addForm">{% csrf_token %}
+                            <div class="sales-mode-panel">
+                                <div class="sales-mode-menu" id="salesModeMenu">
+                                    <button type="button" class="sales-mode-chip active" data-mode="Cash" onclick="selectSalesMode('Cash')">Cash</button>
+                                    <button type="button" class="sales-mode-chip" data-mode="Credit" onclick="selectSalesMode('Credit')">Credit</button>
+                                    <button type="button" class="sales-mode-chip" data-mode="Online" onclick="selectSalesMode('Online')">Online</button>
+                                    <button type="button" class="sales-mode-chip" data-mode="Mix" onclick="selectSalesMode('Mix')">Mix</button>
+                                </div>
+                                <div class="sales-mode-note">Choose the sale mode first. The form stays compact on mobile and only shows the fields needed for that mode.</div>
+                                <input type="hidden" id="salesMode" value="Cash">
 
-                                    <div class="ui left labeled input">
-                                        <div class="ui selection dropdown teal label" id="invoiceSeries">
-                                            <input type="hidden" id="invoiceSeriesId" name="invoiceSeriesId">
-                                            <div class="default text">Select Series</div>
-                                            <i class="dropdown icon"></i>
-                                            <div class="menu"></div>
+                                <div class="two fields">
+                                    <div class="eight wide field required">
+                                        <label>Invoice Number</label>
+                                        <div class="invoice-picker">
+                                            <div class="ui left labeled input" style="width:100%;">
+                                                <div class="ui selection dropdown teal label" id="invoiceSeries" style="width:225px; min-width:225px; background:#18b3ae; color:#fff; border-color:#18b3ae; border-top-right-radius:0; border-bottom-right-radius:0; font-weight:700;">
+                                                    <input type="hidden" id="invoiceSeriesId" name="invoiceSeriesId">
+                                                    <div class="default text">Select Series</div>
+                                                    <i class="dropdown icon"></i>
+                                                    <div class="menu"></div>
+                                                </div>
+                                                <input type="text" placeholder="Auto assigned" id="invoiceNo"
+                                                       name="invoiceNo" readonly style="font-size:1rem; font-weight:700; color:#1f2937; background:#fff; border-left:0;">
+                                            </div>
                                         </div>
-                                        <input type="text" placeholder="Auto assigned" id="invoiceNo"
-                                               name="invoiceNo" readonly>
+                                        <input type="hidden" id="requestedInvoiceNumber" name="requestedInvoiceNumber">
+                                        <div class="invoice-chip-wrap" id="invoiceChipWrap"></div>
                                     </div>
-                                    <input type="hidden" id="requestedInvoiceNumber" name="requestedInvoiceNumber">
-                                    <div class="ui mini grey text" id="invoicePreview" style="margin-top: 6px;">
-                                        Select a series to preview the next invoice number.
-                                    </div>
-                                    <div class="invoice-chip-wrap" id="invoiceChipWrap"></div>
-                                </div>
 
-
-                                <div class="eight wide field required">
-                                    <label>Invoice Date</label>
-                                    <div class="ui calendar" id="cDate">
-                                        <div class="ui input">
-                                            <input type="text" placeholder="Date/Time" id="colDate">
+                                    <div class="eight wide field required">
+                                        <label>Invoice Date</label>
+                                        <div class="ui calendar" id="cDate">
+                                            <div class="ui input">
+                                                <input type="text" placeholder="Date/Time" id="colDate">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="two  fields">
-                                <div class="eight wide field required">
-                                    <label>Party Name</label>
-                                    <select class="ui clearable search dropdown" id="party">
-                                        <option value="">Search By Party Name</option>
-                                    </select>
-                                </div>
-                                <div class="eight wide field required">
-                                    <label>Amount (₹ <a class="ui violet label" id="money">0.0</a>
-                                        )</label>
-                                    <input type="number" name="amount" id="amount" placeholder="Amount"
-                                           onkeyup="toIndianCurrency()">
 
-
+                                <div class="two fields">
+                                    <div class="eight wide field required">
+                                        <label>Party Name</label>
+                                        <select class="ui clearable search dropdown" id="party">
+                                            <option value="">Search By Party Name</option>
+                                        </select>
+                                    </div>
+                                    <div class="eight wide field required" id="singleAmountField">
+                                        <label>Amount (₹ <a class="ui violet label" id="money">0.0</a>)</label>
+                                        <input type="number" name="amount" id="amount" placeholder="Amount" onkeyup="toIndianCurrency()">
+                                    </div>
                                 </div>
 
-                            </div>
-
-
-                            <div class="one  fields ">
-
-                                <div class="sixteen wide  field ">
-                                    <label>Remark</label>
-                                    <textarea name="" id="remark" placeholder="Any Remark"
-                                              rows="3"></textarea>
+                                <div class="two fields" id="onlineFields" style="display:none;">
+                                    <div class="eight wide field required">
+                                        <label>Bank</label>
+                                        <select class="ui search dropdown" id="bank">
+                                            <option value="">Select Bank</option>
+                                            {% for foo in banks %}
+                                                <option value="{{ foo.id }}">{{ foo.name }} - {{ foo.accountNumber }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="eight wide field"></div>
                                 </div>
 
+                                <div class="three fields" id="mixFields" style="display:none;">
+                                    <div class="five wide field required">
+                                        <label>Cash Amount (₹ <a class="ui violet label" id="moneyMixCash">0.0</a>)</label>
+                                        <input type="number" id="amountMixCash" placeholder="Cash amount" onkeyup="toIndianCurrency()">
+                                    </div>
+                                    <div class="five wide field required">
+                                        <label>Online Amount (₹ <a class="ui violet label" id="moneyMixOnline">0.0</a>)</label>
+                                        <input type="number" id="amountMixOnline" placeholder="Online amount" onkeyup="toIndianCurrency()">
+                                    </div>
+                                    <div class="six wide field required">
+                                        <label>Bank</label>
+                                        <select class="ui search dropdown" id="bankMix">
+                                            <option value="">Select Bank</option>
+                                            {% for foo in banks %}
+                                                <option value="{{ foo.id }}">{{ foo.name }} - {{ foo.accountNumber }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
 
+                                <div class="one fields">
+                                    <div class="sixteen wide field">
+                                        <label>Remark</label>
+                                        <textarea id="remark" placeholder="Any Remark" rows="3"></textarea>
+                                    </div>
+                                </div>
                             </div>
-
-
                         </form>
                     </div>
                     <div class="ui  aligned basic  grid">
@@ -218,6 +317,8 @@
     </script>
 
     <script>
+        var salesMode = 'Cash';
+
         var today = new Date();
         $('#cDate')
             .calendar({
@@ -238,6 +339,28 @@
                 }
             );
 
+        function selectSalesMode(newMode) {
+            salesMode = newMode;
+            $('#salesMode').val(newMode);
+            $('#salesModeMenu .sales-mode-chip').removeClass('active');
+            $('#salesModeMenu .sales-mode-chip[data-mode="' + newMode + '"]').addClass('active');
+
+            $('#singleAmountField').toggle(newMode !== 'Mix');
+            $('#onlineFields').toggle(newMode === 'Online');
+            $('#mixFields').toggle(newMode === 'Mix');
+
+            if (newMode !== 'Online') {
+                $('#bank').dropdown('clear');
+            }
+            if (newMode !== 'Mix') {
+                $('#bankMix').dropdown('clear');
+                $('#amountMixCash').val('');
+                $('#amountMixOnline').val('');
+                $('#moneyMixCash').html('0.0');
+                $('#moneyMixOnline').html('0.0');
+            }
+        }
+
 
         function salesSave() {
             showLoading();
@@ -247,19 +370,28 @@
             var colDate = $('#colDate').val();
             var party = $('#party').val();
             var amount = $('#amount').val();
+            var paymentMode = $('#salesMode').val();
+            var bank = paymentMode === 'Mix' ? $('#bankMix').val() : $('#bank').val();
+            var amountMixCash = $('#amountMixCash').val();
+            var amountMixOnline = $('#amountMixOnline').val();
             var remark = $('#remark').val();
 
-
-            debugger;
-
-            if (party === '' || invoiceSeriesId === '' || invoiceNo === '' || colDate === '' || amount === ''
-            ) {
+            if (party === '' || invoiceSeriesId === '' || invoiceNo === '' || colDate === '') {
                 $('body')
                     .toast({
                         class: 'orange',
                         message: '* fields are required !'
                     })
                 ;
+                hideLoading();
+            } else if (paymentMode === 'Mix' && (amountMixCash === '' || amountMixOnline === '' || bank === '')) {
+                $('body').toast({class: 'orange', message: 'Cash amount, online amount, and bank are required for mix sales.'});
+                hideLoading();
+            } else if (paymentMode === 'Online' && (amount === '' || bank === '')) {
+                $('body').toast({class: 'orange', message: 'Amount and bank are required for online sales.'});
+                hideLoading();
+            } else if (paymentMode !== 'Mix' && amount === '') {
+                $('body').toast({class: 'orange', message: 'Amount is required.'});
                 hideLoading();
             } else {
                 data = new FormData();
@@ -268,6 +400,10 @@
                 data.append('colDate', colDate);
                 data.append('party', party);
                 data.append('amount', amount);
+                data.append('paymentMode', paymentMode);
+                data.append('bank', bank);
+                data.append('amountMixCash', amountMixCash);
+                data.append('amountMixOnline', amountMixOnline);
                 data.append('remark', remark);
 
                 $.ajax({
@@ -335,7 +471,6 @@
                     $('#invoiceSeriesId').val('');
                     $('#invoiceNo').val('');
                     $('#requestedInvoiceNumber').val('');
-                    $('#invoicePreview').text('Select a series to preview the next invoice number.');
                     $('#invoiceChipWrap').html('');
 
                     if (response.message !== 'success' || !response.data.length) {
@@ -352,10 +487,11 @@
                     $('#invoiceSeries').dropdown('refresh');
                     const preferred = response.data.find(function (item) { return item.isDefault; }) || response.data[0];
                     $('#invoiceSeries').dropdown('set selected', String(preferred.id));
+                    $('#invoiceSeriesId').val(preferred.id);
+                    $('#invoiceNo').val(preferred.nextNumber);
+                    renderInvoiceChips(preferred.upcomingNumbers || []);
                 },
-                error: function () {
-                    $('#invoicePreview').text('Unable to load invoice series.');
-                }
+                error: function () {}
             });
         }
 
@@ -366,14 +502,12 @@
                     $('#invoiceSeriesId').val('');
                     $('#invoiceNo').val('');
                     $('#requestedInvoiceNumber').val('');
-                    $('#invoicePreview').text('Select a series to preview the next invoice number.');
                     $('#invoiceChipWrap').html('');
                     return;
                 }
                 $('#invoiceSeriesId').val(value);
                 $('#invoiceNo').val($choice.data('next-number'));
                 $('#requestedInvoiceNumber').val('');
-                $('#invoicePreview').text('Upcoming invoice: ' + $choice.data('invoice'));
                 renderInvoiceChips($choice.data('upcoming') || []);
             }
         });
@@ -381,6 +515,15 @@
         function renderInvoiceChips(upcomingNumbers) {
             const wrap = $('#invoiceChipWrap');
             wrap.html('');
+            wrap.css({
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '8px',
+                marginTop: '10px',
+                maxHeight: '120px',
+                overflowY: 'auto',
+                paddingRight: '4px'
+            });
             if (!upcomingNumbers.length) {
                 wrap.append('<div class="ui tiny grey label">No unused invoices available.</div>');
                 return;
@@ -388,24 +531,53 @@
             upcomingNumbers.forEach(function (item, index) {
                 const chip = $('<button type="button" class="invoice-chip"></button>');
                 chip.text(item.invoiceNumber);
+                chip.css({
+                    border: '1px solid rgba(15, 118, 110, 0.18)',
+                    background: '#f8fffe',
+                    color: '#0f766e',
+                    borderRadius: '999px',
+                    padding: '6px 10px',
+                    fontSize: '0.78rem',
+                    fontWeight: '700',
+                    lineHeight: '1',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: 'none'
+                });
                 if (index === 0) {
                     chip.addClass('active');
+                    chip.css({
+                        background: '#0f766e',
+                        color: '#fff',
+                        borderColor: '#0f766e'
+                    });
                     $('#requestedInvoiceNumber').val(item.sequenceNumber);
                     $('#invoiceNo').val(item.displayNumber);
-                    $('#invoicePreview').text('Selected invoice: ' + item.invoiceNumber);
                 }
                 chip.on('click', function () {
                     $('.invoice-chip').removeClass('active');
+                    $('.invoice-chip').css({
+                        background: '#f8fffe',
+                        color: '#0f766e',
+                        borderColor: 'rgba(15, 118, 110, 0.18)'
+                    });
                     chip.addClass('active');
+                    chip.css({
+                        background: '#0f766e',
+                        color: '#fff',
+                        borderColor: '#0f766e'
+                    });
                     $('#requestedInvoiceNumber').val(item.sequenceNumber);
                     $('#invoiceNo').val(item.displayNumber);
-                    $('#invoicePreview').text('Selected invoice: ' + item.invoiceNumber);
                 });
                 wrap.append(chip);
             });
         }
 
         $(loadInvoiceSeries());
+        $(selectSalesMode('Cash'));
 
 
         $(getCustomerList());
@@ -423,7 +595,7 @@
                     var j;
                     for (j = 0; j < response.data.length; j++) {
 
-                        $('#party').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                        $('#party').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
 
                     }
 
@@ -443,9 +615,12 @@
         }
 
         const toIndianCurrency = () => {
-            let num = $('#amount').val();
-            const curr = num.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,")
-            $('#money').html(curr);
+            let num = $('#amount').val() || '';
+            let mixCash = $('#amountMixCash').val() || '';
+            let mixOnline = $('#amountMixOnline').val() || '';
+            $('#money').html(num.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
+            $('#moneyMixCash').html(mixCash.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
+            $('#moneyMixOnline').html(mixOnline.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
         };
     </script>
 {% endblock %}

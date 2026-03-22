@@ -39,6 +39,8 @@ from home.audit import log_audit_event, snapshot_instance
 User = get_user_model()
 BASE_URL_WHATSAPP = "https://bot.betablaster.in/api/"
 DEFAULT_AVATAR_URL = "/static/images/default-avatar.svg"
+OPENSTREETMAP_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
+OPENSTREETMAP_USER_AGENT = "zivaBooks/attendance-location"
 INVOICE_MODULE_MODEL_MAP = {
     InvoiceSeries.Module.SALES: Sales,
     InvoiceSeries.Module.CASH_COUNTER: CashCounter,
@@ -118,16 +120,7 @@ class LocationThread(threading.Thread):
         threading.Thread.__init__(self)
     def run(self):
         while (self._is_running):
-            location = tenant_qs(get_current_tenant(None), GeolocationPackage).filter(isDeleted__exact=False).last()
-            if location.used < location.balance:
-                r = requests.get(
-                    "https://revgeocode.search.hereapi.com/v1/revgeocode?at=" + self.lat + "%2C" + self.lng + "&lang=en-US&apikey=VtAAEVuyqdswCZr8X1BdBzM-4JTpeAdivmp4_3ILPs4")
-                data = r.json()
-                location.used = (location.used + 1)
-                location.save()
-                return data["items"][0]["address"]["label"]
-            else:
-                return ""
+            return _reverse_geocode_openstreetmap(self.lat, self.lng)
         self.stop()
     def stop(self):
         self._is_running = False
@@ -200,6 +193,43 @@ def _parse_party_id_value(raw: str):
     if value.isdigit():
         return int(value)
     return None
+
+
+def _coordinate_fallback(lat, lng):
+    return f"{lat}, {lng}"
+
+
+def _tenant_attendance_location_enabled(request_or_user):
+    tenant = get_current_tenant(request_or_user)
+    return bool(getattr(tenant, 'enableAttendanceLocationMaps', False))
+
+
+def _reverse_geocode_openstreetmap(lat, lng):
+    lat = str(lat).strip()
+    lng = str(lng).strip()
+    if not lat or not lng:
+        return ""
+    try:
+        response = requests.get(
+            OPENSTREETMAP_REVERSE_URL,
+            params={
+                "format": "jsonv2",
+                "lat": lat,
+                "lon": lng,
+                "zoom": 18,
+                "addressdetails": 1,
+            },
+            headers={
+                "User-Agent": OPENSTREETMAP_USER_AGENT,
+                "Accept-Language": "en",
+            },
+            timeout=8,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return payload.get("display_name") or _coordinate_fallback(lat, lng)
+    except Exception:
+        return _coordinate_fallback(lat, lng)
 def request_collection_otp_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
@@ -860,16 +890,7 @@ def _bump_party_cache_version():
     version = cache.get('party_list_cache_version') or 1
     cache.set('party_list_cache_version', version + 1, timeout=None)
 def deduct_location_balance(lat, lng):
-    location = tenant_qs(get_current_tenant(None), GeolocationPackage).filter(isDeleted__exact=False).last()
-    if location.used < location.balance:
-        r = requests.get(
-            "https://revgeocode.search.hereapi.com/v1/revgeocode?at=" + lat + "%2C" + lng + "&lang=en-US&apikey=VtAAEVuyqdswCZr8X1BdBzM-4JTpeAdivmp4_3ILPs4")
-        data = r.json()
-        location.used = (location.used + 1)
-        location.save()
-        return data["items"][0]["address"]["label"]
-    else:
-        return ""
+    return _reverse_geocode_openstreetmap(lat, lng)
 def send_whatsapp_message(number, message):
     msg = tenant_qs(get_current_tenant(None), WhatsappMessage).filter(isDeleted__exact=False).last()
     if msg.used < msg.balance:
@@ -3730,8 +3751,14 @@ def add_attendance_api(request):
         try:
             remark = request.POST.get("remark")
             stat = request.POST.get("stat")
-            lat = request.POST.get("lat")
-            lng = request.POST.get("lng")
+            lat = (request.POST.get("lat") or "").strip()
+            lng = (request.POST.get("lng") or "").strip()
+            photo = request.FILES.get("photo")
+            if not lat or not lng or lat == '0.0' or lng == '0.0':
+                return JsonResponse({
+                    'message': 'error',
+                    'error': 'Live location is required to submit attendance.'
+                }, safe=False)
             obj = tenant_qs(request, Attendance).get(datetime__date=datetime.today().date(),
                                          staffID__user_ID__id=request.user.pk)
             if stat == 'Login':
@@ -3739,25 +3766,35 @@ def add_attendance_api(request):
                 obj.login_remark = remark
                 obj.login_latitude = lat
                 obj.login_longitude = lng
-                obj.loginDateTime = datetime.today().now()
-                try:
-                    obj.login_location = deduct_location_balance(lat, lng)
-                except:
-                    pass
+                obj.loginDateTime = timezone.now()
+                if photo:
+                    obj.loginPhoto = photo
+                if _tenant_attendance_location_enabled(request):
+                    try:
+                        obj.login_location = deduct_location_balance(lat, lng)
+                    except:
+                        pass
+                else:
+                    obj.login_location = None
             if stat == 'Logout':
                 obj.isLogOut = True
                 obj.logout_remark = remark
                 obj.logout_latitude = lat
                 obj.logout_longitude = lng
-                obj.logoutDateTime = datetime.today().now()
-                try:
-                    obj.logout_location = deduct_location_balance(lat, lng)
-                except:
-                    pass
+                obj.logoutDateTime = timezone.now()
+                if photo:
+                    obj.logoutPhoto = photo
+                if _tenant_attendance_location_enabled(request):
+                    try:
+                        obj.logout_location = deduct_location_balance(lat, lng)
+                    except:
+                        pass
+                else:
+                    obj.logout_location = None
             obj.save()
             return JsonResponse({'message': 'success'}, safe=False)
-        except:
-            return JsonResponse({'message': 'error'}, safe=False)
+        except Exception as exc:
+            return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 class StaffAttendanceListJson(BaseDatatableView):
     order_columns = ['datetime', 'loginDateTime', 'login_location', 'login_remark', 'logoutDateTime', 'logout_location',
                      'logout_remark',
@@ -4374,6 +4411,85 @@ def generate_order_pdf(request):
     HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 1cm; }')])
     return response
 # ----------------------Sales-----------------
+def _normalize_sales_mode(mode: str | None) -> str:
+    value = str(mode or Sales.Mode.CASH).strip()
+    aliases = {
+        'Card': Sales.Mode.ONLINE,
+        'Card/Online': Sales.Mode.ONLINE,
+    }
+    if value in aliases:
+        return aliases[value]
+    valid = {choice[0] for choice in Sales.Mode.choices}
+    return value if value in valid else Sales.Mode.CASH
+
+
+def _parse_sales_party(request, party_value: str | None) -> Party:
+    raw = str(party_value or '').strip()
+    if not raw:
+        raise ValueError('Party is required.')
+    if '@' in raw:
+        raw = raw.rsplit('@', 1)[-1].strip()
+    if not raw.isdigit():
+        raise ValueError('Invalid party selection.')
+    return tenant_qs(request, Party).select_related().get(pk=int(raw))
+
+
+def _parse_sales_bank_id(request, bank_value: str | None) -> int | None:
+    raw = str(bank_value or '').strip()
+    if not raw:
+        return None
+    if not raw.isdigit():
+        raise ValueError('Invalid bank selection.')
+    bank = tenant_qs(request, Bank).filter(isDeleted=False, pk=int(raw)).only('id').first()
+    if not bank:
+        raise ValueError('Selected bank was not found.')
+    return bank.pk
+
+
+def _safe_sales_float(value) -> float:
+    try:
+        return float(value or 0.0)
+    except Exception:
+        return 0.0
+
+
+def _apply_sales_mode_payload(request, obj: Sales) -> None:
+    mode = _normalize_sales_mode(
+        request.POST.get("paymentMode")
+        or request.POST.get("salesMode")
+        or request.POST.get("modeOfPayment")
+    )
+    amount = _safe_sales_float(request.POST.get("amount"))
+    mix_cash = _safe_sales_float(request.POST.get("amountMixCash"))
+    mix_online = _safe_sales_float(request.POST.get("amountMixOnline"))
+    bank_id = _parse_sales_bank_id(request, request.POST.get("bank"))
+
+    obj.modeOfPayment = mode
+    obj.mixCashAmount = 0.0
+    obj.mixOnlineAmount = 0.0
+    obj.bankID_id = None
+
+    if mode == Sales.Mode.MIX:
+        if mix_cash <= 0 or mix_online <= 0:
+            raise ValueError('Mix sales require both cash and online amounts.')
+        if not bank_id:
+            raise ValueError('Select a bank for online or mix sales.')
+        obj.mixCashAmount = mix_cash
+        obj.mixOnlineAmount = mix_online
+        obj.bankID_id = bank_id
+        obj.amount = round(mix_cash + mix_online, 2)
+        return
+
+    if amount <= 0:
+        raise ValueError('Amount must be greater than zero.')
+
+    obj.amount = amount
+    if mode == Sales.Mode.ONLINE:
+        if not bank_id:
+            raise ValueError('Select a bank for online or mix sales.')
+        obj.bankID_id = bank_id
+
+
 @transaction.atomic
 def add_sales_by_admin_api(request):
     if request.method == 'POST':
@@ -4382,10 +4498,8 @@ def add_sales_by_admin_api(request):
             requestedInvoiceNumber = request.POST.get("requestedInvoiceNumber")
             colDate = request.POST.get("colDate")
             party = request.POST.get("party")
-            amount = request.POST.get("amount")
             remark = request.POST.get("remark")
-            c = str(party).split('@')
-            cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
+            cus = _parse_sales_party(request, party)
             obj = Sales()
             assign_tenant(obj, request)
             obj.partyID_id = cus.pk
@@ -4398,14 +4512,15 @@ def add_sales_by_admin_api(request):
             obj.invoiceSeries = series
             obj.invoiceSequenceNumber = sequence_number
             obj.invoiceNumber = invoice_number
-            obj.amount = float(amount)
+            _apply_sales_mode_payload(request, obj)
             obj.remark = remark
-            obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y')
+            obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y').date()
             user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
             obj.createdBy_id = user.pk
             obj.save()
             obj.paymentID = 'S' + str(obj.pk).zfill(8)
-            obj.save()
+            obj.save(update_fields=['paymentID', 'lastUpdatedOn'])
+            sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             # try:
             #     msg = "Your order has been dispatched Ag. Bill No. {} Dt. {} Amt. Rs. {}, Please confirm received the material. If you have any queries about your order, Please feel free contact on this no 7005607770. Thanks, BSS".format(obj.invoiceNumber, obj.buildDate.strftime('%d-%m-%Y'), obj.amount)
@@ -4421,8 +4536,8 @@ def add_sales_by_admin_api(request):
         except Exception as exc:
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 class SalesByAdminListJson(BaseDatatableView):
-    order_columns = ['paymentID', 'partyID.name', 'invoiceNumber', 'amount', 'action', 'buildDate', 'createdBy.name',
-                     'isApproved', 'approvedBy.name',
+    order_columns = ['paymentID', 'partyID__name', 'invoiceNumber', 'modeOfPayment', 'bankID__name', 'amount', 'id', 'buildDate', 'createdBy__name',
+                     'isApproved', 'approvedBy__name', 'approvedOn',
                      'datetime', 'remark'
                      ]
     def get_initial_queryset(self):
@@ -4448,7 +4563,7 @@ class SalesByAdminListJson(BaseDatatableView):
                 Q(paymentID__icontains=search) | Q(partyID__name__icontains=search) | Q(
                     amount__icontains=search) | Q(
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
-                    remark__icontains=search)
+                    remark__icontains=search) | Q(modeOfPayment__icontains=search) | Q(bankID__name__icontains=search)
                 | Q(datetime__icontains=search) | Q(buildDate__icontains=search)
             )
         return qs
@@ -4471,6 +4586,19 @@ class SalesByAdminListJson(BaseDatatableView):
                 approvedBy = item.approvedBy.name
             except:
                 approvedBy = '-'
+            bank_name = item.bankID.name if getattr(item, 'bankID', None) else '-'
+            payment_mode = item.modeOfPayment or '-'
+            if payment_mode == Sales.Mode.MIX:
+                payment_detail = 'Cash: {} | Online: {}'.format(
+                    formatINR(format(item.mixCashAmount or 0.0, '.0f')),
+                    formatINR(format(item.mixOnlineAmount or 0.0, '.0f')),
+                )
+            elif payment_mode == Sales.Mode.ONLINE:
+                payment_detail = 'Online via {}'.format(bank_name)
+            elif payment_mode == Sales.Mode.CREDIT:
+                payment_detail = 'Credit sale'
+            else:
+                payment_detail = 'Cash sale'
             if item.isApproved == True:
                 isApproved = '''<div class="ui tiny green label">
                              Yes
@@ -4483,19 +4611,22 @@ class SalesByAdminListJson(BaseDatatableView):
                 escape(item.paymentID),
                 escape(item.partyID.name),
                 escape(item.invoiceNumber),
+                escape(payment_mode),
+                escape(payment_detail),
                 formatINR(format(item.amount, '.0f')),
                 action,
                 escape(item.buildDate.strftime('%d-%m-%Y')),
                 createdBy,
                 isApproved,
                 approvedBy,
+                escape(item.approvedOn.strftime('%d-%m-%Y %I:%M %p') if item.approvedOn else '-'),
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.remark),
             ])
         return json_data
 class SalesByStaffListJson(BaseDatatableView):
-    order_columns = ['paymentID', 'partyID.name', 'invoiceNumber', 'amount', 'buildDate', 'createdBy.name',
-                     'datetime', 'remark'
+    order_columns = ['paymentID', 'partyID__name', 'invoiceNumber', 'modeOfPayment', 'bankID__name', 'amount', 'buildDate', 'createdBy__name',
+                     'approvedOn', 'datetime', 'remark', 'id'
                      ]
     def get_initial_queryset(self):
         queryset = _sales_list_base_qs(self.request).filter(isDeleted__exact=False)
@@ -4525,7 +4656,7 @@ class SalesByStaffListJson(BaseDatatableView):
                 Q(paymentID__icontains=search) | Q(partyID__name__icontains=search) | Q(
                     amount__icontains=search) | Q(
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
-                    remark__icontains=search)
+                    remark__icontains=search) | Q(modeOfPayment__icontains=search) | Q(bankID__name__icontains=search)
                 | Q(datetime__icontains=search) | Q(buildDate__icontains=search)
             )
         return qs
@@ -4533,8 +4664,6 @@ class SalesByStaffListJson(BaseDatatableView):
         json_data = []
         for item in qs:
             action_parts = []
-            if _can_approve_sales(self.request.user):
-                action_parts.append('''<button data-inverted="" data-tooltip="Send Message" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConfirmationModal('{}')" class="ui circular facebook icon button purple"><i class="paper plane icon"></i></button>'''.format(item.pk))
             # Staff can only update sales before approval; after approval the edit page becomes read-only.
             if _can_edit_sales(self.request.user):
                 if item.isApproved and not (_can_manage_sales(self.request.user) or _can_approve_sales(self.request.user) or self.request.user.has_perm('home.can_view_party_credentials')):
@@ -4548,13 +4677,29 @@ class SalesByStaffListJson(BaseDatatableView):
                 createdBy = item.createdBy.name
             except:
                 createdBy = '-'
+            bank_name = item.bankID.name if getattr(item, 'bankID', None) else '-'
+            payment_mode = item.modeOfPayment or '-'
+            if payment_mode == Sales.Mode.MIX:
+                payment_detail = 'Cash: {} | Online: {}'.format(
+                    formatINR(format(item.mixCashAmount or 0.0, '.0f')),
+                    formatINR(format(item.mixOnlineAmount or 0.0, '.0f')),
+                )
+            elif payment_mode == Sales.Mode.ONLINE:
+                payment_detail = 'Online via {}'.format(bank_name)
+            elif payment_mode == Sales.Mode.CREDIT:
+                payment_detail = 'Credit sale'
+            else:
+                payment_detail = 'Cash sale'
             json_data.append([
                 escape(item.paymentID),
                 escape(item.partyID.name),
                 escape(item.invoiceNumber),
+                escape(payment_mode),
+                escape(payment_detail),
                 formatINR(format(item.amount, '.0f')),
                 escape(item.buildDate.strftime('%d-%m-%Y')),
                 createdBy,
+                escape(item.approvedOn.strftime('%d-%m-%Y %I:%M %p') if item.approvedOn else '-'),
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.remark),
                 action,
@@ -4605,6 +4750,7 @@ def delete_sales(request):
             obj = tenant_qs(request, Sales).select_related().get(pk=int(id))
             obj.isDeleted = True
             obj.save()
+            sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
         except:
@@ -4617,20 +4763,18 @@ def update_sales_by_admin_api(request):
         try:
             colDate = request.POST.get("colDate")
             party = request.POST.get("party")
-            amount = request.POST.get("amount")
             remark = request.POST.get("remark")
             ID = request.POST.get("ID")
-            # c = str(party).split('@')
-            # cus = Party.objects.select_related().get(pk=int(c[1]))
-            cus = tenant_qs(request, Party).select_related().get(pk=int(party))
+            cus = _parse_sales_party(request, party)
             obj = tenant_qs(request, Sales).get(pk=int(ID))
             if not _can_edit_sales_record(request.user, obj):
                 return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
             obj.partyID_id = cus.pk
-            obj.amount = float(amount)
+            _apply_sales_mode_payload(request, obj)
             obj.remark = remark
-            obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y')
+            obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y').date()
             obj.save()
+            sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
         except Exception as exc:
@@ -4651,7 +4795,9 @@ def send_message_sales(request):
         user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
         obj.isApproved = True
         obj.approvedBy_id = user.pk
+        obj.approvedOn = timezone.now()
         obj.save()
+        sync_book_transactions(obj)
         log_audit_event(
             obj,
             AuditLog.Action.APPROVE,
@@ -4659,6 +4805,7 @@ def send_message_sales(request):
             changes={
                 'isApproved': {'from': False, 'to': True},
                 'approvedBy_id': {'from': None, 'to': user.pk},
+                'approvedOn': {'from': None, 'to': obj.approvedOn.isoformat() if obj.approvedOn else None},
             },
             snapshot=snapshot_instance(obj),
         )

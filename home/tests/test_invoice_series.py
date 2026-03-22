@@ -1,8 +1,12 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from home.models import Bank, CashCounter, InvoiceSeries, Party, Sales, StaffUser, Tenant, TenantMembership
+from home.models import Bank, BookTransaction, CashCounter, InvoiceSeries, Party, PartyLedgerEntry, Sales, StaffUser, Tenant, TenantMembership
+from home.books import sync_book_transactions
+from home.party_ledger import sync_party_ledger_entries_for_object
 
 
 User = get_user_model()
@@ -24,6 +28,11 @@ class InvoiceSeriesTests(TestCase):
             name="Invoice Staff",
             phone="9999999990",
             isActive="Active",
+        )
+        self.user.user_permissions.add(
+            Permission.objects.get(codename="change_sales"),
+            Permission.objects.get(codename="view_sales"),
+            Permission.objects.get(codename="can_manage_sales"),
         )
         self.party = Party.objects.create(
             tenant=self.tenant,
@@ -139,10 +148,11 @@ class InvoiceSeriesTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, msg=getattr(response, "content", b""))
         sale = Sales.objects.exclude(invoiceSequenceNumber=1).get()
         self.assertEqual(sale.invoiceSequenceNumber, 2)
         self.assertEqual(sale.invoiceNumber, "BCS0002")
+        self.assertFalse(BookTransaction.objects.filter(source_object_id=sale.pk, isDeleted=False).exists())
 
     def test_add_sales_can_use_selected_unused_invoice_number(self):
         Sales.objects.create(
@@ -168,7 +178,7 @@ class InvoiceSeriesTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, msg=getattr(response, "content", b""))
         sale = Sales.objects.exclude(invoiceSequenceNumber=1).get()
         self.assertEqual(sale.invoiceSequenceNumber, 5)
         self.assertEqual(sale.invoiceNumber, "BCS0005")
@@ -200,10 +210,210 @@ class InvoiceSeriesTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["message"], "success")
+        self.assertEqual(response.status_code, 200, msg=getattr(response, "content", b""))
+        self.assertEqual(response.json()["message"], "success", msg=response.json())
         sale = Sales.objects.get(invoiceSequenceNumber=2)
         self.assertEqual(sale.invoiceNumber, "BCS0002")
+
+    def test_add_online_sale_saves_bank_and_mode(self):
+        response = self.client.post(
+            reverse("homeApp:add_sales_by_admin_api"),
+            data={
+                "invoiceSeriesId": str(self.sales_series.pk),
+                "colDate": "21/03/2026",
+                "party": str(self.party.pk),
+                "paymentMode": "Online",
+                "bank": str(self.bank.pk),
+                "amount": "250",
+                "remark": "online sale",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, msg=getattr(response, "content", b""))
+        self.assertEqual(response.json()["message"], "success", msg=response.json())
+        sale = Sales.objects.get(invoiceNumber="BCS0001")
+        self.assertEqual(sale.modeOfPayment, Sales.Mode.ONLINE)
+        self.assertEqual(sale.bankID_id, self.bank.pk)
+        self.assertEqual(sale.amount, 250.0)
+        self.assertEqual(sale.mixCashAmount, 0.0)
+        self.assertEqual(sale.mixOnlineAmount, 0.0)
+        self.assertFalse(BookTransaction.objects.filter(source_object_id=sale.pk, isDeleted=False).exists())
+
+    def test_add_mix_sale_saves_split_amounts(self):
+        response = self.client.post(
+            reverse("homeApp:add_sales_by_admin_api"),
+            data={
+                "invoiceSeriesId": str(self.sales_series.pk),
+                "colDate": "21/03/2026",
+                "party": str(self.party.pk),
+                "paymentMode": "Mix",
+                "bank": str(self.bank.pk),
+                "amountMixCash": "150",
+                "amountMixOnline": "350",
+                "remark": "mix sale",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, msg=getattr(response, "content", b""))
+        self.assertEqual(response.json()["message"], "success", msg=response.json())
+        sale = Sales.objects.get(invoiceNumber="BCS0001")
+        self.assertEqual(sale.modeOfPayment, Sales.Mode.MIX)
+        self.assertEqual(sale.bankID_id, self.bank.pk)
+        self.assertEqual(sale.amount, 500.0)
+        self.assertEqual(sale.mixCashAmount, 150.0)
+        self.assertEqual(sale.mixOnlineAmount, 350.0)
+        self.assertFalse(BookTransaction.objects.filter(source_object_id=sale.pk, isDeleted=False).exists())
+
+    def test_update_sales_mode_clears_mix_and_bank_fields(self):
+        sale = Sales.objects.create(
+            tenant=self.tenant,
+            partyID=self.party,
+            createdBy=self.staff,
+            invoiceSeries=self.sales_series,
+            invoiceSequenceNumber=7,
+            invoiceNumber="BCS0007",
+            modeOfPayment=Sales.Mode.MIX,
+            amount=500,
+            mixCashAmount=200,
+            mixOnlineAmount=300,
+            bankID=self.bank,
+            buildDate="2026-03-21",
+        )
+
+        response = self.client.post(
+            reverse("homeApp:update_sales_by_admin_api"),
+            data={
+                "ID": str(sale.pk),
+                "colDate": "21/03/2026",
+                "party": str(self.party.pk),
+                "paymentMode": "Cash",
+                "amount": "220",
+                "remark": "cash now",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, msg=getattr(response, "content", b""))
+        self.assertEqual(response.json()["message"], "success", msg=response.json())
+        sale.refresh_from_db()
+        self.assertEqual(sale.modeOfPayment, Sales.Mode.CASH)
+        self.assertIsNone(sale.bankID_id)
+        self.assertEqual(sale.mixCashAmount, 0.0)
+        self.assertEqual(sale.mixOnlineAmount, 0.0)
+        self.assertEqual(sale.amount, 220.0)
+
+    def test_approved_cash_sale_posts_to_cashbook_with_real_timestamp(self):
+        sale = Sales.objects.create(
+            tenant=self.tenant,
+            partyID=self.party,
+            createdBy=self.staff,
+            invoiceSeries=self.sales_series,
+            invoiceSequenceNumber=10,
+            invoiceNumber="BCS0010",
+            modeOfPayment=Sales.Mode.CASH,
+            amount=275,
+            buildDate="2026-03-21",
+            isApproved=True,
+            approvedOn=timezone.now(),
+        )
+
+        sync_book_transactions(sale)
+
+        tx = BookTransaction.objects.get(source_object_id=sale.pk, isDeleted=False)
+        self.assertEqual(tx.source, BookTransaction.Source.SALES)
+        self.assertEqual(tx.direction, BookTransaction.Direction.IN)
+        self.assertEqual(tx.amount, 275.0)
+        self.assertIsNotNone(tx.txDateTime)
+        self.assertEqual(tx.txDateTime.hour, sale.approvedOn.hour)
+
+    def test_approved_online_and_mix_sales_post_to_books_only_after_approval(self):
+        online_sale = Sales.objects.create(
+            tenant=self.tenant,
+            partyID=self.party,
+            createdBy=self.staff,
+            invoiceSeries=self.sales_series,
+            invoiceSequenceNumber=11,
+            invoiceNumber="BCS0011",
+            modeOfPayment=Sales.Mode.ONLINE,
+            amount=420,
+            bankID=self.bank,
+            buildDate="2026-03-21",
+            isApproved=True,
+            approvedOn=timezone.now(),
+        )
+        mix_sale = Sales.objects.create(
+            tenant=self.tenant,
+            partyID=self.party,
+            createdBy=self.staff,
+            invoiceSeries=self.sales_series,
+            invoiceSequenceNumber=12,
+            invoiceNumber="BCS0012",
+            modeOfPayment=Sales.Mode.MIX,
+            amount=500,
+            mixCashAmount=200,
+            mixOnlineAmount=300,
+            bankID=self.bank,
+            buildDate="2026-03-21",
+            isApproved=True,
+            approvedOn=timezone.now(),
+        )
+
+        sync_book_transactions(online_sale)
+        sync_book_transactions(mix_sale)
+
+        online_tx = BookTransaction.objects.get(source_object_id=online_sale.pk, isDeleted=False)
+        self.assertEqual(online_tx.account.bank_id, self.bank.pk)
+        self.assertEqual(online_tx.amount, 420.0)
+
+        mix_txs = list(BookTransaction.objects.filter(source_object_id=mix_sale.pk, isDeleted=False).order_by('component'))
+        self.assertEqual(len(mix_txs), 2)
+        self.assertEqual(mix_txs[0].component, 'bank')
+        self.assertEqual(mix_txs[0].amount, 300.0)
+        self.assertEqual(mix_txs[1].component, 'cash')
+        self.assertEqual(mix_txs[1].amount, 200.0)
+
+    def test_only_credit_sales_hit_party_ledger_on_approval(self):
+        cash_sale = Sales.objects.create(
+            tenant=self.tenant,
+            partyID=self.party,
+            createdBy=self.staff,
+            invoiceSeries=self.sales_series,
+            invoiceSequenceNumber=8,
+            invoiceNumber="BCS0008",
+            modeOfPayment=Sales.Mode.CASH,
+            amount=120,
+            buildDate="2026-03-21",
+            isApproved=True,
+        )
+        credit_sale = Sales.objects.create(
+            tenant=self.tenant,
+            partyID=self.party,
+            createdBy=self.staff,
+            invoiceSeries=self.sales_series,
+            invoiceSequenceNumber=9,
+            invoiceNumber="BCS0009",
+            modeOfPayment=Sales.Mode.CREDIT,
+            amount=180,
+            buildDate="2026-03-21",
+            isApproved=True,
+        )
+
+        sync_party_ledger_entries_for_object(cash_sale)
+        sync_party_ledger_entries_for_object(credit_sale)
+
+        self.assertFalse(
+            PartyLedgerEntry.objects.filter(
+                tenant=self.tenant,
+                source_object_id=cash_sale.pk,
+                isDeleted=False,
+            ).exists()
+        )
+        ledger = PartyLedgerEntry.objects.get(
+            tenant=self.tenant,
+            source_object_id=credit_sale.pk,
+            isDeleted=False,
+        )
+        self.assertEqual(ledger.debit, 180.0)
+        self.assertEqual(ledger.credit, 0.0)
 
     def test_add_cash_counter_uses_reserved_invoice_number(self):
         entry = self._create_cash_counter(

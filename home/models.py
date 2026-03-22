@@ -54,6 +54,10 @@ class Tenant(TimeStampedModel, AuditedModel):
     name = models.CharField(max_length=200, unique=True)
     slug = models.SlugField(max_length=200, unique=True)
     isActive = models.BooleanField(default=True)
+    enableAttendanceLocationMaps = models.BooleanField(
+        default=False,
+        help_text='Enable reverse geolocation and map display on attendance records for this tenant.',
+    )
 
     def __str__(self):
         return self.name
@@ -345,6 +349,14 @@ class Attendance(TenantOwnedModel):
     staffID = models.ForeignKey(StaffUser, blank=True, null=True, on_delete=models.SET_NULL,
                                 related_name='staffID')
     registerType = models.CharField(max_length=200, blank=True, null=True)
+    loginPhoto = StdImageField(upload_to='attendance/img', blank=True, variations={
+        'thumbnail': (60, 60, True),
+        'medium': (200, 200, True),
+    }, delete_orphans=True)
+    logoutPhoto = StdImageField(upload_to='attendance/img', blank=True, variations={
+        'thumbnail': (60, 60, True),
+        'medium': (200, 200, True),
+    }, delete_orphans=True)
     login_remark = models.TextField(blank=True, null=True)
     logout_remark = models.TextField(blank=True, null=True)
     other_remark = models.TextField(blank=True, null=True)
@@ -463,13 +475,23 @@ class OrderAttachment(TenantOwnedModel):
 
 
 class Sales(TenantOwnedModel):
+    class Mode(models.TextChoices):
+        CASH = 'Cash', 'Cash'
+        CREDIT = 'Credit', 'Credit'
+        ONLINE = 'Online', 'Online'
+        MIX = 'Mix', 'Mix'
+
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sales')
     partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL)
     paymentID = models.CharField(max_length=200, blank=True, null=True)
     invoiceSeries = models.ForeignKey('InvoiceSeries', blank=True, null=True, on_delete=models.SET_NULL, related_name='sales')
     invoiceSequenceNumber = models.PositiveIntegerField(blank=True, null=True)
     invoiceNumber = models.CharField(max_length=200, default='Cash')
+    modeOfPayment = models.CharField(max_length=50, choices=Mode.choices, default=Mode.CASH)
     amount = models.FloatField(default=0.0)
+    mixCashAmount = models.FloatField(default=0.0)
+    mixOnlineAmount = models.FloatField(default=0.0)
+    bankID = models.ForeignKey(Bank, blank=True, null=True, on_delete=models.SET_NULL, related_name='sales_entries')
     remark = models.CharField(max_length=500, blank=True, null=True)
     createdBy = models.ForeignKey(StaffUser, blank=True, null=True, on_delete=models.SET_NULL,
                                   related_name='createdByStaff')
@@ -647,6 +669,7 @@ class BookTransaction(TenantOwnedModel):
     class Source(models.TextChoices):
         MANUAL = 'manual', 'Manual'
         COLLECTION = 'collection', 'Collection'
+        SALES = 'sales', 'Sales'
         CASH_COUNTER = 'cash_counter', 'Cash Counter'
         COUNTER_COLLECTION = 'counter_collection', 'Counter Collection'
         TRANSFER = 'transfer', 'Transfer'
@@ -743,4 +766,87 @@ class PartyLedgerEntry(TenantOwnedModel):
                 condition=Q(isDeleted=False),
                 name='uniq_active_party_ledger_per_source_component',
             ),
+        ]
+
+
+class JournalEntry(TenantOwnedModel):
+    class Source(models.TextChoices):
+        MANUAL = 'manual', 'Manual'
+        COLLECTION = 'collection', 'Collection'
+        COUNTER_COLLECTION = 'counter_collection', 'Counter Collection'
+        SALES = 'sales', 'Sales'
+        CASH_COUNTER = 'cash_counter', 'Cash Counter'
+        TRANSFER = 'transfer', 'Transfer'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='journal_entries')
+    entryDateTime = models.DateTimeField()
+    reference = models.CharField(max_length=200, blank=True, null=True)
+    narration = models.CharField(max_length=500, blank=True, null=True)
+    source = models.CharField(max_length=30, choices=Source.choices, default=Source.MANUAL)
+    createdBy = models.ForeignKey(
+        StaffUser,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='journal_entries_created',
+    )
+    source_content_type = models.ForeignKey(ContentType, blank=True, null=True, on_delete=models.SET_NULL, related_name='journal_entries')
+    source_object_id = models.PositiveBigIntegerField(blank=True, null=True)
+    source_object = GenericForeignKey('source_content_type', 'source_object_id')
+
+    def __str__(self):
+        source_label = self.get_source_display() if self.source else 'Journal'
+        reference = self.reference or f'#{self.pk}'
+        if self.entryDateTime:
+            return f'{source_label} - {reference} - {self.entryDateTime.strftime("%d-%m-%Y %I:%M %p")}'
+        return f'{source_label} - {reference}'
+
+    class Meta:
+        verbose_name_plural = 'Journal Entries'
+        ordering = ['entryDateTime', 'id']
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'entryDateTime'], name='journal_tenant_dt_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'source'], name='journal_tenant_src_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'source_content_type', 'source_object_id'],
+                condition=Q(isDeleted=False),
+                name='uniq_active_journal_per_source',
+            ),
+        ]
+
+
+class JournalLine(TenantOwnedModel):
+    class AccountType(models.TextChoices):
+        CASH = 'cash', 'Cash'
+        BANK = 'bank', 'Bank'
+        PARTY = 'party', 'Party'
+        SALES = 'sales', 'Sales'
+        EXPENSE = 'expense', 'Expense'
+        ADJUSTMENT = 'adjustment', 'Adjustment'
+        ADVANCE = 'advance', 'Advance'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='journal_lines')
+    journalEntry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name='lines')
+    lineNo = models.PositiveIntegerField(default=1)
+    accountType = models.CharField(max_length=20, choices=AccountType.choices)
+    bookAccount = models.ForeignKey(BookAccount, blank=True, null=True, on_delete=models.SET_NULL, related_name='journal_lines')
+    party = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL, related_name='journal_lines')
+    debit = models.FloatField(default=0.0)
+    credit = models.FloatField(default=0.0)
+    note = models.CharField(max_length=255, blank=True, null=True)
+    component = models.CharField(max_length=30, blank=True, null=True)
+
+    def __str__(self):
+        reference = getattr(self.journalEntry, 'reference', None) or f'Journal#{self.journalEntry_id}'
+        return f'{reference} | {self.get_accountType_display()} | D{self.debit} C{self.credit}'
+
+    class Meta:
+        verbose_name_plural = 'Journal Lines'
+        ordering = ['journalEntry_id', 'lineNo', 'id']
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'journalEntry', 'lineNo'], name='jrnline_tenant_entry_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'accountType'], name='jrnline_tenant_account_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'party'], name='jrnline_tenant_party_idx'),
         ]

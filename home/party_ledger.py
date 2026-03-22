@@ -120,11 +120,14 @@ def _postings_for_counter_collection(obj: CollectionCashCounter) -> Tuple[_Posti
 def _postings_for_sales(obj: Sales) -> Tuple[_Posting, ...]:
     if not obj.partyID_id or obj.isApproved is False:
         return tuple()
+    mode = (obj.modeOfPayment or Sales.Mode.CREDIT).strip()
+    if mode != Sales.Mode.CREDIT:
+        return tuple()
     amount = _safe_float(obj.amount)
     if amount <= 0:
         return tuple()
     ref = obj.invoiceNumber or obj.paymentID or None
-    particulars = 'Sale'
+    particulars = f'Sale ({mode})'
     if obj.remark:
         particulars += f' - {obj.remark}'
     return (

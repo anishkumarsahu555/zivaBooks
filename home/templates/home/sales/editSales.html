@@ -5,69 +5,69 @@
 {% endblock %}
 {% block css %}
     <style>
-        .avatar-upload {
-            position: relative;
-            max-width: 115px;
-            margin: 5px auto;
+        .invoice-chip-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
         }
 
-        .avatar-upload .avatar-edit {
-            position: absolute;
-            right: 12px;
-            z-index: 1;
-            top: 10px;
+        .invoice-chip {
+            border: 1px solid rgba(15, 118, 110, 0.18);
+            background: #f8fffe;
+            color: #0f766e;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: default;
         }
 
-        .avatar-upload .avatar-edit input {
-            display: none;
+        .invoice-chip.active {
+            background: #0f766e;
+            color: #fff;
+            border-color: #0f766e;
         }
 
-        .avatar-upload .avatar-edit input + label {
-            display: inline-block;
-            width: 25px;
-            height: 25px;
-            margin-bottom: 0;
-            border-radius: 100%;
-            background: #FFFFFF;
-            border: 1px solid transparent;
-            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.12);
+        .sales-mode-menu {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            margin-bottom: 14px;
+        }
+
+        .sales-mode-chip {
+            border: 1px solid #d4e7e6;
+            background: #fff;
+            color: #0f766e;
+            border-radius: 999px;
+            padding: 9px 14px;
+            font-size: 0.86rem;
+            font-weight: 700;
+            line-height: 1;
             cursor: pointer;
-            font-weight: normal;
-            transition: all 0.2s ease-in-out;
+            white-space: nowrap;
         }
 
-        .avatar-upload .avatar-edit input + label:hover {
-            background: #f1f1f1;
-            border-color: #d6d6d6;
+        .sales-mode-chip.active {
+            background: #0f766e;
+            color: #fff;
+            border-color: #0f766e;
         }
 
-        .avatar-upload .avatar-edit input + label:after {
-            color: #757575;
-            position: absolute;
-            top: 10px;
-            left: 0;
-            right: 0;
-            text-align: center;
-            margin: auto;
-
+        .sales-mode-panel {
+            padding: 1rem;
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 14px;
+            background: #fbfffe;
         }
 
-        .avatar-upload .avatar-preview {
-            width: 100px;
-            height: 100px;
-            position: relative;
-            border-radius: 100%;
-            border: 6px solid #F8F8F8;
-            box-shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.1);
-        }
-
-        .avatar-upload .avatar-preview > div {
-            width: 100%;
-            height: 100%;
-            border-radius: 100%;
-            background-size: cover;
-            background-repeat: no-repeat;
-            background-position: center;
+        .sales-mode-note {
+            margin: -2px 0 12px;
+            font-size: 0.82rem;
+            color: #5f6b7a;
         }
 
     </style>
@@ -86,58 +86,91 @@
                 <div class="ui row teal stacked segment padded">
                     <div class="content">
 
-                        <form class="ui  small form " id="addForm">{% csrf_token %}
-                            <div class="two fields">
-                                <div class="eight wide field required">
-                                    <label>Invoice Number</label>
-                                    <input type="text" id="invoiceNo" value="{{ invoice_display }}" readonly>
-                                    <div class="ui mini grey text" style="margin-top: 6px;">
-                                        Invoice numbers stay locked after creation.
-                                    </div>
+                        <form class="ui small form" id="addForm">{% csrf_token %}
+                            <div class="sales-mode-panel">
+                                <div class="sales-mode-menu" id="salesModeMenu">
+                                    <button type="button" class="sales-mode-chip" data-mode="Cash" onclick="selectSalesMode('Cash')">Cash</button>
+                                    <button type="button" class="sales-mode-chip" data-mode="Credit" onclick="selectSalesMode('Credit')">Credit</button>
+                                    <button type="button" class="sales-mode-chip" data-mode="Online" onclick="selectSalesMode('Online')">Online</button>
+                                    <button type="button" class="sales-mode-chip" data-mode="Mix" onclick="selectSalesMode('Mix')">Mix</button>
                                 </div>
+                                <div class="sales-mode-note">Invoice stays locked after creation. You can still update the sale mode and payment details until approval.</div>
+                                <input type="hidden" id="salesMode" value="{{ obj.modeOfPayment|default:'Cash' }}">
 
+                                <div class="two fields">
+                                    <div class="eight wide field required">
+                                        <label>Invoice Number</label>
+                                        <input type="hidden" id="invoiceNo" value="{{ invoice_display }}">
+                                        <div class="invoice-chip-wrap">
+                                            <span class="invoice-chip active" id="invoiceChipDisplay">{{ invoice_display }}</span>
+                                        </div>
+                                    </div>
 
-                                <div class="eight wide field required">
-                                    <label>Invoice Date</label>
-                                    <div class="ui calendar" id="cDate">
-                                        <div class="ui input">
-                                            <input type="text" placeholder="Date/Time" id="colDate">
+                                    <div class="eight wide field required">
+                                        <label>Invoice Date</label>
+                                        <div class="ui calendar" id="cDate">
+                                            <div class="ui input">
+                                                <input type="text" placeholder="Date/Time" id="colDate">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div class="two  fields">
-                                <div class="eight wide field required">
-                                    <label>Party Name</label>
-                                    <select class="ui clearable search dropdown" id="party">
-                                        <option value="">Search By Party Name</option>
-                                    </select>
-                                </div>
-                                <div class="eight wide field required">
-                                    <label>Amount (₹ <a class="ui violet label" id="money">{{ obj.amount|convert }}</a>
-                                        )</label>
-                                    <input type="number" name="amount" id="amount" placeholder="Amount"
-                                           onkeyup="toIndianCurrency()" value="{{ obj.amount }}">
 
-
+                                <div class="two fields">
+                                    <div class="eight wide field required">
+                                        <label>Party Name</label>
+                                        <select class="ui clearable search dropdown" id="party">
+                                            <option value="">Search By Party Name</option>
+                                        </select>
+                                    </div>
+                                    <div class="eight wide field required" id="singleAmountField">
+                                        <label>Amount (₹ <a class="ui violet label" id="money">{{ obj.amount|convert }}</a>)</label>
+                                        <input type="number" name="amount" id="amount" placeholder="Amount" onkeyup="toIndianCurrency()" value="{{ obj.amount }}">
+                                    </div>
                                 </div>
 
-                            </div>
-
-
-                            <div class="one  fields ">
-
-                                <div class="sixteen wide  field ">
-                                    <label>Remark</label>
-                                    <textarea name="" id="remark" placeholder="Any Remark"
-                                              rows="3">{{ obj.remark }}</textarea>
+                                <div class="two fields" id="onlineFields" style="display:none;">
+                                    <div class="eight wide field required">
+                                        <label>Bank</label>
+                                        <select class="ui search dropdown" id="bank">
+                                            <option value="">Select Bank</option>
+                                            {% for foo in banks %}
+                                                <option value="{{ foo.id }}" {% if obj.bankID_id == foo.id %}selected{% endif %}>{{ foo.name }} - {{ foo.accountNumber }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="eight wide field"></div>
                                 </div>
 
+                                <div class="three fields" id="mixFields" style="display:none;">
+                                    <div class="five wide field required">
+                                        <label>Cash Amount (₹ <a class="ui violet label" id="moneyMixCash">{{ obj.mixCashAmount|convert }}</a>)</label>
+                                        <input type="number" id="amountMixCash" placeholder="Cash amount" onkeyup="toIndianCurrency()" value="{{ obj.mixCashAmount }}">
+                                    </div>
+                                    <div class="five wide field required">
+                                        <label>Online Amount (₹ <a class="ui violet label" id="moneyMixOnline">{{ obj.mixOnlineAmount|convert }}</a>)</label>
+                                        <input type="number" id="amountMixOnline" placeholder="Online amount" onkeyup="toIndianCurrency()" value="{{ obj.mixOnlineAmount }}">
+                                    </div>
+                                    <div class="six wide field required">
+                                        <label>Bank</label>
+                                        <select class="ui search dropdown" id="bankMix">
+                                            <option value="">Select Bank</option>
+                                            {% for foo in banks %}
+                                                <option value="{{ foo.id }}" {% if obj.bankID_id == foo.id %}selected{% endif %}>{{ foo.name }} - {{ foo.accountNumber }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
 
+                                <div class="one fields">
+                                    <div class="sixteen wide field">
+                                        <label>Remark</label>
+                                        <textarea id="remark" placeholder="Any Remark" rows="3">{{ obj.remark }}</textarea>
+                                    </div>
+                                </div>
+
+                                <input type="hidden" id="ID" value="{{ obj.pk }}">
                             </div>
-
-                            <input type="hidden" id="ID" value="{{ obj.pk }}">
-
                         </form>
                     </div>
                     <div class="ui  aligned basic  grid">
@@ -185,6 +218,7 @@
     <script>
         var salesEditReadOnly = {{ sales_edit_readonly|yesno:"true,false" }};
         var salesReturnUrl = "{{ sales_return_url|default:'' }}";
+        var selectedPartyId = "{{ obj.partyID_id|default:'' }}";
 
         var today = new Date();
         $('#cDate')
@@ -206,21 +240,24 @@
                 }
             );
 
+        function selectSalesMode(newMode) {
+            $('#salesMode').val(newMode);
+            $('#salesModeMenu .sales-mode-chip').removeClass('active');
+            $('#salesModeMenu .sales-mode-chip[data-mode="' + newMode + '"]').addClass('active');
+            $('#singleAmountField').toggle(newMode !== 'Mix');
+            $('#onlineFields').toggle(newMode === 'Online');
+            $('#mixFields').toggle(newMode === 'Mix');
+        }
+
         $(loadDetail());
 
         function loadDetail() {
+            selectSalesMode($('#salesMode').val() || 'Cash');
             if (salesEditReadOnly) {
                 // Disable form and hide update button for staff once approved.
                 $('#addForm input, #addForm select, #addForm textarea').prop('disabled', true);
                 $('#saveBtn').hide();
             }
-
-            setTimeout(function () {
-                $('#party').val("{{obj.partyID.pk}}").change();
-
-
-            }, 2000);
-
         }
 
         function salesSave() {
@@ -232,14 +269,14 @@
             var colDate = $('#colDate').val();
             var party = $('#party').val();
             var amount = $('#amount').val();
+            var paymentMode = $('#salesMode').val();
+            var bank = paymentMode === 'Mix' ? $('#bankMix').val() : $('#bank').val();
+            var amountMixCash = $('#amountMixCash').val();
+            var amountMixOnline = $('#amountMixOnline').val();
             var remark = $('#remark').val();
             var ID = $('#ID').val();
 
-
-            debugger;
-
-            if (ID === '' || party === '' || colDate === '' || amount === ''
-            ) {
+            if (ID === '' || party === '' || colDate === '') {
                 $('body')
                     .toast({
                         class: 'orange',
@@ -247,11 +284,24 @@
                     })
                 ;
                 hideLoading();
+            } else if (paymentMode === 'Mix' && (amountMixCash === '' || amountMixOnline === '' || bank === '')) {
+                $('body').toast({class: 'orange', message: 'Cash amount, online amount, and bank are required for mix sales.'});
+                hideLoading();
+            } else if (paymentMode === 'Online' && (amount === '' || bank === '')) {
+                $('body').toast({class: 'orange', message: 'Amount and bank are required for online sales.'});
+                hideLoading();
+            } else if (paymentMode !== 'Mix' && amount === '') {
+                $('body').toast({class: 'orange', message: 'Amount is required.'});
+                hideLoading();
             } else {
                 data = new FormData();
                 data.append('colDate', colDate);
                 data.append('party', party);
                 data.append('amount', amount);
+                data.append('paymentMode', paymentMode);
+                data.append('bank', bank);
+                data.append('amountMixCash', amountMixCash);
+                data.append('amountMixOnline', amountMixOnline);
                 data.append('remark', remark);
                 data.append('ID', ID);
 
@@ -284,7 +334,7 @@
                             $('body')
                                 .toast({
                                     class: 'error',
-                                    message: 'An error occurred !'
+                                    message: response.error || 'An error occurred !'
                                 })
                             ;
                             hideLoading();
@@ -306,7 +356,7 @@
                         $('body')
                             .toast({
                                 class: 'error',
-                                message: 'An error occurred !'
+                                message: (arguments[0] && arguments[0].responseJSON && arguments[0].responseJSON.error) || 'An error occurred !'
                             })
                         ;
                         hideLoading();
@@ -338,15 +388,10 @@
                         $('#party').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
 
                     }
-                    {#$('#party').val("{{ obj.partyID.name  }} - {% if obj.partyID.name %}{{obj.partyID.partyGroupID.name}}{% else %}N/A{% endif %} @ {{obj.partyID.pk}}").change();#}
-                    $('#party').val("{{obj.partyID.pk}}").change();
-
-                    {% comment %}    setTimeout(function(){
-                            $('#party').val("{{ obj.partyID.name  }} - {% if obj.partyID.name %}{{obj.partyID.partyGroupID.name}}{% else %}N/A{% endif %} @ {{obj.partyID.pk}}").change();
-
-
-
-          },2000);{% endcomment %}
+                    $('#party').dropdown('refresh');
+                    if (selectedPartyId) {
+                        $('#party').dropdown('set selected', selectedPartyId);
+                    }
 
                 },
 
@@ -364,9 +409,12 @@
         }
 
         const toIndianCurrency = () => {
-            let num = $('#amount').val();
-            const curr = num.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,")
-            $('#money').html(curr);
+            let num = $('#amount').val() || '';
+            let mixCash = $('#amountMixCash').val() || '';
+            let mixOnline = $('#amountMixOnline').val() || '';
+            $('#money').html(num.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
+            $('#moneyMixCash').html(mixCash.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
+            $('#moneyMixOnline').html(mixOnline.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
         };
     </script>
 {% endblock %}

@@ -129,9 +129,12 @@
                                 <th>PaymentID</th>
                                 <th>Party Name</th>
                                 <th>InvoiceNumber</th>
+                                <th>Mode</th>
+                                <th>Payment Detail</th>
                                 <th>Amount</th>
                                 <th>InvoiceDate</th>
                                 <th>Created By</th>
+                                <th>Approved On</th>
                                 <th>Added On</th>
                                 <th>Remark</th>
                                 <th>Action</th>
@@ -171,32 +174,6 @@
             </div>
         </div>
     </div>
-
-    {% if sales_capabilities.can_message %}
-        <div class="ui mini modal" id="imgModal">
-            <div class="header">
-                Send Message
-            </div>
-            <div class="content">
-                <p>Are you sure you want to send message?</p>
-            </div>
-            <input type="hidden" id="approveCollectionID">
-            <div class="actions">
-                <div class="ui negative button">
-                    No
-                </div>
-                <button class="ui green right labeled icon button saveBtn" onclick="confirmApproval()">
-                    Yes
-                    <i class="checkmark icon"></i>
-                </button>
-                <button style="display: none;" class="ui teal right labeled icon button saveBtnLoad">
-                    Saving ....
-                    <i class="checkmark icon"></i>
-                </button>
-
-            </div>
-        </div>
-    {% endif %}
 {% endblock %}
 
 {% block js %}
@@ -252,7 +229,7 @@
             buttons: [{
                 extend: 'excel',
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6, 7]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
                 }
             }
                 {% comment %}      , {
@@ -266,15 +243,18 @@
                 {"name": "paymentID", "targets": 0, "orderable": true},
                 {"name": "partyID.name", "targets": 1, "orderable": true},
                 {"name": "invoiceNumber", "targets": 2, "orderable": true},
-                {"name": "amount", "targets": 3, "orderable": true,"className": "dt-body-right"},
-                {"name": "buildDate", "targets": 4, "orderable": true},
-                {"name": "createdBy.name", "targets": 5, "orderable": true},
-                {"name": "datetime", "targets": 6, "orderable": true},
-                {"name": "remark", "targets": 7, "orderable": true},
-                {"name": "action", "targets": 8, "orderable": false},
+                {"name": "modeOfPayment", "targets": 3, "orderable": true},
+                {"name": "bankID__name", "targets": 4, "orderable": true},
+                {"name": "amount", "targets": 5, "orderable": true,"className": "dt-body-right"},
+                {"name": "buildDate", "targets": 6, "orderable": true},
+                {"name": "createdBy__name", "targets": 7, "orderable": true},
+                {"name": "approvedOn", "targets": 8, "orderable": true},
+                {"name": "datetime", "targets": 9, "orderable": true},
+                {"name": "remark", "targets": 10, "orderable": true},
+                {"name": "id", "targets": 11, "orderable": false},
 
             ],
-            aaSorting: [[6, 'desc']],
+            aaSorting: [[9, 'desc']],
             "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
             "pageLength": 10,
             "processing": true,
@@ -352,66 +332,6 @@
 
         }
 
-        function showConfirmationModal(id) {
-            if (!$('#imgModal').length) {
-                return;
-            }
-            $('#imgModal').modal('show');
-            $('#approveCollectionID').val('' + id);
-        }
-
-
-        function confirmApproval() {
-            showLoading();
-            var id = $('#approveCollectionID').val();
-            var formdata = new FormData();
-            formdata.append('userID', id);
-
-            $.ajax({
-                url: "{% url 'homeApp:send_message_sales' %}",
-                type: "post",
-                data: formdata,
-                contentType: false,
-                cache: false,
-                processData: false,
-
-                success: function (response) {
-                    if (response.message === 'success') {
-                        $('body')
-                            .toast({
-                                class: 'success',
-                                message: response.detail || 'Sale approved successfully.'
-                            })
-                        ;
-
-                        $('#imgModal').modal('hide');
-                        userTab.ajax.reload(null, false);
-                        hideLoading();
-                    } else {
-                        $('body')
-                            .toast({
-                                class: 'error',
-                                message: response.detail || 'Unable to approve sale.'
-                            })
-                        ;
-                        hideLoading();
-                    }
-
-                    return response;
-                },
-                error: function () {
-                    $('body')
-                        .toast({
-                            class: 'error',
-                            message: 'Unable to approve sale.'
-                        })
-                    ;
-                    hideLoading();
-                }
-
-            });
-
-        }
 
         $(ChangeDate());
 
