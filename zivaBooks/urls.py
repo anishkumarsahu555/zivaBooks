@@ -16,9 +16,15 @@ Including another URLconf
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
-from django.conf.urls.static import static
+from django.urls import re_path
+from django.views.static import serve as media_serve
 
 urlpatterns = [
+    re_path(
+        rf'^{settings.MEDIA_URL.lstrip("/")}(?P<path>.*)$',
+        media_serve,
+        {'document_root': settings.MEDIA_ROOT},
+    ),
     path('', include(('home.urls', 'home'), namespace='homeApp')),
     path('admin/', admin.site.urls),
     path('activate/', include(('activation.urls', 'activation'), namespace='activationApp')),
@@ -29,8 +35,3 @@ urlpatterns = [
 handler403 = 'home.views.custom_permission_denied'
 handler404 = 'home.views.custom_page_not_found'
 handler500 = 'home.views.custom_server_error'
-
-
-if settings.DEBUG:
-    urlpatterns = urlpatterns + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns = urlpatterns + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
