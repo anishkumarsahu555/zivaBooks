@@ -4,18 +4,33 @@ from .models import StaffUser, Tenant, TenantMembership
 
 
 def get_current_tenant(request_or_user=None):
+    if request_or_user is not None and hasattr(request_or_user, '_cached_current_tenant'):
+        return request_or_user._cached_current_tenant
     user = getattr(request_or_user, 'user', request_or_user)
+    if user is not None and hasattr(user, '_cached_current_tenant'):
+        return user._cached_current_tenant
     if user is not None and getattr(user, 'is_authenticated', False):
         membership = TenantMembership.objects.select_related('tenant').filter(
             user=user,
             isDefault=True,
         ).first()
         if membership:
+            if request_or_user is not None:
+                setattr(request_or_user, '_cached_current_tenant', membership.tenant)
+            setattr(user, '_cached_current_tenant', membership.tenant)
             return membership.tenant
         membership = TenantMembership.objects.select_related('tenant').filter(user=user).first()
         if membership:
+            if request_or_user is not None:
+                setattr(request_or_user, '_cached_current_tenant', membership.tenant)
+            setattr(user, '_cached_current_tenant', membership.tenant)
             return membership.tenant
-    return Tenant.objects.order_by('id').first()
+    tenant = Tenant.objects.only('id', 'name', 'slug', 'enableAttendanceLocationMaps').order_by('id').first()
+    if request_or_user is not None:
+        setattr(request_or_user, '_cached_current_tenant', tenant)
+    if user is not None:
+        setattr(user, '_cached_current_tenant', tenant)
+    return tenant
 
 
 def tenant_qs(request_or_user, model_or_qs, include_unassigned=True):
@@ -57,4 +72,8 @@ def ensure_membership(user, tenant, role):
 
 
 def get_staff_user_for_request(request):
-    return tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk).first()
+    if hasattr(request, '_cached_staff_user'):
+        return request._cached_staff_user
+    staff_user = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk).first()
+    request._cached_staff_user = staff_user
+    return staff_user

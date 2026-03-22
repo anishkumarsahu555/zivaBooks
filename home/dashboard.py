@@ -76,6 +76,8 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             'action_sections': [],
             'license_message': '',
         }
+    if hasattr(request, '_dashboard_state_cache'):
+        return request._dashboard_state_cache
     effective_permissions = _effective_permission_names(request)
 
     display_name = (
@@ -572,10 +574,11 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             ],
         })
 
-    return {
+    dashboard_state = {
         'hero': hero,
         'metric_groups': metric_groups,
         'action_sections': action_sections,
         'license_message': getattr(request, 'dashboard_license_message', '') or _build_license_message(tenant),
     }
-    effective_permissions = _effective_permission_names(request)
+    request._dashboard_state_cache = dashboard_state
+    return dashboard_state

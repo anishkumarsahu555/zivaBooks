@@ -24,8 +24,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
 
+
+def _env_flag(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', True)
+DEBUG = _env_flag('DEBUG', True)
 
 ALLOWED_HOSTS = ['*']
 
@@ -94,6 +102,8 @@ if os.getenv('DATABASE_ENGINE') == 'postgres':
             'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'pass'),
             'HOST': os.environ.get('POSTGRES_HOST', '127.0.0.1'),
             'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '0')),
+            'CONN_HEALTH_CHECKS': _env_flag('DB_CONN_HEALTH_CHECKS', True),
         }
     }
 else:
@@ -101,6 +111,8 @@ else:
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
+            # SQLite does not benefit from persistent connections under load.
+            'CONN_MAX_AGE': 0,
         }
     }
 
@@ -180,12 +192,22 @@ PWA_APP_ICONS = [
 
 PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'home', '../static/sw/serviceworker.js')
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://127.0.0.1:6379/1",
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+if _env_flag('USE_REDIS_CACHE', True):
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": os.environ.get("REDIS_CACHE_URL", "redis://127.0.0.1:6379/1"),
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+            "TIMEOUT": int(os.environ.get("CACHE_DEFAULT_TIMEOUT", "300")),
         }
     }
-}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "zivabooks-local-cache",
+            "TIMEOUT": int(os.environ.get("CACHE_DEFAULT_TIMEOUT", "300")),
+        }
+    }

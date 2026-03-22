@@ -22,13 +22,50 @@ def _tenant_admin_group_name(tenant):
 def _all_permission_names(user):
     if not getattr(user, 'is_authenticated', False):
         return set()
-    return set(user.get_all_permissions())
+    cached = getattr(user, '_all_permission_names_cache', None)
+    if cached is not None:
+        return cached
+    permissions = set(user.get_all_permissions())
+    user._all_permission_names_cache = permissions
+    return permissions
+
+
+def _tenant_permission_names(request_or_user, tenant):
+    request = request_or_user if hasattr(request_or_user, 'META') else None
+    if request is not None and hasattr(request, '_tenant_permission_names_cache'):
+        return request._tenant_permission_names_cache
+
+    cached = getattr(tenant, '_tenant_permission_names_cache', None)
+    if cached is not None:
+        if request is not None:
+            request._tenant_permission_names_cache = cached
+        return cached
+
+    tenant_admin_group = (
+        Group.objects
+        .filter(name=_tenant_admin_group_name(tenant))
+        .prefetch_related('permissions__content_type')
+        .first()
+    )
+    if tenant_admin_group is None:
+        permissions = set()
+    else:
+        permissions = {
+            f'{permission.content_type.app_label}.{permission.codename}'
+            for permission in tenant_admin_group.permissions.all()
+        }
+    tenant._tenant_permission_names_cache = permissions
+    if request is not None:
+        request._tenant_permission_names_cache = permissions
+    return permissions
 
 
 def _effective_permission_names(request_or_user):
     user = getattr(request_or_user, 'user', request_or_user)
     if not getattr(user, 'is_authenticated', False):
         return set()
+    if hasattr(request_or_user, '_tenant_effective_perm_cache'):
+        return request_or_user._tenant_effective_perm_cache
     cached = getattr(user, '_tenant_effective_perm_cache', None)
     if cached is not None:
         return cached
@@ -36,19 +73,15 @@ def _effective_permission_names(request_or_user):
     user_permissions = _all_permission_names(user)
     tenant = get_current_tenant(request_or_user)
     if tenant is None:
+        if hasattr(request_or_user, 'META'):
+            request_or_user._tenant_effective_perm_cache = user_permissions
         user._tenant_effective_perm_cache = user_permissions
         return user_permissions
 
-    tenant_admin_group = Group.objects.filter(name=_tenant_admin_group_name(tenant)).first()
-    if tenant_admin_group is None:
-        user._tenant_effective_perm_cache = set()
-        return user._tenant_effective_perm_cache
-
-    tenant_permissions = {
-        f'{permission.content_type.app_label}.{permission.codename}'
-        for permission in tenant_admin_group.permissions.select_related('content_type')
-    }
+    tenant_permissions = _tenant_permission_names(request_or_user, tenant)
     effective_permissions = tenant_permissions if user.is_superuser else user_permissions & tenant_permissions
+    if hasattr(request_or_user, 'META'):
+        request_or_user._tenant_effective_perm_cache = effective_permissions
     user._tenant_effective_perm_cache = effective_permissions
     return effective_permissions
 
@@ -396,6 +429,8 @@ def build_sidebar_sections(request_or_user):
     user = getattr(request_or_user, 'user', request_or_user)
     if not getattr(user, 'is_authenticated', False):
         return []
+    if hasattr(request_or_user, '_sidebar_sections_cache'):
+        return request_or_user._sidebar_sections_cache
     is_admin_like = _has_any_perm(request_or_user, ADMIN_LIKE_PERMS)
     party_admin_perms = ('home.can_manage_parties', 'home.can_view_party_credentials')
     bank_perms = (
@@ -581,4 +616,8 @@ def build_sidebar_sections(request_or_user):
     for section in sections:
         if section['title'] in ('General', 'Profile') or section.get('items'):
             visible_sections.append(section)
+    if hasattr(request_or_user, 'META'):
+        request_or_user._sidebar_sections_cache = visible_sections
+    else:
+        user._sidebar_sections_cache = visible_sections
     return visible_sections

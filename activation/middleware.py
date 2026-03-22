@@ -12,6 +12,8 @@ from .models import Validity
 
 
 def _validity_for_request(request):
+    if hasattr(request, "_cached_tenant_validity"):
+        return request._cached_tenant_validity
     user = getattr(request, "user", None)
     tenant = get_current_tenant(request) if (user and user.is_authenticated) else None
 
@@ -19,8 +21,11 @@ def _validity_for_request(request):
     if tenant is not None:
         validity = qs.filter(tenant=tenant).order_by("-expiryDate", "-id").first()
         if validity is not None:
+            request._cached_tenant_validity = validity
             return validity
-    return qs.filter(tenant__isnull=True).order_by("-expiryDate", "-id").first()
+    validity = qs.filter(tenant__isnull=True).order_by("-expiryDate", "-id").first()
+    request._cached_tenant_validity = validity
+    return validity
 
 
 def _is_expired(validity) -> bool:
