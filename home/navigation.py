@@ -134,7 +134,7 @@ def _admin_sections(user):
         {
             'title': 'Collections',
             'items': _filter_items(user, [
-                _nav_item('Take Collection', 'homeApp:take_collection', 'hand holding usd', 'home.add_collection'),
+                _nav_item('Take Collection', 'homeApp:add_collection', 'hand holding usd', 'home.add_collection'),
                 _nav_item('Collection List', 'homeApp:collection_list', 'book', 'home.view_collection'),
                 _nav_item('Cheque Reminder List', 'homeApp:cheque_reminder_list', 'bell', 'home.view_collection'),
             ]),
@@ -179,7 +179,7 @@ def _admin_sections(user):
                     'home.add_attendance',
                     'home.view_attendance',
                 )),
-                _nav_item('Attendance Report', 'homeApp:attendance_report_admin', 'calendar alternate', (
+                _nav_item('Attendance List', 'homeApp:attendance_list', 'calendar alternate', (
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
                 )),
@@ -241,7 +241,7 @@ def _collection_sections(user):
             'title': 'Collections',
             'items': _filter_items(user, [
                 _nav_item('Take Collection', 'homeApp:add_collection', 'hand holding usd', 'home.add_collection'),
-                _nav_item('Collection List', 'homeApp:my_collection', 'book', (
+                _nav_item('Collection List', 'homeApp:collection_list', 'book', (
                     'home.view_collection',
                     'home.add_collection',
                     'home.change_collection',
@@ -252,7 +252,7 @@ def _collection_sections(user):
             'title': 'Sales',
             'items': _filter_items(user, [
                 _nav_item('Add Sale', 'homeApp:add_sales', 'shopping cart', 'home.add_sales'),
-                _nav_item('Sales List', 'homeApp:my_sales_list', 'book', (
+                _nav_item('Sales List', 'homeApp:sales_list', 'book', (
                     'home.view_sales',
                     'home.add_sales',
                     'home.change_sales',
@@ -287,7 +287,7 @@ def _staff_sections(user):
             'title': 'Sales',
             'items': _filter_items(user, [
                 _nav_item('Add Sale', 'homeApp:add_sales', 'shopping cart', 'home.add_sales'),
-                _nav_item('Sales List', 'homeApp:my_sales_list', 'book', (
+                _nav_item('Sales List', 'homeApp:sales_list', 'book', (
                     'home.view_sales',
                     'home.add_sales',
                     'home.change_sales',
@@ -323,7 +323,7 @@ def _sales_sections(user):
             'title': 'Collections',
             'items': _filter_items(user, [
                 _nav_item('Take Collection', 'homeApp:add_collection', 'hand holding usd', 'home.add_collection'),
-                _nav_item('Collection List', 'homeApp:my_collection', 'book', (
+                _nav_item('Collection List', 'homeApp:collection_list', 'book', (
                     'home.view_collection',
                     'home.add_collection',
                     'home.change_collection',
@@ -387,7 +387,7 @@ def _cash_counter_sections(user):
             'title': 'Sales',
             'items': _filter_items(user, [
                 _nav_item('Add Sale', 'homeApp:add_sales', 'shopping cart', 'home.add_sales'),
-                _nav_item('Sales List', 'homeApp:my_sales_list', 'book', (
+                _nav_item('Sales List', 'homeApp:sales_list', 'book', (
                     'home.view_sales',
                     'home.add_sales',
                     'home.change_sales',
@@ -471,19 +471,17 @@ def build_sidebar_sections(request_or_user):
         {
             'title': 'Collections',
             'items': _filter_items(request_or_user, [
-                _nav_item('Take Collection', 'homeApp:add_collection', 'hand holding usd', 'home.add_collection'),
-                _nav_item('My Collections', 'homeApp:my_collection', 'book', (
+                _nav_item('Take Collection', 'homeApp:add_collection', 'hand holding usd', (
+                    'home.add_collection',
+                    'home.can_approve_collection',
+                )),
+                _nav_item('Collection List', 'homeApp:collection_list', 'book', (
                     'home.view_collection',
                     'home.add_collection',
                     'home.change_collection',
-                )),
-                _nav_item('Collection List', 'homeApp:collection_list', 'clipboard list', (
                     'home.can_approve_collection',
                 )),
                 _nav_item('Cheque Reminder List', 'homeApp:cheque_reminder_list', 'bell', (
-                    'home.can_approve_collection',
-                )),
-                _nav_item('Take Collection (Admin)', 'homeApp:take_collection', 'hand holding usd', (
                     'home.can_approve_collection',
                 )),
             ]),
@@ -492,13 +490,10 @@ def build_sidebar_sections(request_or_user):
             'title': 'Sales',
             'items': _filter_items(request_or_user, [
                 _nav_item('Add Sale', 'homeApp:add_sales', 'shopping cart', 'home.add_sales'),
-                _nav_item('My Sales List', 'homeApp:my_sales_list', 'book', (
+                _nav_item('Sales List', 'homeApp:sales_list', 'book', (
                     'home.view_sales',
                     'home.add_sales',
                     'home.change_sales',
-                    'home.can_manage_sales',
-                )),
-                _nav_item('Sales List', 'homeApp:sales_list', 'clipboard list', (
                     'home.can_manage_sales',
                     'home.can_approve_sales',
                 )),
@@ -519,13 +514,10 @@ def build_sidebar_sections(request_or_user):
             'title': 'Orders',
             'items': _filter_items(request_or_user, [
                 _nav_item('Add Order', 'homeApp:add_order', 'clipboard outline', 'home.add_order'),
-                _nav_item('My Orders List', 'homeApp:my_orders_list', 'list alternate outline', (
+                _nav_item('Orders List', 'homeApp:orders_list', 'list alternate outline', (
                     'home.view_order',
                     'home.add_order',
                     'home.change_order',
-                    'home.can_manage_orders',
-                )),
-                _nav_item('Orders List', 'homeApp:orders_list', 'clipboard list', (
                     'home.can_manage_orders',
                     'home.can_approve_orders',
                 )),
@@ -568,14 +560,12 @@ def build_sidebar_sections(request_or_user):
                     'home.view_attendance',
                     'home.change_attendance',
                 )),
-                _nav_item('Attendance Report', 'homeApp:attendance_report_admin', 'calendar alternate', (
-                    'home.can_view_all_attendance',
-                    'home.can_view_attendance_reports',
-                )),
-                _nav_item('Attendance Report (Mine)', 'homeApp:attendance_report', 'calendar alternate outline', (
+                _nav_item('Attendance List', 'homeApp:attendance_list', 'calendar alternate', (
                     'home.view_attendance',
                     'home.add_attendance',
                     'home.change_attendance',
+                    'home.can_view_all_attendance',
+                    'home.can_view_attendance_reports',
                 )),
             ]),
         },

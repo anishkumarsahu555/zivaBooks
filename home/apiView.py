@@ -882,7 +882,7 @@ def _orders_list_base_qs(request_or_user):
 def _attendance_list_base_qs(request_or_user):
     return tenant_qs(request_or_user, Attendance).select_related('staffID').only(
         'id', 'datetime', 'isLogIn', 'isLogOut', 'loginDateTime', 'logoutDateTime',
-        'login_remark', 'logout_remark', 'login_location', 'logout_location', 'staffID__name'
+        'login_remark', 'logout_remark', 'login_location', 'logout_location', 'loginPhoto', 'logoutPhoto', 'staffID__name'
     )
 def _cash_counter_list_base_qs(request_or_user):
     return tenant_qs(request_or_user, CashCounter).select_related('partyID', 'bankID', 'createdBy').only(
@@ -3871,7 +3871,7 @@ def add_attendance_api(request):
         except Exception as exc:
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 class StaffAttendanceListJson(BaseDatatableView):
-    order_columns = ['datetime', 'loginDateTime', 'login_location', 'login_remark', 'logoutDateTime', 'logout_location',
+    order_columns = ['datetime', 'loginDateTime', 'loginPhoto', 'login_location', 'login_remark', 'logoutDateTime', 'logoutPhoto', 'logout_location',
                      'logout_remark',
                      ]
     def get_initial_queryset(self):
@@ -3908,30 +3908,36 @@ class StaffAttendanceListJson(BaseDatatableView):
                 login_time = item.loginDateTime.strftime('%I:%M %p')
                 login_remark = item.login_remark
                 login_location = item.login_location
+                login_photo = '<img src="{}" alt="Login photo" style="width:40px;height:40px;border-radius:10px;object-fit:cover;border:1px solid rgba(15,23,42,0.08);">'.format(escape(_image_url(item.loginPhoto, 'thumbnail'))) if getattr(item, 'loginPhoto', None) else '-'
             else:
                 login_time = '-'
                 login_remark = '-'
                 login_location = '-'
+                login_photo = '-'
             if item.isLogOut == True:
                 logout_time = item.logoutDateTime.strftime('%I:%M %p')
                 logout_remark = item.logout_remark
                 logout_location = item.logout_location
+                logout_photo = '<img src="{}" alt="Logout photo" style="width:40px;height:40px;border-radius:10px;object-fit:cover;border:1px solid rgba(15,23,42,0.08);">'.format(escape(_image_url(item.logoutPhoto, 'thumbnail'))) if getattr(item, 'logoutPhoto', None) else '-'
             else:
                 logout_time = '-'
                 logout_remark = '-'
                 logout_location = '-'
+                logout_photo = '-'
             json_data.append([
                 escape(item.datetime.strftime('%d-%m-%Y')),
                 login_time,
+                login_photo,
                 login_location,
                 login_remark,
                 logout_time,
+                logout_photo,
                 logout_location,
                 logout_remark
             ])
         return json_data
 class AdminAttendanceListJson(BaseDatatableView):
-    order_columns = ['datetime', 'staffID.name', 'loginDateTime', 'logoutDateTime', 'login_location', 'login_remark',
+    order_columns = ['datetime', 'staffID.name', 'loginDateTime', 'loginPhoto', 'logoutDateTime', 'logoutPhoto', 'login_location', 'login_remark',
                      'logout_location', 'logout_remark',
                      ]
     def get_initial_queryset(self):
@@ -3974,23 +3980,29 @@ class AdminAttendanceListJson(BaseDatatableView):
                 login_time = item.loginDateTime.strftime('%I:%M %p')
                 login_remark = item.login_remark
                 login_location = item.login_location
+                login_photo = '<img src="{}" alt="Login photo" style="width:40px;height:40px;border-radius:10px;object-fit:cover;border:1px solid rgba(15,23,42,0.08);">'.format(escape(_image_url(item.loginPhoto, 'thumbnail'))) if getattr(item, 'loginPhoto', None) else '-'
             else:
                 login_time = '-'
                 login_remark = '-'
                 login_location = '-'
+                login_photo = '-'
             if item.isLogOut == True:
                 logout_time = item.logoutDateTime.strftime('%I:%M %p')
                 logout_remark = item.logout_remark
                 logout_location = item.logout_location
+                logout_photo = '<img src="{}" alt="Logout photo" style="width:40px;height:40px;border-radius:10px;object-fit:cover;border:1px solid rgba(15,23,42,0.08);">'.format(escape(_image_url(item.logoutPhoto, 'thumbnail'))) if getattr(item, 'logoutPhoto', None) else '-'
             else:
                 logout_time = '-'
                 logout_remark = '-'
                 logout_location = '-'
+                logout_photo = '-'
             json_data.append([
                 escape(item.datetime.strftime('%d-%m-%Y')),
                 escape(item.staffID.name),
                 login_time,
+                login_photo,
                 logout_time,
+                logout_photo,
                 login_location,
                 login_remark,
                 logout_location,

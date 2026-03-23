@@ -620,7 +620,7 @@
                             </div>
                             {% endif %}
                         </div>
-                        <div class="ui teal button attendance-action {% if obj.isLogOut == True %} disabled {% endif %}" onclick="showUserModal('Logout')">
+                        <div class="ui teal button attendance-action {% if obj.isLogOut == True or obj.isLogIn != True %} disabled {% endif %}" onclick="showUserModal('Logout')">
                             <i class="add icon"></i>
                             Logout
                         </div>
@@ -815,6 +815,20 @@
         }
 
         function showUserModal(status) {
+            if (status === 'Logout' && {{ obj.isLogIn|yesno:"false,true" }} ) {
+                $('body')
+                    .toast({
+                        class: 'warning',
+                        message: 'Login must be completed before logout.'
+                    });
+                return;
+            }
+            if (status === 'Logout' && {{ obj.isLogOut|yesno:"true,false" }}) {
+                return;
+            }
+            if (status === 'Login' && {{ obj.isLogIn|yesno:"true,false" }}) {
+                return;
+            }
             getLocation(true).then(function (locationReady) {
                 if (!locationReady) {
                     $('body')

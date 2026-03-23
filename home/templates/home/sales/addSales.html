@@ -425,11 +425,7 @@
 
                             hideLoading();
 
-                            {% if perms.home.can_approve_sales or perms.home.can_view_party_credentials or perms.home.can_view_audit_logs %}
-                                location.href = "{% url 'homeApp:sales_list' %}"
-                            {% else %}
-                                location.href = "{% url 'homeApp:my_sales_list' %}"
-                            {% endif %}
+                            location.href = "{% url 'homeApp:sales_list' %}"
 
                         } else {
                             $('body')

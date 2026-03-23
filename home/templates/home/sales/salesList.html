@@ -22,12 +22,10 @@
 {% block title %}
     <title>Sales List</title>
 {% endblock %}
-{% block css %}
-{% endblock %}
+
 {% block body %}
 
     <style>
-
         #UserTable_length {
             left: 20px;
             position: absolute;
@@ -47,14 +45,13 @@
         }
     </style>
 
-    <div class="ui  basic  grid">
+    <div class="ui basic grid">
         <div class="sixteen wide column">
-            <div class="ui  pointing secondary menu">
-                <div style="cursor: pointer;" class="item active" data-tab="user"
-                >Sales List
-                </div>
+            <div class="ui pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user">Sales List</div>
+
                 {% if sales_capabilities.can_add %}
-                    <div style=" position: absolute;right: 1.5rem;top: 18px;">
+                    <div style="position: absolute; right: 1.5rem; top: 18px;">
                         <a href="{% url 'homeApp:add_sales' %}" class="ui green mini plus button right">
                             <i class="plus square outline icon"></i>
                             Add Sales
@@ -63,11 +60,8 @@
                 {% endif %}
             </div>
 
-            <div class="ui tab " data-tab="user">
-
+            <div class="ui tab" data-tab="user">
                 <div class="row" style="padding-left: 5px; padding-right: 5px">
-
-
                     <div class="">
                         {% if sales_capabilities.can_filter_staff %}
                             <div class="ui form">
@@ -77,10 +71,7 @@
                                             <label>Start Date</label>
                                             <div class="ui calendar" id="rangestart">
                                                 <div class="ui input left icon">
-
-                                                    <input class="" type="text" placeholder="Start Date"
-                                                           style="width:100%;"
-                                                           id="startDateF" onchange="ChangeDate()">
+                                                    <input type="text" placeholder="Start Date" style="width:100%;" id="startDateF" onchange="ChangeDate()">
                                                 </div>
                                             </div>
                                         </div>
@@ -88,42 +79,37 @@
                                             <label>End Date</label>
                                             <div class="ui calendar" id="rangeend">
                                                 <div class="ui input left icon">
-
-                                                    <input class="" type="text" placeholder="End Date"
-                                                           style="width:100%;"
-                                                           id="endDateF">
+                                                    <input type="text" placeholder="End Date" style="width:100%;" id="endDateF">
                                                 </div>
                                             </div>
                                         </div>
-                                        <div class="three wide  field" style="width: 40%">
+                                        <div class="three wide field" style="width: 40%">
                                             <label>Staff</label>
-                                            <select class="ui fluid search dropdown" id="staffID"
-                                                    onchange="ChangeDate()">
+                                            <select class="ui fluid search dropdown" id="staffID" onchange="ChangeDate()">
                                                 <option value="All">All</option>
                                                 {% for staff in staffs %}
-                                                    <option value="{{ staff.id }}">{{ staff.name|capfirst }}
-                                                        - {{ staff.partyGroupID.name|capfirst }}  </option>
+                                                    <option value="{{ staff.id }}">{{ staff.name|capfirst }} - {{ staff.partyGroupID.name|capfirst }}</option>
                                                 {% endfor %}
-
-
                                             </select>
                                         </div>
                                         <div class="seven wide field">
                                             <label>Action</label>
-                                            <button class="ui tiny active button" type="button"
-                                                    onclick="filterDetails()">
+                                            <button class="ui tiny active button" type="button" onclick="filterDetails()">
                                                 <i class="funnel dollar icon"></i>
                                                 Search
                                             </button>
-
+                                            {% if sales_capabilities.can_export %}
+                                                <a id="reportUrl" href="{% url 'homeApp:generate_sales_report' %}" style="float: right;" class="teal tiny ui button">Download Report</a>
+                                            {% endif %}
                                         </div>
                                     </div>
                                 </form>
                             </div>
+                        {% else %}
+                            <input type="hidden" id="staffID" value="All">
                         {% endif %}
-                        <table class="ui unstackable  sortable celled very nowrap very small compact table"
-                               id="UserTable"
-                               style="margin-top: 5px;width: 100%">
+
+                        <table class="ui unstackable sortable celled very nowrap very small compact table" id="UserTable" style="margin-top: 5px; width: 100%">
                             <thead>
                             <tr>
                                 <th>PaymentID</th>
@@ -132,16 +118,24 @@
                                 <th>Mode</th>
                                 <th>Payment Detail</th>
                                 <th>Amount</th>
+                                {% if sales_capabilities.can_filter_staff %}
+                                    <th>Action</th>
+                                {% endif %}
                                 <th>InvoiceDate</th>
                                 <th>Created By</th>
+                                {% if sales_capabilities.can_filter_staff %}
+                                    <th>IsApproved?</th>
+                                    <th>ApprovedBy</th>
+                                {% endif %}
                                 <th>Approved On</th>
                                 <th>Added On</th>
                                 <th>Remark</th>
-                                <th>Action</th>
+                                {% if not sales_capabilities.can_filter_staff %}
+                                    <th>Action</th>
+                                {% endif %}
                             </tr>
                             </thead>
-                            <tbody>
-                            </tbody>
+                            <tbody></tbody>
                         </table>
                     </div>
                 </div>
@@ -153,8 +147,7 @@
                             Sales Details will be Deleted
                         </div>
                         <div class="content">
-                            <p style="text-align: center">The Sale will be deleted, are you sure to delete this
-                                Sale?</p>
+                            <p style="text-align: center">The Sale will be deleted, are you sure to delete this Sale?</p>
                         </div>
                         <div class="actions">
                             <div class="ui red basic cancel inverted button">
@@ -169,16 +162,34 @@
                         </div>
                     </div>
                 {% endif %}
-
-
             </div>
         </div>
     </div>
+
+    {% if sales_capabilities.can_message %}
+        <div class="ui mini modal" id="imgModal">
+            <div class="header">Approve Sale?</div>
+            <div class="content">
+                <p>Are you sure you want to approve this sale?</p>
+            </div>
+            <input type="hidden" id="approveCollectionID">
+            <div class="actions">
+                <div class="ui negative button">No</div>
+                <button class="ui green right labeled icon button saveBtn" onclick="confirmApproval()">
+                    Yes
+                    <i class="checkmark icon"></i>
+                </button>
+                <button style="display: none;" class="ui teal right labeled icon button saveBtnLoad">
+                    Saving ....
+                    <i class="checkmark icon"></i>
+                </button>
+            </div>
+        </div>
+    {% endif %}
 {% endblock %}
 
 {% block js %}
     <script>
-
         var today = new Date();
         $('#rangestart').calendar({
             initialDate: today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear(),
@@ -188,10 +199,7 @@
             formatter: {
                 date: function (date, settings) {
                     if (!date) return '';
-                    var day = date.getDate();
-                    var month = date.getMonth() + 1;
-                    var year = date.getFullYear();
-                    return day + '/' + month + '/' + year;
+                    return date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
                 }
             }
         });
@@ -203,74 +211,70 @@
             formatter: {
                 date: function (date, settings) {
                     if (!date) return '';
-                    var day = date.getDate();
-                    var month = date.getMonth() + 1;
-                    var year = date.getFullYear();
-                    return day + '/' + month + '/' + year;
+                    return date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
                 }
             }
         });
 
-
-        var userTab;
-
-
-        // user Details
-
-        userTab = $('#UserTable').DataTable({
+        var userTab = $('#UserTable').DataTable({
             dom: 'Blfrtip',
             "scrollY": "350px",
             "scrollX": true,
-            stateSave: true,
             fixedColumns: {
-                left: 1,
-                right: 1
+                left: 1{% if not sales_capabilities.can_filter_staff %},
+                right: 1{% endif %}
             },
             buttons: [{
                 extend: 'excel',
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+                    columns: [{% if sales_capabilities.can_filter_staff %}0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 13{% else %}0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10{% endif %}]
                 }
-            }
-                {% comment %}      , {
-                          extend: 'print',
-                          exportOptions: {
-                               columns: [1, 2, 3, 4, 5, 6, 7, 8]
-                          }
-                      }{% endcomment %}
-            ],
+            }],
             "columnDefs": [
-                {"name": "paymentID", "targets": 0, "orderable": true},
-                {"name": "partyID.name", "targets": 1, "orderable": true},
-                {"name": "invoiceNumber", "targets": 2, "orderable": true},
-                {"name": "modeOfPayment", "targets": 3, "orderable": true},
-                {"name": "bankID__name", "targets": 4, "orderable": true},
-                {"name": "amount", "targets": 5, "orderable": true,"className": "dt-body-right"},
-                {"name": "buildDate", "targets": 6, "orderable": true},
-                {"name": "createdBy__name", "targets": 7, "orderable": true},
-                {"name": "approvedOn", "targets": 8, "orderable": true},
-                {"name": "datetime", "targets": 9, "orderable": true},
-                {"name": "remark", "targets": 10, "orderable": true},
-                {"name": "id", "targets": 11, "orderable": false},
-
+                {% if sales_capabilities.can_filter_staff %}
+                    {"name": "paymentID", "targets": 0, "orderable": true},
+                    {"name": "partyID.name", "targets": 1, "orderable": true},
+                    {"name": "invoiceNumber", "targets": 2, "orderable": true},
+                    {"name": "modeOfPayment", "targets": 3, "orderable": true},
+                    {"name": "bankID__name", "targets": 4, "orderable": true},
+                    {"name": "amount", "targets": 5, "orderable": true, "className": "dt-body-right"},
+                    {"name": "id", "targets": 6, "orderable": false},
+                    {"name": "buildDate", "targets": 7, "orderable": true},
+                    {"name": "createdBy__name", "targets": 8, "orderable": true},
+                    {"name": "isApproved", "targets": 9, "orderable": true},
+                    {"name": "approvedBy__name", "targets": 10, "orderable": true},
+                    {"name": "approvedOn", "targets": 11, "orderable": true},
+                    {"name": "datetime", "targets": 12, "orderable": true},
+                    {"name": "remark", "targets": 13, "orderable": true}
+                {% else %}
+                    {"name": "paymentID", "targets": 0, "orderable": true},
+                    {"name": "partyID.name", "targets": 1, "orderable": true},
+                    {"name": "invoiceNumber", "targets": 2, "orderable": true},
+                    {"name": "modeOfPayment", "targets": 3, "orderable": true},
+                    {"name": "bankID__name", "targets": 4, "orderable": true},
+                    {"name": "amount", "targets": 5, "orderable": true, "className": "dt-body-right"},
+                    {"name": "buildDate", "targets": 6, "orderable": true},
+                    {"name": "createdBy__name", "targets": 7, "orderable": true},
+                    {"name": "approvedOn", "targets": 8, "orderable": true},
+                    {"name": "datetime", "targets": 9, "orderable": true},
+                    {"name": "remark", "targets": 10, "orderable": true},
+                    {"name": "id", "targets": 11, "orderable": false}
+                {% endif %}
             ],
-            aaSorting: [[9, 'desc']],
+            aaSorting: [[{% if sales_capabilities.can_filter_staff %}12{% else %}9{% endif %}, 'desc']],
             "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
             "pageLength": 10,
             "processing": true,
             "serverSide": true,
-            "ajax": "{% url 'homeApp:SalesByStaffListJson' %}"
+            "ajax": "{% if sales_capabilities.can_filter_staff %}{% url 'homeApp:SalesByAdminListJson' %}{% else %}{% url 'homeApp:SalesByStaffListJson' %}{% endif %}"
         });
-
 
         function delUser(id) {
             if (!$('#deleteUser').length) {
                 return;
             }
-            $('#deleteUser')
-                .modal('show')
-            ;
-            $('#UserID').val(id)
+            $('#deleteUser').modal('show');
+            $('#UserID').val(id);
         }
 
         function deleteUser() {
@@ -286,59 +290,78 @@
                 contentType: false,
                 cache: false,
                 processData: false,
-
                 success: function (response) {
                     if (response.message === 'success') {
-                        $('body')
-                            .toast({
-                                class: 'success',
-                                message: 'Sales Detail Deleted Successfully.'
-                            })
-                        ;
-
-
+                        $('body').toast({class: 'success', message: 'Sales Detail Deleted Successfully.'});
                         userTab.ajax.reload(null, false);
                         hideLoading();
                     } else {
-                        $('body')
-                            .toast({
-                                class: 'error',
-                                message: 'An error occurred !'
-                            })
-                        ;
+                        $('body').toast({class: 'error', message: 'An error occurred !'});
                         hideLoading();
                     }
-
                     return response;
                 },
                 error: function () {
-                    $('body')
-                        .toast({
-                            class: 'error',
-                            message: 'An error occurred !'
-                        })
-                    ;
-                    hideLoading()
+                    $('body').toast({class: 'error', message: 'An error occurred !'});
+                    hideLoading();
                 }
             });
-
         }
 
         function filterDetails() {
             var startDate = $('#startDateF').val();
             var endDate = $('#endDateF').val();
             var staffID = $('#staffID').val();
-            userTab.ajax.url('{% url 'homeApp:SalesByStaffListJson' %}?startDate=' + startDate + '&endDate=' + endDate + '&staffID=' + staffID).load();
-
+            userTab.ajax.url('{% if sales_capabilities.can_filter_staff %}{% url 'homeApp:SalesByAdminListJson' %}{% else %}{% url 'homeApp:SalesByStaffListJson' %}{% endif %}?startDate=' + startDate + '&endDate=' + endDate + '&staffID=' + staffID).load();
         }
 
+        {% if sales_capabilities.can_message %}
+        function showConfirmationModal(id) {
+            $('#imgModal').modal('show');
+            $('#approveCollectionID').val('' + id);
+        }
+
+        function confirmApproval() {
+            showLoading();
+            var id = $('#approveCollectionID').val();
+            var formdata = new FormData();
+            formdata.append('userID', id);
+
+            $.ajax({
+                url: "{% url 'homeApp:send_message_sales' %}",
+                type: "post",
+                data: formdata,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: response.detail || 'Sale approved successfully.'});
+                        $('#imgModal').modal('hide');
+                        userTab.ajax.reload(null, false);
+                        hideLoading();
+                    } else {
+                        $('body').toast({class: 'error', message: response.detail || 'Unable to approve sale.'});
+                        hideLoading();
+                    }
+                    return response;
+                },
+                error: function () {
+                    $('body').toast({class: 'error', message: 'Unable to approve sale.'});
+                    hideLoading();
+                }
+            });
+        }
+        {% endif %}
 
         $(ChangeDate());
 
         function ChangeDate() {
             var startDateF = $('#startDateF').val();
             var staffID = $('#staffID').val();
-            $("#reportUrl").attr("href", "{% url 'homeApp:generate_sales_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
+            if ($('#reportUrl').length) {
+                $("#reportUrl").attr("href", "{% url 'homeApp:generate_sales_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
+            }
         }
     </script>
 

@@ -157,7 +157,7 @@
                     if (response.message === 'success') {
                         $('body').toast({class:'success', message:'Order Created Successfully.'});
                         hideLoading();
-                        location.href = "{% url 'homeApp:my_orders_list' %}";
+                        location.href = "{% url 'homeApp:orders_list' %}";
                     } else {
                         $('body').toast({class:'error', message:'An error occurred !'});
                         hideLoading();

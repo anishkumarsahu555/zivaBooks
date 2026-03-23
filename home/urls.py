@@ -135,6 +135,7 @@ urlpatterns = [
 
     # attendance
     path('add_attendance/', add_attendance, name='add_attendance'),
+    path('attendance_list/', attendance_list, name='attendance_list'),
     path('attendance_report/', attendance_report, name='attendance_report'),
     path('attendance_report_admin/', attendance_report_admin, name='attendance_report_admin'),
     path('api/add_attendance_api/', add_attendance_api, name='add_attendance_api'),

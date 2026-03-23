@@ -478,11 +478,7 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
         })
 
     if _has_any_perm(request, ['home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders', 'home.can_approve_orders']):
-        orders_list_url = (
-            reverse('homeApp:orders_list')
-            if _has_any_perm(request, ['home.can_manage_orders', 'home.can_view_party_credentials'])
-            else reverse('homeApp:my_orders_list')
-        )
+        orders_list_url = reverse('homeApp:orders_list')
         metric_groups.append({
             'title': 'Orders Overview',
             'subtitle': 'Order volume and approval status in the scope available to this user.',
