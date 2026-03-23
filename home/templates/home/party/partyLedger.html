@@ -93,13 +93,12 @@
             .pl-part { max-width: 52vw; }
         }
 
-        #UserTable_length {
+    #UserTable_length {
             left: 20px;
             position: absolute;
         }
 
         #UserTable_filter {
-            width: 50%;
             float: right;
         }
 
@@ -111,6 +110,7 @@
         input[type=search] {
             width: 100px !important;
         }
+
     </style>
 {% endblock %}
 
@@ -210,7 +210,7 @@
                     </div>
                 </div>
 
-                <table class="ui unstackable tiny sortable celled very compact table party-ledger-table" id="UserTable" style="width: 100%">
+                <table class="ui unstackable tiny sortable celled very compact table party-ledger-table" id="UserTable" style="margin-top: 5px; width: 100%">
                     <thead>
                     <tr>
                         <th>Date/Time</th>
@@ -258,8 +258,8 @@
         var isMobileLedger = window.matchMedia && window.matchMedia("(max-width: 520px)").matches;
 
         $('#UserTable').DataTable({
-
-             "scrollX": true,
+            dom: 'lfrtip',
+            "scrollX": true,
             fixedColumns: isMobileLedger ? false : { left: 1, right: 1 },
 
             columnDefs: [
