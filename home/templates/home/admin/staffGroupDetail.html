@@ -252,6 +252,31 @@
             margin-bottom: 10px !important;
         }
 
+        .group-topbar-link {
+            font-weight: 700;
+        }
+
+        .group-topbar-action {
+            align-items: center !important;
+            background: linear-gradient(135deg, #0f766e, #14b8a6) !important;
+            border: 1px solid #0f8b80 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 10px 20px rgba(15, 118, 110, 0.16) !important;
+            color: #ffffff !important;
+            display: inline-flex !important;
+            font-size: 0.8rem !important;
+            font-weight: 700 !important;
+            justify-content: center !important;
+            min-height: 38px !important;
+            padding: 0 12px !important;
+            width: auto !important;
+        }
+
+        .group-topbar-action:hover {
+            box-shadow: 0 14px 26px rgba(15, 118, 110, 0.22) !important;
+            color: #ffffff !important;
+        }
+
         @media (max-width: 991px) {
             .group-grid {
                 grid-template-columns: 1fr;
@@ -261,6 +286,35 @@
         @media (max-width: 640px) {
             .group-shell {
                 padding: 8px;
+            }
+
+            .group-topbar {
+                align-items: center;
+                display: flex !important;
+                justify-content: space-between;
+            }
+
+            .group-topbar .right.menu {
+                margin-left: auto;
+            }
+
+            .group-topbar .right.menu .item {
+                justify-content: flex-end;
+            }
+
+            .group-topbar .item {
+                padding-left: 0.55rem !important;
+                padding-right: 0.55rem !important;
+            }
+
+            .group-topbar-link {
+                font-size: 0.92rem !important;
+            }
+
+            .group-topbar-action {
+                font-size: 0.72rem !important;
+                min-height: 32px !important;
+                padding: 0 10px !important;
             }
 
             .group-hero,
@@ -289,13 +343,13 @@
 {% block body %}
     <div class="group-shell">
         <div class="ui secondary pointing menu group-topbar">
-            <a class="item" href="{% url 'homeApp:staff_group_list' %}">
+            <a class="item group-topbar-link" href="{% url 'homeApp:staff_group_list' %}">
                 <i class="arrow left icon"></i>
                 Staff Group List
             </a>
             <div class="right menu">
                 <div class="item">
-                    <a class="ui teal button" href="{% url 'homeApp:staff_group_list' %}">
+                    <a class="ui button group-topbar-action" href="{% url 'homeApp:staff_group_list' %}">
                         Back To Groups
                     </a>
                 </div>
@@ -323,7 +377,7 @@
                     <div class="group-stat-value">{{ permission_count }}</div>
                 </div>
                 <div class="group-stat">
-                    <div class="group-stat-label">Linked Django Group</div>
+                    <div class="group-stat-label">Linked Group</div>
                     <div class="group-stat-value">
                         {% if group.djangoGroup %}{{ group.djangoGroup.name|truncatechars:20 }}{% else %}-{% endif %}
                     </div>

@@ -62,6 +62,16 @@
             grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
         }
 
+        .group-form-topnav {
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .group-form-topnav .item {
+            border-radius: 12px;
+            font-weight: 700;
+        }
+
         .group-form-card {
             background: #ffffff;
             border: 1px solid #dce7f3;
@@ -484,9 +494,24 @@
                 padding: 8px;
             }
 
-            .ui.secondary.pointing.menu {
-                align-items: flex-start;
-                flex-direction: column;
+            .group-form-topnav {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .group-form-topnav .item {
+                align-items: center;
+                display: flex !important;
+                justify-content: center;
+                margin: 0 !important;
+                min-height: 40px;
+                padding: 10px 8px;
+                text-align: center;
+                white-space: normal;
+            }
+
+            .group-form-topnav .item:nth-child(3) {
+                grid-column: 1 / -1;
             }
 
             .group-form-card-body,
@@ -527,12 +552,27 @@
                 flex-direction: column;
             }
         }
+
+        @media (max-width: 420px) {
+            .group-form-topnav {
+                grid-template-columns: 1fr;
+            }
+
+            .group-form-topnav .item {
+                justify-content: flex-start;
+                text-align: left;
+            }
+
+            .group-form-topnav .item:nth-child(3) {
+                grid-column: auto;
+            }
+        }
     </style>
 {% endblock %}
 
 {% block body %}
     <div class="group-form-shell" data-page-mode="{{ page_mode }}">
-        <div class="ui secondary pointing menu">
+        <div class="ui secondary pointing menu group-form-topnav">
             <a class="item" href="{% url 'homeApp:staff_group_list' %}">
                 <i class="arrow left icon"></i>
                 Staff Group List
@@ -541,12 +581,6 @@
                 <i class="shield alternate icon"></i>
                 Permission Reference
             </a>
-            {% if group_obj %}
-                <a class="item" href="{% url 'homeApp:staff_group_detail' group_obj.id %}">
-                    <i class="eye icon"></i>
-                    View Detail
-                </a>
-            {% endif %}
         </div>
 
         <section class="group-form-hero">

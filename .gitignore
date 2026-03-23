@@ -45,3 +45,5 @@ build/
 home/migrations-old
 migrations-old
 .env.example
+server-setup.md
+zivabooks_deployment.md

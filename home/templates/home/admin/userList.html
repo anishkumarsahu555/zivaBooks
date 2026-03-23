@@ -240,6 +240,20 @@
                 grid-template-columns: 1fr;
             }
 
+            #addForm .two.fields:not(.upload-grid),
+            #EditForm .two.fields:not(.upload-grid) {
+                display: grid !important;
+                gap: 0.75rem !important;
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                margin: 0 0 1em !important;
+            }
+
+            #addForm .two.fields:not(.upload-grid) > .field,
+            #EditForm .two.fields:not(.upload-grid) > .field {
+                margin: 0 !important;
+                width: 100% !important;
+            }
+
             .upload-actions {
                 flex-wrap: wrap;
             }

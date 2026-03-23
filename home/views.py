@@ -1469,7 +1469,7 @@ def homepage(request):
             _ensure_party_portal_permissions(request.user)
             return redirect('homeApp:customer_home')
         if _user_has_portal_access(request.user):
-            if request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_manage_staff'):
+            if _has_tenant_any_perm(request, ['home.can_view_party_credentials', 'home.can_manage_staff']):
                 try:
                     val = tenant_qs(request, Validity).order_by('-expiryDate', '-id').first()
                     if val and val.expiryDate and val.expiryDate < datetime.today().date():

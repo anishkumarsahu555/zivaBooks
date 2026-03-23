@@ -944,7 +944,7 @@ def add_staff_group_api(request):
         except Exception as exc:
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 class StaffGroupListJson(BaseDatatableView):
-    order_columns = ['name', 'description', 'datetime']
+    order_columns = ['name', 'description', 'name', 'datetime', 'name']
     def get_initial_queryset(self):
         qs = tenant_qs(self.request, StaffGroup).filter(isDeleted__exact=False)
         start_date = self.request.GET.get('startDate')

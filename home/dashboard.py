@@ -59,6 +59,13 @@ def _is_admin_like(request_or_user):
     ])
 
 
+def _should_show_license_message(request_or_user):
+    return _has_any_perm(request_or_user, [
+        'home.can_manage_staff',
+        'home.can_view_party_credentials',
+    ])
+
+
 def _can_filter_cash_counter(request_or_user):
     return _has_any_perm(request_or_user, [
         'home.can_manage_cash_counter',
@@ -574,7 +581,11 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
         'hero': hero,
         'metric_groups': metric_groups,
         'action_sections': action_sections,
-        'license_message': getattr(request, 'dashboard_license_message', '') or _build_license_message(tenant),
+        'license_message': (
+            (getattr(request, 'dashboard_license_message', '') or _build_license_message(tenant))
+            if _should_show_license_message(request)
+            else ''
+        ),
     }
     request._dashboard_state_cache = dashboard_state
     return dashboard_state
