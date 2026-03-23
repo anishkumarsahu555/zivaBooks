@@ -1884,7 +1884,7 @@ def add_order(request):
         'order_capabilities': _order_capabilities(request.user),
     })
 @is_activated()
-@permission_required_any('home.can_manage_orders', 'home.view_order', 'home.change_order')
+@permission_required_any('home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders')
 def orders_list(request):
     capabilities = _order_capabilities(request.user)
     staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name') if capabilities['can_filter_staff'] else []
@@ -1892,15 +1892,10 @@ def orders_list(request):
         'staffs': staffs,
         'order_capabilities': capabilities,
     }
-    return render(request, 'home/orders/ordersListByAdmin.html', context)
+    return render(request, 'home/orders/ordersList.html', context)
 @permission_required_any('home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders')
 def my_orders_list(request):
-    capabilities = _order_capabilities(request.user)
-    context = {
-        'staffs': tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name') if capabilities['can_filter_staff'] else [],
-        'order_capabilities': capabilities,
-    }
-    return render(request, 'home/orders/ordersListByStaff.html', context)
+    return redirect('homeApp:orders_list')
 @permission_required_any('home.change_order', 'home.can_manage_orders', 'home.can_approve_orders')
 def edit_order(request, id=None):
     obj = get_object_or_404(tenant_qs(request, Order), pk=id)
@@ -1908,14 +1903,14 @@ def edit_order(request, id=None):
     admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_orders') or request.user.has_perm('home.can_manage_orders')
     if not admin_like:
         if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
-            return redirect('homeApp:my_orders_list')
+            return redirect('homeApp:orders_list')
     attachments = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order=obj).order_by('-id')
     context = {
         'obj': obj,
         'attachments': attachments,
         'order_capabilities': capabilities,
         'order_edit_readonly': bool(str(obj.status) == Order.Status.APPROVED and not admin_like),
-        'order_return_url': reverse('homeApp:orders_list') if admin_like else reverse('homeApp:my_orders_list'),
+        'order_return_url': reverse('homeApp:orders_list'),
     }
     return render(request, 'home/orders/editOrder.html', context)
 @permission_required_any('home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders')
@@ -1925,7 +1920,7 @@ def order_detail(request, id=None):
     admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_orders') or request.user.has_perm('home.can_manage_orders')
     if not admin_like:
         if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
-            return redirect('homeApp:my_orders_list')
+            return redirect('homeApp:orders_list')
     attachments = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order=obj).order_by('-id')
     context = {
         'obj': obj,
@@ -1934,7 +1929,7 @@ def order_detail(request, id=None):
         'is_admin_like': admin_like,
         'can_approve_order': capabilities.get('can_approve', False) and str(obj.status) != Order.Status.APPROVED,
         'can_edit_order': capabilities.get('can_edit', False) and (admin_like or str(obj.status) != Order.Status.APPROVED),
-        'order_return_url': reverse('homeApp:orders_list') if admin_like else reverse('homeApp:my_orders_list'),
+        'order_return_url': reverse('homeApp:orders_list'),
     }
     return render(request, 'home/orders/orderDetail.html', context)
 # -----------------------Message---------------------

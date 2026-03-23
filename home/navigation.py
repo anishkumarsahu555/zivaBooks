@@ -514,13 +514,10 @@ def build_sidebar_sections(request_or_user):
             'title': 'Orders',
             'items': _filter_items(request_or_user, [
                 _nav_item('Add Order', 'homeApp:add_order', 'clipboard outline', 'home.add_order'),
-                _nav_item('My Orders List', 'homeApp:my_orders_list', 'list alternate outline', (
+                _nav_item('Orders List', 'homeApp:orders_list', 'list alternate outline', (
                     'home.view_order',
                     'home.add_order',
                     'home.change_order',
-                    'home.can_manage_orders',
-                )),
-                _nav_item('Orders List', 'homeApp:orders_list', 'clipboard list', (
                     'home.can_manage_orders',
                     'home.can_approve_orders',
                 )),
