@@ -8,6 +8,7 @@ urlpatterns = [
     # pages
     path('home/', homepage, name='homepage'),
     path('', loginPage, name='loginPage'),
+    path('claim-access/<str:token>/', claim_access, name='claim_access'),
     path('logout/', user_logout, name='logout'),
     path('postLogin/', postLogin, name='UserLogin'),
 
@@ -53,6 +54,7 @@ urlpatterns = [
     path('api/delete_staff_user/', delete_staff_user, name='delete_staff_user'),
     path('api/get_staff_user_detail/', get_staff_user_detail, name='get_staff_user_detail'),
     path('api/edit_staff_api/', edit_staff_api, name='edit_staff_api'),
+    path('api/generate_staff_access_link_api/', generate_staff_access_link_api, name='generate_staff_access_link_api'),
     path('api/StaffUserListJson/', StaffUserListJson.as_view(), name='StaffUserListJson'),
     path('api/add_staff_group_api/', add_staff_group_api, name='add_staff_group_api'),
     path('api/edit_staff_group_api/', edit_staff_group_api, name='edit_staff_group_api'),
@@ -82,6 +84,7 @@ urlpatterns = [
     # api party
     path('api/add_party_api/', add_party_api, name='add_party_api'),
     path('api/generate_party_users_api/', generate_party_users_api, name='generate_party_users_api'),
+    path('api/generate_party_access_link_api/', generate_party_access_link_api, name='generate_party_access_link_api'),
     path('api/PartyListJson/', PartyListJson.as_view(), name='PartyListJson'),
     path('api/PartyLedgerListJson/', PartyLedgerListJson.as_view(), name='PartyLedgerListJson'),
     path('api/generate_party_ledger_pdf/<int:party_id>/', generate_party_ledger_pdf, name='generate_party_ledger_pdf'),
