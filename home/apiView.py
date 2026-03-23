@@ -1083,9 +1083,9 @@ def add_staff_api(request):
             # except:
             #     pass
             staff.save()
-            username = 'USER' + get_random_string(length=3, allowed_chars='1234567890')
-            while User.objects.select_related().filter(username__exact=username).count() > 0:
-                username = 'USER' + get_random_string(length=5, allowed_chars='1234567890')
+            username = 'u' + get_random_string(length=7, allowed_chars='0123456789')
+            while User.objects.filter(username__exact=username).exists():
+                username = 'u' + get_random_string(length=7, allowed_chars='0123456789')
             else:
                 new_user = User()
                 new_user.username = username
@@ -1581,9 +1581,9 @@ def add_party_api(request):
                 obj.partyGroupID_id = int(partyGroup)
             except:
                 pass
-            username = get_random_string(length=6, allowed_chars='0123456789')
+            username = get_random_string(length=7, allowed_chars='0123456789')
             while User.objects.filter(username__exact=username).exists():
-                username = get_random_string(length=6, allowed_chars='0123456789')
+                username = get_random_string(length=7, allowed_chars='0123456789')
             password = get_random_string(length=6, allowed_chars='0123456789')
             new_user = User()
             new_user.username = username
@@ -1616,9 +1616,9 @@ def generate_party_users_api(request):
                 if party.userID_id:
                     skipped = skipped + 1
                     continue
-                username = get_random_string(length=6, allowed_chars='0123456789')
+                username = get_random_string(length=7, allowed_chars='0123456789')
                 while User.objects.filter(username__exact=username).exists():
-                    username = get_random_string(length=6, allowed_chars='0123456789')
+                    username = get_random_string(length=7, allowed_chars='0123456789')
                 password = get_random_string(length=6, allowed_chars='0123456789')
                 new_user = User()
                 new_user.username = username

@@ -1,10 +1,13 @@
 {% load static %}
 {% load formatting %}
+{% load pwa %}
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% progressive_web_app_meta %}
+    <link rel="stylesheet" href="{% static 'css/app-loader.css' %}">
     <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
     <title>Customer Ledger</title>
@@ -765,6 +768,16 @@
     </style>
 </head>
 <body>
+<div class="app-loader" data-app-loader>
+    <div class="app-loader__panel">
+        <div class="app-loader__logo-wrap">
+            <img class="app-loader__logo" src="{% static 'sw/images/icon-192.png' %}" alt="zivaBooks logo">
+        </div>
+        <p class="app-loader__title">zivaBooks</p>
+        <p class="app-loader__subtitle" data-app-loader-subtitle>Loading customer view...</p>
+        <div class="app-loader__progress" aria-hidden="true"></div>
+    </div>
+</div>
 
 <div class="ui left vertical inverted sidebar menu cust-sidebar" id="custSidebar">
     <div class="item" style="padding: 14px 14px 10px;">
@@ -1344,5 +1357,6 @@
         scheduleOtpPoll(400);
     });
 </script>
+<script src="{% static 'js/app-loader.js' %}"></script>
 </body>
 </html>

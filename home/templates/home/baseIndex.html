@@ -14,6 +14,7 @@
 
     <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
+    <link rel="stylesheet" href="{% static 'css/app-loader.css' %}">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
     <link rel="stylesheet" type="text/css"
@@ -121,20 +122,6 @@
                 transform: scale(1);
                 opacity: 0;
             }
-        }
-
-        .preloader {
-            align-items: center;
-            background: rgb(23, 22, 22);
-            display: flex;
-            height: 100vh;
-            justify-content: center;
-            left: 0;
-            position: fixed;
-            top: 0;
-            transition: opacity 0.3s linear;
-            width: 100%;
-            z-index: 9999;
         }
 
         body ::-webkit-scrollbar {
@@ -589,14 +576,20 @@
 
 
 </div>
-<div class="preloader">
-    <div class="ui active dimmer">
-        <div class="ui medium text loader">Loading</div>
+<div class="app-loader" data-app-loader>
+    <div class="app-loader__panel">
+        <div class="app-loader__logo-wrap">
+            <img class="app-loader__logo" src="{% static 'sw/images/icon-192.png' %}" alt="zivaBooks logo">
+        </div>
+        <p class="app-loader__title">zivaBooks</p>
+        <p class="app-loader__subtitle" data-app-loader-subtitle>Loading your workspace...</p>
+        <div class="app-loader__progress" aria-hidden="true"></div>
     </div>
 </div>
 
 
 <script src="https://frontendfunn.github.io/semantic-ui-admin-dashboard-template/js/script.js"></script>
+<script src="{% static 'js/app-loader.js' %}"></script>
 
 <script>
     function getCookie(name) {
@@ -625,17 +618,15 @@
     });
 
     $('.menu .item').tab();
-    $(window).on("load", function () {
-        $(".preloader").fadeOut(50);
-    });
-
     function showLoading() {
+        if (window.AppLoader) window.AppLoader.show('Saving...');
         $('.saveBtn').css('display', 'none');
         $('.saveBtnLoad').css('display', '');
 
     }
 
     function hideLoading() {
+        if (window.AppLoader) window.AppLoader.hide();
         $('.saveBtn').css('display', '');
         $('.saveBtnLoad').css('display', 'none');
 
