@@ -21,6 +21,7 @@ from activation.models import *
 from activation.views import is_activated
 from .models import *
 from .books import ensure_books_for_tenant
+from .credential_links import credential_share_token_status, consume_credential_share_token
 from .navigation import build_sidebar_sections, _has_any_perm as _has_tenant_any_perm
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_qs
 from .otp import get_collection_otp_payload, get_collection_status_payload, OTP_TTL_SECONDS
@@ -1098,6 +1099,91 @@ def loginPage(request):
     return render(request, 'home/login.html')
     # else:
     #     return redirect('/admin_home/')
+
+
+@ensure_csrf_cookie
+def claim_access(request, token):
+    share_token, status = credential_share_token_status(token)
+    if share_token is None and status == 'missing':
+        return render(request, 'home/claimAccess.html', {
+            'claim_status': 'invalid',
+            'claim_heading': 'Link unavailable',
+            'claim_message': 'This access link is invalid or no longer available.',
+        }, status=404)
+
+    subject_name = ''
+    username = ''
+    subject_type = 'Account'
+    expires_at = None
+    if share_token is not None:
+        username = share_token.user.username
+        expires_at = share_token.expiresAt
+        if share_token.staffUser_id:
+            subject_name = share_token.staffUser.name
+            subject_type = 'Staff'
+        elif share_token.party_id:
+            subject_name = share_token.party.name
+            subject_type = 'Customer'
+        else:
+            subject_name = share_token.user.username
+
+    if request.method == 'POST' and status == 'valid':
+        new_password = (request.POST.get('new_password') or '').strip()
+        confirm_password = (request.POST.get('confirm_password') or '').strip()
+        error = None
+        if not new_password or not confirm_password:
+            error = 'Both password fields are required.'
+        elif len(new_password) < 6:
+            error = 'Password must be at least 6 characters.'
+        elif new_password != confirm_password:
+            error = 'Passwords do not match.'
+        if error is None:
+            claimed_ip = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() or request.META.get('REMOTE_ADDR')
+            if consume_credential_share_token(share_token, new_password, claimed_from_ip=claimed_ip):
+                return render(request, 'home/claimAccess.html', {
+                    'claim_status': 'success',
+                    'claim_heading': 'Access activated',
+                    'claim_message': 'Your password has been set successfully. You can now sign in.',
+                    'username': username,
+                    'subject_name': subject_name,
+                    'subject_type': subject_type,
+                })
+            status = 'used'
+
+        if error is not None:
+            return render(request, 'home/claimAccess.html', {
+                'claim_status': 'valid',
+                'claim_heading': 'Set your password',
+                'claim_message': 'This secure link can be used only once.',
+                'username': username,
+                'subject_name': subject_name,
+                'subject_type': subject_type,
+                'expires_at': expires_at,
+                'form_error': error,
+            }, status=400)
+
+    if status == 'used':
+        return render(request, 'home/claimAccess.html', {
+            'claim_status': 'used',
+            'claim_heading': 'Link already used',
+            'claim_message': 'This access link has already been claimed. Ask your administrator for a fresh link if needed.',
+        }, status=410)
+    if status == 'expired':
+        return render(request, 'home/claimAccess.html', {
+            'claim_status': 'expired',
+            'claim_heading': 'Link expired',
+            'claim_message': 'This access link has expired. Ask your administrator to generate a new one.',
+        }, status=410)
+
+    return render(request, 'home/claimAccess.html', {
+        'claim_status': 'valid',
+        'claim_heading': 'Set your password',
+        'claim_message': 'This secure link can be used only once.',
+        'username': username,
+        'subject_name': subject_name,
+        'subject_type': subject_type,
+        'expires_at': expires_at,
+    })
 @permission_required_any('home.can_view_party_credentials', 'home.can_manage_staff')
 def admin_home(request):
     try:

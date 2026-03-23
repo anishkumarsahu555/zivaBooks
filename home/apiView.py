@@ -25,6 +25,7 @@ from django_datatables_view.base_datatable_view import BaseDatatableView
 from weasyprint import CSS, HTML
 from home.models import *
 from home.books import ensure_bank_account, ensure_books_for_tenant, sync_book_transactions
+from home.credential_links import DEFAULT_CREDENTIAL_LINK_MINUTES, create_credential_share_token
 from home.otp import (
     OTP_TTL_SECONDS,
     clear_collection_otp,
@@ -713,6 +714,23 @@ def _can_approve_orders(user):
     return user.has_perm('home.can_approve_orders')
 def _can_set_order_date(user):
     return user.has_perm('home.can_manage_orders') or user.has_perm('home.can_approve_orders') or user.has_perm('home.can_view_party_credentials')
+def _credential_share_payload(request, raw_token, token_obj):
+    claim_url = request.build_absolute_uri(reverse('homeApp:claim_access', args=[raw_token]))
+    subject_name = token_obj.staffUser.name if token_obj.staffUser_id else (token_obj.party.name if token_obj.party_id else token_obj.user.username)
+    share_text = (
+        f"Username: {token_obj.user.username}\n"
+        f"One-time access link: {claim_url}\n"
+        f"This link expires in {DEFAULT_CREDENTIAL_LINK_MINUTES} minutes and can be used only once."
+    )
+    return {
+        'message': 'success',
+        'claimUrl': claim_url,
+        'shareText': share_text,
+        'username': token_obj.user.username,
+        'expiresAt': token_obj.expiresAt.strftime('%d-%m-%Y %I:%M %p'),
+        'subjectName': subject_name,
+        'subjectType': token_obj.get_subjectType_display(),
+    }
 def _format_order_number(pk):
     return 'O' + str(int(pk)).zfill(8)
 def _order_status_label(status):
@@ -1099,6 +1117,30 @@ def add_staff_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except Exception:
             return JsonResponse({'message': 'error'}, safe=False)
+
+
+@transaction.atomic
+def generate_staff_access_link_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _can_manage_staff(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    staff_id = request.POST.get('userID')
+    if not staff_id or not str(staff_id).isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Invalid staff id.'}, status=400)
+    staff = tenant_qs(request, StaffUser).filter(isDeleted=False, pk=int(staff_id)).select_related('user_ID').first()
+    if staff is None or staff.user_ID_id is None:
+        return JsonResponse({'message': 'error', 'error': 'Staff login account is not available.'}, status=404)
+    raw_token, token_obj = create_credential_share_token(
+        request,
+        user=staff.user_ID,
+        subject_type=CredentialShareToken.SubjectType.STAFF,
+        staff_user=staff,
+        created_by=request.user,
+    )
+    return JsonResponse(_credential_share_payload(request, raw_token, token_obj), safe=False)
 #
 class StaffUserListJson(BaseDatatableView):
     order_columns = ['photo', 'name', 'username', 'userPassword', 'group', 'phone', 'address',
@@ -1127,9 +1169,12 @@ class StaffUserListJson(BaseDatatableView):
                 action = '''<button data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick = "GetUserDetails('{}')" class="ui circular facebook icon button green">
                     <i class="pen icon"></i>
                   </button>
+                  <button data-inverted="" data-tooltip="Share Access Link" data-position="left center" data-variation="mini" style="font-size:10px;" onclick ="showAccessLink('staff','{}')" class="ui circular teal icon button" style="margin-left: 3px">
+                    <i class="linkify icon"></i>
+                  </button>
                   <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
                     <i class="trash alternate icon"></i>
-                  </button></td>'''.format(item.pk, item.pk),
+                  </button></td>'''.format(item.pk, item.pk, item.pk),
                 username = item.username
                 password = item.userPassword
             else:
@@ -1640,6 +1685,32 @@ def generate_party_users_api(request):
             }, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
+
+
+@transaction.atomic
+def generate_party_access_link_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _can_manage_party_records(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    party_id = request.POST.get('userID')
+    if not party_id or not str(party_id).isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Invalid customer id.'}, status=400)
+    party = tenant_qs(request, Party).filter(isDeleted=False, pk=int(party_id)).select_related('userID').first()
+    if party is None or party.userID_id is None:
+        return JsonResponse({'message': 'error', 'error': 'Customer login account is not available.'}, status=404)
+    raw_token, token_obj = create_credential_share_token(
+        request,
+        user=party.userID,
+        subject_type=CredentialShareToken.SubjectType.PARTY,
+        party=party,
+        created_by=request.user,
+    )
+    return JsonResponse(_credential_share_payload(request, raw_token, token_obj), safe=False)
+
+
 class PartyListJson(BaseDatatableView):
     order_columns = ['name', 'phone', 'openingBalance', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
     def get_initial_queryset(self):
@@ -1675,6 +1746,10 @@ class PartyListJson(BaseDatatableView):
             action = action + ''' <a data-inverted="" data-tooltip="Ledger" data-position="left center" data-variation="mini" style="font-size:10px;" href="{}" class="ui circular blue icon button">
                     <i class="book icon"></i>
                   </a>'''.format(ledger_url)
+            if can_view_credentials:
+                action = action + ''' <button data-inverted="" data-tooltip="Share Access Link" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showAccessLink('party','{}')" class="ui circular teal icon button">
+                    <i class="linkify icon"></i>
+                  </button>'''.format(item.pk)
             if can_delete:
                 action = action + ''' <button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
                     <i class="trash alternate icon"></i>

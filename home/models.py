@@ -95,6 +95,57 @@ class TenantMembership(TimeStampedModel, AuditedModel):
         ]
 
 
+class CredentialShareToken(TenantOwnedModel):
+    class SubjectType(models.TextChoices):
+        STAFF = 'staff', 'Staff'
+        PARTY = 'party', 'Customer'
+
+    class Purpose(models.TextChoices):
+        INITIAL_LOGIN = 'initial_login', 'Initial Login'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='credential_share_tokens')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='credential_share_tokens')
+    staffUser = models.ForeignKey(
+        'StaffUser',
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,
+        related_name='credential_share_tokens',
+    )
+    party = models.ForeignKey(
+        'Party',
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,
+        related_name='credential_share_tokens',
+    )
+    subjectType = models.CharField(max_length=20, choices=SubjectType.choices)
+    purpose = models.CharField(max_length=30, choices=Purpose.choices, default=Purpose.INITIAL_LOGIN)
+    tokenHash = models.CharField(max_length=64, unique=True)
+    expiresAt = models.DateTimeField()
+    usedAt = models.DateTimeField(blank=True, null=True)
+    createdBy = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='generated_credential_share_tokens',
+    )
+    claimedFromIP = models.GenericIPAddressField(blank=True, null=True)
+
+    def __str__(self):
+        subject_label = self.staffUser.name if self.staffUser_id else (self.party.name if self.party_id else self.user.username)
+        return f'{self.get_subjectType_display()} access link for {subject_label}'
+
+    class Meta:
+        verbose_name_plural = 'Credential Share Tokens'
+        indexes = [
+            models.Index(fields=['tenant', 'subjectType', 'expiresAt'], name='credtoken_tenant_subj_exp_idx'),
+            models.Index(fields=['user', 'usedAt'], name='credtoken_user_used_idx'),
+            models.Index(fields=['tokenHash'], name='credtoken_hash_idx'),
+        ]
+
+
 class AuditLog(TimeStampedModel):
     class Action(models.TextChoices):
         CREATE = 'create', 'Create'

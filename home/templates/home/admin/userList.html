@@ -486,6 +486,42 @@
                     </div>
                 </div>
 
+                <div class="ui tiny modal" id="accessLinkModal">
+                    <i class="close icon"></i>
+                    <div class="header">Secure Access Link</div>
+                    <div class="content">
+                        <div class="ui small form">
+                            <div class="field">
+                                <label>Account Type</label>
+                                <input type="text" id="accessLinkSubjectType" readonly>
+                            </div>
+                            <div class="field">
+                                <label>Account Name</label>
+                                <input type="text" id="accessLinkSubjectName" readonly>
+                            </div>
+                            <div class="field">
+                                <label>Username</label>
+                                <div class="ui action input">
+                                    <input type="text" id="accessLinkUsername" readonly>
+                                    <button class="ui button" type="button" onclick="copyAccessField('#accessLinkUsername')">Copy</button>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>One-time Link</label>
+                                <div class="ui action input">
+                                    <input type="text" id="accessLinkUrl" readonly>
+                                    <button class="ui teal button" type="button" onclick="copyAccessField('#accessLinkUrl')">Copy Link</button>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>Share Text</label>
+                                <textarea rows="4" id="accessLinkShareText" readonly></textarea>
+                            </div>
+                            <div class="ui tiny teal message" id="accessLinkExpiryNote"></div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="ui modal" id="userModal">
                     <i class="close icon"></i>
                     <div class="header">
@@ -1162,6 +1198,71 @@
             "serverSide": true,
             "ajax": "{% url 'homeApp:StaffUserListJson' %}"
         });
+
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text);
+            }
+            return new Promise(function (resolve, reject) {
+                var textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    textArea.remove();
+                    resolve();
+                } catch (err) {
+                    textArea.remove();
+                    reject(err);
+                }
+            });
+        }
+
+        function copyAccessField(selector) {
+            var text = $(selector).val();
+            if (!text) {
+                return;
+            }
+            copyToClipboard(text).then(function () {
+                $('body').toast({class: 'success', message: 'Copied to clipboard.'});
+            }).catch(function () {
+                $('body').toast({class: 'error', message: 'Unable to copy.'});
+            });
+        }
+
+        function showAccessLink(kind, id) {
+            var formdata = new FormData();
+            formdata.append('userID', id);
+            $.ajax({
+                url: kind === 'party' ? "{% url 'homeApp:generate_party_access_link_api' %}" : "{% url 'homeApp:generate_staff_access_link_api' %}",
+                type: "post",
+                data: formdata,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('#accessLinkSubjectType').val(response.subjectType || '');
+                        $('#accessLinkSubjectName').val(response.subjectName || '');
+                        $('#accessLinkUsername').val(response.username || '');
+                        $('#accessLinkUrl').val(response.claimUrl || '');
+                        $('#accessLinkShareText').val(response.shareText || '');
+                        $('#accessLinkExpiryNote').text('This link expires on ' + (response.expiresAt || '') + ' and can be used only once.');
+                        $('#accessLinkModal').modal('show');
+                    } else {
+                        $('body').toast({class: 'error', message: response.error || 'Unable to generate access link.'});
+                    }
+                },
+                error: function (xhr) {
+                    var errorMessage = (xhr.responseJSON && xhr.responseJSON.error) || 'Unable to generate access link.';
+                    $('body').toast({class: 'error', message: errorMessage});
+                }
+            });
+        }
 
 
         function delUser(id) {

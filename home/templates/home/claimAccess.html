@@ -1,0 +1,233 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+    <title>Claim Access</title>
+    <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
+    <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.8.8/semantic.min.css"
+          integrity="sha512-pbLYRiE96XJxmJgF8oWBfa9MdKwuXhlV7vgs2LLlapHLXceztfcta0bdeOgA4reIf0WH67ThWzA684JwkM3zfQ=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"/>
+    <style>
+        :root {
+            --bg-0: #09101d;
+            --bg-1: #0f1728;
+            --bg-2: #16233c;
+            --card: #f7f2ea;
+            --ink: #172033;
+            --muted: #677088;
+            --accent: #d97549;
+            --accent-deep: #a94a2a;
+            --teal: #2b7a78;
+            --line: rgba(18, 24, 38, 0.1);
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 16px;
+            background:
+                radial-gradient(circle at 12% 16%, rgba(217, 117, 73, 0.18), transparent 24%),
+                radial-gradient(circle at 84% 18%, rgba(43, 122, 120, 0.16), transparent 24%),
+                linear-gradient(140deg, var(--bg-0) 0%, var(--bg-1) 42%, var(--bg-2) 100%);
+            font-family: "Avenir Next", "Segoe UI", sans-serif;
+        }
+
+        .claim-card {
+            width: min(100%, 460px);
+            padding: 20px 18px 18px;
+            border-radius: 20px;
+            background: var(--card);
+            box-shadow: 0 24px 70px rgba(4, 8, 18, 0.38);
+        }
+
+        .brand-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            line-height: 1;
+        }
+
+        .brand-logo {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: block;
+            box-shadow: 0 8px 18px rgba(7, 11, 22, 0.12);
+        }
+
+        .brand-name {
+            margin: 0;
+            color: var(--ink);
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: -0.04em;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .claim-eyebrow {
+            color: var(--accent-deep);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        .claim-title {
+            margin: 8px 0 6px;
+            font-size: 26px;
+            line-height: 1;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            color: var(--ink);
+        }
+
+        .claim-copy {
+            margin: 0 0 14px;
+            color: var(--muted);
+            line-height: 1.45;
+            font-size: 13px;
+        }
+
+        .claim-meta {
+            display: grid;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .claim-meta-row {
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: #fff;
+            border: 1px solid var(--line);
+        }
+
+        .claim-meta-label {
+            display: block;
+            margin-bottom: 3px;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .claim-meta-value {
+            color: var(--ink);
+            font-size: 16px;
+            font-weight: 800;
+            word-break: break-word;
+        }
+
+        .claim-actions {
+            margin-top: 10px;
+        }
+
+        .claim-button.ui.button,
+        .claim-actions .ui.button {
+            border-radius: 12px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding-top: 0.9em;
+            padding-bottom: 0.9em;
+        }
+
+        .claim-actions .ui.green.button {
+            background: linear-gradient(90deg, var(--accent-deep), var(--accent));
+            color: #fffaf6;
+        }
+
+        .claim-actions .ui.teal.button {
+            background: linear-gradient(135deg, #0f766e, #115e59);
+            color: #fff;
+        }
+
+        .claim-card .ui.form .field {
+            margin-bottom: 0.85rem;
+        }
+
+        .claim-card .ui.form .field > label {
+            margin-bottom: 0.35rem;
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .claim-card .ui.form input {
+            border-radius: 12px;
+            min-height: 42px;
+        }
+
+        .claim-card .ui.message {
+            margin-bottom: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+<div class="claim-card">
+    <div class="brand-header">
+        <img class="brand-logo" src="{% static 'sw/images/icon-192.png' %}" alt="zivaBooks logo">
+        <div class="brand-name">zivaBooks</div>
+    </div>
+    <div class="claim-eyebrow">Secure Access</div>
+    <h1 class="claim-title">{{ claim_heading }}</h1>
+    <p class="claim-copy">{{ claim_message }}</p>
+
+    {% if claim_status == 'valid' %}
+        <div class="claim-meta">
+            <div class="claim-meta-row">
+                <span class="claim-meta-label">{{ subject_type }}</span>
+                <span class="claim-meta-value">{{ subject_name }}</span>
+            </div>
+            <div class="claim-meta-row">
+                <span class="claim-meta-label">Username</span>
+                <span class="claim-meta-value">{{ username }}</span>
+            </div>
+            <div class="claim-meta-row">
+                <span class="claim-meta-label">Expires</span>
+                <span class="claim-meta-value">{{ expires_at|date:"d-m-Y h:i A" }}</span>
+            </div>
+        </div>
+
+        <form class="ui form" method="post">
+            {% csrf_token %}
+            {% if form_error %}
+                <div class="ui negative message">{{ form_error }}</div>
+            {% endif %}
+            <div class="field">
+                <label>New Password</label>
+                <input type="password" name="new_password" placeholder="Set a new password" autocomplete="new-password">
+            </div>
+            <div class="field">
+                <label>Confirm Password</label>
+                <input type="password" name="confirm_password" placeholder="Confirm password" autocomplete="new-password">
+            </div>
+            <div class="claim-actions">
+                <button class="ui fluid green button" type="submit">Activate Access</button>
+            </div>
+        </form>
+    {% else %}
+        {% if username %}
+            <div class="claim-meta">
+                <div class="claim-meta-row">
+                    <span class="claim-meta-label">Username</span>
+                    <span class="claim-meta-value">{{ username }}</span>
+                </div>
+            </div>
+        {% endif %}
+        <div class="claim-actions">
+            <a class="ui fluid teal button" href="{% url 'homeApp:loginPage' %}">Go To Login</a>
+        </div>
+    {% endif %}
+</div>
+</body>
+</html>

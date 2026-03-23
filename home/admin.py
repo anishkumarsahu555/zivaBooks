@@ -146,6 +146,26 @@ class PartyAdmin(admin.ModelAdmin):
 admin.site.register(Party, PartyAdmin)
 
 
+class CredentialShareTokenAdmin(admin.ModelAdmin):
+    list_display = [
+        'tenant',
+        'subjectType',
+        'user',
+        'staffUser',
+        'party',
+        'expiresAt',
+        'usedAt',
+        'createdBy',
+        'isDeleted',
+    ]
+    list_filter = ['tenant', 'subjectType', 'purpose', 'isDeleted', 'usedAt', 'expiresAt']
+    search_fields = ['user__username', 'staffUser__name', 'party__name', 'tokenHash']
+    readonly_fields = ['tokenHash', 'usedAt', 'claimedFromIP', 'datetime', 'lastUpdatedOn']
+
+
+admin.site.register(CredentialShareToken, CredentialShareTokenAdmin)
+
+
 class OrderAdmin(admin.ModelAdmin):
     list_display = ['tenant', 'orderNumber', 'partyID', 'status', 'createdBy', 'buildDate', 'datetime', 'lastUpdatedOn', 'isDeleted']
 
