@@ -1,4 +1,4 @@
-{% extends 'home/collection/indexCollection.html' %}
+{% extends base_template %}
 {% load static %}
 {% block title %}
     <title>Take Collection</title>
@@ -87,58 +87,65 @@
                     <div class="content">
 
                         <form class="ui  small form " id="addForm">{% csrf_token %}
-                            <div class="one fields">
-                                <div class="sixteen wide field required">
-                                    <label>Filter Parties By</label>
-                                    <select class="ui search dropdown" id="partyAssign" onchange="partyAssignType()">
-                                        <option value="All">All</option>
-                                        <option value="Executive">Executive</option>
-                                        <option value="Station">Station</option>
-                                    </select>
+                            {% if collection_admin_mode %}
+                                <div class="one fields">
+                                    <div class="sixteen wide field required">
+                                        <label>Party Name</label>
+                                        <select class="ui clearable search dropdown" id="party">
+                                            <option value="">Search By Party Name</option>
+                                        </select>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="one fields" id="ExecutiveList" style="display: none">
-                                <div class="sixteen wide field required">
-                                    <label>Select Executive</label>
-                                    <select class="ui clearable search dropdown" id="executive" onchange="getPartyListByStationOrStaff('e')">
-                                        <option value="">Search By Executive</option>
-                                        {% for obj in staffs %}
-                                            <option value="{{ obj.pk }}">{{ obj.name|capfirst }}</option>
-                                        {% endfor %}
-                                    </select>
+                            {% else %}
+                                <div class="one fields">
+                                    <div class="sixteen wide field required">
+                                        <label>Filter Parties By</label>
+                                        <select class="ui search dropdown" id="partyAssign" onchange="partyAssignType()">
+                                            <option value="All">All</option>
+                                            <option value="Executive">Executive</option>
+                                            <option value="Station">Station</option>
+                                        </select>
+                                    </div>
                                 </div>
-
-                            </div>
-                           <div class="one fields" id="StationList" style="display: none">
-                                <div class="sixteen wide field required">
-                                    <label>Select Station</label>
-                                    <select class="ui clearable search dropdown" id="station" onchange="getPartyListByStationOrStaff('s')">
-                                        <option value="">Search By Station</option>
-                                        {% for obj in p_groups %}
-                                            <option value="{{ obj.pk }}">{{ obj.name|capfirst }}</option>
-                                        {% endfor %}
-                                    </select>
+                                <div class="one fields" id="ExecutiveList" style="display: none">
+                                    <div class="sixteen wide field required">
+                                        <label>Select Executive</label>
+                                        <select class="ui clearable search dropdown" id="executive" onchange="getPartyListByStationOrStaff('e')">
+                                            <option value="">Search By Executive</option>
+                                            {% for obj in staffs %}
+                                                <option value="{{ obj.pk }}">{{ obj.name|capfirst }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
                                 </div>
-
-                            </div>
-                            <div class="one fields" id="partyAll" >
-                                <div class="sixteen wide field required">
-                                    <label>Party Name</label>
-                                    <select class="ui clearable search dropdown" id="partyAllAll">
-                                        <option value="">Search By Party Name</option>
-                                    </select>
+                               <div class="one fields" id="StationList" style="display: none">
+                                    <div class="sixteen wide field required">
+                                        <label>Select Station</label>
+                                        <select class="ui clearable search dropdown" id="station" onchange="getPartyListByStationOrStaff('s')">
+                                            <option value="">Search By Station</option>
+                                            {% for obj in p_groups %}
+                                                <option value="{{ obj.pk }}">{{ obj.name|capfirst }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
                                 </div>
-
-                            </div>
-                         <div class="one fields" id="partyFilter" style="display: none;">
-                                <div class="sixteen wide field required">
-                                    <label>Party Name</label>
-                                    <select class="ui clearable search dropdown" id="partyAllFilter">
-                                        <option value="">Search By Party Name</option>
-                                    </select>
+                                <div class="one fields" id="partyAll" >
+                                    <div class="sixteen wide field required">
+                                        <label>Party Name</label>
+                                        <select class="ui clearable search dropdown" id="partyAllAll">
+                                            <option value="">Search By Party Name</option>
+                                        </select>
+                                    </div>
                                 </div>
-
-                            </div>
+                                <div class="one fields" id="partyFilter" style="display: none;">
+                                    <div class="sixteen wide field required">
+                                        <label>Party Name</label>
+                                        <select class="ui clearable search dropdown" id="partyAllFilter">
+                                            <option value="">Search By Party Name</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            {% endif %}
                             <div class="two required fields ">
                                 <div class=" field required">
                                     <label>Mode Of Payment</label>
@@ -342,11 +349,15 @@
             });
 
         function getSelectedPartyValue() {
-            var partyAssign = $('#partyAssign').val();
-            if (partyAssign === 'All') {
-                return $('#partyAllAll').val();
-            }
-            return $('#partyAllFilter').val();
+            {% if collection_admin_mode %}
+                return $('#party').val();
+            {% else %}
+                var partyAssign = $('#partyAssign').val();
+                if (partyAssign === 'All') {
+                    return $('#partyAllAll').val();
+                }
+                return $('#partyAllFilter').val();
+            {% endif %}
         }
 
         function toggleOtp() {
@@ -378,11 +389,15 @@
         }
 
         function lockFormAfterOtp() {
-            setDropdownDisabled('#partyAssign', true);
-            setDropdownDisabled('#executive', true);
-            setDropdownDisabled('#station', true);
-            setDropdownDisabled('#partyAllAll', true);
-            setDropdownDisabled('#partyAllFilter', true);
+            {% if collection_admin_mode %}
+                setDropdownDisabled('#party', true);
+            {% else %}
+                setDropdownDisabled('#partyAssign', true);
+                setDropdownDisabled('#executive', true);
+                setDropdownDisabled('#station', true);
+                setDropdownDisabled('#partyAllAll', true);
+                setDropdownDisabled('#partyAllFilter', true);
+            {% endif %}
             setDropdownDisabled('#paymentMode', true);
             $('#amountPaid').prop('disabled', true);
             $('#collectDate').prop('disabled', true);
@@ -394,11 +409,15 @@
         }
 
         function unlockFormAfterOtp() {
-            setDropdownDisabled('#partyAssign', false);
-            setDropdownDisabled('#executive', false);
-            setDropdownDisabled('#station', false);
-            setDropdownDisabled('#partyAllAll', false);
-            setDropdownDisabled('#partyAllFilter', false);
+            {% if collection_admin_mode %}
+                setDropdownDisabled('#party', false);
+            {% else %}
+                setDropdownDisabled('#partyAssign', false);
+                setDropdownDisabled('#executive', false);
+                setDropdownDisabled('#station', false);
+                setDropdownDisabled('#partyAllAll', false);
+                setDropdownDisabled('#partyAllFilter', false);
+            {% endif %}
             setDropdownDisabled('#paymentMode', false);
             $('#amountPaid').prop('disabled', false);
             $('#collectDate').prop('disabled', false);
@@ -551,6 +570,9 @@
         }
 
         function partyAssignType() {
+            {% if collection_admin_mode %}
+                return;
+            {% endif %}
             var partyAssign = $('#partyAssign').val();
             if (partyAssign === 'All') {
                 $('#partyAll').css('display', "");
@@ -607,12 +629,7 @@
             var lat = $('#lat').val();
             var lng = $('#lng').val();
             var chequeDate = $('#chequeDate').val();
-            var partyAssign = $('#partyAssign').val();
-            if (partyAssign === 'All') {
-                var party = $('#partyAllAll').val();
-            } else {
-                var party = $('#partyAllFilter').val();
-            }
+            var party = getSelectedPartyValue();
 
             if (party === '' || paymentMode === '' || amountPaid === '' || collectDate === '') {
                 $('body')
@@ -668,7 +685,7 @@
 
                 $.ajax({
                     type: 'post',
-                    url: '{% url 'homeApp:add_collection_by_staff_api' %}',
+                    url: '{{ collection_submit_url }}',
                     data: data,
                     contentType: false,
                     cache: false,
@@ -686,7 +703,7 @@
                             hideLoading();
                             try { $('#otpRequired').prop('checked', false); toggleOtp(); } catch (e) {}
 
-                            location.href = "{% url 'homeApp:my_collection' %}"
+                            location.href = "{% url 'homeApp:collection_list' %}"
 
                         } else if (response.message === 'bank_required') {
                             $('body')
@@ -805,14 +822,23 @@
 
                 success: function (response) {
 
-                    $('#partyAllAll').html('');
-                    $('#partyAllAll').append(' <option value="">Search By Party Name</option>');
+                    {% if collection_admin_mode %}
+                        $('#party').html('');
+                        $('#party').append(' <option value="">Search By Party Name</option>');
+                    {% else %}
+                        $('#partyAllAll').html('');
+                        $('#partyAllAll').append(' <option value="">Search By Party Name</option>');
+                    {% endif %}
                      $('#TransferredParty').html('');
                     $('#TransferredParty').append(' <option value="">Search By Party Name</option>');
                    var j;
                     for (j = 0; j < response.data.length; j++) {
 
-                        $('#partyAllAll').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                        {% if collection_admin_mode %}
+                            $('#party').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                        {% else %}
+                            $('#partyAllAll').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+                        {% endif %}
                         $('#TransferredParty').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
 
                     }
@@ -834,6 +860,9 @@
 
 
         function getPartyListByStationOrStaff(ch) {
+            {% if collection_admin_mode %}
+                return;
+            {% endif %}
             if(ch === 'e'){
               var executive = $('#executive').val();
               var station = 'All'
