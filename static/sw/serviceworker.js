@@ -1,30 +1,41 @@
-var version = 'v1.3.5::';
+var version = 'v1.4.0::';
+var OFFLINE_URL = '/static/sw/offline.html';
+var CORE_CACHE = version + 'fundamentals';
+var RUNTIME_CACHE = version + 'pages';
+
+var CORE_ASSETS = [
+    OFFLINE_URL,
+    '/static/sw/images/icon-192.png',
+    '/static/sw/images/icon-512.png',
+    '/static/sw/images/apple-touch-icon.png',
+    'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.js',
+    'https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css',
+    'https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js',
+    'https://cdn.datatables.net/1.12.1/js/dataTables.semanticui.min.js',
+    'https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js',
+    'https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js',
+    'https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js',
+    'https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js',
+    'https://cdn.datatables.net/buttons/2.2.2/js/buttons.colVis.min.js',
+    'https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic&subset=latin'
+];
+
 self.addEventListener("install", function (event) {
     console.log('WORKER: install event in progress.');
     event.waitUntil(
         caches
-            .open(version + 'fundamentals')
+            .open(CORE_CACHE)
             .then(function (cache) {
-                return cache.addAll([
-                    'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js',
-                    'https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.css',
-                    'https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.js',
-                    'https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css',
-                    'https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js',
-                    'https://cdn.datatables.net/1.12.1/js/dataTables.semanticui.min.js',
-                    'https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js',
-                    'https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js',
-                    'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js',
-                    'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js',
-                    'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js',
-                    'https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js',
-                    'https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js',
-                    'https://cdn.datatables.net/buttons/2.2.2/js/buttons.colVis.min.js',
-                    'https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic&subset=latin'
-                ]);
+                return cache.addAll(CORE_ASSETS);
             })
             .then(function () {
                 console.log('WORKER: install completed');
+                return self.skipWaiting();
             })
     );
 });
@@ -38,39 +49,61 @@ self.addEventListener("fetch", function (event) {
     if (event.request.method !== 'GET') {
         return;
     }
+
+    var request = event.request;
+    var acceptsHtml = request.headers.get('accept') && request.headers.get('accept').indexOf('text/html') !== -1;
+    var isNavigation = request.mode === 'navigate' || acceptsHtml;
+
+    if (isNavigation) {
+        event.respondWith(
+            fetch(request)
+                .then(function (response) {
+                    var cacheCopy = response.clone();
+                    caches.open(RUNTIME_CACHE).then(function (cache) {
+                        cache.put(request, cacheCopy);
+                    });
+                    return response;
+                })
+                .catch(function () {
+                    return caches.match(request).then(function (cachedPage) {
+                        return cachedPage || caches.match(OFFLINE_URL);
+                    });
+                })
+        );
+        return;
+    }
+
     event.respondWith(
         caches
-            .match(event.request)
+            .match(request)
             .then(function (cached) {
-                var networked = fetch(event.request)
+                var networked = fetch(request)
                     .then(fetchedFromNetwork, unableToResolve)
                     .catch(unableToResolve);
-                // console.log('WORKER: fetch event', cached ? '(cached)' : '(network)', event.request.url);
                 return cached || networked;
 
                 function fetchedFromNetwork(response) {
                     var cacheCopy = response.clone();
                     caches
-                        .open(version + 'pages')
+                        .open(RUNTIME_CACHE)
                         .then(function add(cache) {
-                            var img = get_url_extension(event.request.url);
+                            var img = get_url_extension(request.url);
                             if (img.toLowerCase() === 'png' || img.toLowerCase() === 'jpg' || img.toLowerCase() === 'jpeg' || img.toLowerCase() === 'svg') {
-                                cache.put(event.request, cacheCopy);
+                                cache.put(request, cacheCopy);
                             }
                         })
-                        .then(function () {
-                            // console.log('WORKER: fetch response stored in cache.', event.request.url);
-                        });
                     return response;
                 }
 
                 function unableToResolve() {
-                    // console.log('WORKER: fetch request failed in both cache and network.');
-                    return new Response('<h1>Service Unavailable</h1>', {
+                    if (request.destination === 'image') {
+                        return caches.match('/static/sw/images/icon-192.png');
+                    }
+                    return new Response('Offline', {
                         status: 503,
                         statusText: 'Service Unavailable',
                         headers: new Headers({
-                            'Content-Type': 'text/html'
+                            'Content-Type': 'text/plain'
                         })
                     });
                 }
@@ -95,8 +128,8 @@ self.addEventListener("activate", function (event) {
             })
             .then(function () {
                 console.log('WORKER: activate completed.');
+                return self.clients.claim();
             })
     );
 });
-
 

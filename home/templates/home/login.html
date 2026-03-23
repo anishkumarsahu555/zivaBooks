@@ -9,6 +9,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
+    <link rel="stylesheet" href="{% static 'css/app-loader.css' %}">
     <title>Login</title>
     {% progressive_web_app_meta %}
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"
@@ -544,6 +545,16 @@
     </style>
 </head>
 <body>
+<div class="app-loader" data-app-loader>
+    <div class="app-loader__panel">
+        <div class="app-loader__logo-wrap">
+            <img class="app-loader__logo" src="{% static 'sw/images/icon-192.png' %}" alt="zivaBooks logo">
+        </div>
+        <p class="app-loader__title">zivaBooks</p>
+        <p class="app-loader__subtitle" data-app-loader-subtitle>Preparing sign in...</p>
+        <div class="app-loader__progress" aria-hidden="true"></div>
+    </div>
+</div>
 <div class="container">
     <div class="ui equal width center aligned padded grid">
         <div class="ui basic segment" style="width: 100%; max-width: 1040px; padding: 0; box-shadow: none; background: transparent;">
@@ -670,6 +681,7 @@
     </div>
 </div>
 <p class="credit" style="">Developed by <a href="http://zivainfotech.com" target="_blank">Ziva Infotech</a></p>
+<script src="{% static 'js/app-loader.js' %}"></script>
 <script>
     function getCookie(name) {
         var cookieValue = null;
@@ -711,6 +723,7 @@
             ;
 
         } else {
+            if (window.AppLoader) window.AppLoader.show('Signing you in...');
             data = new FormData();
             data.append('userName', username);
             data.append('password', password);
@@ -733,6 +746,7 @@
                             });
                         document.location.href = "" + response.data;
                     } else {
+                        if (window.AppLoader) window.AppLoader.hide();
                         $('body')
                             .toast({
                                 class: 'warning',
@@ -745,6 +759,7 @@
                     return response;
                 },
                 error: function () {
+                    if (window.AppLoader) window.AppLoader.hide();
                     $('body')
                         .toast({
                             class: 'error',

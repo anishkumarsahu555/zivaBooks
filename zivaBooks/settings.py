@@ -185,14 +185,61 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 PWA_APP_NAME = 'zivaBooks'
 PWA_APP_DESCRIPTION = "In-house management Application."
 PWA_APP_THEME_COLOR = '#272E38'
+PWA_APP_BACKGROUND_COLOR = '#0C1D2F'
 PWA_APP_DISPLAY = 'standalone'
 PWA_APP_START_URL = '/home/'
+PWA_APP_SCOPE = '/'
 PWA_APP_ICONS = [
-    {"src": "static/sw/images/favicon.ico", "type": "image/x-icon", "sizes": "16x16 32x32"},
-    {"src": "static/sw/images/icon-192.png", "type": "image/png", "sizes": "192x192"},
-    {"src": "static/sw/images/icon-512.png", "type": "image/png", "sizes": "512x512"},
-    {"src": "static/sw/images/icon-192-maskable.png", "type": "image/png", "sizes": "192x192", "purpose": "maskable"},
-    {"src": "static/sw/images/icon-512-maskable.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable"}
+    {"src": "/static/sw/images/favicon.ico", "type": "image/x-icon", "sizes": "16x16 32x32"},
+    {"src": "/static/sw/images/icon-192.png", "type": "image/png", "sizes": "192x192"},
+    {"src": "/static/sw/images/icon-512.png", "type": "image/png", "sizes": "512x512"},
+    {"src": "/static/sw/images/icon-192-maskable.png", "type": "image/png", "sizes": "192x192", "purpose": "maskable"},
+    {"src": "/static/sw/images/icon-512-maskable.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable"}
+]
+PWA_APP_ICONS_APPLE = [
+    {"src": "/static/sw/images/apple-touch-icon.png", "sizes": "180x180"},
+]
+PWA_APP_SPLASH_SCREEN = [
+    {
+        "src": "/static/sw/images/splash/splash-640x1136.png",
+        "media": "(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)",
+    },
+    {
+        "src": "/static/sw/images/splash/splash-750x1334.png",
+        "media": "(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)",
+    },
+    {
+        "src": "/static/sw/images/splash/splash-1242x2208.png",
+        "media": "(device-width: 621px) and (device-height: 1104px) and (-webkit-device-pixel-ratio: 3)",
+    },
+    {
+        "src": "/static/sw/images/splash/splash-1125x2436.png",
+        "media": "(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)",
+    },
+    {
+        "src": "/static/sw/images/splash/splash-828x1792.png",
+        "media": "(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)",
+    },
+    {
+        "src": "/static/sw/images/splash/splash-1242x2688.png",
+        "media": "(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)",
+    },
+    {
+        "src": "/static/sw/images/splash/splash-1536x2048.png",
+        "media": "(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)",
+    },
+    {
+        "src": "/static/sw/images/splash/splash-1668x2224.png",
+        "media": "(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)",
+    },
+    {
+        "src": "/static/sw/images/splash/splash-1668x2388.png",
+        "media": "(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)",
+    },
+    {
+        "src": "/static/sw/images/splash/splash-2048x2732.png",
+        "media": "(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)",
+    },
 ]
 
 PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'home', '../static/sw/serviceworker.js')
