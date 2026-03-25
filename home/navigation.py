@@ -740,7 +740,7 @@ def build_sidebar_sections(request_or_user):
                     'home.can_view_order_reports',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Exception Dashboard', 'homeApp:analytics_exceptions', 'exclamation triangle', (
+                _nav_item('Exceptions', 'homeApp:analytics_exceptions', 'exclamation triangle', (
                     'home.can_view_party_credentials',
                     'home.can_approve_collection',
                     'home.can_approve_sales',
@@ -751,63 +751,63 @@ def build_sidebar_sections(request_or_user):
         {
             'title': 'Reports',
             'items': _filter_items(request_or_user, [
-                _nav_item('Daily Summary Report', 'homeApp:report_daily_summary', 'sun', (
+                _nav_item('Daily Summary', 'homeApp:report_daily_summary', 'sun', (
                     'home.can_manage_staff',
                     'home.can_view_party_credentials',
                     'home.can_view_sales_reports',
                     'home.can_view_collection_reports',
                     'home.can_view_cash_counter_reports',
                 )),
-                _nav_item('Staff Performance Report', 'homeApp:report_staff_activity', 'id badge outline', (
+                _nav_item('Staff Performance', 'homeApp:report_staff_activity', 'id badge outline', (
                     'home.can_manage_staff',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Customer Outstanding Report', 'homeApp:report_outstanding', 'balance scale', (
+                _nav_item('Customer Outstanding', 'homeApp:report_outstanding', 'balance scale', (
                     'home.can_manage_parties',
                     'home.can_view_party_credentials',
                     'home.can_view_collection_reports',
                 )),
-                _nav_item('Customer Ledger Report', 'homeApp:report_party_ledger', 'address card outline', (
+                _nav_item('Customer Ledger', 'homeApp:report_party_ledger', 'address card outline', (
                     'home.can_manage_parties',
                     'home.can_view_party_credentials',
                     'home.view_party',
                 )),
-                _nav_item('Collection Report', 'homeApp:report_collections', 'file invoice dollar', (
+                _nav_item('Collections', 'homeApp:report_collections', 'file invoice dollar', (
                     'home.can_approve_collection',
                     'home.can_view_collection_reports',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Sales Report', 'homeApp:report_sales', 'file alternate outline', (
+                _nav_item('Sales', 'homeApp:report_sales', 'file alternate outline', (
                     'home.can_manage_sales',
                     'home.can_view_sales_reports',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Cash Closing Report', 'homeApp:report_cash_closing', 'receipt', (
+                _nav_item('Cash Closing', 'homeApp:report_cash_closing', 'receipt', (
                     'home.can_manage_cash_counter',
                     'home.can_view_cash_counter_reports',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Order Status Report', 'homeApp:report_orders', 'file outline', (
+                _nav_item('Order Status', 'homeApp:report_orders', 'file outline', (
                     'home.can_manage_orders',
                     'home.can_view_order_reports',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Attendance Report', 'homeApp:report_attendance', 'calendar', (
+                _nav_item('Attendance', 'homeApp:report_attendance', 'calendar', (
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Pending Approval Report', 'homeApp:report_pending_approvals', 'clipboard check', (
+                _nav_item('Pending Approvals', 'homeApp:report_pending_approvals', 'clipboard check', (
                     'home.can_approve_collection',
                     'home.can_approve_sales',
                     'home.can_approve_orders',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Bank/Cash Movement Report', 'homeApp:report_bank_cash_movement', 'exchange alternate', (
+                _nav_item('Cash/Bank Movement', 'homeApp:report_bank_cash_movement', 'exchange alternate', (
                     'home.can_manage_books',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Failed Message Report', 'homeApp:report_failed_messages', 'comment alternate outline', (
+                _nav_item('Failed Messages', 'homeApp:report_failed_messages', 'comment alternate outline', (
                     'home.view_whatsappmessagestatus',
                     'home.add_whatsappmessagestatus',
                     'home.change_whatsappmessagestatus',
@@ -831,6 +831,7 @@ def build_sidebar_sections(request_or_user):
     visible_sections = []
     for section in sections:
         if section['title'] in ('General', 'Profile') or section.get('items'):
+            section['collapsed_by_default'] = True
             visible_sections.append(section)
     if hasattr(request_or_user, 'META'):
         request_or_user._sidebar_sections_cache = visible_sections
