@@ -1,0 +1,106 @@
+{% load formatting %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Daily Summary</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #0f172a; font-size: 11px; }
+        .title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        .subtitle { color: #475569; margin-bottom: 14px; }
+        .grid { width: 100%; border-collapse: separate; border-spacing: 8px; margin: 0 -8px 14px; }
+        .card { border: 1px solid #dbe5f0; border-radius: 12px; padding: 10px; background: #f8fbff; }
+        .card-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+        .card-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #dbe5f0; padding: 7px 8px; text-align: left; }
+        th { background: #eff6ff; font-size: 10px; text-transform: uppercase; color: #334155; }
+        .section-title { font-size: 13px; font-weight: 700; margin: 16px 0 8px; }
+        .right { text-align: right; }
+        .pdf-footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #dbe5f0; color: #64748b; font-size: 9px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="title">Daily Summary Report</div>
+    <div class="subtitle">{{ pdf_brand_name }} | Business date: {{ report_date|date:"d M Y" }}</div>
+
+    <table class="grid">
+        <tr>
+            <td class="card">
+                <div class="card-label">Sales</div>
+                <div class="card-value">{{ sales_total|money }}</div>
+                <div>{{ sales_count }} invoices</div>
+            </td>
+            <td class="card">
+                <div class="card-label">Collections</div>
+                <div class="card-value">{{ collection_total|money }}</div>
+                <div>{{ collection_count }} receipts</div>
+            </td>
+            <td class="card">
+                <div class="card-label">Cash Counter</div>
+                <div class="card-value">{{ cash_counter_total|money }}</div>
+                <div>Counter movement</div>
+            </td>
+            <td class="card">
+                <div class="card-label">Returns / Expenses</div>
+                <div class="card-value">{{ return_total|money }} / {{ expense_total|money }}</div>
+                <div>Risk outflow</div>
+            </td>
+        </tr>
+    </table>
+
+    <table class="grid">
+        <tr>
+            <td class="card">
+                <div class="card-label">Pending Sales</div>
+                <div class="card-value">{{ pending_sales }}</div>
+            </td>
+            <td class="card">
+                <div class="card-label">Pending Collections</div>
+                <div class="card-value">{{ pending_collections }}</div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">Top Sales Staff</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Staff</th>
+                <th class="right">Sales Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in top_sales_staff %}
+            <tr>
+                <td>{{ row.createdBy__name|default:'-' }}</td>
+                <td class="right">{{ row.total|money }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2">No sales activity.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="section-title">Top Collection Staff</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Staff</th>
+                <th class="right">Collection Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in top_collection_staff %}
+            <tr>
+                <td>{{ row.collectedBy__name|default:'-' }}</td>
+                <td class="right">{{ row.total|money }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2">No collection activity.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% include 'home/report/_pdfFooter.html' %}
+</body>
+</html>

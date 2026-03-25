@@ -139,6 +139,10 @@
                 </div>
                 {% if audit_can_export %}
                     <div style="position: absolute;right: 1.5rem;top: 18px;">
+                        <button class="ui basic mini button" type="button" onclick="exportAuditExcel()">
+                            <i class="file excel outline icon"></i>
+                            Export Excel
+                        </button>
                         <button class="ui teal mini button" type="button" onclick="exportAuditCsv()">
                             <i class="download icon"></i>
                             Export CSV
@@ -331,6 +335,11 @@
     function exportAuditCsv() {
         var params = $.param(currentAuditFilters());
         window.location = '{% url "homeApp:export_audit_log_csv" %}?' + params;
+    }
+
+    function exportAuditExcel() {
+        var params = $.param(currentAuditFilters());
+        window.location = '{% url "homeApp:export_audit_log_excel" %}?' + params;
     }
 
     function formatAuditCompareValue(value) {

@@ -1,0 +1,56 @@
+{% extends 'home/business/link_report.html' %}
+
+{% block css %}
+{{ block.super }}
+<style>
+@media (max-width:1024px){
+    .shell > .action-grid{
+        display:grid!important;
+        grid-template-columns:1fr!important;
+        gap:.55rem!important;
+        overflow:visible!important;
+    }
+    .shell > .action-grid > .action-card{
+        padding:.8rem!important;
+        min-width:0!important;
+        max-width:none!important;
+        width:auto!important;
+        flex:none!important;
+    }
+    .shell > .action-grid > .action-card h4{
+        margin-bottom:.25rem!important;
+        font-size:1rem!important;
+    }
+    .shell > .action-grid > .action-card p{
+        margin-bottom:.55rem!important;
+        font-size:.82rem!important;
+        line-height:1.4;
+    }
+    .shell > .action-grid > .action-card:first-child .action-buttons .ui.button{
+        padding:.6rem .75rem!important;
+        font-size:.82rem!important;
+    }
+    .shell > .action-grid > .action-card:nth-of-type(2) .action-buttons{
+        display:flex!important;
+        flex-wrap:nowrap!important;
+        overflow-x:auto!important;
+        overflow-y:hidden!important;
+        gap:.45rem;
+        padding-bottom:2px;
+        -webkit-overflow-scrolling:touch;
+        scrollbar-width:none;
+    }
+    .shell > .action-grid > .action-card:nth-of-type(2) .action-buttons::-webkit-scrollbar{display:none}
+    .shell > .action-grid > .action-card:nth-of-type(2) .action-buttons .report-export-link{
+        width:auto;
+        min-width:max-content;
+        margin:0!important;
+        white-space:nowrap;
+        line-height:1.25;
+        justify-content:center;
+        text-align:center;
+        padding:.6rem .55rem!important;
+    }
+}
+</style>
+{% endblock %}

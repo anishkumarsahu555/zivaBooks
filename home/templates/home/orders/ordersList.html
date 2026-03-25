@@ -99,6 +99,7 @@
                                             <i class="funnel dollar icon"></i>
                                             Search
                                         </button>
+                                        <a id="excelUrl" href="{% url 'homeApp:export_orders_list_excel' %}" style="float: right;" class="green tiny ui button">Excel Export</a>
                                     </div>
                                 </div>
                             </form>
@@ -375,6 +376,13 @@
         }
         {% endif %}
 
-        function ChangeDate() {}
+        $(ChangeDate());
+
+        function ChangeDate() {
+            var startDateF = $('#startDateF').val();
+            var endDateF = $('#endDateF').val();
+            var staffID = $('#staffID').val() || 'All';
+            $('#excelUrl').attr('href', "{% url 'homeApp:export_orders_list_excel' %}?startDate=" + startDateF + '&endDate=' + endDateF + '&staffID=' + staffID);
+        }
     </script>
 {% endblock %}

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Monthly Attendance</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #0f172a; font-size: 10px; }
+        .title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+        .subtitle { color: #475569; margin-bottom: 12px; }
+        .legend { margin-bottom: 12px; color: #475569; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #dbe5f0; padding: 5px 4px; text-align: center; }
+        th { background: #eff6ff; font-size: 9px; }
+        .staff-col { text-align: left; min-width: 120px; font-weight: 700; }
+        .summary-col { font-weight: 700; }
+        .status-P { background: #ecfdf5; color: #047857; font-weight: 700; }
+        .status-A { background: #fff1f2; color: #be123c; font-weight: 700; }
+        .status-H { background: #fffbeb; color: #b45309; font-weight: 700; }
+        .status-- { color: #94a3b8; }
+        .footer { margin-top: 10px; color: #64748b; font-size: 9px; }
+        .pdf-footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #dbe5f0; color: #64748b; font-size: 9px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="title">Monthly Attendance Register</div>
+    <div class="subtitle">{{ pdf_brand_name }} | {{ month_label }} | {{ staffName }}</div>
+    <div class="legend">Legend: <strong>P</strong> = Present, <strong>A</strong> = Absent, <strong>H</strong> = Weekly Holiday (Sunday), <strong>-</strong> = Future Date</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th class="staff-col">Staff</th>
+                {% for day in day_numbers %}
+                <th>{{ day }}</th>
+                {% endfor %}
+                <th class="summary-col">P</th>
+                <th class="summary-col">A</th>
+                <th class="summary-col">H</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td class="staff-col">{{ row.staff.name }}</td>
+                {% for status in row.statuses %}
+                <td class="status-{{ status }}">{{ status }}</td>
+                {% endfor %}
+                <td class="summary-col">{{ row.present_count }}</td>
+                <td class="summary-col">{{ row.absent_count }}</td>
+                <td class="summary-col">{{ row.holiday_count }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">Generated on {{ generated_on|date:"d M Y h:i A" }}. Month range: {{ month_start|date:"d M Y" }} to {{ month_end|date:"d M Y" }}.</div>
+    {% include 'home/report/_pdfFooter.html' %}
+</body>
+</html>

@@ -1,0 +1,25 @@
+{% extends 'home/business/staff_productivity.html' %}
+
+{% block css %}
+{{ block.super }}
+<style>
+@media (max-width: 768px){
+    .panel .ui.form > .fields:first-child{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:.45rem;
+        align-items:end;
+    }
+    .panel .ui.form > .fields:first-child > .field{
+        width:auto!important;
+        margin:0!important;
+    }
+    .panel .ui.form > .fields:first-child > .field:last-child{
+        grid-column:1 / -1;
+    }
+    .panel .ui.form > .fields:first-child .ui.button{
+        width:100%;
+    }
+}
+</style>
+{% endblock %}

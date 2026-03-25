@@ -1,0 +1,154 @@
+{% extends 'home/admin/index.html' %}
+{% block title %}<title>{{ page_title }}</title>{% endblock %}
+{% block css %}
+<style>
+.shell{padding:1rem}
+.hero{background:linear-gradient(135deg,#0f172a,#1e3a8a 58%,#0f766e);color:#f8fafc;border-radius:22px;padding:1.1rem;margin-bottom:1rem}
+.hero h1{margin:0;font-size:1.6rem}
+.hero p{margin:.35rem 0 0;color:rgba(226,232,240,.9)}
+.panel{background:#fff;border:1px solid #dce7f3;border-radius:18px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:1rem;margin-bottom:1rem}
+.action-card{border:1px solid #e2ebf3;border-radius:16px;padding:14px;background:linear-gradient(180deg,#fbfdff,#f8fafc);height:100%}
+.action-card h4{margin:0 0 .35rem}
+.action-card p{margin:0 0 .8rem;color:#64748b}
+.action-buttons{display:flex;flex-wrap:wrap;gap:.55rem}
+.tip-list{margin:0;padding-left:1.1rem;color:#475569;line-height:1.6}
+.tip-list li+li{margin-top:.35rem}
+@media (max-width:768px){
+  .shell{padding:.2rem}
+  .panel{padding:.7rem;border-radius:14px;margin-bottom:.55rem}
+  .hero{border-radius:16px;padding:.8rem .75rem;margin-bottom:.6rem}
+  .hero h1{font-size:1.2rem}
+  .hero p{font-size:.82rem}
+  .action-card{padding:10px;border-radius:14px}
+  .action-buttons{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+  .action-buttons .ui.button{width:auto;white-space:nowrap;flex:0 0 auto}
+  .ui.stackable.grid>.column{padding-left:.2rem!important;padding-right:.2rem!important}
+  .field{margin-bottom:.42rem!important}
+}
+@media (max-width:768px){
+    .panel .ui.form>.fields:first-child{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:.45rem;
+    }
+    .panel .ui.form>.fields:first-child>.field{
+        width:auto!important;
+        margin:0!important;
+    }
+}
+</style>
+{% endblock %}
+{% block body %}
+<div class="shell">
+  <div class="hero">
+    <h1>{{ page_title }}</h1>
+    <p>{{ page_subtitle|default:'Open the detailed cashbook and bankbook reports from here.' }}</p>
+  </div>
+
+  <div class="panel">
+    <div class="ui tiny form">
+      <div class="fields">
+        <div class="four wide field">
+          <label>Start Date</label>
+          <div class="ui calendar" id="startDateCal"><div class="ui input"><input type="text" id="startDate" value="{{ defaultStartDate }}" placeholder="Start Date"></div></div>
+        </div>
+        <div class="four wide field">
+          <label>End Date</label>
+          <div class="ui calendar" id="endDateCal"><div class="ui input"><input type="text" id="endDate" value="{{ defaultEndDate }}" placeholder="End Date"></div></div>
+        </div>
+        <div class="four wide field">
+          <label>Cash Account</label>
+          <select class="ui dropdown" id="cashAccountID">
+            {% for account in cash_accounts %}
+            <option value="{{ account.id }}">{{ account.name }}</option>
+            {% empty %}
+            <option value="">No cash account</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="four wide field">
+          <label>Bank</label>
+          <select class="ui dropdown" id="bankID">
+            {% for account in bank_accounts %}
+            <option value="{{ account.bank_id }}">{{ account.bank.name|default:account.name }}</option>
+            {% empty %}
+            <option value="">No bank</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="ui info message" style="margin-top:.85rem;">
+      <div class="header">Recommended Workflow</div>
+      <p style="margin-top:.35rem;">Use the same date window in both books before comparing movement. Export the PDF when you want a shareable statement; open the live book when you need transaction-level inspection or edits.</p>
+    </div>
+  </div>
+
+  <div class="ui two column stackable grid">
+    <div class="column">
+      <div class="action-card">
+        <h4 class="ui header">Cash Movement</h4>
+        <p>Review inflow, outflow, and closing cash for the selected cash account.</p>
+        <div class="action-buttons">
+          <a class="ui teal button" id="openCashbookLink" href="{{ cashbook_url }}">Open Cashbook</a>
+          <a class="ui pink button" id="cashbookPdfLink" href="{{ cashbook_pdf_url }}"><i class="file pdf outline icon"></i>Export Cashbook PDF</a>
+          <a class="ui green button" id="cashbookExcelLink" href="{{ cashbook_excel_url }}"><i class="file excel outline icon"></i>Export Cashbook Excel</a>
+        </div>
+      </div>
+    </div>
+    <div class="column">
+      <div class="action-card">
+        <h4 class="ui header">Bank Movement</h4>
+        <p>Review receipts, payments, and closing bank balance for the selected bank.</p>
+        <div class="action-buttons">
+          <a class="ui teal button" id="openBankbookLink" href="{{ bankbook_url }}">Open Bankbook</a>
+          <a class="ui pink button" id="bankbookPdfLink" href="{{ bankbook_pdf_url }}"><i class="file pdf outline icon"></i>Export Bankbook PDF</a>
+          <a class="ui green button" id="bankbookExcelLink" href="{{ bankbook_excel_url }}"><i class="file excel outline icon"></i>Export Bankbook Excel</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h4 class="ui header">What This Report Helps You Check</h4>
+    <ul class="tip-list">
+      <li>Cash closing versus bank receipts for the same period.</li>
+      <li>Whether the wrong account is carrying entries that should be transferred or corrected.</li>
+      <li>Which book statement should be shared with the accountant, branch manager, or owner.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block js %}
+<script>
+function ddmmyyyy(date){
+  if(!date) return '';
+  return String(date.getDate()).padStart(2,'0') + '/' + String(date.getMonth()+1).padStart(2,'0') + '/' + date.getFullYear();
+}
+
+function updateBookLinks(){
+  const startDate = $('#startDate').val() || '';
+  const endDate = $('#endDate').val() || '';
+  const cashAccountId = $('#cashAccountID').val() || '';
+  const bankId = $('#bankID').val() || '';
+
+  const cashParams = new URLSearchParams({account: cashAccountId, startDate: startDate, endDate: endDate});
+  const bankParams = new URLSearchParams({bank: bankId, startDate: startDate, endDate: endDate});
+
+  $('#openCashbookLink').attr('href', '{{ cashbook_url }}?' + cashParams.toString());
+  $('#cashbookPdfLink').attr('href', '{{ cashbook_pdf_url }}?' + cashParams.toString());
+  $('#cashbookExcelLink').attr('href', '{{ cashbook_excel_url }}?' + cashParams.toString());
+  $('#openBankbookLink').attr('href', '{{ bankbook_url }}?' + bankParams.toString());
+  $('#bankbookPdfLink').attr('href', '{{ bankbook_pdf_url }}?' + bankParams.toString());
+  $('#bankbookExcelLink').attr('href', '{{ bankbook_excel_url }}?' + bankParams.toString());
+}
+
+$(function(){
+  $('.ui.dropdown').dropdown();
+  $('#startDateCal').calendar({type:'date', formatter:{date:ddmmyyyy}});
+  $('#endDateCal').calendar({type:'date', startCalendar: $('#startDateCal'), formatter:{date:ddmmyyyy}});
+  updateBookLinks();
+  $('#startDate, #endDate, #cashAccountID, #bankID').on('change keyup', updateBookLinks);
+});
+</script>
+{% endblock %}

@@ -2,40 +2,36 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>zivaBooks</title>
+    <title>zivabooks.in</title>
     <style>
         @page {
             size: A5;
             margin: .3cm;
+            @bottom-right {
+                content: "Page " counter(page);
+                font-size: 9px;
+                color: #555;
+            }
         }
-
-
-    </style>
-    <style>
-        table {
-            font-family: arial, sans-serif;
-            border-collapse: collapse;
-            width: 100%;
-        }
-
-        td, th {
-            border: 1px solid #dddddd;
-            text-align: left;
-            padding: 5px;
-        }
-
-        tr:nth-child(even) {
-            background-color: #dddddd;
-        }
+        body { font-family: Arial, sans-serif; color: #0f172a; font-size: 10px; }
+        .header-block { margin-bottom: 10px; }
+        .title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+        .subtitle { color: #475569; margin-bottom: 8px; }
+        table { border-collapse: collapse; width: 100%; }
+        td, th { border: 1px solid #dbe5f0; text-align: left; padding: 5px; }
+        th { background: #eff6ff; text-transform: uppercase; font-size: 9px; color: #334155; }
+        tr:nth-child(even) { background-color: #f8fbff; }
+        .pdf-footer { margin-top: 10px; padding-top: 6px; border-top: 1px solid #dbe5f0; color: #555; font-size: 9px; line-height: 1.5; }
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="row">
-        <span style="font-size: 10px;">(zivaBooks) Attendance Report from {{ startDate|date }} to {{ endDate|date }} - {{ staffName }}</span>
+    <div class="header-block">
+        <div class="title">{{ pdf_tenant_name }}</div>
+        <div class="subtitle">Attendance Report | {{ pdf_brand_name }} | {{ startDate|date:"d M Y" }} to {{ endDate|date:"d M Y" }} | {{ staffName }}</div>
     </div>
 
-    <p style="font-size: 10px; margin: 2px;padding-top: 10px">Attendance Details</p>
+    <p style="font-size: 10px; margin: 2px;padding-top: 6px">Attendance Details</p>
 
     <table style="font-size: 10px">
         <tr>
@@ -64,6 +60,6 @@
 
     </table>
 </div>
-
+{% include 'home/report/_pdfFooter.html' %}
 </body>
 </html>

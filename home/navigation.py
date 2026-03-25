@@ -215,6 +215,119 @@ def _admin_sections(user):
             ]),
         },
         {
+            'title': 'Analytics',
+            'items': _filter_items(user, [
+                _nav_item('Business Snapshot', 'homeApp:analytics_overview', 'chart pie', (
+                    'home.can_manage_staff',
+                    'home.can_view_party_credentials',
+                    'home.can_view_sales_reports',
+                    'home.can_view_collection_reports',
+                    'home.can_view_cash_counter_reports',
+                )),
+                _nav_item('Revenue Trend', 'homeApp:analytics_sales', 'rupee sign', (
+                    'home.can_manage_sales',
+                    'home.can_view_sales_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Collection Trend', 'homeApp:analytics_collections', 'bar chart', (
+                    'home.can_approve_collection',
+                    'home.can_view_collection_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Receivables', 'homeApp:analytics_receivables', 'balance scale right', (
+                    'home.can_manage_parties',
+                    'home.can_view_party_credentials',
+                    'home.can_view_collection_reports',
+                )),
+                _nav_item('Staff Productivity', 'homeApp:analytics_staff', 'users', (
+                    'home.can_manage_staff',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Cash Position', 'homeApp:analytics_books', 'book', (
+                    'home.can_manage_books',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Order Pipeline', 'homeApp:analytics_orders', 'clipboard list', (
+                    'home.can_manage_orders',
+                    'home.can_view_order_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Exception Dashboard', 'homeApp:analytics_exceptions', 'exclamation triangle', (
+                    'home.can_view_party_credentials',
+                    'home.can_approve_collection',
+                    'home.can_approve_sales',
+                    'home.can_approve_orders',
+                )),
+            ]),
+        },
+        {
+            'title': 'Reports',
+            'items': _filter_items(user, [
+                _nav_item('Daily Summary Report', 'homeApp:report_daily_summary', 'sun', (
+                    'home.can_manage_staff',
+                    'home.can_view_party_credentials',
+                    'home.can_view_sales_reports',
+                    'home.can_view_collection_reports',
+                    'home.can_view_cash_counter_reports',
+                )),
+                _nav_item('Staff Performance Report', 'homeApp:report_staff_activity', 'id badge outline', (
+                    'home.can_manage_staff',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Customer Outstanding Report', 'homeApp:report_outstanding', 'balance scale', (
+                    'home.can_manage_parties',
+                    'home.can_view_party_credentials',
+                    'home.can_view_collection_reports',
+                )),
+                _nav_item('Customer Ledger Report', 'homeApp:report_party_ledger', 'address card outline', (
+                    'home.can_manage_parties',
+                    'home.can_view_party_credentials',
+                    'home.view_party',
+                )),
+                _nav_item('Collection Report', 'homeApp:report_collections', 'file invoice dollar', (
+                    'home.can_approve_collection',
+                    'home.can_view_collection_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Sales Report', 'homeApp:report_sales', 'file alternate outline', (
+                    'home.can_manage_sales',
+                    'home.can_view_sales_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Cash Closing Report', 'homeApp:report_cash_closing', 'receipt', (
+                    'home.can_manage_cash_counter',
+                    'home.can_view_cash_counter_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Order Status Report', 'homeApp:report_orders', 'file outline', (
+                    'home.can_manage_orders',
+                    'home.can_view_order_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Attendance Report', 'homeApp:report_attendance', 'calendar', (
+                    'home.can_view_all_attendance',
+                    'home.can_view_attendance_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Pending Approval Report', 'homeApp:report_pending_approvals', 'clipboard check', (
+                    'home.can_approve_collection',
+                    'home.can_approve_sales',
+                    'home.can_approve_orders',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Bank/Cash Movement Report', 'homeApp:report_bank_cash_movement', 'exchange alternate', (
+                    'home.can_manage_books',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Failed Message Report', 'homeApp:report_failed_messages', 'comment alternate outline', (
+                    'home.view_whatsappmessagestatus',
+                    'home.add_whatsappmessagestatus',
+                    'home.change_whatsappmessagestatus',
+                    'home.delete_whatsappmessagestatus',
+                )),
+            ]),
+        },
+        {
             'title': 'Profile',
             'items': [
                 _nav_item('My Profile', 'homeApp:my_profile', 'user'),
@@ -586,6 +699,119 @@ def build_sidebar_sections(request_or_user):
                 _nav_item('Audit Report', 'homeApp:audit_log_report', 'history', (
                     'home.can_view_audit_logs',
                     'home.can_export_audit_logs',
+                )),
+            ]),
+        },
+        {
+            'title': 'Analytics',
+            'items': _filter_items(request_or_user, [
+                _nav_item('Business Snapshot', 'homeApp:analytics_overview', 'chart pie', (
+                    'home.can_manage_staff',
+                    'home.can_view_party_credentials',
+                    'home.can_view_sales_reports',
+                    'home.can_view_collection_reports',
+                    'home.can_view_cash_counter_reports',
+                )),
+                _nav_item('Revenue Trend', 'homeApp:analytics_sales', 'rupee sign', (
+                    'home.can_manage_sales',
+                    'home.can_view_sales_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Collection Trend', 'homeApp:analytics_collections', 'bar chart', (
+                    'home.can_approve_collection',
+                    'home.can_view_collection_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Receivables', 'homeApp:analytics_receivables', 'balance scale right', (
+                    'home.can_manage_parties',
+                    'home.can_view_party_credentials',
+                    'home.can_view_collection_reports',
+                )),
+                _nav_item('Staff Productivity', 'homeApp:analytics_staff', 'users', (
+                    'home.can_manage_staff',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Cash Position', 'homeApp:analytics_books', 'book', (
+                    'home.can_manage_books',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Order Pipeline', 'homeApp:analytics_orders', 'clipboard list', (
+                    'home.can_manage_orders',
+                    'home.can_view_order_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Exception Dashboard', 'homeApp:analytics_exceptions', 'exclamation triangle', (
+                    'home.can_view_party_credentials',
+                    'home.can_approve_collection',
+                    'home.can_approve_sales',
+                    'home.can_approve_orders',
+                )),
+            ]),
+        },
+        {
+            'title': 'Reports',
+            'items': _filter_items(request_or_user, [
+                _nav_item('Daily Summary Report', 'homeApp:report_daily_summary', 'sun', (
+                    'home.can_manage_staff',
+                    'home.can_view_party_credentials',
+                    'home.can_view_sales_reports',
+                    'home.can_view_collection_reports',
+                    'home.can_view_cash_counter_reports',
+                )),
+                _nav_item('Staff Performance Report', 'homeApp:report_staff_activity', 'id badge outline', (
+                    'home.can_manage_staff',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Customer Outstanding Report', 'homeApp:report_outstanding', 'balance scale', (
+                    'home.can_manage_parties',
+                    'home.can_view_party_credentials',
+                    'home.can_view_collection_reports',
+                )),
+                _nav_item('Customer Ledger Report', 'homeApp:report_party_ledger', 'address card outline', (
+                    'home.can_manage_parties',
+                    'home.can_view_party_credentials',
+                    'home.view_party',
+                )),
+                _nav_item('Collection Report', 'homeApp:report_collections', 'file invoice dollar', (
+                    'home.can_approve_collection',
+                    'home.can_view_collection_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Sales Report', 'homeApp:report_sales', 'file alternate outline', (
+                    'home.can_manage_sales',
+                    'home.can_view_sales_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Cash Closing Report', 'homeApp:report_cash_closing', 'receipt', (
+                    'home.can_manage_cash_counter',
+                    'home.can_view_cash_counter_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Order Status Report', 'homeApp:report_orders', 'file outline', (
+                    'home.can_manage_orders',
+                    'home.can_view_order_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Attendance Report', 'homeApp:report_attendance', 'calendar', (
+                    'home.can_view_all_attendance',
+                    'home.can_view_attendance_reports',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Pending Approval Report', 'homeApp:report_pending_approvals', 'clipboard check', (
+                    'home.can_approve_collection',
+                    'home.can_approve_sales',
+                    'home.can_approve_orders',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Bank/Cash Movement Report', 'homeApp:report_bank_cash_movement', 'exchange alternate', (
+                    'home.can_manage_books',
+                    'home.can_view_party_credentials',
+                )),
+                _nav_item('Failed Message Report', 'homeApp:report_failed_messages', 'comment alternate outline', (
+                    'home.view_whatsappmessagestatus',
+                    'home.add_whatsappmessagestatus',
+                    'home.change_whatsappmessagestatus',
+                    'home.delete_whatsappmessagestatus',
                 )),
             ]),
         },

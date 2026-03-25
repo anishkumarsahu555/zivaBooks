@@ -147,12 +147,13 @@
             font-size: 10px;
             color: #555;
         }
+        .pdf-footer { margin-top: 10px; padding-top: 6px; border-top: 1px solid #d8d8d8; color: #555; font-size: 9px; line-height: 1.5; }
     </style>
 </head>
 <body>
     <div class="sheet">
         <div class="statement-head">
-            <div class="statement-title">{{ tenant.name|default:"zivaBooks" }}</div>
+            <div class="statement-title">{{ pdf_tenant_name }}</div>
             <div class="statement-subtitle">Party Ledger Statement</div>
             <div class="party-name">{{ party.name|default:"Party" }}</div>
             <div class="party-meta">
@@ -234,7 +235,8 @@
             </tbody>
         </table>
 
-        <div class="footer-note">This is a system-generated ledger statement.</div>
+        <div class="footer-note">This is a system-generated ledger statement from {{ pdf_brand_name }}.</div>
+        {% include 'home/report/_pdfFooter.html' %}
     </div>
 </body>
 </html>

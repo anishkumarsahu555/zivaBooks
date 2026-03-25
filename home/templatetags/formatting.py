@@ -65,9 +65,6 @@ def _format_money(value, places=2):
     except (InvalidOperation, ValueError, TypeError, AttributeError):
         return _format_inr(value)
 
-    if dec == dec.to_integral():
-        return _format_inr(str(dec.to_integral()))
-
     quant = Decimal('1').scaleb(-places)
     return _format_inr(format(dec.quantize(quant), 'f'))
 
@@ -80,5 +77,5 @@ def convert(value):
 
 @register.filter(name="money")
 def money(value):
-    """Formats money in INR style, trimming trailing .0 and keeping 2dp when needed."""
+    """Formats money in INR style with exactly 2 decimal places."""
     return _format_money(value, places=2)

@@ -107,7 +107,17 @@
                                         <a id="reportUrl"
                                            href="{% if attendance_capabilities.can_filter_staff %}{% url 'homeApp:generate_attendance_pdf_admin_report' %}{% else %}{% url 'homeApp:generate_attendance_pdf_staff_report' %}{% endif %}"
                                            style="float: right;"
-                                           class="teal tiny ui button">Download Report
+                                           class="pink tiny ui button">Download PDF
+                                        </a>
+                                        <a id="monthlyReportUrl"
+                                           href="{% if attendance_capabilities.can_filter_staff %}{% url 'homeApp:generate_attendance_monthly_pdf_admin_report' %}{% else %}{% url 'homeApp:generate_attendance_monthly_pdf_staff_report' %}{% endif %}"
+                                           style="float: right; margin-right: 8px;"
+                                           class="violet tiny ui button">Monthly View PDF
+                                        </a>
+                                        <a id="excelUrl"
+                                           href="{% url 'homeApp:export_attendance_list_excel' %}"
+                                           style="float: right; margin-right: 8px;"
+                                           class="green tiny ui button">Excel Export
                                         </a>
                                     </div>
                                 </div>
@@ -237,8 +247,12 @@
             {% if attendance_capabilities.can_filter_staff %}
                 var staffID = $('#staffID').val();
                 $("#reportUrl").attr("href", "{% url 'homeApp:generate_attendance_pdf_admin_report' %}?cDate=" + startDateF + '&staffID=' + staffID + '&eDate=' + endDate);
+                $("#monthlyReportUrl").attr("href", "{% url 'homeApp:generate_attendance_monthly_pdf_admin_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
+                $("#excelUrl").attr("href", "{% url 'homeApp:export_attendance_list_excel' %}?startDate=" + startDateF + '&endDate=' + endDate + '&staffID=' + staffID);
             {% else %}
                 $("#reportUrl").attr("href", "{% url 'homeApp:generate_attendance_pdf_staff_report' %}?cDate=" + startDateF + '&eDate=' + endDate);
+                $("#monthlyReportUrl").attr("href", "{% url 'homeApp:generate_attendance_monthly_pdf_staff_report' %}?cDate=" + startDateF);
+                $("#excelUrl").attr("href", "{% url 'homeApp:export_attendance_list_excel' %}?startDate=" + startDateF + '&endDate=' + endDate);
             {% endif %}
         }
     </script>

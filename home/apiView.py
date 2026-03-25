@@ -1,5 +1,7 @@
 import threading
 import csv
+from io import BytesIO
+from calendar import month_name, monthrange
 from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -11,7 +13,7 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q, Sum, Count, Case, When, Value, F, FloatField, ExpressionWrapper, Window
+from django.db.models import Q, Sum, Count, Case, When, Value, F, FloatField, ExpressionWrapper, Window, Max
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
@@ -22,6 +24,9 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.cache import cache_page
 from django_datatables_view.base_datatable_view import BaseDatatableView
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 from weasyprint import CSS, HTML
 from home.models import *
 from home.books import ensure_bank_account, ensure_books_for_tenant, sync_book_transactions
@@ -322,6 +327,107 @@ def formatINR(number):
     s, *d = str(number).partition(".")
     r = ",".join([s[x - 2:x] for x in range(-3, -len(s), -2)][::-1] + [s[-3:]])
     return "".join([r] + d)
+
+
+def _money(value):
+    return f'Rs. {formatINR(format(float(value or 0.0), ".0f"))}'
+
+
+def _report_date(value, default):
+    if not value:
+        return default
+    try:
+        return datetime.strptime(value, '%d/%m/%Y').date()
+    except Exception:
+        return default
+
+
+def _today_date():
+    try:
+        now = timezone.now()
+        if timezone.is_aware(now):
+            return timezone.localtime(now).date()
+        return now.date()
+    except Exception:
+        return datetime.today().date()
+
+
+def _report_range(request):
+    today = _today_date()
+    start_date = _report_date(request.GET.get('startDate'), today)
+    end_date = _report_date(request.GET.get('endDate'), today)
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    return start_date, end_date
+
+
+def _rows_with_money(rows):
+    return [
+        {
+            'label': row.get('label') or 'Unassigned',
+            'amount': _money(row.get('amount') or 0.0),
+            'count': row.get('count') or 0,
+        }
+        for row in rows
+    ]
+
+
+def _date_points(start_date, end_date):
+    points = []
+    current = start_date
+    while current <= end_date:
+        points.append(current)
+        current += timedelta(days=1)
+    return points
+
+
+def _pct_change(current, previous):
+    current = float(current or 0.0)
+    previous = float(previous or 0.0)
+    if previous == 0:
+        if current == 0:
+            return 0.0
+        return 100.0
+    return ((current - previous) / previous) * 100.0
+
+
+def _group_trend_series(points, series_map, group_by='day'):
+    group_by = (group_by or 'day').lower()
+    grouped = []
+    bucket_index = {}
+    for point in points:
+        if group_by == 'month':
+            key = point.replace(day=1)
+            label = point.strftime('%b %Y')
+        elif group_by == 'week':
+            week_start = point - timedelta(days=point.weekday())
+            key = week_start
+            week_end = min(week_start + timedelta(days=6), points[-1])
+            label = f"{week_start.strftime('%d %b')} - {week_end.strftime('%d %b')}"
+        else:
+            key = point
+            label = point.strftime('%d %b')
+        if key not in bucket_index:
+            bucket_index[key] = len(grouped)
+            grouped.append({
+                'label': label,
+                'sales': 0.0,
+                'collections': 0.0,
+                'cash_counter': 0.0,
+            })
+        bucket = grouped[bucket_index[key]]
+        bucket['sales'] += float(series_map['sales'].get(point, 0.0) or 0.0)
+        bucket['collections'] += float(series_map['collections'].get(point, 0.0) or 0.0)
+        bucket['cash_counter'] += float(series_map['cash_counter'].get(point, 0.0) or 0.0)
+    return {
+        'labels': [item['label'] for item in grouped],
+        'sales': [round(item['sales'], 2) for item in grouped],
+        'collections': [round(item['collections'], 2) for item in grouped],
+        'cashCounter': [round(item['cash_counter'], 2) for item in grouped],
+        'groupBy': group_by,
+    }
+
+
 def _invoice_series_queryset(request_or_user, module):
     return tenant_qs(request_or_user, InvoiceSeries).filter(
         isDeleted=False,
@@ -2469,6 +2575,69 @@ class CollectionByAdminListJson(BaseDatatableView):
                 escape(item.remark),
             ])
         return json_data
+
+
+def export_collection_list_excel(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    qs = _collection_list_base_qs(request).filter(isDeleted=False)
+    try:
+        start_date = datetime.strptime(request.GET.get('startDate'), '%d/%m/%Y').date()
+        end_date = datetime.strptime(request.GET.get('endDate'), '%d/%m/%Y').date()
+    except Exception:
+        start_date = end_date = datetime.today().date()
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    qs = qs.filter(collectionDateTime__date__range=[start_date, end_date])
+    if not _can_filter_all_collections(request.user):
+        qs = qs.filter(collectedBy__user_ID_id=request.user.pk)
+        staff_name = 'MyList'
+    else:
+        staff_id = request.GET.get('staffID')
+        if staff_id and staff_id != 'All':
+            qs = qs.filter(collectedBy_id=int(staff_id))
+            staff = tenant_qs(request, StaffUser).filter(pk=int(staff_id)).first()
+            staff_name = staff.name if staff else 'Selected Staff'
+        else:
+            staff_name = 'All'
+    search = (request.GET.get('search') or '').strip()
+    if search:
+        qs = qs.filter(
+            Q(paymentID__icontains=search) | Q(partyID__name__icontains=search) |
+            Q(transferredPartyID__name__icontains=search) | Q(paidAmount__icontains=search) |
+            Q(modeOfPayment__icontains=search) | Q(bankID__name__icontains=search) |
+            Q(chequeDate__icontains=search) | Q(detail__icontains=search) |
+            Q(remark__icontains=search) | Q(collectionAddress__icontains=search) |
+            Q(collectedBy__name__icontains=search) | Q(approvedBy__name__icontains=search)
+        )
+    rows = []
+    for item in qs.order_by('-collectionDateTime', '-datetime'):
+        rows.append([
+            item.paymentID or '-',
+            item.partyID.name if item.partyID_id else '-',
+            float(item.paidAmount or 0.0),
+            'Yes' if item.otpVerified else 'No',
+            item.modeOfPayment or '-',
+            item.collectedBy.name if item.collectedBy_id else '-',
+            item.collectionDateTime.strftime('%d/%m/%Y') if item.collectionDateTime else '-',
+            item.datetime.strftime('%d/%m/%Y %I:%M %p') if item.datetime else '-',
+            'Yes' if item.isApproved else 'No',
+            item.approvedBy.name if item.approvedBy_id else '-',
+            item.bankID.name if item.bankID_id else '-',
+            'Yes' if item.isTallied else 'No',
+            item.detail or '-',
+            item.chequeDate.strftime('%d/%m/%Y') if item.chequeDate else '-',
+            item.transferredPartyID.name if item.transferredPartyID_id else '-',
+            item.collectionAddress or '-',
+            item.remark or '-',
+        ])
+    return _xlsx_report_response('collection-list', [{
+        'title': 'Collections',
+        'report_title': 'Collection List Export',
+        'report_subtitle': 'Detailed filtered collection rows',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('From', start_date.strftime('%d/%m/%Y')), ('To', end_date.strftime('%d/%m/%Y')), ('Staff', staff_name), ('Search', search or '-')],
+        'tables': [{'title': 'Collections', 'headers': ['Payment ID', 'Party', 'Amount', 'Verified', 'Mode', 'Collected By', 'Collection Date', 'Added On', 'Approved', 'Approved By', 'Bank', 'Tallied', 'Detail', 'Cheque Date', 'Transferred Party', 'Location', 'Remark'], 'rows': rows}],
+    }])
 class ChequeReminderCollectionListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID.name', 'paidAmount', 'modeOfPayment', 'collectedBy.name',
                      'collectionDateTime', 'datetime',
@@ -3233,6 +3402,244 @@ def _format_money_compact(value):
     if abs(val - int(val)) < 1e-9:
         return formatINR(format(int(val), '.0f'))
     return formatINR(format(val, '.2f'))
+
+
+def _pdf_base_context(request, applied_filters=None):
+    tenant = get_current_tenant(request)
+    generated_by = 'System'
+    try:
+        if request.user.is_authenticated:
+            staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk).first()
+            generated_by = staff.name if staff and staff.name else request.user.get_username()
+    except Exception:
+        generated_by = getattr(request.user, 'username', 'System') or 'System'
+    return {
+        'tenant': tenant,
+        'pdf_brand_name': 'zivabooks.in',
+        'pdf_tenant_name': getattr(tenant, 'name', None) or 'zivabooks.in',
+        'pdf_generated_by': generated_by,
+        'pdf_generated_on': timezone.now(),
+        'pdf_applied_filters': applied_filters or [],
+    }
+
+
+def _analytics_excel_workbook(context):
+    generated_on = context.get('pdf_generated_on')
+    if generated_on:
+        if timezone.is_naive(generated_on):
+            generated_on_display = generated_on.strftime('%d %b %Y %I:%M %p')
+        else:
+            generated_on_display = timezone.localtime(generated_on).strftime('%d %b %Y %I:%M %p')
+    else:
+        generated_on_display = ''
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = 'Report'
+
+    thin_border = Border(
+        left=Side(style='thin', color='D7E0EA'),
+        right=Side(style='thin', color='D7E0EA'),
+        top=Side(style='thin', color='D7E0EA'),
+        bottom=Side(style='thin', color='D7E0EA'),
+    )
+    title_fill = PatternFill('solid', fgColor='FFFFFF')
+    section_fill = PatternFill('solid', fgColor='E8F1FB')
+    header_fill = PatternFill('solid', fgColor='D7E8FB')
+    wrap_alignment = Alignment(vertical='center', wrap_text=True)
+
+    def add_row(values, font=None, fill=None):
+        row_index = sheet.max_row + 1
+        for column, value in enumerate(values, start=1):
+            cell = sheet.cell(row=row_index, column=column, value='' if value is None else str(value))
+            cell.alignment = wrap_alignment
+            cell.border = thin_border
+            if font:
+                cell.font = font
+            if fill:
+                cell.fill = fill
+        return row_index
+
+    add_row([context.get('pdf_tenant_name') or 'zivabooks.in'], font=Font(name='Calibri', size=16, bold=True), fill=title_fill)
+    add_row([context.get('report_title') or '', context.get('report_subtitle') or '', context.get('pdf_brand_name') or 'zivabooks.in'], font=Font(name='Calibri', size=11, color='475569'))
+    add_row([])
+
+    summary = context.get('summary') or []
+    if summary:
+        add_row(['Summary'], font=Font(name='Calibri', size=12, bold=True), fill=section_fill)
+        add_row(['Metric', 'Value', 'Delta'], font=Font(name='Calibri', size=11, bold=True), fill=header_fill)
+        for item in summary:
+            add_row([
+                item.get('label', ''),
+                item.get('value', ''),
+                item.get('delta', '-') if item.get('delta') is not None else '-',
+            ])
+        add_row([])
+
+    health = context.get('health') or []
+    if health:
+        add_row(['Health'], font=Font(name='Calibri', size=12, bold=True), fill=section_fill)
+        add_row(['Metric', 'Value', 'Note'], font=Font(name='Calibri', size=11, bold=True), fill=header_fill)
+        for item in health:
+            add_row([
+                item.get('label', ''),
+                item.get('value', ''),
+                item.get('subtext', '-') or '-',
+            ])
+        add_row([])
+
+    for section in context.get('section_tables') or []:
+        add_row([section.get('title', 'Section')], font=Font(name='Calibri', size=12, bold=True), fill=section_fill)
+        add_row(section.get('headers') or [], font=Font(name='Calibri', size=11, bold=True), fill=header_fill)
+        for row in section.get('rows') or []:
+            add_row(row)
+        add_row([])
+
+    insights = context.get('insights') or []
+    if insights:
+        add_row(['Insights'], font=Font(name='Calibri', size=12, bold=True), fill=section_fill)
+        add_row(['Topic', 'Observation'], font=Font(name='Calibri', size=11, bold=True), fill=header_fill)
+        for item in insights:
+            add_row([
+                item.get('title', ''),
+                item.get('body', ''),
+            ])
+        add_row([])
+
+    meta_font = Font(name='Calibri', size=11, color='334155')
+    add_row(['Generated By', context.get('pdf_generated_by', '')], font=meta_font)
+    add_row(['Generated On', generated_on_display], font=meta_font)
+    add_row(['Applied Filters', ' | '.join(context.get('pdf_applied_filters') or ['All records'])], font=meta_font)
+
+    widths = {
+        'A': 28,
+        'B': 24,
+        'C': 34,
+        'D': 20,
+        'E': 20,
+        'F': 20,
+        'G': 20,
+    }
+    for column, width in widths.items():
+        sheet.column_dimensions[column].width = width
+
+    stream = BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+    return stream.getvalue()
+
+
+def _safe_sheet_title(title):
+    text = (title or 'Report').strip() or 'Report'
+    cleaned = ''.join(ch for ch in text if ch not in '[]:*?/\\')
+    return cleaned[:31] or 'Report'
+
+
+def _xlsx_report_response(filename_prefix, sheets):
+    workbook = Workbook()
+    workbook.remove(workbook.active)
+    thin_border = Border(
+        left=Side(style='thin', color='D7E0EA'),
+        right=Side(style='thin', color='D7E0EA'),
+        top=Side(style='thin', color='D7E0EA'),
+        bottom=Side(style='thin', color='D7E0EA'),
+    )
+    wrap_alignment = Alignment(vertical='center', wrap_text=True)
+    title_font = Font(name='Calibri', size=15, bold=True)
+    subtitle_font = Font(name='Calibri', size=11, color='475569')
+    section_font = Font(name='Calibri', size=12, bold=True)
+    header_font = Font(name='Calibri', size=11, bold=True)
+    meta_font = Font(name='Calibri', size=11, color='334155')
+    section_fill = PatternFill('solid', fgColor='E8F1FB')
+    header_fill = PatternFill('solid', fgColor='D7E8FB')
+
+    def write_cell(cell, value, font=None, fill=None):
+        cell.value = value
+        cell.alignment = wrap_alignment
+        cell.border = thin_border
+        if font:
+            cell.font = font
+        if fill:
+            cell.fill = fill
+        if isinstance(value, (float, Decimal)):
+            cell.number_format = '#,##0.00'
+        elif isinstance(value, datetime):
+            cell.number_format = 'DD-MM-YYYY HH:MM'
+        elif hasattr(value, 'strftime') and not isinstance(value, str):
+            cell.number_format = 'DD-MM-YYYY'
+
+    for index, spec in enumerate(sheets):
+        ws = workbook.create_sheet(title=_safe_sheet_title(spec.get('title') or f'Report {index + 1}'))
+        row_idx = 1
+
+        def append_row(values, font=None, fill=None):
+            nonlocal row_idx
+            for col_idx, value in enumerate(values, start=1):
+                write_cell(ws.cell(row=row_idx, column=col_idx), value, font=font, fill=fill)
+            row_idx += 1
+
+        if spec.get('report_title'):
+            append_row([spec['report_title']], font=title_font)
+        if spec.get('report_subtitle'):
+            append_row([spec['report_subtitle']], font=subtitle_font)
+        if spec.get('report_title') or spec.get('report_subtitle'):
+            row_idx += 1
+
+        metadata = spec.get('metadata') or []
+        if metadata:
+            append_row(['Report Metadata'], font=section_font, fill=section_fill)
+            for label, value in metadata:
+                append_row([label, value], font=meta_font)
+            row_idx += 1
+
+        for table in spec.get('tables') or []:
+            if table.get('title'):
+                append_row([table['title']], font=section_font, fill=section_fill)
+            headers = table.get('headers') or []
+            if headers:
+                append_row(headers, font=header_font, fill=header_fill)
+            for row in table.get('rows') or []:
+                append_row(row)
+            row_idx += 1
+
+        for column_cells in ws.columns:
+            length = 0
+            letter = get_column_letter(column_cells[0].column)
+            for cell in column_cells:
+                value = '' if cell.value is None else str(cell.value)
+                length = max(length, len(value))
+            ws.column_dimensions[letter].width = min(max(length + 2, 14), 40)
+
+    stream = BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = f'attachment; filename={filename_prefix}-{datetime.today().strftime("%Y-%m-%d")}.xlsx'
+    response.write(stream.getvalue())
+    return response
+
+
+def _analytics_export_response(request, report_title, report_subtitle, summary, health, insights, section_tables, applied_filters, filename_prefix, file_format='pdf'):
+    context = {
+        'report_title': report_title,
+        'report_subtitle': report_subtitle,
+        'summary': summary or [],
+        'health': health or [],
+        'insights': insights or [],
+        'section_tables': section_tables or [],
+    }
+    context.update(_pdf_base_context(request, applied_filters))
+    safe_name = f"{filename_prefix}-{datetime.today().strftime('%Y-%m-%d')}"
+    if file_format == 'excel':
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename={safe_name}.xlsx'
+        response.write(_analytics_excel_workbook(context))
+        return response
+    response = HttpResponse(content_type="application/pdf")
+    response['Content-Disposition'] = f'attachment; filename={safe_name}.pdf'
+    html = render_to_string("home/report/analyticsSummaryPDF.html", context)
+    HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A4 portrait; margin: .7cm; }')])
+    return response
 def generate_cashbook_pdf(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
@@ -3246,9 +3653,7 @@ def generate_cashbook_pdf(request):
     if end_date < start_date:
         start_date, end_date = end_date, start_date
     statement = _cashbook_statement_rows(request, account, start_date, end_date)
-    tenant = get_current_tenant(request)
     context = {
-        'tenant': tenant,
         'account': account,
         'start_date': start_date,
         'end_date': end_date,
@@ -3259,6 +3664,11 @@ def generate_cashbook_pdf(request):
         'closing': statement['closing'],
         'generated_on': timezone.now(),
     }
+    context.update(_pdf_base_context(request, [
+        f'Account: {account.name}',
+        f'From: {start_date.strftime("%d/%m/%Y")}',
+        f'To: {end_date.strftime("%d/%m/%Y")}',
+    ]))
     response = HttpResponse(content_type="application/pdf")
     safe_name = (account.name or f'cashbook-{account.pk}').replace('/', '-')
     response['Content-Disposition'] = f'attachment; filename=cashbook-{safe_name}.pdf'
@@ -3269,6 +3679,31 @@ def generate_cashbook_pdf(request):
         stylesheets=[CSS(string='@page { size: A4 portrait; margin: 1cm 0.75cm 1.1cm; }')]
     )
     return response
+
+
+def generate_cashbook_excel(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_access_cashbook(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    account = _cashbook_export_account(request)
+    if account is None:
+        return JsonResponse({'message': 'not_found'}, status=404, safe=False)
+    start_date = _parse_books_date(request.GET.get('startDate')) or datetime.today().date()
+    end_date = _parse_books_date(request.GET.get('endDate')) or start_date
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    statement = _cashbook_statement_rows(request, account, start_date, end_date)
+    return _xlsx_report_response('cashbook', [{
+        'title': 'Cashbook',
+        'report_title': 'Cashbook Statement',
+        'report_subtitle': account.name,
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('Account', account.name), ('From', start_date.strftime('%d/%m/%Y')), ('To', end_date.strftime('%d/%m/%Y'))],
+        'tables': [
+            {'title': 'Summary', 'headers': ['Metric', 'Value'], 'rows': [['Opening', statement['opening']], ['Total In', statement['total_in']], ['Total Out', statement['total_out']], ['Closing', statement['closing']]]},
+            {'title': 'Transaction Detail', 'headers': ['Date', 'Particulars', 'Party', 'Receipt', 'Payment', 'Balance', 'Source'], 'rows': [[row['date'].strftime('%d/%m/%Y %I:%M %p') if row['date'] else '-', row['particulars'], row['party'], row['receipt'], row['payment'], row['balance'], row['source']] for row in statement['rows']]},
+        ],
+    }])
 def generate_bankbook_pdf(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
@@ -3282,9 +3717,7 @@ def generate_bankbook_pdf(request):
     if end_date < start_date:
         start_date, end_date = end_date, start_date
     statement = _bankbook_statement_rows(request, account, start_date, end_date)
-    tenant = get_current_tenant(request)
     context = {
-        'tenant': tenant,
         'account': account,
         'bank': getattr(account, 'bank', None),
         'start_date': start_date,
@@ -3296,6 +3729,11 @@ def generate_bankbook_pdf(request):
         'closing': statement['closing'],
         'generated_on': timezone.now(),
     }
+    context.update(_pdf_base_context(request, [
+        f'Bank: {getattr(getattr(account, "bank", None), "name", account.name)}',
+        f'From: {start_date.strftime("%d/%m/%Y")}',
+        f'To: {end_date.strftime("%d/%m/%Y")}',
+    ]))
     response = HttpResponse(content_type="application/pdf")
     safe_name = (account.name or f'bankbook-{account.pk}').replace('/', '-')
     response['Content-Disposition'] = f'attachment; filename=bankbook-{safe_name}.pdf'
@@ -3306,6 +3744,32 @@ def generate_bankbook_pdf(request):
         stylesheets=[CSS(string='@page { size: A4 portrait; margin: 1cm 0.75cm 1.1cm; }')]
     )
     return response
+
+
+def generate_bankbook_excel(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_access_bankbook(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    account = _bankbook_export_account(request)
+    if account is None:
+        return JsonResponse({'message': 'not_found'}, status=404, safe=False)
+    start_date = _parse_books_date(request.GET.get('startDate')) or datetime.today().date()
+    end_date = _parse_books_date(request.GET.get('endDate')) or start_date
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    statement = _bankbook_statement_rows(request, account, start_date, end_date)
+    bank_name = getattr(getattr(account, 'bank', None), 'name', account.name)
+    return _xlsx_report_response('bankbook', [{
+        'title': 'Bankbook',
+        'report_title': 'Bankbook Statement',
+        'report_subtitle': bank_name,
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('Bank', bank_name), ('From', start_date.strftime('%d/%m/%Y')), ('To', end_date.strftime('%d/%m/%Y'))],
+        'tables': [
+            {'title': 'Summary', 'headers': ['Metric', 'Value'], 'rows': [['Opening', statement['opening']], ['Total In', statement['total_in']], ['Total Out', statement['total_out']], ['Closing', statement['closing']]]},
+            {'title': 'Transaction Detail', 'headers': ['Date', 'Particulars', 'Party', 'Receipt', 'Payment', 'Balance', 'Source'], 'rows': [[row['date'].strftime('%d/%m/%Y %I:%M %p') if row['date'] else '-', row['particulars'], row['party'], row['receipt'], row['payment'], row['balance'], row['source']] for row in statement['rows']]},
+        ],
+    }])
 class BookTransactionListJson(BaseDatatableView):
     """
     Server-side DataTables list for BookTransaction.
@@ -3680,9 +4144,7 @@ def generate_party_ledger_pdf(request, party_id):
         end_date,
         is_customer_view=is_customer_view,
     )
-    tenant = get_current_tenant(request)
     context = {
-        'tenant': tenant,
         'party': party,
         'start_date': start_date,
         'end_date': end_date,
@@ -3693,6 +4155,11 @@ def generate_party_ledger_pdf(request, party_id):
         'closing': statement['closing'],
         'generated_on': timezone.now(),
     }
+    context.update(_pdf_base_context(request, [
+        f'Party: {party.name}',
+        f'From: {start_date.strftime("%d/%m/%Y") if start_date else "-"}',
+        f'To: {end_date.strftime("%d/%m/%Y") if end_date else "-"}',
+    ]))
     response = HttpResponse(content_type="application/pdf")
     safe_party_name = (party.name or f'party-{party.pk}').replace('/', '-')
     response['Content-Disposition'] = f'attachment; filename=party-ledger-{safe_party_name}.pdf'
@@ -3703,6 +4170,34 @@ def generate_party_ledger_pdf(request, party_id):
         stylesheets=[CSS(string='@page { size: A4 portrait; margin: 1cm 0.75cm 1.1cm; }')]
     )
     return response
+
+
+def generate_party_ledger_excel(request, party_id):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.view_party', 'home.can_manage_parties', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    party = _party_ledger_export_party(request, party_id)
+    if not party:
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    is_customer_view = TenantMembership.objects.filter(user=request.user, role=TenantMembership.Role.PARTY).exists()
+    today = datetime.today().date()
+    start_date = _parse_ddmmyyyy_api(request.GET.get('startDate'), today)
+    end_date = _parse_ddmmyyyy_api(request.GET.get('endDate'), today)
+    if end_date and start_date and end_date < start_date:
+        start_date, end_date = end_date, start_date
+    statement = _party_ledger_statement_rows(request, party, start_date, end_date, is_customer_view=is_customer_view)
+    safe_party_name = (party.name or f'party-{party.pk}').replace('/', '-')
+    return _xlsx_report_response(f'party-ledger-{safe_party_name}', [{
+        'title': 'Party Ledger',
+        'report_title': 'Customer Ledger Statement',
+        'report_subtitle': party.name,
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('Party', party.name), ('From', start_date.strftime('%d/%m/%Y')), ('To', end_date.strftime('%d/%m/%Y'))],
+        'tables': [
+            {'title': 'Summary', 'headers': ['Metric', 'Value'], 'rows': [['Opening', statement['opening']], ['Debit', statement['total_debit']], ['Credit', statement['total_credit']], ['Closing', statement['closing']]]},
+            {'title': 'Ledger Detail', 'headers': ['Date', 'Particulars', 'Voucher Type', 'Voucher No', 'Debit', 'Credit', 'Balance'], 'rows': [[row['date'].strftime('%d/%m/%Y') if row['date'] else '-', row['particulars'], row['voucher_type'], row['voucher_no'], row['debit'], row['credit'], row['balance']] for row in statement['rows']]},
+        ],
+    }])
 @cache_page(60 * 5)
 def get_sales_dashboard_report_api(request):
     today = datetime.today().date()
@@ -3814,11 +4309,83 @@ def generate_collection_report(request):
         'a_total_party': a_total_party,
         'total': a_total_cash + a_total_cheque + a_total_online + a_total_cheque_cc + a_total_party
     }
+    context.update(_pdf_base_context(request, [
+        f'Date: {colDate.strftime("%d/%m/%Y")}',
+        f'Staff: {staffName}',
+        'Approved collections only',
+    ]))
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/admin/collectionReportPDF.html", context)
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
     return response
+
+
+def generate_collection_report_excel(request):
+    cDate = request.GET.get('cDate')
+    staffID = request.GET.get('staffID')
+    colDate = datetime.strptime(cDate, '%d/%m/%Y')
+    base_qs = tenant_qs(request, Collection).select_related('partyID', 'collectedBy', 'bankID').filter(
+        collectionDateTime__date=colDate.date(),
+        isApproved__exact=True,
+        isDeleted__exact=False
+    )
+    if _can_filter_all_collections(request.user):
+        if staffID and staffID != 'All':
+            col = base_qs.filter(collectedBy_id=int(staffID)).order_by('collectedBy__name', 'collectionDateTime')
+            user = tenant_qs(request, StaffUser).get(pk=int(staffID))
+            staffName = user.name + ' - ' + user.partyGroupID.name
+        else:
+            col = base_qs.order_by('collectedBy__name', 'collectionDateTime')
+            staffName = 'All'
+    else:
+        col = base_qs.filter(collectedBy__user_ID_id=request.user.pk).order_by('collectedBy__name', 'collectionDateTime')
+        staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk).first()
+        staffName = staff.name if staff else 'MyList'
+
+    mode_totals = defaultdict(float)
+    detail_rows = []
+    total = 0.0
+    for item in col:
+        amount = float(item.paidAmount or 0.0)
+        total += amount
+        mode_totals[item.modeOfPayment or 'Unknown'] += amount
+        detail_rows.append([
+            item.paymentID or '-',
+            item.partyID.name if item.partyID_id else '-',
+            item.collectedBy.name if item.collectedBy_id else '-',
+            item.modeOfPayment or '-',
+            getattr(item.bankID, 'name', '-') if getattr(item, 'bankID', None) else '-',
+            amount,
+            item.collectionDateTime.strftime('%d/%m/%Y %I:%M %p') if item.collectionDateTime else '-',
+            'Yes' if item.otpVerified else 'No',
+            'Yes' if item.isTallied else 'No',
+            item.remark or '-',
+        ])
+
+    return _xlsx_report_response('collection-report', [{
+        'title': 'Collection Report',
+        'report_title': 'Collection Report',
+        'report_subtitle': 'Approved collections only',
+        'metadata': [
+            ('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')),
+            ('Date', colDate.strftime('%d/%m/%Y')),
+            ('Staff', staffName),
+            ('Generated By', _pdf_base_context(request).get('pdf_generated_by')),
+        ],
+        'tables': [
+            {
+                'title': 'Summary',
+                'headers': ['Metric', 'Value'],
+                'rows': [['Total Collections', total]] + [[mode, amount] for mode, amount in sorted(mode_totals.items())],
+            },
+            {
+                'title': 'Collection Detail',
+                'headers': ['Payment ID', 'Customer', 'Collector', 'Mode', 'Bank', 'Amount', 'Collected On', 'OTP Verified', 'Tallied', 'Remark'],
+                'rows': detail_rows,
+            },
+        ],
+    }])
 # ----------- attendance API----------------
 @transaction.atomic
 def add_attendance_api(request):
@@ -4009,6 +4576,54 @@ class AdminAttendanceListJson(BaseDatatableView):
                 logout_remark
             ])
         return json_data
+
+
+def export_attendance_list_excel(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        start_date = datetime.strptime(request.GET.get('startDate'), '%d/%m/%Y').date()
+        end_date = datetime.strptime(request.GET.get('endDate'), '%d/%m/%Y').date()
+    except Exception:
+        start_date = end_date = datetime.today().date()
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    qs = _attendance_list_base_qs(request).filter(isDeleted=False, datetime__range=(start_date, end_date + timedelta(days=1)))
+    if request.user.has_perm('home.can_view_all_attendance') or request.user.has_perm('home.can_view_attendance_reports') or request.user.has_perm('home.can_view_party_credentials'):
+        staff_id = request.GET.get('staffID')
+        if staff_id and staff_id != 'All':
+            qs = qs.filter(staffID_id=int(staff_id))
+            staff = tenant_qs(request, StaffUser).filter(pk=int(staff_id)).first()
+            staff_name = staff.name if staff else 'Selected Staff'
+        else:
+            staff_name = 'All'
+    else:
+        qs = qs.filter(staffID__user_ID__id=request.user.pk)
+        staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk).first()
+        staff_name = staff.name if staff else 'My Attendance'
+    search = (request.GET.get('search') or '').strip()
+    if search:
+        qs = qs.filter(
+            Q(login_remark__icontains=search) | Q(login_location__icontains=search) |
+            Q(logout_remark__icontains=search) | Q(logout_location__icontains=search)
+        )
+    rows = [[
+        item.datetime.strftime('%d/%m/%Y') if item.datetime else '-',
+        item.staffID.name if item.staffID_id else '-',
+        item.loginDateTime.strftime('%I:%M %p') if item.isLogIn and item.loginDateTime else '-',
+        item.logoutDateTime.strftime('%I:%M %p') if item.isLogOut and item.logoutDateTime else '-',
+        item.login_location or '-',
+        item.login_remark or '-',
+        item.logout_location or '-',
+        item.logout_remark or '-',
+    ] for item in qs.order_by('-datetime')]
+    return _xlsx_report_response('attendance-list', [{
+        'title': 'Attendance',
+        'report_title': 'Attendance List Export',
+        'report_subtitle': 'Detailed filtered attendance rows',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('From', start_date.strftime('%d/%m/%Y')), ('To', end_date.strftime('%d/%m/%Y')), ('Staff', staff_name), ('Search', search or '-')],
+        'tables': [{'title': 'Attendance', 'headers': ['Date', 'Staff', 'Login Time', 'Logout Time', 'Login Location', 'Login Remark', 'Logout Location', 'Logout Remark'], 'rows': rows}],
+    }])
 def generate_attendance_pdf_staff_report(request):
     cDate = request.GET.get('cDate')
     eDate = request.GET.get('eDate')
@@ -4025,11 +4640,152 @@ def generate_attendance_pdf_staff_report(request):
         'col': col,
         'staffName': user.name,
     }
+    context.update(_pdf_base_context(request, [
+        f'From: {startDate.strftime("%d/%m/%Y")}',
+        f'To: {endDate.strftime("%d/%m/%Y")}',
+        f'Staff: {user.name}',
+    ]))
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/report/staffAttendanceReportPDF.html", context)
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
     return response
+
+
+def generate_attendance_excel_staff_report(request):
+    cDate = request.GET.get('cDate')
+    eDate = request.GET.get('eDate')
+    startDate = datetime.strptime(cDate, '%d/%m/%Y')
+    endDate = datetime.strptime(eDate, '%d/%m/%Y')
+    col = tenant_qs(request, Attendance).select_related('staffID').filter(
+        datetime__range=(startDate.date(), endDate.date() + timedelta(days=1)),
+        isDeleted__exact=False,
+        staffID__user_ID_id__exact=request.user.pk
+    ).order_by('datetime')
+    user = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
+    rows = [[
+        item.datetime.strftime('%d/%m/%Y') if item.datetime else '-',
+        item.staffID.name if item.staffID_id else '-',
+        item.loginDateTime.strftime('%I:%M %p') if item.isLogIn and item.loginDateTime else '-',
+        item.logoutDateTime.strftime('%I:%M %p') if item.isLogOut and item.logoutDateTime else '-',
+        item.login_location or '-',
+        item.login_remark or '-',
+        item.logout_location or '-',
+        item.logout_remark or '-',
+    ] for item in col]
+    return _xlsx_report_response('attendance-staff', [{
+        'title': 'Attendance',
+        'report_title': 'Attendance Report',
+        'report_subtitle': 'My attendance detail',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('From', startDate.strftime('%d/%m/%Y')), ('To', endDate.strftime('%d/%m/%Y')), ('Staff', user.name)],
+        'tables': [{'title': 'Attendance Detail', 'headers': ['Date', 'Staff', 'Login', 'Logout', 'Login Location', 'Login Remark', 'Logout Location', 'Logout Remark'], 'rows': rows}],
+    }])
+
+
+def _attendance_month_reference(request):
+    raw_date = request.GET.get('cDate') or request.GET.get('monthDate')
+    if raw_date:
+        try:
+            return datetime.strptime(raw_date, '%d/%m/%Y').date()
+        except Exception:
+            pass
+    return datetime.today().date()
+
+
+def _attendance_monthly_rows(request, staff_queryset, month_start, month_end):
+    today = datetime.today().date()
+    day_numbers = list(range(1, month_end.day + 1))
+    attendance_qs = tenant_qs(request, Attendance).filter(
+        isDeleted=False,
+        staffID__in=staff_queryset,
+        datetime__date__range=[month_start, month_end],
+    ).select_related('staffID').order_by('staffID__name', 'datetime')
+    attendance_map = defaultdict(set)
+    for record in attendance_qs:
+        day = None
+        if getattr(record, 'loginDateTime', None):
+            day = record.loginDateTime.date()
+        elif getattr(record, 'datetime', None):
+            day = record.datetime.date()
+        if day:
+            attendance_map[record.staffID_id].add(day)
+
+    rows = []
+    for staff in staff_queryset:
+        present_days = attendance_map.get(staff.id, set())
+        statuses = []
+        present_count = 0
+        absent_count = 0
+        holiday_count = 0
+        for day_number in day_numbers:
+            current_day = month_start.replace(day=day_number)
+            if current_day in present_days:
+                status = 'P'
+                present_count += 1
+            elif current_day > today:
+                status = '-'
+            elif current_day.weekday() == 6:
+                status = 'H'
+                holiday_count += 1
+            else:
+                status = 'A'
+                absent_count += 1
+            statuses.append(status)
+        rows.append({
+            'staff': staff,
+            'statuses': statuses,
+            'present_count': present_count,
+            'absent_count': absent_count,
+            'holiday_count': holiday_count,
+        })
+    return day_numbers, rows
+
+
+def generate_attendance_monthly_pdf_staff_report(request):
+    reference_date = _attendance_month_reference(request)
+    month_start = reference_date.replace(day=1)
+    month_end = reference_date.replace(day=monthrange(reference_date.year, reference_date.month)[1])
+    staff = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
+    day_numbers, rows = _attendance_monthly_rows(request, [staff], month_start, month_end)
+    context = {
+        'month_label': f'{month_name[reference_date.month]} {reference_date.year}',
+        'month_start': month_start,
+        'month_end': month_end,
+        'day_numbers': day_numbers,
+        'rows': rows,
+        'staffName': staff.name,
+        'generated_on': timezone.now(),
+        'is_single_staff': True,
+    }
+    context.update(_pdf_base_context(request, [
+        f'Month: {month_name[reference_date.month]} {reference_date.year}',
+        f'Staff: {staff.name}',
+        'Legend: P/A/H/-',
+    ]))
+    response = HttpResponse(content_type="application/pdf")
+    response['Content-Disposition'] = f'attachment; filename=attendance-monthly-{reference_date.strftime("%Y-%m")}-{staff.name}.pdf'
+    html = render_to_string("home/report/attendanceMonthlyMatrixPDF.html", context)
+    HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A4 landscape; margin: .55cm; }')])
+    return response
+
+
+def generate_attendance_monthly_excel_staff_report(request):
+    reference_date = _attendance_month_reference(request)
+    month_start = reference_date.replace(day=1)
+    month_end = reference_date.replace(day=monthrange(reference_date.year, reference_date.month)[1])
+    staff = tenant_qs(request, StaffUser).get(user_ID__id=request.user.pk)
+    day_numbers, rows = _attendance_monthly_rows(request, [staff], month_start, month_end)
+    excel_rows = [[staff.name] + row['statuses'] + [row['present_count'], row['absent_count'], row['holiday_count']] for row in rows]
+    headers = ['Staff'] + [str(day) for day in day_numbers] + ['P', 'A', 'H']
+    return _xlsx_report_response('attendance-monthly', [{
+        'title': 'Attendance Monthly',
+        'report_title': 'Monthly Attendance Register',
+        'report_subtitle': f'{month_name[reference_date.month]} {reference_date.year}',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('Month', f'{month_name[reference_date.month]} {reference_date.year}'), ('Staff', staff.name), ('Legend', 'P/A/H/-')],
+        'tables': [{'title': 'Attendance Matrix', 'headers': headers, 'rows': excel_rows}],
+    }])
+
+
 def generate_attendance_pdf_admin_report(request):
     cDate = request.GET.get('cDate')
     eDate = request.GET.get('eDate')
@@ -4053,11 +4809,113 @@ def generate_attendance_pdf_admin_report(request):
         'col': col,
         'staffName': staffName,
     }
+    context.update(_pdf_base_context(request, [
+        f'From: {startDate.strftime("%d/%m/%Y")}',
+        f'To: {endDate.strftime("%d/%m/%Y")}',
+        f'Staff: {staffName}',
+    ]))
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/report/adminAttendanceReportPDF.html", context)
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
     return response
+
+
+def generate_attendance_excel_admin_report(request):
+    cDate = request.GET.get('cDate')
+    eDate = request.GET.get('eDate')
+    staffID = request.GET.get('staffID')
+    startDate = datetime.strptime(cDate, '%d/%m/%Y')
+    endDate = datetime.strptime(eDate, '%d/%m/%Y')
+    if staffID == 'All':
+        col = tenant_qs(request, Attendance).select_related('staffID').filter(
+            datetime__range=(startDate.date(), endDate.date() + timedelta(days=1)),
+            isDeleted__exact=False
+        ).order_by('staffID__name', 'datetime')
+        staffName = 'All'
+    else:
+        col = tenant_qs(request, Attendance).select_related('staffID').filter(
+            datetime__range=(startDate.date(), endDate.date() + timedelta(days=1)),
+            isDeleted__exact=False,
+            staffID_id=int(staffID)
+        ).order_by('datetime')
+        staffName = tenant_qs(request, StaffUser).get(id=int(staffID)).name
+    rows = [[
+        item.datetime.strftime('%d/%m/%Y') if item.datetime else '-',
+        item.staffID.name if item.staffID_id else '-',
+        item.loginDateTime.strftime('%I:%M %p') if item.isLogIn and item.loginDateTime else '-',
+        item.logoutDateTime.strftime('%I:%M %p') if item.isLogOut and item.logoutDateTime else '-',
+        item.login_location or '-',
+        item.login_remark or '-',
+        item.logout_location or '-',
+        item.logout_remark or '-',
+    ] for item in col]
+    return _xlsx_report_response('attendance-report', [{
+        'title': 'Attendance',
+        'report_title': 'Attendance Report',
+        'report_subtitle': 'Admin attendance detail',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('From', startDate.strftime('%d/%m/%Y')), ('To', endDate.strftime('%d/%m/%Y')), ('Staff', staffName)],
+        'tables': [{'title': 'Attendance Detail', 'headers': ['Date', 'Staff', 'Login', 'Logout', 'Login Location', 'Login Remark', 'Logout Location', 'Logout Remark'], 'rows': rows}],
+    }])
+
+
+def generate_attendance_monthly_pdf_admin_report(request):
+    reference_date = _attendance_month_reference(request)
+    month_start = reference_date.replace(day=1)
+    month_end = reference_date.replace(day=monthrange(reference_date.year, reference_date.month)[1])
+    staffID = request.GET.get('staffID')
+    if not staffID or staffID == 'All':
+        staff_queryset = list(tenant_qs(request, StaffUser).filter(isDeleted=False).order_by('name'))
+        staff_name = 'All Staff'
+    else:
+        staff = tenant_qs(request, StaffUser).get(id=int(staffID))
+        staff_queryset = [staff]
+        staff_name = staff.name
+    day_numbers, rows = _attendance_monthly_rows(request, staff_queryset, month_start, month_end)
+    context = {
+        'month_label': f'{month_name[reference_date.month]} {reference_date.year}',
+        'month_start': month_start,
+        'month_end': month_end,
+        'day_numbers': day_numbers,
+        'rows': rows,
+        'staffName': staff_name,
+        'generated_on': timezone.now(),
+        'is_single_staff': len(staff_queryset) == 1,
+    }
+    context.update(_pdf_base_context(request, [
+        f'Month: {month_name[reference_date.month]} {reference_date.year}',
+        f'Staff: {staff_name}',
+        'Legend: P/A/H/-',
+    ]))
+    response = HttpResponse(content_type="application/pdf")
+    response['Content-Disposition'] = f'attachment; filename=attendance-monthly-{reference_date.strftime("%Y-%m")}.pdf'
+    html = render_to_string("home/report/attendanceMonthlyMatrixPDF.html", context)
+    HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A4 landscape; margin: .55cm; }')])
+    return response
+
+
+def generate_attendance_monthly_excel_admin_report(request):
+    reference_date = _attendance_month_reference(request)
+    month_start = reference_date.replace(day=1)
+    month_end = reference_date.replace(day=monthrange(reference_date.year, reference_date.month)[1])
+    staffID = request.GET.get('staffID')
+    if not staffID or staffID == 'All':
+        staff_queryset = list(tenant_qs(request, StaffUser).filter(isDeleted=False).order_by('name'))
+        staff_name = 'All Staff'
+    else:
+        staff = tenant_qs(request, StaffUser).get(id=int(staffID))
+        staff_queryset = [staff]
+        staff_name = staff.name
+    day_numbers, rows = _attendance_monthly_rows(request, staff_queryset, month_start, month_end)
+    excel_rows = [[row['staff'].name] + row['statuses'] + [row['present_count'], row['absent_count'], row['holiday_count']] for row in rows]
+    headers = ['Staff'] + [str(day) for day in day_numbers] + ['P', 'A', 'H']
+    return _xlsx_report_response('attendance-monthly', [{
+        'title': 'Attendance Monthly',
+        'report_title': 'Monthly Attendance Register',
+        'report_subtitle': f'{month_name[reference_date.month]} {reference_date.year}',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('Month', f'{month_name[reference_date.month]} {reference_date.year}'), ('Staff', staff_name), ('Legend', 'P/A/H/-')],
+        'tables': [{'title': 'Attendance Matrix', 'headers': headers, 'rows': excel_rows}],
+    }])
 # -------------------Message List---------------
 class MessageListJson(BaseDatatableView):
     order_columns = ['messageTo', 'phone', 'message', 'datetime', 'status']
@@ -4161,6 +5019,34 @@ def export_audit_log_csv(request):
             payload['snapshot_pretty'],
         ])
     return response
+
+
+def export_audit_log_excel(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.can_export_audit_logs', 'home.can_view_party_credentials'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    qs = _apply_audit_log_filters(request, _tenant_audit_log_queryset(request)).order_by('-datetime')
+    rows = []
+    for item in qs:
+        payload = _audit_log_detail_payload(item)
+        rows.append([
+            payload['datetime'],
+            payload['actor'],
+            payload['model'],
+            payload['action'],
+            payload['object_id'],
+            payload['object_repr'],
+            payload['changes_pretty'],
+            payload['snapshot_pretty'],
+        ])
+    return _xlsx_report_response('audit-log-report', [{
+        'title': 'Audit Log',
+        'report_title': 'Audit Log Report',
+        'report_subtitle': 'Filtered audit history',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('Generated By', _pdf_base_context(request).get('pdf_generated_by'))],
+        'tables': [{'title': 'Audit Entries', 'headers': ['Datetime', 'Actor', 'Model', 'Action', 'Object ID', 'Object', 'Changes', 'Snapshot'], 'rows': rows}],
+    }])
 # ----------------------Orders-----------------
 @transaction.atomic
 def add_order_api(request):
@@ -4467,6 +5353,60 @@ class OrdersByStaffListJson(BaseDatatableView):
                 action,
             ])
         return json_data
+
+
+def export_orders_list_excel(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    qs = _orders_list_base_qs(request).filter(isDeleted=False)
+    if not _can_filter_all_orders(request.user):
+        qs = qs.filter(createdBy__user_ID_id=request.user.pk)
+        staff_name = 'My Orders'
+    else:
+        staff_id = request.GET.get('staffID')
+        if staff_id and staff_id != 'All':
+            qs = qs.filter(createdBy_id=int(staff_id))
+            staff = tenant_qs(request, StaffUser).filter(pk=int(staff_id)).first()
+            staff_name = staff.name if staff else 'Selected Staff'
+        else:
+            staff_name = 'All'
+    try:
+        start_date = datetime.strptime(request.GET.get('startDate'), '%d/%m/%Y').date()
+        end_date = datetime.strptime(request.GET.get('endDate'), '%d/%m/%Y').date()
+    except Exception:
+        start_date = end_date = datetime.today().date()
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    qs = qs.filter(buildDate__range=[start_date, end_date])
+    search = (request.GET.get('search') or '').strip()
+    if search:
+        qs = qs.filter(
+            Q(orderNumber__icontains=search) | Q(partyID__name__icontains=search) |
+            Q(status__icontains=search) | Q(remark__icontains=search)
+        )
+    rows = []
+    for item in qs.order_by('-datetime'):
+        att_count = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
+        rows.append([
+            item.orderNumber or str(item.pk),
+            item.partyID.name if item.partyID_id else '-',
+            item.buildDate.strftime('%d/%m/%Y') if item.buildDate else '-',
+            item.get_status_display(),
+            item.approvedBy.name if item.approvedBy_id else '-',
+            item.approvedOn.strftime('%d/%m/%Y %I:%M %p') if item.approvedOn else '-',
+            item.createdBy.name if item.createdBy_id else '-',
+            item.lastUpdatedOn.strftime('%d/%m/%Y %I:%M %p') if item.lastUpdatedOn else '-',
+            item.datetime.strftime('%d/%m/%Y %I:%M %p') if item.datetime else '-',
+            att_count,
+            item.remark or '-',
+        ])
+    return _xlsx_report_response('orders-list', [{
+        'title': 'Orders',
+        'report_title': 'Order List Export',
+        'report_subtitle': 'Detailed filtered order rows',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('From', start_date.strftime('%d/%m/%Y')), ('To', end_date.strftime('%d/%m/%Y')), ('Staff', staff_name), ('Search', search or '-')],
+        'tables': [{'title': 'Orders', 'headers': ['Order No', 'Party', 'Date', 'Status', 'Approved By', 'Approved On', 'Created By', 'Updated', 'Created', 'Images', 'Remark'], 'rows': rows}],
+    }])
 def generate_order_pdf(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
@@ -4490,6 +5430,11 @@ def generate_order_pdf(request):
         'attachments': attachments,
         'location': location,
     }
+    context.update(_pdf_base_context(request, [
+        f'Order: {order.orderNumber or order.pk}',
+        f'Party: {getattr(getattr(order, "partyID", None), "name", "-")}',
+        f'Status: {order.get_status_display()}',
+    ]))
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = f"attachment; filename=order-{order.orderNumber or order.pk}.pdf"
     html = render_to_string("home/orders/orderPDF.html", context)
@@ -4812,19 +5757,214 @@ def generate_sales_report(request):
             'createdBy__name')
         user = tenant_qs(request, StaffUser).get(pk=int(staffID))
         staffName = user.name + ' - ' + user.partyGroupID.name
+    cash_total = 0.0
+    online_total = 0.0
+    credit_total = 0.0
+    mix_total = 0.0
+    approved_count = 0
+    pending_count = 0
+    top_customer_map = defaultdict(float)
     for a in col:
-        a_total = a_total + a.amount
+        a_total += a.amount
+        if a.modeOfPayment == Sales.Mode.CASH:
+            cash_total += a.amount
+        elif a.modeOfPayment == Sales.Mode.ONLINE:
+            online_total += a.amount
+        elif a.modeOfPayment == Sales.Mode.CREDIT:
+            credit_total += a.amount
+        elif a.modeOfPayment == Sales.Mode.MIX:
+            mix_total += a.amount
+        if a.isApproved:
+            approved_count += 1
+        else:
+            pending_count += 1
+        if getattr(a, 'partyID', None):
+            top_customer_map[a.partyID.name] += float(a.amount or 0.0)
+    total_count = len(col)
+    avg_bill = a_total / total_count if total_count else 0.0
+    top_customers = sorted(top_customer_map.items(), key=lambda item: item[1], reverse=True)[:5]
     context = {
         'date': colDate,
         'col': col,
         'staffName': staffName,
         'total': a_total,
+        'total_count': total_count,
+        'avg_bill': avg_bill,
+        'approved_count': approved_count,
+        'pending_count': pending_count,
+        'cash_total': cash_total,
+        'online_total': online_total,
+        'credit_total': credit_total,
+        'mix_total': mix_total,
+        'top_customers': top_customers,
     }
+    context.update(_pdf_base_context(request, [
+        f'Date: {colDate.strftime("%d/%m/%Y")}',
+        f'Staff: {staffName}',
+        f'Invoices: {total_count}',
+    ]))
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/report/salesReportPDF.html", context)
-    HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
+    HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A4 portrait; margin: .65cm; }')])
     return response
+
+
+def generate_sales_report_excel(request):
+    cDate = request.GET.get('cDate')
+    staffID = request.GET.get('staffID')
+    colDate = datetime.strptime(cDate, '%d/%m/%Y')
+    if staffID == 'All':
+        col = tenant_qs(request, Sales).select_related('partyID', 'createdBy', 'bankID').filter(
+            buildDate__exact=colDate.date(),
+            isDeleted__exact=False
+        ).order_by('createdBy__name', 'invoiceNumber')
+        staffName = 'All'
+    else:
+        col = tenant_qs(request, Sales).select_related('partyID', 'createdBy', 'bankID').filter(
+            buildDate__exact=colDate.date(),
+            isDeleted__exact=False,
+            createdBy_id=int(staffID)
+        ).order_by('createdBy__name', 'invoiceNumber')
+        user = tenant_qs(request, StaffUser).get(pk=int(staffID))
+        staffName = user.name + ' - ' + user.partyGroupID.name
+    cash_total = 0.0
+    online_total = 0.0
+    credit_total = 0.0
+    mix_total = 0.0
+    approved_count = 0
+    pending_count = 0
+    a_total = 0.0
+    rows = []
+    for a in col:
+        amount = float(a.amount or 0.0)
+        a_total += amount
+        if a.modeOfPayment == Sales.Mode.CASH:
+            cash_total += amount
+        elif a.modeOfPayment == Sales.Mode.ONLINE:
+            online_total += amount
+        elif a.modeOfPayment == Sales.Mode.CREDIT:
+            credit_total += amount
+        elif a.modeOfPayment == Sales.Mode.MIX:
+            mix_total += amount
+        if a.isApproved:
+            approved_count += 1
+        else:
+            pending_count += 1
+        rows.append([
+            a.invoiceNumber or '-',
+            a.paymentID or '-',
+            a.partyID.name if a.partyID_id else '-',
+            a.createdBy.name if a.createdBy_id else '-',
+            a.modeOfPayment or '-',
+            getattr(a.bankID, 'name', '-') if getattr(a, 'bankID', None) else '-',
+            amount,
+            a.buildDate.strftime('%d/%m/%Y') if a.buildDate else '-',
+            'Approved' if a.isApproved else 'Pending',
+            a.remark or '-',
+        ])
+    total_count = len(rows)
+    avg_bill = a_total / total_count if total_count else 0.0
+    return _xlsx_report_response('sales-report', [{
+        'title': 'Sales Report',
+        'report_title': 'Sales Report',
+        'report_subtitle': 'Invoice-wise sales export',
+        'metadata': [
+            ('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')),
+            ('Date', colDate.strftime('%d/%m/%Y')),
+            ('Staff', staffName),
+            ('Generated By', _pdf_base_context(request).get('pdf_generated_by')),
+        ],
+        'tables': [
+            {
+                'title': 'Summary',
+                'headers': ['Metric', 'Value'],
+                'rows': [
+                    ['Total Sales', a_total],
+                    ['Invoices', total_count],
+                    ['Average Bill', avg_bill],
+                    ['Approved', approved_count],
+                    ['Pending', pending_count],
+                    ['Cash', cash_total],
+                    ['Online', online_total],
+                    ['Credit', credit_total],
+                    ['Mix', mix_total],
+                ],
+            },
+            {
+                'title': 'Invoice Detail',
+                'headers': ['Invoice No', 'Payment ID', 'Customer', 'Staff', 'Mode', 'Bank', 'Amount', 'Date', 'Approval', 'Remark'],
+                'rows': rows,
+            },
+        ],
+    }])
+
+
+def export_sales_list_excel(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    qs = _sales_list_base_qs(request).filter(isDeleted=False)
+    if not _can_filter_all_sales(request.user):
+        qs = qs.filter(createdBy__user_ID_id=request.user.pk)
+        staff_name = 'My Sales'
+    else:
+        staff_id = request.GET.get('staffID')
+        if staff_id and staff_id != 'All':
+            qs = qs.filter(createdBy_id=int(staff_id))
+            staff = tenant_qs(request, StaffUser).filter(pk=int(staff_id)).first()
+            staff_name = staff.name if staff else 'Selected Staff'
+        else:
+            staff_name = 'All'
+    try:
+        start_date = datetime.strptime(request.GET.get('startDate'), '%d/%m/%Y').date()
+        end_date = datetime.strptime(request.GET.get('endDate'), '%d/%m/%Y').date()
+    except Exception:
+        start_date = end_date = datetime.today().date()
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    qs = qs.filter(buildDate__range=[start_date, end_date])
+    search = (request.GET.get('search') or '').strip()
+    if search:
+        qs = qs.filter(
+            Q(paymentID__icontains=search) | Q(partyID__name__icontains=search) |
+            Q(amount__icontains=search) | Q(invoiceNumber__icontains=search) |
+            Q(createdBy__name__icontains=search) | Q(remark__icontains=search) |
+            Q(modeOfPayment__icontains=search) | Q(bankID__name__icontains=search)
+        )
+    rows = []
+    for item in qs.order_by('-datetime'):
+        bank_name = item.bankID.name if getattr(item, 'bankID', None) else '-'
+        payment_mode = item.modeOfPayment or '-'
+        if payment_mode == Sales.Mode.MIX:
+            payment_detail = f"Cash: {_money(item.mixCashAmount or 0.0)} | Online: {_money(item.mixOnlineAmount or 0.0)}"
+        elif payment_mode == Sales.Mode.ONLINE:
+            payment_detail = f"Online via {bank_name}"
+        elif payment_mode == Sales.Mode.CREDIT:
+            payment_detail = 'Credit sale'
+        else:
+            payment_detail = 'Cash sale'
+        rows.append([
+            item.paymentID or '-',
+            item.partyID.name if item.partyID_id else '-',
+            item.invoiceNumber or '-',
+            payment_mode,
+            payment_detail,
+            float(item.amount or 0.0),
+            item.buildDate.strftime('%d/%m/%Y') if item.buildDate else '-',
+            item.createdBy.name if item.createdBy_id else '-',
+            'Yes' if item.isApproved else 'No',
+            item.approvedBy.name if item.approvedBy_id else '-',
+            item.approvedOn.strftime('%d/%m/%Y %I:%M %p') if item.approvedOn else '-',
+            item.datetime.strftime('%d/%m/%Y %I:%M %p') if item.datetime else '-',
+            item.remark or '-',
+        ])
+    return _xlsx_report_response('sales-list', [{
+        'title': 'Sales',
+        'report_title': 'Sales List Export',
+        'report_subtitle': 'Detailed filtered sales rows',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('From', start_date.strftime('%d/%m/%Y')), ('To', end_date.strftime('%d/%m/%Y')), ('Staff', staff_name), ('Search', search or '-')],
+        'tables': [{'title': 'Sales', 'headers': ['Payment ID', 'Party', 'Invoice Number', 'Mode', 'Payment Detail', 'Amount', 'Invoice Date', 'Created By', 'Approved', 'Approved By', 'Approved On', 'Added On', 'Remark'], 'rows': rows}],
+    }])
 @transaction.atomic
 def delete_sales(request):
     if request.method == 'POST':
@@ -5772,11 +6912,240 @@ def generate_cash_counter_report(request):
         'a_total_party': a_total_party,
         'a_total': a_total_cash + a_total_cheque + a_total_online + a_total_cheque_cc + a_total_party
     }
+    context.update(_pdf_base_context(request, [
+        f'Date: {colDate.strftime("%d/%m/%Y")}',
+        f'Staff: {staffID if staffID else "All"}',
+        'Counter + counter collection summary',
+    ]))
     response = HttpResponse(content_type="application/pdf")
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/report/cashCounterReportPDF.html", context)
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A5; margin: .3cm ; }')])
     return response
+
+
+def generate_cash_counter_report_excel(request):
+    cDate = request.GET.get('cDate')
+    staffID = request.GET.get('staffID')
+    colDate = datetime.strptime(cDate, '%d/%m/%Y')
+    ccol = _cash_counter_collection_list_base_qs(request).filter(
+        collectionDateTime__date=colDate.date(),
+        isDeleted__exact=False
+    )
+    if not _can_filter_all_cash_counter(request.user):
+        ccol = ccol.filter(collectedBy__user_ID_id=request.user.pk)
+        staff_name = 'MyList'
+    elif staffID and staffID != 'All':
+        ccol = ccol.filter(collectedBy_id=int(staffID))
+        staff_name = tenant_qs(request, StaffUser).get(pk=int(staffID)).name
+    else:
+        staff_name = 'All'
+    ccol = ccol.order_by('collectedBy__name', 'collectionDateTime')
+    counter_rows = _cash_counter_list_base_qs(request).filter(
+        datetime__date=colDate.date(),
+        isDeleted__exact=False
+    )
+    if not _can_filter_all_cash_counter(request.user):
+        counter_rows = counter_rows.filter(createdBy__user_ID_id=request.user.pk)
+    elif staffID and staffID != 'All':
+        counter_rows = counter_rows.filter(createdBy_id=int(staffID))
+    counter_rows = counter_rows.order_by('mode', 'datetime')
+
+    mode_totals = defaultdict(float)
+    detail_rows = []
+    for item in counter_rows:
+        if item.mode == 'Mix':
+            amount = float(item.mixCashAmount or 0.0) + float(item.mixCardAmount or 0.0)
+        else:
+            amount = float(item.amount or 0.0)
+        mode_totals[item.mode or 'Unknown'] += amount
+        detail_rows.append([
+            item.counterID or '-',
+            item.mode or '-',
+            item.partyID.name if item.partyID_id else '-',
+            getattr(item.bankID, 'name', '-') if getattr(item, 'bankID', None) else '-',
+            float(item.amount or 0.0),
+            float(item.mixCashAmount or 0.0),
+            float(item.mixCardAmount or 0.0),
+            item.createdBy.name if item.createdBy_id else '-',
+            item.datetime.strftime('%d/%m/%Y %I:%M %p') if item.datetime else '-',
+            item.remark or '-',
+        ])
+
+    collection_mode_totals = defaultdict(float)
+    collection_detail_rows = []
+    for item in ccol:
+        amount = float(item.paidAmount or 0.0)
+        collection_mode_totals[item.modeOfPayment or 'Unknown'] += amount
+        collection_detail_rows.append([
+            item.paymentID or '-',
+            item.partyID.name if item.partyID_id else '-',
+            item.collectedBy.name if item.collectedBy_id else '-',
+            item.modeOfPayment or '-',
+            amount,
+            item.collectionDateTime.strftime('%d/%m/%Y %I:%M %p') if item.collectionDateTime else '-',
+            item.remark or '-',
+        ])
+
+    return _xlsx_report_response('cash-counter-report', [{
+        'title': 'Cash Closing',
+        'report_title': 'Cash Counter Report',
+        'report_subtitle': 'Counter entries and counter collections',
+        'metadata': [
+            ('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')),
+            ('Date', colDate.strftime('%d/%m/%Y')),
+            ('Staff', staff_name),
+            ('Generated By', _pdf_base_context(request).get('pdf_generated_by')),
+        ],
+        'tables': [
+            {'title': 'Counter Mode Summary', 'headers': ['Mode', 'Amount'], 'rows': [[mode, amount] for mode, amount in sorted(mode_totals.items())]},
+            {'title': 'Counter Entry Detail', 'headers': ['Counter ID', 'Mode', 'Party', 'Bank', 'Amount', 'Mix Cash', 'Mix Card', 'Created By', 'Date Time', 'Remark'], 'rows': detail_rows},
+            {'title': 'Counter Collection Summary', 'headers': ['Mode', 'Amount'], 'rows': [[mode, amount] for mode, amount in sorted(collection_mode_totals.items())]},
+            {'title': 'Counter Collection Detail', 'headers': ['Payment ID', 'Customer', 'Collector', 'Mode', 'Amount', 'Collected On', 'Remark'], 'rows': collection_detail_rows},
+        ],
+    }])
+
+
+def generate_daily_summary_pdf(request):
+    cDate = request.GET.get('cDate')
+    report_date = datetime.strptime(cDate, '%d/%m/%Y').date() if cDate else datetime.today().date()
+    sales_qs = tenant_qs(request, Sales).filter(isDeleted=False, buildDate=report_date)
+    if not _can_filter_all_sales(request.user):
+        sales_qs = sales_qs.filter(createdBy__user_ID_id=request.user.pk)
+    collection_qs = tenant_qs(request, Collection).filter(isDeleted=False, isApproved=True, collectionDateTime__date=report_date)
+    if not _can_filter_all_collections(request.user):
+        collection_qs = collection_qs.filter(collectedBy__user_ID_id=request.user.pk)
+    cash_counter_qs = _cash_counter_list_base_qs(request).filter(isDeleted=False, datetime__date=report_date)
+    if not _can_filter_all_cash_counter(request.user):
+        cash_counter_qs = cash_counter_qs.filter(createdBy__user_ID_id=request.user.pk)
+
+    sales_total = float(sales_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    collection_total = float(collection_qs.aggregate(total=Sum('paidAmount'))['total'] or 0.0)
+    cash_counter_total = float(cash_counter_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    expense_total = float(cash_counter_qs.filter(mode='Expense').aggregate(total=Sum('amount'))['total'] or 0.0)
+    return_total = float(cash_counter_qs.filter(mode='Return').aggregate(total=Sum('amount'))['total'] or 0.0)
+    pending_sales = sales_qs.filter(isApproved=False).count()
+    pending_collection_qs = tenant_qs(request, Collection).filter(
+        isDeleted=False,
+        collectionDateTime__date=report_date,
+        isApproved=False,
+    )
+    if not _can_filter_all_collections(request.user):
+        pending_collection_qs = pending_collection_qs.filter(collectedBy__user_ID_id=request.user.pk)
+    pending_collections = pending_collection_qs.count()
+    top_sales_staff = list(
+        sales_qs.values('createdBy__name')
+        .annotate(total=Sum('amount'))
+        .order_by('-total')[:5]
+    )
+    top_collection_staff = list(
+        collection_qs.values('collectedBy__name')
+        .annotate(total=Sum('paidAmount'))
+        .order_by('-total')[:5]
+    )
+    context = {
+        'report_date': report_date,
+        'sales_total': sales_total,
+        'sales_count': sales_qs.count(),
+        'collection_total': collection_total,
+        'collection_count': collection_qs.count(),
+        'cash_counter_total': cash_counter_total,
+        'expense_total': expense_total,
+        'return_total': return_total,
+        'pending_sales': pending_sales,
+        'pending_collections': pending_collections,
+        'top_sales_staff': top_sales_staff,
+        'top_collection_staff': top_collection_staff,
+        'generated_on': timezone.now(),
+    }
+    context.update(_pdf_base_context(request, [
+        f'Date: {report_date.strftime("%d/%m/%Y")}',
+        'Scope: Daily business summary',
+    ]))
+    response = HttpResponse(content_type="application/pdf")
+    response['Content-Disposition'] = f'attachment; filename=daily-summary-{report_date.strftime("%Y-%m-%d")}.pdf'
+    html = render_to_string("home/report/dailySummaryPDF.html", context)
+    HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A4 portrait; margin: .7cm; }')])
+    return response
+
+
+def generate_daily_summary_excel(request):
+    cDate = request.GET.get('cDate')
+    report_date = datetime.strptime(cDate, '%d/%m/%Y').date() if cDate else datetime.today().date()
+    sales_qs = tenant_qs(request, Sales).filter(isDeleted=False, buildDate=report_date)
+    if not _can_filter_all_sales(request.user):
+        sales_qs = sales_qs.filter(createdBy__user_ID_id=request.user.pk)
+    collection_qs = tenant_qs(request, Collection).filter(isDeleted=False, isApproved=True, collectionDateTime__date=report_date)
+    if not _can_filter_all_collections(request.user):
+        collection_qs = collection_qs.filter(collectedBy__user_ID_id=request.user.pk)
+    cash_counter_qs = _cash_counter_list_base_qs(request).filter(isDeleted=False, datetime__date=report_date)
+    if not _can_filter_all_cash_counter(request.user):
+        cash_counter_qs = cash_counter_qs.filter(createdBy__user_ID_id=request.user.pk)
+    sales_total = float(sales_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    collection_total = float(collection_qs.aggregate(total=Sum('paidAmount'))['total'] or 0.0)
+    cash_counter_total = float(cash_counter_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    expense_total = float(cash_counter_qs.filter(mode='Expense').aggregate(total=Sum('amount'))['total'] or 0.0)
+    return_total = float(cash_counter_qs.filter(mode='Return').aggregate(total=Sum('amount'))['total'] or 0.0)
+    pending_sales = sales_qs.filter(isApproved=False).count()
+    pending_collection_qs = tenant_qs(request, Collection).filter(isDeleted=False, collectionDateTime__date=report_date, isApproved=False)
+    if not _can_filter_all_collections(request.user):
+        pending_collection_qs = pending_collection_qs.filter(collectedBy__user_ID_id=request.user.pk)
+    pending_collections = pending_collection_qs.count()
+    top_sales_staff = list(sales_qs.values_list('createdBy__name').annotate(total=Sum('amount')).order_by('-total')[:5])
+    top_collection_staff = list(collection_qs.values_list('collectedBy__name').annotate(total=Sum('paidAmount')).order_by('-total')[:5])
+    return _xlsx_report_response('daily-summary', [{
+        'title': 'Daily Summary',
+        'report_title': 'Daily Summary Report',
+        'report_subtitle': 'Daily owner snapshot',
+        'metadata': [
+            ('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')),
+            ('Date', report_date.strftime('%d/%m/%Y')),
+            ('Generated By', _pdf_base_context(request).get('pdf_generated_by')),
+        ],
+        'tables': [
+            {'title': 'Business Summary', 'headers': ['Metric', 'Value'], 'rows': [
+                ['Sales Total', sales_total],
+                ['Sales Count', sales_qs.count()],
+                ['Collection Total', collection_total],
+                ['Collection Count', collection_qs.count()],
+                ['Cash Counter Total', cash_counter_total],
+                ['Expense Total', expense_total],
+                ['Return Total', return_total],
+                ['Pending Sales', pending_sales],
+                ['Pending Collections', pending_collections],
+            ]},
+            {'title': 'Top Sales Staff', 'headers': ['Staff', 'Amount'], 'rows': [[label or '-', float(total or 0.0)] for label, total in top_sales_staff]},
+            {'title': 'Top Collection Staff', 'headers': ['Staff', 'Amount'], 'rows': [[label or '-', float(total or 0.0)] for label, total in top_collection_staff]},
+        ],
+    }])
+
+
+def generate_monthly_business_summary_excel(request):
+    reference = _attendance_month_reference(request)
+    month_start = reference.replace(day=1)
+    month_end = reference.replace(day=monthrange(reference.year, reference.month)[1])
+    sales_qs = tenant_qs(request, Sales).filter(isDeleted=False, buildDate__range=[month_start, month_end])
+    if not _can_filter_all_sales(request.user):
+        sales_qs = sales_qs.filter(createdBy__user_ID_id=request.user.pk)
+    collection_qs = tenant_qs(request, Collection).filter(isDeleted=False, isApproved=True, collectionDateTime__date__range=[month_start, month_end])
+    if not _can_filter_all_collections(request.user):
+        collection_qs = collection_qs.filter(collectedBy__user_ID_id=request.user.pk)
+    daily_sales = {item['buildDate']: float(item['total'] or 0.0) for item in sales_qs.values('buildDate').annotate(total=Sum('amount'))}
+    daily_collections = {item['collectionDateTime__date']: float(item['total'] or 0.0) for item in collection_qs.values('collectionDateTime__date').annotate(total=Sum('paidAmount'))}
+    rows = []
+    for day in range(1, month_end.day + 1):
+        current = month_start.replace(day=day)
+        rows.append([current.strftime('%d/%m/%Y'), daily_sales.get(current, 0.0), daily_collections.get(current, 0.0)])
+    return _xlsx_report_response('monthly-business-summary', [{
+        'title': 'Monthly Business',
+        'report_title': 'Monthly Business Summary',
+        'report_subtitle': f'{month_name[reference.month]} {reference.year}',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('Month', f'{month_name[reference.month]} {reference.year}'), ('Generated By', _pdf_base_context(request).get('pdf_generated_by'))],
+        'tables': [
+            {'title': 'Monthly Totals', 'headers': ['Metric', 'Value'], 'rows': [['Sales Total', float(sales_qs.aggregate(total=Sum('amount'))['total'] or 0.0)], ['Collection Total', float(collection_qs.aggregate(total=Sum('paidAmount'))['total'] or 0.0)], ['Sales Count', sales_qs.count()], ['Collection Count', collection_qs.count()]]},
+            {'title': 'Day Wise Movement', 'headers': ['Date', 'Sales', 'Collections'], 'rows': rows},
+        ],
+    }])
 @transaction.atomic
 def add_collection_from_cash_counter_api(request):
     if request.method == 'POST':
@@ -6002,3 +7371,1026 @@ def edit_cash_counter_collection_by_admin_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
+
+
+@cache_page(60 * 5)
+def api_business_snapshot(request):
+    start_date, end_date = _report_range(request)
+    group_by = request.GET.get('groupBy', 'day')
+    range_days = max((end_date - start_date).days + 1, 1)
+    prev_end = start_date - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=range_days - 1)
+    sales_qs = tenant_qs(request, Sales).filter(isDeleted=False, buildDate__range=[start_date, end_date])
+    collection_qs = tenant_qs(request, Collection).filter(isDeleted=False, collectionDateTime__date__range=[start_date, end_date])
+    order_qs = tenant_qs(request, Order).filter(isDeleted=False, buildDate__range=[start_date, end_date])
+    cash_qs = tenant_qs(request, CashCounter).filter(isDeleted=False, datetime__date__range=[start_date, end_date])
+    prev_sales_qs = tenant_qs(request, Sales).filter(isDeleted=False, buildDate__range=[prev_start, prev_end])
+    prev_collection_qs = tenant_qs(request, Collection).filter(isDeleted=False, collectionDateTime__date__range=[prev_start, prev_end])
+    prev_cash_qs = tenant_qs(request, CashCounter).filter(isDeleted=False, datetime__date__range=[prev_start, prev_end])
+    prev_order_qs = tenant_qs(request, Order).filter(isDeleted=False, buildDate__range=[prev_start, prev_end])
+
+    sales_total = float(sales_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    collection_total = float(collection_qs.aggregate(total=Sum('paidAmount'))['total'] or 0.0)
+    cash_total = float(cash_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    order_total = order_qs.count()
+    prev_sales_total = float(prev_sales_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    prev_collection_total = float(prev_collection_qs.aggregate(total=Sum('paidAmount'))['total'] or 0.0)
+    prev_cash_total = float(prev_cash_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    prev_order_total = prev_order_qs.count()
+
+    sales_by_day = {
+        item['buildDate']: float(item['total'] or 0.0)
+        for item in sales_qs.values('buildDate').annotate(total=Sum('amount'))
+    }
+    collections_by_day = {
+        item['collectionDateTime__date']: float(item['total'] or 0.0)
+        for item in collection_qs.values('collectionDateTime__date').annotate(total=Sum('paidAmount'))
+    }
+    cash_by_day = {
+        item['datetime__date']: float(item['total'] or 0.0)
+        for item in cash_qs.values('datetime__date').annotate(total=Sum('amount'))
+    }
+    date_points = _date_points(start_date, end_date)
+    grouped_trend = _group_trend_series(
+        date_points,
+        {
+            'sales': sales_by_day,
+            'collections': collections_by_day,
+            'cash_counter': cash_by_day,
+        },
+        group_by=group_by,
+    )
+
+    staff_sales_rows = sales_qs.values('createdBy__name').annotate(sales_total=Sum('amount'), sales_count=Count('id'))
+    staff_collection_rows = collection_qs.values('collectedBy__name').annotate(collection_total=Sum('paidAmount'), collection_count=Count('id'))
+    staff_map = defaultdict(lambda: {'sales': 0.0, 'collections': 0.0, 'count': 0})
+    for row in staff_sales_rows:
+        label = row.get('createdBy__name') or 'Unassigned'
+        staff_map[label]['sales'] += float(row.get('sales_total') or 0.0)
+        staff_map[label]['count'] += int(row.get('sales_count') or 0)
+    for row in staff_collection_rows:
+        label = row.get('collectedBy__name') or 'Unassigned'
+        staff_map[label]['collections'] += float(row.get('collection_total') or 0.0)
+        staff_map[label]['count'] += int(row.get('collection_count') or 0)
+    top_staff = sorted([
+        {
+            'label': label,
+            'sales': values['sales'],
+            'collections': values['collections'],
+            'total': values['sales'] + values['collections'],
+            'count': values['count'],
+        }
+        for label, values in staff_map.items()
+    ], key=lambda item: item['total'], reverse=True)[:8]
+
+    customer_sales = sales_qs.values('partyID__name').annotate(total=Sum('amount'))
+    customer_collections = collection_qs.values('partyID__name').annotate(total=Sum('paidAmount'))
+    customer_map = defaultdict(float)
+    for row in customer_sales:
+        customer_map[row.get('partyID__name') or 'Unknown'] += float(row.get('total') or 0.0)
+    for row in customer_collections:
+        customer_map[row.get('partyID__name') or 'Unknown'] += float(row.get('total') or 0.0)
+    top_customers = sorted([
+        {'label': label, 'amount': amount}
+        for label, amount in customer_map.items()
+    ], key=lambda item: item['amount'], reverse=True)[:8]
+
+    party_map = {
+        party.id: {
+            'name': party.name or 'Unknown',
+            'opening': float(party.openingBalance or 0.0),
+        }
+        for party in tenant_qs(request, Party).filter(isDeleted=False).only('id', 'name', 'openingBalance')
+    }
+    ledger_rows = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False).values('party').annotate(
+        debit_total=Sum('debit'),
+        credit_total=Sum('credit'),
+    )
+    outstanding_total = 0.0
+    outstanding_customers = 0
+    for row in ledger_rows:
+        party_id = row.get('party')
+        party_info = party_map.get(party_id)
+        if not party_info:
+            continue
+        closing = party_info['opening'] + float(row.get('debit_total') or 0.0) - float(row.get('credit_total') or 0.0)
+        if closing > 0:
+            outstanding_customers += 1
+            outstanding_total += closing
+
+    pending_sales = tenant_qs(request, Sales).filter(isDeleted=False, isApproved=False).count()
+    pending_collections = tenant_qs(request, Collection).filter(isDeleted=False, isApproved=False).count()
+    pending_orders = tenant_qs(request, Order).filter(isDeleted=False, status__in=[Order.Status.DRAFT, Order.Status.SUBMITTED]).count()
+    failed_messages = tenant_qs(request, WhatsappMessageStatus).filter(isDeleted=False).exclude(status='Success').count()
+    untallied_collections = tenant_qs(request, Collection).filter(isDeleted=False, isTallied=False).count()
+    missing_logout = tenant_qs(request, Attendance).filter(isDeleted=False, isLogIn=True, isLogOut=False).count()
+    returns_total = float(tenant_qs(request, CashCounter).filter(isDeleted=False, mode='Return', datetime__date__range=[start_date, end_date]).aggregate(total=Sum('amount'))['total'] or 0.0)
+    expenses_total = float(tenant_qs(request, CashCounter).filter(isDeleted=False, mode='Expense', datetime__date__range=[start_date, end_date]).aggregate(total=Sum('amount'))['total'] or 0.0)
+    approvals_total = pending_sales + pending_collections + pending_orders
+    total_business_value = sales_total + collection_total + cash_total
+    collection_coverage = ((collection_total / sales_total) * 100.0) if sales_total else 0.0
+    top_staff_share = ((top_staff[0]['total'] / total_business_value) * 100.0) if top_staff and total_business_value > 0 else 0.0
+    top5_customer_total = sum(item['amount'] for item in top_customers[:5])
+    top5_customer_share = ((top5_customer_total / total_business_value) * 100.0) if total_business_value > 0 else 0.0
+    active_staff = len([item for item in top_staff if item['total'] > 0])
+    insights = []
+    insights.append({
+        'title': 'Revenue movement',
+        'body': f"Sales moved {round(_pct_change(sales_total, prev_sales_total), 1)}% against the previous period.",
+        'tone': 'teal' if sales_total >= prev_sales_total else 'red',
+    })
+    insights.append({
+        'title': 'Collection coverage',
+        'body': f"Collections are {round((collection_total / sales_total) * 100.0, 1) if sales_total else 0}% of sales in the selected range.",
+        'tone': 'blue',
+    })
+    insights.append({
+        'title': 'Staff concentration',
+        'body': f"Top staff contributed {round(top_staff_share, 1)}% of total visible business value.",
+        'tone': 'violet',
+    })
+    insights.append({
+        'title': 'Customer concentration',
+        'body': f"Top 5 customers account for {round(top5_customer_share, 1)}% of the tracked business value.",
+        'tone': 'orange',
+    })
+    insights.append({
+        'title': 'Outstanding position',
+        'body': f"{outstanding_customers} customers currently hold { _money(outstanding_total) } in receivables.",
+        'tone': 'red' if outstanding_total > collection_total else 'teal',
+    })
+    trend_peak = max(grouped_trend['sales']) if grouped_trend['sales'] else 0.0
+    trend_peak_label = grouped_trend['labels'][grouped_trend['sales'].index(trend_peak)] if trend_peak and grouped_trend['labels'] else '-'
+    trend_caption = (
+        f"Sales peaked at {_money(trend_peak)} during {trend_peak_label}; "
+        f"collections are covering {round(collection_coverage, 1)}% of sales in this range."
+    )
+    mix_leader_index = max(range(len([sales_total, collection_total, cash_total, float(approvals_total)])), key=lambda idx: [sales_total, collection_total, cash_total, float(approvals_total)][idx]) if total_business_value or approvals_total else 0
+    mix_labels = ['Sales', 'Collections', 'Cash Counter', 'Pending Approvals']
+    mix_caption = f"{mix_labels[mix_leader_index]} is the biggest visible slice in this snapshot."
+    staff_caption = f"{active_staff} staff contributed activity; the top contributor accounts for {round(top_staff_share, 1)}% of visible value."
+    customer_caption = f"Top 5 customers account for {round(top5_customer_share, 1)}% of tracked business."
+    waterfall_caption = f"After expenses and returns, the net visible effect is {_money(sales_total + collection_total + cash_total - expenses_total - returns_total)}."
+    data = {
+        'summary': [
+            {'label': 'Sales', 'value': _money(sales_total), 'delta': round(_pct_change(sales_total, prev_sales_total), 1), 'previous': _money(prev_sales_total), 'action_url': reverse('homeApp:report_sales')},
+            {'label': 'Collections', 'value': _money(collection_total), 'delta': round(_pct_change(collection_total, prev_collection_total), 1), 'previous': _money(prev_collection_total), 'action_url': reverse('homeApp:report_collections')},
+            {'label': 'Cash Counter', 'value': _money(cash_total), 'delta': round(_pct_change(cash_total, prev_cash_total), 1), 'previous': _money(prev_cash_total), 'action_url': reverse('homeApp:report_cash_closing')},
+            {'label': 'Orders', 'value': order_total, 'delta': round(_pct_change(order_total, prev_order_total), 1), 'previous': prev_order_total, 'action_url': reverse('homeApp:report_orders')},
+            {'label': 'Pending Approvals', 'value': approvals_total, 'delta': 0.0, 'previous': '-', 'action_url': reverse('homeApp:report_pending_approvals')},
+        ],
+        'trend': grouped_trend,
+        'lastUpdated': timezone.now().strftime('%d %b %Y %I:%M %p'),
+        'trendCaption': trend_caption,
+        'mix': {
+            'labels': ['Sales', 'Collections', 'Cash Counter', 'Pending Approvals'],
+            'values': [sales_total, collection_total, cash_total, float(pending_sales + pending_collections + pending_orders)],
+            'urls': [
+                reverse('homeApp:report_sales'),
+                reverse('homeApp:report_collections'),
+                reverse('homeApp:report_cash_closing'),
+                reverse('homeApp:report_pending_approvals'),
+            ],
+            'caption': mix_caption,
+        },
+        'top_staff': [
+            {
+                'label': item['label'],
+                'sales': item['sales'],
+                'collections': item['collections'],
+                'total': item['total'],
+                'count': item['count'],
+                'totalDisplay': _money(item['total']),
+                'action_url': reverse('homeApp:report_staff_activity'),
+            }
+            for item in top_staff
+        ],
+        'top_staff_caption': staff_caption,
+        'top_customers': [
+            {
+                'label': item['label'],
+                'amount': item['amount'],
+                'amountDisplay': _money(item['amount']),
+                'action_url': reverse('homeApp:report_party_ledger'),
+            }
+            for item in top_customers
+        ],
+        'top_customers_caption': customer_caption,
+        'exceptions': [
+            {'label': 'Pending Sales', 'value': pending_sales, 'tone': 'amber', 'action_url': reverse('homeApp:report_pending_approvals')},
+            {'label': 'Pending Collections', 'value': pending_collections, 'tone': 'amber', 'action_url': reverse('homeApp:report_pending_approvals')},
+            {'label': 'Pending Orders', 'value': pending_orders, 'tone': 'amber', 'action_url': reverse('homeApp:report_pending_approvals')},
+            {'label': 'Failed Messages', 'value': failed_messages, 'tone': 'red' if failed_messages else 'green', 'action_url': reverse('homeApp:report_failed_messages')},
+            {'label': 'Untallied Collections', 'value': untallied_collections, 'tone': 'amber', 'action_url': reverse('homeApp:report_collections')},
+            {'label': 'Missing Logout', 'value': missing_logout, 'tone': 'red' if missing_logout else 'green', 'action_url': reverse('homeApp:report_attendance')},
+        ],
+        'comparisons': [
+            {'label': 'Sales vs previous', 'current': _money(sales_total), 'previous': _money(prev_sales_total), 'delta': round(_pct_change(sales_total, prev_sales_total), 1)},
+            {'label': 'Collections vs previous', 'current': _money(collection_total), 'previous': _money(prev_collection_total), 'delta': round(_pct_change(collection_total, prev_collection_total), 1)},
+            {'label': 'Orders vs previous', 'current': order_total, 'previous': prev_order_total, 'delta': round(_pct_change(order_total, prev_order_total), 1)},
+        ],
+        'insights': insights,
+        'waterfall': {
+            'labels': ['Sales', 'Collections', 'Cash Counter', 'Expenses', 'Returns', 'Net Effect'],
+            'values': [sales_total, collection_total, cash_total, -expenses_total, -returns_total, sales_total + collection_total + cash_total - expenses_total - returns_total],
+            'colors': ['#0f766e', '#2563eb', '#f97316', '#dc2626', '#be123c', '#111827'],
+            'caption': waterfall_caption,
+        },
+        'health': [
+            {
+                'label': 'Collection Coverage',
+                'value': f"{round(collection_coverage, 1)}%",
+                'subtext': f"Against {_money(sales_total)} sales",
+                'tone': 'teal' if collection_coverage >= 80 else 'amber',
+                'action_url': reverse('homeApp:report_collections'),
+            },
+            {
+                'label': 'Outstanding',
+                'value': _money(outstanding_total),
+                'subtext': f"{outstanding_customers} customers pending",
+                'tone': 'red' if outstanding_total > collection_total else 'amber',
+                'action_url': reverse('homeApp:report_outstanding'),
+            },
+            {
+                'label': 'Customer Concentration',
+                'value': f"{round(top5_customer_share, 1)}%",
+                'subtext': 'Top 5 customer contribution',
+                'tone': 'violet',
+                'action_url': reverse('homeApp:report_party_ledger'),
+            },
+            {
+                'label': 'Active Staff',
+                'value': active_staff,
+                'subtext': f"{len(top_staff)} staff visible in leaderboard",
+                'tone': 'blue',
+                'action_url': reverse('homeApp:report_staff_activity'),
+            },
+        ],
+    }
+    return JsonResponse({'data': data}, safe=False)
+
+
+def _build_revenue_trend_data(request):
+    start_date, end_date = _report_range(request)
+    group_by = request.GET.get('groupBy', 'day')
+    range_days = max((end_date - start_date).days + 1, 1)
+    prev_end = start_date - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=range_days - 1)
+    qs = tenant_qs(request, Sales).filter(isDeleted=False, buildDate__range=[start_date, end_date])
+    prev_qs = tenant_qs(request, Sales).filter(isDeleted=False, buildDate__range=[prev_start, prev_end])
+    modes = qs.values(label=F('modeOfPayment')).annotate(amount=Sum('amount'), count=Count('id')).order_by('-amount', 'label')
+    top_customers = qs.values(label=F('partyID__name')).annotate(amount=Sum('amount'), count=Count('id')).order_by('-amount', 'label')[:10]
+    trend_by_day = {
+        item['buildDate']: float(item['amount'] or 0.0)
+        for item in qs.values('buildDate').annotate(amount=Sum('amount'))
+    }
+    points = _date_points(start_date, end_date)
+    trend = _group_trend_series(
+        points,
+        {
+            'sales': trend_by_day,
+            'collections': {},
+            'cash_counter': {},
+        },
+        group_by=group_by,
+    )
+    revenue_total = float(qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    prev_revenue_total = float(prev_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    invoice_count = qs.count()
+    approved_count = qs.filter(isApproved=True).count()
+    pending_count = qs.filter(isApproved=False).count()
+    avg_invoice = (revenue_total / invoice_count) if invoice_count else 0.0
+    approved_share = ((approved_count / invoice_count) * 100.0) if invoice_count else 0.0
+    top5_share = ((sum(float(item['amount'] or 0.0) for item in top_customers[:5]) / revenue_total) * 100.0) if revenue_total else 0.0
+    data = {
+        'summary': [
+            {'label': 'Revenue', 'value': _money(revenue_total), 'delta': round(_pct_change(revenue_total, prev_revenue_total), 1)},
+            {'label': 'Invoices', 'value': invoice_count, 'delta': round(_pct_change(invoice_count, prev_qs.count()), 1)},
+            {'label': 'Approved', 'value': approved_count, 'delta': 0.0},
+            {'label': 'Pending', 'value': pending_count, 'delta': 0.0},
+        ],
+        'health': [
+            {'label': 'Average Bill', 'value': _money(avg_invoice), 'subtext': 'Revenue per invoice', 'tone': 'teal'},
+            {'label': 'Approval Share', 'value': f"{round(approved_share, 1)}%", 'subtext': 'Approved invoices over total', 'tone': 'blue'},
+            {'label': 'Top 5 Customers', 'value': f"{round(top5_share, 1)}%", 'subtext': 'Share of total revenue', 'tone': 'violet'},
+        ],
+        'trend': trend,
+        'trend_caption': f"Revenue is grouped by {group_by}; average bill value is {_money(avg_invoice)} in this range.",
+        'mode_rows': [
+            {
+                'label': row.get('label') or 'Unknown',
+                'amount': float(row.get('amount') or 0.0),
+                'amountDisplay': _money(row.get('amount') or 0.0),
+                'count': row.get('count') or 0,
+            }
+            for row in modes
+        ],
+        'customer_rows': [
+            {
+                'label': row.get('label') or 'Unknown',
+                'amount': float(row.get('amount') or 0.0),
+                'amountDisplay': _money(row.get('amount') or 0.0),
+                'count': row.get('count') or 0,
+            }
+            for row in top_customers
+        ],
+        'insights': [
+            {
+                'title': 'Revenue movement',
+                'body': f"Revenue moved {round(_pct_change(revenue_total, prev_revenue_total), 1)}% against the previous period.",
+            },
+            {
+                'title': 'Approval control',
+                'body': f"{approved_count} of {invoice_count} invoices are approved in the selected range.",
+            },
+            {
+                'title': 'Customer concentration',
+                'body': f"Top 5 customers contribute {round(top5_share, 1)}% of revenue.",
+            },
+        ],
+        'mode_caption': 'Payment mode mix shows how revenue is being realized across cash, online, credit, and mixed bills.',
+        'customer_caption': 'Top customers highlight where the revenue concentration sits.',
+    }
+    return start_date, end_date, group_by, data
+
+
+@cache_page(60 * 5)
+def api_revenue_trend(request):
+    _, _, _, data = _build_revenue_trend_data(request)
+    return JsonResponse({'data': data}, safe=False)
+
+
+def _build_collection_trend_data(request):
+    start_date, end_date = _report_range(request)
+    group_by = request.GET.get('groupBy', 'day')
+    range_days = max((end_date - start_date).days + 1, 1)
+    prev_end = start_date - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=range_days - 1)
+    qs = tenant_qs(request, Collection).filter(isDeleted=False, collectionDateTime__date__range=[start_date, end_date])
+    prev_qs = tenant_qs(request, Collection).filter(isDeleted=False, collectionDateTime__date__range=[prev_start, prev_end])
+    modes = qs.values(label=F('modeOfPayment')).annotate(amount=Sum('paidAmount'), count=Count('id')).order_by('-amount', 'label')
+    top_customers = qs.values(label=F('partyID__name')).annotate(amount=Sum('paidAmount'), count=Count('id')).order_by('-amount', 'label')[:10]
+    top_staff = qs.values(label=F('collectedBy__name')).annotate(amount=Sum('paidAmount'), count=Count('id')).order_by('-amount', 'label')[:10]
+    trend_by_day = {
+        item['collectionDateTime__date']: float(item['amount'] or 0.0)
+        for item in qs.values('collectionDateTime__date').annotate(amount=Sum('paidAmount'))
+    }
+    points = _date_points(start_date, end_date)
+    trend = _group_trend_series(
+        points,
+        {
+            'sales': trend_by_day,
+            'collections': {},
+            'cash_counter': {},
+        },
+        group_by=group_by,
+    )
+    collection_total = float(qs.aggregate(total=Sum('paidAmount'))['total'] or 0.0)
+    prev_collection_total = float(prev_qs.aggregate(total=Sum('paidAmount'))['total'] or 0.0)
+    entry_count = qs.count()
+    approved_count = qs.filter(isApproved=True).count()
+    tallied_count = qs.filter(isTallied=True).count()
+    otp_count = qs.filter(otpVerified=True).count()
+    avg_collection = (collection_total / entry_count) if entry_count else 0.0
+    approved_share = ((approved_count / entry_count) * 100.0) if entry_count else 0.0
+    tally_share = ((tallied_count / entry_count) * 100.0) if entry_count else 0.0
+    data = {
+        'summary': [
+            {'label': 'Collected', 'value': _money(collection_total), 'delta': round(_pct_change(collection_total, prev_collection_total), 1)},
+            {'label': 'Entries', 'value': entry_count, 'delta': round(_pct_change(entry_count, prev_qs.count()), 1)},
+            {'label': 'Approved', 'value': approved_count, 'delta': 0.0},
+            {'label': 'Tallied', 'value': tallied_count, 'delta': 0.0},
+        ],
+        'health': [
+            {'label': 'Average Collection', 'value': _money(avg_collection), 'subtext': 'Collected per entry', 'tone': 'teal'},
+            {'label': 'Approval Share', 'value': f"{round(approved_share, 1)}%", 'subtext': 'Approved entries over total', 'tone': 'blue'},
+            {'label': 'Tally Share', 'value': f"{round(tally_share, 1)}%", 'subtext': 'Tallied entries over total', 'tone': 'violet'},
+            {'label': 'OTP Verified', 'value': otp_count, 'subtext': 'Entries with OTP verification', 'tone': 'amber'},
+        ],
+        'trend': trend,
+        'trend_caption': f"Collections are grouped by {group_by}; average collection size is {_money(avg_collection)} in this range.",
+        'mode_rows': [
+            {
+                'label': row.get('label') or 'Unknown',
+                'amount': float(row.get('amount') or 0.0),
+                'amountDisplay': _money(row.get('amount') or 0.0),
+                'count': row.get('count') or 0,
+            }
+            for row in modes
+        ],
+        'customer_rows': [
+            {
+                'label': row.get('label') or 'Unknown',
+                'amount': float(row.get('amount') or 0.0),
+                'amountDisplay': _money(row.get('amount') or 0.0),
+                'count': row.get('count') or 0,
+            }
+            for row in top_customers
+        ],
+        'staff_rows': [
+            {
+                'label': row.get('label') or 'Unassigned',
+                'amount': float(row.get('amount') or 0.0),
+                'amountDisplay': _money(row.get('amount') or 0.0),
+                'count': row.get('count') or 0,
+            }
+            for row in top_staff
+        ],
+        'insights': [
+            {
+                'title': 'Collection movement',
+                'body': f"Collections moved {round(_pct_change(collection_total, prev_collection_total), 1)}% against the previous period.",
+            },
+            {
+                'title': 'Control quality',
+                'body': f"{approved_count} approved and {tallied_count} tallied entries are in the selected range.",
+            },
+            {
+                'title': 'Recovery channel',
+                'body': f"OTP verification was completed on {otp_count} entries in this range.",
+            },
+        ],
+        'mode_caption': 'Collection modes show where recovery is happening across cash, online, cheque, and transfer flows.',
+        'customer_caption': 'Top customers show which parties are contributing most to recovery.',
+        'staff_caption': 'Collector leaderboard shows who is driving the recovery effort.',
+    }
+    return start_date, end_date, group_by, data
+
+
+@cache_page(60 * 5)
+def api_collection_trend(request):
+    _, _, _, data = _build_collection_trend_data(request)
+    return JsonResponse({'data': data}, safe=False)
+
+
+def _build_receivables_data(request):
+    _, end_date = _report_range(request)
+    parties = tenant_qs(request, Party).filter(isDeleted=False).select_related('assignTo').order_by('name')
+    rows = []
+    aging = {'0-7': 0.0, '8-15': 0.0, '16-30': 0.0, '31-60': 0.0, '60+': 0.0}
+    staff_map = defaultdict(float)
+
+    def bucket_for_days(days):
+        if days <= 7:
+            return '0-7'
+        if days <= 15:
+            return '8-15'
+        if days <= 30:
+            return '16-30'
+        if days <= 60:
+            return '31-60'
+        return '60+'
+
+    for party in parties:
+        agg = tenant_qs(request, PartyLedgerEntry).filter(
+            isDeleted=False,
+            party=party,
+            txDateTime__date__lte=end_date,
+        ).aggregate(
+            debit=Sum('debit'),
+            credit=Sum('credit'),
+            last_tx=Max('txDateTime'),
+        )
+        closing = float(party.openingBalance or 0.0) + float(agg['debit'] or 0.0) - float(agg['credit'] or 0.0)
+        if closing <= 0:
+            continue
+        last_tx = agg.get('last_tx')
+        age_days = (end_date - last_tx.date()).days if last_tx else 999
+        age_bucket = bucket_for_days(age_days)
+        aging[age_bucket] += closing
+        staff_label = party.assignTo.name if party.assignTo_id else 'Unassigned'
+        staff_map[staff_label] += closing
+        rows.append({
+            'party': party.name or '-',
+            'staff': staff_label,
+            'closing': _money(closing),
+            'closing_raw': closing,
+            'last_activity': last_tx.strftime('%d %b %Y') if last_tx else '-',
+            'age_days': age_days if age_days < 999 else '-',
+            'age_bucket': age_bucket,
+            'ledger_url': reverse('homeApp:party_ledger', args=[party.pk]),
+        })
+    rows = sorted(rows, key=lambda item: item['closing_raw'], reverse=True)
+    total_outstanding = sum(item['closing_raw'] for item in rows)
+    avg_outstanding = (total_outstanding / len(rows)) if rows else 0.0
+    high_risk_amount = aging['31-60'] + aging['60+']
+    top5_share = ((sum(item['closing_raw'] for item in rows[:5]) / total_outstanding) * 100.0) if total_outstanding else 0.0
+    staff_rows = sorted([
+        {'label': label, 'amount': amount, 'count': 0}
+        for label, amount in staff_map.items()
+    ], key=lambda item: item['amount'], reverse=True)[:8]
+    data = {
+        'summary': [
+            {'label': 'Outstanding Customers', 'value': len(rows)},
+            {'label': 'Total Outstanding', 'value': _money(total_outstanding)},
+            {'label': 'Average Outstanding', 'value': _money(avg_outstanding)},
+            {'label': '31+ Day Risk', 'value': _money(high_risk_amount)},
+        ],
+        'aging_rows': [{'label': key, 'amount': _money(val), 'amount_raw': round(val, 2), 'count': 0} for key, val in aging.items()],
+        'table_rows': rows[:200],
+        'top_customers': [
+            {
+                'label': row['party'],
+                'amount': round(row['closing_raw'], 2),
+                'amountDisplay': row['closing'],
+                'action_url': row['ledger_url'],
+            }
+            for row in rows[:8]
+        ],
+        'staff_rows': [
+            {
+                'label': row['label'],
+                'amount': round(row['amount'], 2),
+                'amountDisplay': _money(row['amount']),
+            }
+            for row in staff_rows
+        ],
+        'insights': [
+            {
+                'title': 'Concentration',
+                'body': f"Top 5 customers account for {round(top5_share, 1)}% of total outstanding.",
+            },
+            {
+                'title': 'Overdue pressure',
+                'body': f"{_money(high_risk_amount)} sits in 31+ day buckets.",
+            },
+            {
+                'title': 'As of date',
+                'body': f"Receivables are calculated up to {end_date.strftime('%d %b %Y')}.",
+            },
+        ],
+        'aging_caption': f"{_money(high_risk_amount)} of outstanding is older than 30 days.",
+        'customers_caption': f"{len(rows)} customers have receivables; average exposure is {_money(avg_outstanding)}.",
+        'staff_caption': 'Exposure by assigned staff helps identify where follow-up needs to happen.',
+    }
+    return end_date, data
+
+
+@cache_page(60 * 5)
+def api_receivables(request):
+    _, data = _build_receivables_data(request)
+    return JsonResponse({'data': data}, safe=False)
+
+
+def _build_staff_productivity_data(request):
+    start_date, end_date = _report_range(request)
+    range_days = max((end_date - start_date).days + 1, 1)
+    prev_end = start_date - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=range_days - 1)
+    rows = []
+    attendance_qs = tenant_qs(request, Attendance).filter(isDeleted=False, loginDateTime__date__range=[start_date, end_date])
+    attendance_prev_qs = tenant_qs(request, Attendance).filter(isDeleted=False, loginDateTime__date__range=[prev_start, prev_end])
+    active_staff = tenant_qs(request, StaffUser).filter(isDeleted=False).order_by('name')
+    present_staff = attendance_qs.filter(isLogIn=True).values_list('staffID_id', flat=True).distinct()
+    prev_present_staff = attendance_prev_qs.filter(isLogIn=True).values_list('staffID_id', flat=True).distinct()
+    for staff in active_staff:
+        sales_total = tenant_qs(request, Sales).filter(isDeleted=False, createdBy=staff, buildDate__range=[start_date, end_date]).aggregate(total=Sum('amount'))['total'] or 0.0
+        collection_total = tenant_qs(request, Collection).filter(isDeleted=False, collectedBy=staff, collectionDateTime__date__range=[start_date, end_date]).aggregate(total=Sum('paidAmount'))['total'] or 0.0
+        order_count = tenant_qs(request, Order).filter(isDeleted=False, createdBy=staff, buildDate__range=[start_date, end_date]).count()
+        attendance_count = attendance_qs.filter(staffID=staff, isLogIn=True).count()
+        business_value = float(sales_total) + float(collection_total)
+        rows.append({
+            'label': staff.name or '-',
+            'amount': business_value,
+            'count': order_count,
+            'sales': float(sales_total),
+            'collections': float(collection_total),
+            'attendance': attendance_count,
+            'efficiency': round((business_value / attendance_count), 2) if attendance_count else 0.0,
+        })
+    rows = sorted(rows, key=lambda item: item['amount'], reverse=True)
+    staff_with_activity = [row for row in rows if row['amount'] > 0 or row['count'] > 0]
+    total_sales = sum(row['sales'] for row in rows)
+    total_collections = sum(row['collections'] for row in rows)
+    total_orders = sum(row['count'] for row in rows)
+    top_share = ((sum(row['amount'] for row in rows[:3]) / sum(row['amount'] for row in rows)) * 100.0) if rows and sum(row['amount'] for row in rows) else 0.0
+    present_count = len(set(present_staff))
+    prev_present_count = len(set(prev_present_staff))
+    data = {
+        'summary': [
+            {'label': 'Active Staff', 'value': len(rows), 'delta': 0.0},
+            {'label': 'Staff With Activity', 'value': len(staff_with_activity), 'delta': 0.0},
+            {'label': 'Present Staff', 'value': present_count, 'delta': round(_pct_change(present_count, prev_present_count), 1)},
+            {'label': 'Orders Captured', 'value': total_orders, 'delta': 0.0},
+        ],
+        'health': [
+            {'label': 'Sales Value', 'value': _money(total_sales), 'subtext': 'Captured by staff in selected range', 'tone': 'teal'},
+            {'label': 'Collection Value', 'value': _money(total_collections), 'subtext': 'Collected by staff in selected range', 'tone': 'blue'},
+            {'label': 'Top 3 Concentration', 'value': f"{round(top_share, 1)}%", 'subtext': 'Share of visible staff business', 'tone': 'violet'},
+        ],
+        'leaderboard': [
+            {
+                'label': row['label'],
+                'amount': row['amount'],
+                'amountDisplay': _money(row['amount']),
+                'count': row['count'],
+                'sales': row['sales'],
+                'collections': row['collections'],
+                'attendance': row['attendance'],
+                'efficiency': row['efficiency'],
+            }
+            for row in rows[:20]
+        ],
+        'insights': [
+            {
+                'title': 'Team coverage',
+                'body': f"{len(staff_with_activity)} of {len(rows)} staff showed measurable business activity.",
+            },
+            {
+                'title': 'Concentration',
+                'body': f"Top 3 staff account for {round(top_share, 1)}% of visible business value.",
+            },
+            {
+                'title': 'Attendance signal',
+                'body': f"{present_count} staff marked attendance in this period.",
+            },
+        ],
+        'sales_collection_caption': 'Sales and collections together show who is driving revenue and recovery.',
+        'orders_caption': 'Order volume by staff helps separate booking activity from billing activity.',
+        'efficiency_caption': 'Business value per attendance day highlights who converts presence into output.',
+    }
+    return start_date, end_date, data
+
+
+@cache_page(60 * 5)
+def api_staff_productivity(request):
+    _, _, data = _build_staff_productivity_data(request)
+    return JsonResponse({'data': data}, safe=False)
+
+
+@cache_page(60 * 5)
+def api_cash_position(request):
+    start_date, end_date = _report_range(request)
+    group_by = request.GET.get('groupBy', 'day')
+    range_days = max((end_date - start_date).days + 1, 1)
+    prev_end = start_date - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=range_days - 1)
+    cashbook_qs = tenant_qs(request, BookTransaction).filter(isDeleted=False, account__type=BookAccount.Type.CASH, txDateTime__date__range=[start_date, end_date])
+    bankbook_qs = tenant_qs(request, BookTransaction).filter(isDeleted=False, account__type=BookAccount.Type.BANK, txDateTime__date__range=[start_date, end_date])
+    cash_in = cashbook_qs.filter(direction=BookTransaction.Direction.IN).aggregate(total=Sum('amount'))['total'] or 0.0
+    cash_out = cashbook_qs.filter(direction=BookTransaction.Direction.OUT).aggregate(total=Sum('amount'))['total'] or 0.0
+    bank_in = bankbook_qs.filter(direction=BookTransaction.Direction.IN).aggregate(total=Sum('amount'))['total'] or 0.0
+    bank_out = bankbook_qs.filter(direction=BookTransaction.Direction.OUT).aggregate(total=Sum('amount'))['total'] or 0.0
+    prev_qs = tenant_qs(request, BookTransaction).filter(isDeleted=False, txDateTime__date__range=[prev_start, prev_end])
+    prev_cash_in = prev_qs.filter(account__type=BookAccount.Type.CASH, direction=BookTransaction.Direction.IN).aggregate(total=Sum('amount'))['total'] or 0.0
+    prev_cash_out = prev_qs.filter(account__type=BookAccount.Type.CASH, direction=BookTransaction.Direction.OUT).aggregate(total=Sum('amount'))['total'] or 0.0
+    prev_bank_in = prev_qs.filter(account__type=BookAccount.Type.BANK, direction=BookTransaction.Direction.IN).aggregate(total=Sum('amount'))['total'] or 0.0
+    prev_bank_out = prev_qs.filter(account__type=BookAccount.Type.BANK, direction=BookTransaction.Direction.OUT).aggregate(total=Sum('amount'))['total'] or 0.0
+    all_qs = tenant_qs(request, BookTransaction).filter(isDeleted=False, txDateTime__date__range=[start_date, end_date])
+    sources = all_qs.values(label=F('source')).annotate(amount=Sum('amount'), count=Count('id')).order_by('-amount', 'label')
+    accounts = all_qs.values(label=F('account__name')).annotate(
+        amount=Sum(
+            Case(
+                When(direction=BookTransaction.Direction.IN, then=F('amount')),
+                default=ExpressionWrapper(F('amount') * Value(-1.0), output_field=FloatField()),
+                output_field=FloatField(),
+            )
+        ),
+        count=Count('id'),
+    ).order_by('-amount', 'label')
+    in_by_day = {
+        item['txDateTime__date']: float(item['amount'] or 0.0)
+        for item in all_qs.filter(direction=BookTransaction.Direction.IN).values('txDateTime__date').annotate(amount=Sum('amount'))
+    }
+    out_by_day = {
+        item['txDateTime__date']: float(item['amount'] or 0.0)
+        for item in all_qs.filter(direction=BookTransaction.Direction.OUT).values('txDateTime__date').annotate(amount=Sum('amount'))
+    }
+    points = _date_points(start_date, end_date)
+    trend = _group_trend_series(
+        points,
+        {
+            'sales': in_by_day,
+            'collections': out_by_day,
+            'cash_counter': {},
+        },
+        group_by=group_by,
+    )
+    net_movement = float(cash_in) - float(cash_out) + float(bank_in) - float(bank_out)
+    transfer_total = all_qs.filter(source=BookTransaction.Source.TRANSFER).aggregate(total=Sum('amount'))['total'] or 0.0
+    data = {
+        'summary': [
+            {'label': 'Cash In', 'value': _money(cash_in), 'delta': round(_pct_change(cash_in, prev_cash_in), 1)},
+            {'label': 'Cash Out', 'value': _money(cash_out), 'delta': round(_pct_change(cash_out, prev_cash_out), 1)},
+            {'label': 'Bank In', 'value': _money(bank_in), 'delta': round(_pct_change(bank_in, prev_bank_in), 1)},
+            {'label': 'Bank Out', 'value': _money(bank_out), 'delta': round(_pct_change(bank_out, prev_bank_out), 1)},
+        ],
+        'health': [
+            {'label': 'Net Movement', 'value': _money(net_movement), 'subtext': 'Cash + bank combined', 'tone': 'teal' if net_movement >= 0 else 'red'},
+            {'label': 'Transfer Volume', 'value': _money(transfer_total), 'subtext': 'Internal movement tracked', 'tone': 'blue'},
+            {'label': 'Active Accounts', 'value': len([row for row in accounts if float(row.get('amount') or 0.0) != 0.0]), 'subtext': 'Accounts with movement', 'tone': 'violet'},
+        ],
+        'trend': trend,
+        'trend_caption': f"Inflow and outflow are grouped by {group_by}. Net movement for the selected range is {_money(net_movement)}.",
+        'source_rows': _rows_with_money(sources),
+        'account_rows': _rows_with_money(accounts[:10]),
+        'source_caption': 'Source mix shows which modules are driving book movements.',
+        'account_caption': 'Net movement by account highlights where cash or bank pressure is building.',
+    }
+    return JsonResponse({'data': data}, safe=False)
+
+
+def _build_order_pipeline_data(request):
+    start_date, end_date = _report_range(request)
+    group_by = request.GET.get('groupBy', 'day')
+    range_days = max((end_date - start_date).days + 1, 1)
+    prev_end = start_date - timedelta(days=1)
+    prev_start = prev_end - timedelta(days=range_days - 1)
+    qs = tenant_qs(request, Order).filter(isDeleted=False, buildDate__range=[start_date, end_date])
+    prev_qs = tenant_qs(request, Order).filter(isDeleted=False, buildDate__range=[prev_start, prev_end])
+    status_rows = qs.values(label=F('status')).annotate(amount=Count('id'), count=Count('id')).order_by('-count', 'label')
+    staff_rows = qs.values(label=F('createdBy__name')).annotate(amount=Count('id'), count=Count('id')).order_by('-count', 'label')[:10]
+    customer_rows = qs.values(label=F('partyID__name')).annotate(amount=Count('id'), count=Count('id')).order_by('-count', 'label')[:8]
+    status_counts = {row['label'] or 'Unknown': row['count'] for row in status_rows}
+    orders_by_day = {
+        item['buildDate']: float(item['count'] or 0.0)
+        for item in qs.values('buildDate').annotate(count=Count('id'))
+    }
+    points = _date_points(start_date, end_date)
+    trend = _group_trend_series(
+        points,
+        {
+            'sales': orders_by_day,
+            'collections': {},
+            'cash_counter': {},
+        },
+        group_by=group_by,
+    )
+    total_orders = qs.count()
+    submitted = qs.filter(status=Order.Status.SUBMITTED).count()
+    approved = qs.filter(status=Order.Status.APPROVED).count()
+    fulfilled = qs.filter(status=Order.Status.FULFILLED).count()
+    cancelled = qs.filter(status=Order.Status.CANCELLED).count()
+    prev_total_orders = prev_qs.count()
+    approval_rate = ((approved + fulfilled) / total_orders * 100.0) if total_orders else 0.0
+    fulfillment_rate = (fulfilled / total_orders * 100.0) if total_orders else 0.0
+    data = {
+        'summary': [
+            {'label': 'Orders', 'value': total_orders, 'delta': round(_pct_change(total_orders, prev_total_orders), 1)},
+            {'label': 'Submitted', 'value': submitted, 'delta': 0.0},
+            {'label': 'Approved', 'value': approved, 'delta': 0.0},
+            {'label': 'Fulfilled', 'value': fulfilled, 'delta': 0.0},
+        ],
+        'health': [
+            {'label': 'Approval Rate', 'value': f"{round(approval_rate, 1)}%", 'subtext': 'Approved + fulfilled over total', 'tone': 'teal' if approval_rate >= 70 else 'amber'},
+            {'label': 'Fulfillment Rate', 'value': f"{round(fulfillment_rate, 1)}%", 'subtext': 'Fulfilled over total orders', 'tone': 'blue'},
+            {'label': 'Cancelled', 'value': cancelled, 'subtext': 'Orders lost in this range', 'tone': 'red' if cancelled else 'teal'},
+        ],
+        'trend': trend,
+        'trend_caption': f"Order creation is grouped by {group_by}; approval rate is {round(approval_rate, 1)}% for this range.",
+        'status_rows': [
+            {
+                'label': (row['label'] or 'Unknown').replace('_', ' ').title(),
+                'amount': row['count'],
+                'count': row['count'],
+            }
+            for row in status_rows
+        ],
+        'staff_rows': [
+            {
+                'label': row.get('label') or 'Unassigned',
+                'amount': row.get('count') or 0,
+                'count': row.get('count') or 0,
+            }
+            for row in staff_rows
+        ],
+        'customer_rows': [
+            {
+                'label': row.get('label') or 'Unknown',
+                'amount': row.get('count') or 0,
+                'count': row.get('count') or 0,
+            }
+            for row in customer_rows
+        ],
+        'status_caption': 'Status split shows where the pipeline is getting stuck.',
+        'staff_caption': 'Top staff by orders captured in the selected range.',
+        'customer_caption': 'Top customers by order count.',
+        'insights': [
+            {
+                'title': 'Approval flow',
+                'body': f"{approved + fulfilled} of {total_orders} orders have crossed approval.",
+            },
+            {
+                'title': 'Fulfillment',
+                'body': f"{fulfilled} orders were fulfilled while {submitted} remain submitted and {cancelled} were cancelled.",
+            },
+            {
+                'title': 'Period comparison',
+                'body': f"Orders moved {round(_pct_change(total_orders, prev_total_orders), 1)}% against the previous period.",
+            },
+        ],
+    }
+    return start_date, end_date, group_by, data
+
+
+@cache_page(60 * 5)
+def api_order_pipeline(request):
+    _, _, _, data = _build_order_pipeline_data(request)
+    return JsonResponse({'data': data}, safe=False)
+
+
+def export_revenue_trend_pdf(request):
+    start_date, end_date, group_by, data = _build_revenue_trend_data(request)
+    sections = [
+        {'title': 'Payment Mode Summary', 'headers': ['Mode', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('mode_rows', [])]},
+        {'title': 'Top Customers', 'headers': ['Customer', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('customer_rows', [])]},
+    ]
+    return _analytics_export_response(request, 'Revenue Trend Report', f'Grouped by {group_by}', data.get('summary'), data.get('health'), data.get('insights'), sections, [f'From: {start_date.strftime("%d/%m/%Y")}', f'To: {end_date.strftime("%d/%m/%Y")}', f'Group By: {group_by}'], 'revenue-trend', 'pdf')
+
+
+def export_revenue_trend_excel(request):
+    start_date, end_date, group_by, data = _build_revenue_trend_data(request)
+    sections = [
+        {'title': 'Payment Mode Summary', 'headers': ['Mode', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('mode_rows', [])]},
+        {'title': 'Top Customers', 'headers': ['Customer', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('customer_rows', [])]},
+    ]
+    return _analytics_export_response(request, 'Revenue Trend Report', f'Grouped by {group_by}', data.get('summary'), data.get('health'), data.get('insights'), sections, [f'From: {start_date.strftime("%d/%m/%Y")}', f'To: {end_date.strftime("%d/%m/%Y")}', f'Group By: {group_by}'], 'revenue-trend', 'excel')
+
+
+def export_collection_trend_pdf(request):
+    start_date, end_date, group_by, data = _build_collection_trend_data(request)
+    sections = [
+        {'title': 'Collection Mode Summary', 'headers': ['Mode', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('mode_rows', [])]},
+        {'title': 'Top Customers', 'headers': ['Customer', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('customer_rows', [])]},
+        {'title': 'Top Collectors', 'headers': ['Staff', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('staff_rows', [])]},
+    ]
+    return _analytics_export_response(request, 'Collection Trend Report', f'Grouped by {group_by}', data.get('summary'), data.get('health'), data.get('insights'), sections, [f'From: {start_date.strftime("%d/%m/%Y")}', f'To: {end_date.strftime("%d/%m/%Y")}', f'Group By: {group_by}'], 'collection-trend', 'pdf')
+
+
+def export_collection_trend_excel(request):
+    start_date, end_date, group_by, data = _build_collection_trend_data(request)
+    sections = [
+        {'title': 'Collection Mode Summary', 'headers': ['Mode', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('mode_rows', [])]},
+        {'title': 'Top Customers', 'headers': ['Customer', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('customer_rows', [])]},
+        {'title': 'Top Collectors', 'headers': ['Staff', 'Amount', 'Count'], 'rows': [[row['label'], row['amountDisplay'], row['count']] for row in data.get('staff_rows', [])]},
+    ]
+    return _analytics_export_response(request, 'Collection Trend Report', f'Grouped by {group_by}', data.get('summary'), data.get('health'), data.get('insights'), sections, [f'From: {start_date.strftime("%d/%m/%Y")}', f'To: {end_date.strftime("%d/%m/%Y")}', f'Group By: {group_by}'], 'collection-trend', 'excel')
+
+
+def export_receivables_pdf(request):
+    end_date, data = _build_receivables_data(request)
+    sections = [
+        {'title': 'Aging Buckets', 'headers': ['Bucket', 'Amount'], 'rows': [[row['label'], row['amount']] for row in data.get('aging_rows', [])]},
+        {'title': 'Customer Outstanding', 'headers': ['Customer', 'Assigned Staff', 'Outstanding', 'Last Activity', 'Age Days', 'Bucket'], 'rows': [[row['party'], row['staff'], row['closing'], row['last_activity'], row['age_days'], row['age_bucket']] for row in data.get('table_rows', [])]},
+    ]
+    return _analytics_export_response(request, 'Receivables Aging Report', f'As of {end_date.strftime("%d %b %Y")}', data.get('summary'), [], data.get('insights'), sections, [f'As Of: {end_date.strftime("%d/%m/%Y")}'], 'receivables-aging', 'pdf')
+
+
+def export_receivables_excel(request):
+    end_date, data = _build_receivables_data(request)
+    sections = [
+        {'title': 'Aging Buckets', 'headers': ['Bucket', 'Amount'], 'rows': [[row['label'], row['amount']] for row in data.get('aging_rows', [])]},
+        {'title': 'Customer Outstanding', 'headers': ['Customer', 'Assigned Staff', 'Outstanding', 'Last Activity', 'Age Days', 'Bucket'], 'rows': [[row['party'], row['staff'], row['closing'], row['last_activity'], row['age_days'], row['age_bucket']] for row in data.get('table_rows', [])]},
+    ]
+    return _analytics_export_response(request, 'Receivables Aging Report', f'As of {end_date.strftime("%d %b %Y")}', data.get('summary'), [], data.get('insights'), sections, [f'As Of: {end_date.strftime("%d/%m/%Y")}'], 'receivables-aging', 'excel')
+
+
+def export_staff_productivity_pdf(request):
+    start_date, end_date, data = _build_staff_productivity_data(request)
+    sections = [
+        {'title': 'Staff Productivity Detail', 'headers': ['Staff', 'Business Value', 'Orders', 'Sales', 'Collections', 'Attendance', 'Efficiency'], 'rows': [[row['label'], row['amountDisplay'], row['count'], _money(row['sales']), _money(row['collections']), row['attendance'], _money(row['efficiency'])] for row in data.get('leaderboard', [])]},
+    ]
+    return _analytics_export_response(request, 'Staff Productivity Report', 'Sales, collections, orders and attendance-backed efficiency', data.get('summary'), data.get('health'), data.get('insights'), sections, [f'From: {start_date.strftime("%d/%m/%Y")}', f'To: {end_date.strftime("%d/%m/%Y")}'], 'staff-productivity', 'pdf')
+
+
+def export_staff_productivity_excel(request):
+    start_date, end_date, data = _build_staff_productivity_data(request)
+    sections = [
+        {'title': 'Staff Productivity Detail', 'headers': ['Staff', 'Business Value', 'Orders', 'Sales', 'Collections', 'Attendance', 'Efficiency'], 'rows': [[row['label'], row['amountDisplay'], row['count'], _money(row['sales']), _money(row['collections']), row['attendance'], _money(row['efficiency'])] for row in data.get('leaderboard', [])]},
+    ]
+    return _analytics_export_response(request, 'Staff Productivity Report', 'Sales, collections, orders and attendance-backed efficiency', data.get('summary'), data.get('health'), data.get('insights'), sections, [f'From: {start_date.strftime("%d/%m/%Y")}', f'To: {end_date.strftime("%d/%m/%Y")}'], 'staff-productivity', 'excel')
+
+
+def export_order_pipeline_pdf(request):
+    start_date, end_date, group_by, data = _build_order_pipeline_data(request)
+    sections = [
+        {'title': 'Status Split', 'headers': ['Status', 'Count'], 'rows': [[row['label'], row['count']] for row in data.get('status_rows', [])]},
+        {'title': 'Top Staff', 'headers': ['Staff', 'Orders'], 'rows': [[row['label'], row['count']] for row in data.get('staff_rows', [])]},
+        {'title': 'Top Customers', 'headers': ['Customer', 'Orders'], 'rows': [[row['label'], row['count']] for row in data.get('customer_rows', [])]},
+    ]
+    return _analytics_export_response(request, 'Order Pipeline Report', f'Grouped by {group_by}', data.get('summary'), data.get('health'), data.get('insights'), sections, [f'From: {start_date.strftime("%d/%m/%Y")}', f'To: {end_date.strftime("%d/%m/%Y")}', f'Group By: {group_by}'], 'order-pipeline', 'pdf')
+
+
+def export_order_pipeline_excel(request):
+    start_date, end_date, group_by, data = _build_order_pipeline_data(request)
+    sections = [
+        {'title': 'Status Split', 'headers': ['Status', 'Count'], 'rows': [[row['label'], row['count']] for row in data.get('status_rows', [])]},
+        {'title': 'Top Staff', 'headers': ['Staff', 'Orders'], 'rows': [[row['label'], row['count']] for row in data.get('staff_rows', [])]},
+        {'title': 'Top Customers', 'headers': ['Customer', 'Orders'], 'rows': [[row['label'], row['count']] for row in data.get('customer_rows', [])]},
+    ]
+    return _analytics_export_response(request, 'Order Pipeline Report', f'Grouped by {group_by}', data.get('summary'), data.get('health'), data.get('insights'), sections, [f'From: {start_date.strftime("%d/%m/%Y")}', f'To: {end_date.strftime("%d/%m/%Y")}', f'Group By: {group_by}'], 'order-pipeline', 'excel')
+
+
+@cache_page(60 * 2)
+def api_exception_dashboard(request):
+    start_date, end_date = _report_range(request)
+    pending_sales_qs = tenant_qs(request, Sales).filter(isDeleted=False, isApproved=False, buildDate__range=[start_date, end_date])
+    pending_collection_qs = tenant_qs(request, Collection).filter(isDeleted=False, isApproved=False, collectionDateTime__date__range=[start_date, end_date])
+    pending_order_qs = tenant_qs(request, Order).filter(isDeleted=False, status__in=[Order.Status.DRAFT, Order.Status.SUBMITTED], buildDate__range=[start_date, end_date])
+    failed_msg_qs = tenant_qs(request, WhatsappMessageStatus).filter(isDeleted=False).exclude(status='Success').filter(datetime__date__range=[start_date, end_date])
+    untallied_qs = tenant_qs(request, Collection).filter(isDeleted=False, isTallied=False, collectionDateTime__date__range=[start_date, end_date])
+    return_qs = tenant_qs(request, CashCounter).filter(isDeleted=False, mode='Return', datetime__date__range=[start_date, end_date])
+    missing_logout_qs = tenant_qs(request, Attendance).filter(isDeleted=False, isLogIn=True, isLogOut=False, loginDateTime__date__range=[start_date, end_date])
+    failed_messages = failed_msg_qs.count()
+    pending_sales = pending_sales_qs.count()
+    pending_collections = pending_collection_qs.count()
+    pending_orders = pending_order_qs.count()
+    untallied_amount = float(untallied_qs.aggregate(total=Sum('paidAmount'))['total'] or 0.0)
+    untallied_count = untallied_qs.count()
+    return_amount = float(return_qs.aggregate(total=Sum('amount'))['total'] or 0.0)
+    return_count = return_qs.count()
+    missing_logout = missing_logout_qs.count()
+    attention_total = pending_sales + pending_collections + pending_orders + failed_messages + untallied_count + missing_logout
+    data = {
+        'summary': [
+            {'label': 'Pending Sales Approval', 'value': pending_sales},
+            {'label': 'Pending Collection Approval', 'value': pending_collections},
+            {'label': 'Pending Order Approval', 'value': pending_orders},
+            {'label': 'Failed Messages', 'value': failed_messages},
+        ],
+        'health': [
+            {'label': 'Attention Items', 'value': attention_total, 'subtext': 'Open issues in selected range', 'tone': 'red' if attention_total else 'teal'},
+            {'label': 'Untallied Amount', 'value': _money(untallied_amount), 'subtext': f'{untallied_count} collection entries', 'tone': 'amber'},
+            {'label': 'Return Value', 'value': _money(return_amount), 'subtext': f'{return_count} return entries', 'tone': 'amber'},
+            {'label': 'Missing Logout', 'value': missing_logout, 'subtext': 'Attendance closures missing', 'tone': 'red' if missing_logout else 'teal'},
+        ],
+        'rows': [
+            {'label': 'Pending Sales Approval', 'amount': pending_sales, 'count': pending_sales, 'tone': 'amber'},
+            {'label': 'Pending Collection Approval', 'amount': pending_collections, 'count': pending_collections, 'tone': 'amber'},
+            {'label': 'Pending Order Approval', 'amount': pending_orders, 'count': pending_orders, 'tone': 'amber'},
+            {'label': 'Failed Messages', 'amount': failed_messages, 'count': failed_messages, 'tone': 'red' if failed_messages else 'green'},
+            {'label': 'Untallied Collections', 'amount': untallied_amount, 'amountDisplay': _money(untallied_amount), 'count': untallied_count, 'tone': 'amber'},
+            {'label': 'Returns', 'amount': return_amount, 'amountDisplay': _money(return_amount), 'count': return_count, 'tone': 'amber'},
+            {'label': 'Missing Logout', 'amount': missing_logout, 'count': missing_logout, 'tone': 'red' if missing_logout else 'green'},
+        ],
+        'insights': [
+            {
+                'title': 'Approval backlog',
+                'body': f"{pending_sales + pending_collections + pending_orders} approvals are open in the selected range.",
+            },
+            {
+                'title': 'Recovery risk',
+                'body': f"Untallied collections hold {_money(untallied_amount)} that still needs closure.",
+            },
+            {
+                'title': 'Operations hygiene',
+                'body': f"{missing_logout} attendance records remain incomplete and {failed_messages} messages failed.",
+            },
+        ],
+        'count_caption': 'Count-based exceptions show operational backlog and unresolved actions.',
+        'value_caption': 'Value-based exceptions show where money or control risk is sitting.',
+    }
+    return JsonResponse({'data': data}, safe=False)
+
+
+@cache_page(60 * 5)
+def api_failed_messages(request):
+    rows = [
+        {
+            'label': item.messageTo or '-',
+            'amount': item.phone or '-',
+            'count': item.datetime.strftime('%d-%m-%Y %I:%M %p'),
+        }
+        for item in tenant_qs(request, WhatsappMessageStatus).filter(isDeleted=False).exclude(status='Success').order_by('-datetime')[:100]
+    ]
+    data = {
+        'summary': [
+            {'label': 'Failed Messages', 'value': len(rows)},
+        ],
+        'rows': rows,
+    }
+    return JsonResponse({'data': data}, safe=False)
+
+
+def export_failed_messages_excel(request):
+    qs = tenant_qs(request, WhatsappMessageStatus).filter(isDeleted=False).exclude(status='Success').order_by('-datetime')[:500]
+    rows = [[item.messageTo or '-', item.phone or '-', item.status or '-', item.datetime.strftime('%d-%m-%Y %I:%M %p') if item.datetime else '-', item.message or '-'] for item in qs]
+    return _xlsx_report_response('failed-messages', [{
+        'title': 'Failed Messages',
+        'report_title': 'Failed Message Report',
+        'report_subtitle': 'Recent failed outbound messages',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('Generated By', _pdf_base_context(request).get('pdf_generated_by'))],
+        'tables': [{'title': 'Failed Messages', 'headers': ['Recipient', 'Phone', 'Status', 'Datetime', 'Message'], 'rows': rows}],
+    }])
+
+
+def export_pending_approvals_excel(request):
+    start_date, end_date = _report_range(request)
+    pending_sales_qs = tenant_qs(request, Sales).filter(isDeleted=False, isApproved=False, buildDate__range=[start_date, end_date]).select_related('partyID', 'createdBy')
+    pending_collection_qs = tenant_qs(request, Collection).filter(isDeleted=False, isApproved=False, collectionDateTime__date__range=[start_date, end_date]).select_related('partyID', 'collectedBy')
+    pending_order_qs = tenant_qs(request, Order).filter(isDeleted=False, status__in=[Order.Status.DRAFT, Order.Status.SUBMITTED], buildDate__range=[start_date, end_date]).select_related('partyID', 'createdBy')
+    sales_rows = [[item.invoiceNumber or '-', item.partyID.name if item.partyID_id else '-', item.createdBy.name if item.createdBy_id else '-', float(item.amount or 0.0), item.buildDate.strftime('%d/%m/%Y') if item.buildDate else '-'] for item in pending_sales_qs]
+    collection_rows = [[item.paymentID or '-', item.partyID.name if item.partyID_id else '-', item.collectedBy.name if item.collectedBy_id else '-', float(item.paidAmount or 0.0), item.collectionDateTime.strftime('%d/%m/%Y %I:%M %p') if item.collectionDateTime else '-'] for item in pending_collection_qs]
+    order_rows = [[item.orderNumber or '-', item.partyID.name if item.partyID_id else '-', item.createdBy.name if item.createdBy_id else '-', item.get_status_display(), item.buildDate.strftime('%d/%m/%Y') if item.buildDate else '-'] for item in pending_order_qs]
+    return _xlsx_report_response('pending-approvals', [{
+        'title': 'Pending Approvals',
+        'report_title': 'Pending Approval Report',
+        'report_subtitle': f'{start_date.strftime("%d/%m/%Y")} to {end_date.strftime("%d/%m/%Y")}',
+        'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('From', start_date.strftime('%d/%m/%Y')), ('To', end_date.strftime('%d/%m/%Y')), ('Generated By', _pdf_base_context(request).get('pdf_generated_by'))],
+        'tables': [
+            {'title': 'Approval Summary', 'headers': ['Queue', 'Count'], 'rows': [['Sales', pending_sales_qs.count()], ['Collections', pending_collection_qs.count()], ['Orders', pending_order_qs.count()]]},
+            {'title': 'Pending Sales', 'headers': ['Invoice No', 'Customer', 'Staff', 'Amount', 'Date'], 'rows': sales_rows},
+            {'title': 'Pending Collections', 'headers': ['Payment ID', 'Customer', 'Collector', 'Amount', 'Collected On'], 'rows': collection_rows},
+            {'title': 'Pending Orders', 'headers': ['Order No', 'Customer', 'Staff', 'Status', 'Date'], 'rows': order_rows},
+        ],
+    }])

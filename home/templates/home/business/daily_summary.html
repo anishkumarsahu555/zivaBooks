@@ -1,0 +1,30 @@
+{% extends 'home/business/business_snapshot.html' %}
+
+{% block css %}
+{{ block.super }}
+<style>
+.snapshot-panel.sticky-panel{
+    position:static;
+    top:auto;
+}
+
+@media (max-width: 768px){
+    .snapshot-panel.sticky-panel .ui.form > .fields:first-child{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:.45rem;
+        align-items:end;
+    }
+    .snapshot-panel.sticky-panel .ui.form > .fields:first-child > .field{
+        width:auto!important;
+        margin:0!important;
+    }
+    .snapshot-panel.sticky-panel .ui.form > .fields:first-child > .field:last-child{
+        grid-column:1 / -1;
+    }
+    .snapshot-panel.sticky-panel .ui.form > .fields:first-child .ui.button{
+        width:100%;
+    }
+}
+</style>
+{% endblock %}

@@ -1,38 +1,35 @@
+{% load formatting %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>zivaBooks</title>
+    <title>zivabooks.in</title>
     <style>
         @page {
             size: A5;
             margin: .3cm;
+            @bottom-right {
+                content: "Page " counter(page);
+                font-size: 9px;
+                color: #555;
+            }
         }
-
-
-    </style>
-    <style>
-        table {
-            font-family: arial, sans-serif;
-            border-collapse: collapse;
-            width: 100%;
-        }
-
-        td, th {
-            border: 1px solid #dddddd;
-            text-align: left;
-            padding: 5px;
-        }
-
-        tr:nth-child(even) {
-            background-color: #dddddd;
-        }
+        body { font-family: Arial, sans-serif; color: #0f172a; font-size: 10px; }
+        .header-block { margin-bottom: 10px; }
+        .title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+        .subtitle { color: #475569; margin-bottom: 8px; }
+        table { border-collapse: collapse; width: 100%; }
+        td, th { border: 1px solid #dbe5f0; text-align: left; padding: 5px; }
+        th { background: #eff6ff; text-transform: uppercase; font-size: 9px; color: #334155; }
+        tr:nth-child(even) { background-color: #f8fbff; }
+        .pdf-footer { margin-top: 10px; padding-top: 6px; border-top: 1px solid #dbe5f0; color: #555; font-size: 9px; line-height: 1.5; }
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="row">
-        <span style="font-size: 10px;">(zivaBooks) Cash Counter Report for Date: {{ date|date }}</span>
+    <div class="header-block">
+        <div class="title">{{ pdf_tenant_name }}</div>
+        <div class="subtitle">Cash Counter Report | {{ pdf_brand_name }} | {{ date|date:"d M Y" }}</div>
     </div>
 
  <p style="font-size: 10px; margin: 2px;padding-top: 10px">Counter Details</p>
@@ -51,16 +48,16 @@
             <th>Rokad</th>
         </tr>
         <tr>
-            <td>{{ cash_total|convert }}</td>
-            <td>{{ card_total|convert }}</td>
-            <td>{{ credit_total|convert }}</td>
-            <td>{{ mix_cash_total|convert }}</td>
-            <td>{{ mix_card_total|convert }}</td>
-            <td>{{ expense_total|convert }}</td>
-            <td>{{ return_total|convert }}</td>
-            <td>{{ advance_total|convert }}</td>
-            <td>{{ total|convert }}</td>
-            <td>{{ RokadValue|convert }}</td>
+            <td>{{ cash_total|money }}</td>
+            <td>{{ card_total|money }}</td>
+            <td>{{ credit_total|money }}</td>
+            <td>{{ mix_cash_total|money }}</td>
+            <td>{{ mix_card_total|money }}</td>
+            <td>{{ expense_total|money }}</td>
+            <td>{{ return_total|money }}</td>
+            <td>{{ advance_total|money }}</td>
+            <td>{{ total|money }}</td>
+            <td>{{ RokadValue|money }}</td>
         </tr>
     </table>
    
@@ -86,9 +83,9 @@
                 {% endif %}
                 <td>{{ foo.mode }}</td>
                 {% if foo.mode == 'Mix' %}
-                    <td>{{ foo.mixCashAmount|convert }} / {{ foo.mixCardAmount|convert }}</td>
+                    <td>{{ foo.mixCashAmount|money }} / {{ foo.mixCardAmount|money }}</td>
                 {% else %}
-                    <td>{{ foo.amount|convert }}</td>
+                    <td>{{ foo.amount|money }}</td>
                 {% endif %}
                 <td>{{ foo.createdBy.name|truncatechars:10 }}</td>
                 {% if foo.partyID %}
@@ -116,12 +113,12 @@
         </tr>
         <tr>
          
-            <td>{{ a_total_cash|convert }}</td>
-            <td>{{ a_total_cheque_cc|convert }}</td>
-            <td>{{ a_total_cheque|convert }}</td>
-            <td>{{ a_total_online|convert }}</td>
-            <td>{{ a_total_party|convert }}</td>
-            <td>{{ a_total|convert }}</td>
+            <td>{{ a_total_cash|money }}</td>
+            <td>{{ a_total_cheque_cc|money }}</td>
+            <td>{{ a_total_cheque|money }}</td>
+            <td>{{ a_total_online|money }}</td>
+            <td>{{ a_total_party|money }}</td>
+            <td>{{ a_total|money }}</td>
         </tr>
     </table>
     
@@ -138,7 +135,7 @@
             <tr>
                 <td>{{ foo.paymentID }}</td>
                 <td>{{ foo.partyID.name }}</td>
-                <td>{{ foo.paidAmount|convert }}</td>
+                <td>{{ foo.paidAmount|money }}</td>
                 <td>{{ foo.modeOfPayment }}</td>
                 <td>{{ foo.collectedBy.name }}</td>
             </tr>
@@ -146,6 +143,6 @@
 
     </table>
 </div>
-
+{% include 'home/report/_pdfFooter.html' %}
 </body>
 </html>
