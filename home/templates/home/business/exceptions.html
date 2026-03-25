@@ -1,0 +1,250 @@
+{% extends 'home/admin/index.html' %}
+{% block title %}<title>{{ page_title }}</title>{% endblock %}
+{% block css %}
+<style>
+.page-shell{padding:1rem}.panel{background:#fff;border:1px solid #dce7f3;border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:1rem;margin-bottom:1rem}.hero{background:linear-gradient(135deg,#1f2937,#7f1d1d 58%,#b45309);color:#f8fafc;border-radius:24px;padding:1.2rem;margin-bottom:1rem}.hero h1{margin:0;font-size:1.75rem}.hero p{margin:.35rem 0 0;color:rgba(226,232,240,.9)}.hero-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.85rem}.hero-action{display:inline-flex;align-items:center;gap:.45rem;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff!important;border-radius:999px;padding:.55rem .8rem;font-weight:700}.hero-helper{margin-top:.65rem;font-size:.8rem;color:rgba(226,232,240,.84);font-weight:700}.summary-grid,.health-grid,.insight-grid,.alert-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}.summary-card,.health-card,.insight-card,.alert-card{border:1px solid #e2ebf3;border-radius:18px;padding:14px;background:linear-gradient(180deg,#fbfdff,#f5f9fc)}.summary-label,.health-label,.insight-title,.alert-label{font-size:.78rem;font-weight:800;text-transform:uppercase;color:#64748b}.summary-value,.health-value,.alert-value{font-size:1.35rem;font-weight:800;color:#0f172a;margin-top:8px}.health-subtext,.insight-body,.chart-caption,.alert-subtext{margin-top:8px;color:#475569;font-weight:700;line-height:1.5}.alert-card.red{border-color:#fecdd3;background:linear-gradient(180deg,#fff1f2,#fff7f7)}.alert-card.amber{border-color:#fde68a;background:linear-gradient(180deg,#fffbeb,#fff7ed)}.alert-card.green{border-color:#a7f3d0;background:linear-gradient(180deg,#ecfdf5,#f0fdf4)}.chart-shell{height:320px;position:relative}.chart-shell.short{height:280px}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px 8px;border-bottom:1px solid #e2ebf3;text-align:left}.table th{font-size:.76rem;color:#64748b;text-transform:uppercase}@media (max-width:768px){.page-shell{padding:.2rem}.panel{padding:.7rem;border-radius:14px;margin-bottom:.55rem}.hero{border-radius:16px;padding:.8rem .75rem;margin-bottom:.6rem}.hero h1{font-size:1.22rem}.hero p,.hero-helper{font-size:.8rem}.hero-actions{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;margin-top:.55rem;gap:.4rem}.hero-action{width:auto;justify-content:flex-start;white-space:nowrap;flex:0 0 auto;padding:.42rem .62rem;font-size:.76rem}.summary-grid,.health-grid,.alert-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.insight-grid{grid-template-columns:1fr;gap:8px}.summary-card,.health-card,.insight-card,.alert-card{padding:10px;border-radius:14px}.summary-value,.health-value,.alert-value{font-size:1.08rem}.chart-shell{height:210px}.chart-shell.short{height:180px}.ui.stackable.grid>.column{padding-left:.2rem!important;padding-right:.2rem!important}.table{display:block;overflow-x:auto;white-space:nowrap}.fields{margin-bottom:0!important}.field{margin-bottom:.42rem!important}}
+@media (max-width:768px){
+    .panel .ui.form>.fields:first-child{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:.45rem;
+        align-items:end;
+    }
+    .panel .ui.form>.fields:first-child>.field{
+        width:auto!important;
+        margin:0!important;
+    }
+    .panel .ui.form>.fields:first-child>.field:last-child{
+        grid-column:1/-1;
+    }
+    .panel .ui.form>.fields:first-child .ui.button{
+        width:100%;
+    }
+}
+</style>
+{% endblock %}
+{% block body %}
+<div class="page-shell">
+    <div class="hero">
+        <h1>{{ page_title }}</h1>
+        <p>{{ page_subtitle|default:'See the backlog, control breaks, and value at risk that need action right now.' }}</p>
+        {% if report_actions %}
+        <div class="hero-actions">
+            {% for action in report_actions %}
+            <a class="hero-action" href="{{ action.url }}"><i class="{{ action.icon }} icon"></i>{{ action.label }}</a>
+            {% endfor %}
+            {% for action in export_actions %}
+            <a class="hero-action report-export-link" href="{{ action.url }}" data-base-url="{{ action.url }}" data-mode="{{ action.mode|default:'range_only' }}"><i class="{{ action.icon|default:'download' }} icon"></i>{{ action.label }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if report_help %}
+        <div class="hero-helper">{{ report_help }}</div>
+        {% endif %}
+    </div>
+
+    <div class="panel">
+        <div class="ui tiny form">
+            <div class="fields">
+                <div class="four wide field">
+                    <label>Start Date</label>
+                    <div class="ui calendar" id="rangestart"><div class="ui input"><input type="text" id="startDate" value="{{ defaultStartDate }}" placeholder="Start Date"></div></div>
+                </div>
+                <div class="four wide field">
+                    <label>End Date</label>
+                    <div class="ui calendar" id="rangeend"><div class="ui input"><input type="text" id="endDate" value="{{ defaultEndDate }}" placeholder="End Date"></div></div>
+                </div>
+                <div class="four wide field">
+                    <label>&nbsp;</label>
+                    <button class="ui teal button" type="button" onclick="loadExceptions()">Refresh</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel"><div class="summary-grid" id="summaryGrid"></div></div>
+    <div class="panel"><div class="health-grid" id="healthGrid"></div></div>
+    <div class="panel">
+        <h3 class="ui header">Owner Notes</h3>
+        <div class="insight-grid" id="insightGrid"></div>
+    </div>
+    <div class="panel">
+        <h3 class="ui header">Action Cards</h3>
+        <div class="alert-grid" id="alertGrid"></div>
+    </div>
+
+    <div class="ui stackable two column grid">
+        <div class="eight wide column">
+            <div class="panel">
+                <h3 class="ui header">Exception Counts</h3>
+                <div class="chart-shell short"><canvas id="countChart"></canvas></div>
+                <div class="chart-caption" id="countCaption"></div>
+            </div>
+        </div>
+        <div class="eight wide column">
+            <div class="panel">
+                <h3 class="ui header">Value-Based Exceptions</h3>
+                <div class="chart-shell short"><canvas id="valueChart"></canvas></div>
+                <div class="chart-caption" id="valueCaption"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3 class="ui header">Exception Detail</h3>
+        <table class="table" id="detailTable"></table>
+    </div>
+</div>
+{% endblock %}
+{% block js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+let countChart = null;
+let valueChart = null;
+
+function refreshExportLinks() {
+    $('.report-export-link').each(function () {
+        const params = new URLSearchParams();
+        params.set('startDate', $('#startDate').val() || '');
+        params.set('endDate', $('#endDate').val() || '');
+        $(this).attr('href', $(this).data('base-url') + '?' + params.toString());
+    });
+}
+
+function formatDate(d) {
+    return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear();
+}
+
+function numberFormat(value) {
+    return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function renderSummary(items) {
+    const target = $('#summaryGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="summary-card">' +
+            '<div class="summary-label">' + item.label + '</div>' +
+            '<div class="summary-value">' + item.value + '</div>' +
+            '</div>'
+        );
+    });
+}
+
+function renderHealth(items) {
+    const target = $('#healthGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="health-card">' +
+            '<div class="health-label">' + item.label + '</div>' +
+            '<div class="health-value">' + item.value + '</div>' +
+            '<div class="health-subtext">' + (item.subtext || '') + '</div>' +
+            '</div>'
+        );
+    });
+}
+
+function renderInsights(items) {
+    const target = $('#insightGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="insight-card">' +
+            '<div class="insight-title">' + item.title + '</div>' +
+            '<div class="insight-body">' + item.body + '</div>' +
+            '</div>'
+        );
+    });
+}
+
+function renderAlerts(items) {
+    const target = $('#alertGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="alert-card ' + (item.tone || 'amber') + '">' +
+            '<div class="alert-label">' + item.label + '</div>' +
+            '<div class="alert-value">' + (item.amountDisplay || item.amount) + '</div>' +
+            '<div class="alert-subtext">' + item.count + ' items</div>' +
+            '</div>'
+        );
+    });
+}
+
+function destroyChart(chart) {
+    if (chart) chart.destroy();
+}
+
+function loadExceptions() {
+    refreshExportLinks();
+    $.getJSON('{{ api_url }}', {
+        startDate: $('#startDate').val(),
+        endDate: $('#endDate').val()
+    }).done(function (response) {
+        const data = response.data || {};
+        renderSummary(data.summary);
+        renderHealth(data.health);
+        renderInsights(data.insights);
+        renderAlerts(data.rows);
+        $('#countCaption').text(data.count_caption || '');
+        $('#valueCaption').text(data.value_caption || '');
+
+        destroyChart(countChart);
+        countChart = new Chart(document.getElementById('countChart'), {
+            type: 'bar',
+            data: {
+                labels: (data.rows || []).map(item => item.label),
+                datasets: [{ label: 'Count', data: (data.rows || []).map(item => item.count), backgroundColor: '#ef4444', borderRadius: 8 }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        const valueRows = (data.rows || []).filter(item => typeof item.amount === 'number' && item.amount > 0);
+        destroyChart(valueChart);
+        valueChart = new Chart(document.getElementById('valueChart'), {
+            type: 'bar',
+            data: {
+                labels: valueRows.map(item => item.label),
+                datasets: [{ label: 'Value', data: valueRows.map(item => item.amount), backgroundColor: '#f59e0b', borderRadius: 8 }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: function (context) { return 'Value: Rs. ' + numberFormat(context.raw); } } }
+                }
+            }
+        });
+
+        const table = $('#detailTable').empty();
+        table.append('<thead><tr><th>Exception</th><th>Count</th><th>Amount</th><th>Severity</th></tr></thead>');
+        const body = $('<tbody></tbody>');
+        (data.rows || []).forEach(function (row) {
+            const amountText = typeof row.amount === 'number' ? 'Rs. ' + numberFormat(row.amount) : (row.amountDisplay || row.amount || '-');
+            body.append('<tr><td>' + row.label + '</td><td>' + row.count + '</td><td>' + amountText + '</td><td>' + (row.tone || '-') + '</td></tr>');
+        });
+        table.append(body);
+    });
+}
+
+$('#rangestart').calendar({
+    type: 'date',
+    endCalendar: $('#rangeend'),
+    monthFirst: false,
+    formatter: { date: function (date) { if (!date) return ''; return formatDate(date); } }
+});
+$('#rangeend').calendar({
+    type: 'date',
+    startCalendar: $('#rangestart'),
+    monthFirst: false,
+    formatter: { date: function (date) { if (!date) return ''; return formatDate(date); } }
+});
+
+loadExceptions();
+</script>
+{% endblock %}

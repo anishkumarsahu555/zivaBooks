@@ -1,12 +1,19 @@
 {% if sidebar_sections %}
     {% for section in sidebar_sections %}
         {% if section.items %}
-            <div class="item">
-                <div class="header">{{ section.title }}</div>
-                <div class="menu">
+            <div class="nav-section item{% if section.collapsed_by_default %} is-collapsed{% endif %}">
+                <button class="nav-section-header" type="button" aria-expanded="{% if section.collapsed_by_default %}false{% else %}true{% endif %}">
+                    <span class="nav-section-title-wrap">
+                        <span class="nav-section-title">{{ section.title }}</span>
+                        <span class="nav-section-count">{{ section.items|length }}</span>
+                    </span>
+                    <span class="nav-section-chevron"><i class="chevron down icon"></i></span>
+                </button>
+                <div class="menu nav-section-menu">
                     {% for item in section.items %}
-                        <a class="item" href="{{ item.url }}">
-                            <div><i class="{{ item.icon }} icon"></i>{{ item.label }}</div>
+                        <a class="item nav-link" href="{{ item.url }}">
+                            <span class="nav-link-icon"><i class="{{ item.icon }} icon"></i></span>
+                            <span class="nav-link-label">{{ item.label }}</span>
                         </a>
                     {% endfor %}
                 </div>
@@ -15,14 +22,8 @@
     {% endfor %}
 {% endif %}
 
-<div class="ui segment bgColor inverted">
-    <div class="ui tiny olive inverted progress">
-        <div class="bar" style="width: 54%"></div>
-        <div class="label">Developed By Ziva Infotech</div>
+<div class="sidebar-meta">
+    <div class="sidebar-meta-brand">zivaBooks</div>
+    <div class="sidebar-meta-copy">Developed by Ziva Infotech</div>
+    <div class="sidebar-meta-version">v 2.0.1</div>
     </div>
-
-    <div class="ui tiny teal inverted progress">
-        <div class="bar" style="width:78%"></div>
-        <div class="label">v 2.0.1</div>
-    </div>
-</div>

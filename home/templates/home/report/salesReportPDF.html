@@ -1,74 +1,115 @@
+{% load formatting %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>zivaBooks</title>
+    <title>Sales Report</title>
     <style>
-        @page {
-            size: A5;
-            margin: .3cm;
-        }
-
-
-    </style>
-    <style>
-        table {
-            font-family: arial, sans-serif;
-            border-collapse: collapse;
-            width: 100%;
-        }
-
-        td, th {
-            border: 1px solid #dddddd;
-            text-align: left;
-            padding: 5px;
-        }
-
-        tr:nth-child(even) {
-            background-color: #dddddd;
-        }
+        body { font-family: Arial, sans-serif; color: #0f172a; font-size: 11px; }
+        .title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        .subtitle { color: #475569; margin-bottom: 14px; }
+        .meta { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+        .meta td { padding: 6px 8px; border: 1px solid #dbe5f0; }
+        .cards { width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 0 -8px 16px; }
+        .card { border: 1px solid #dbe5f0; border-radius: 12px; padding: 10px; background: #f8fbff; }
+        .card-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+        .card-value { font-size: 18px; font-weight: 700; margin-top: 6px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #dbe5f0; padding: 7px 8px; text-align: left; vertical-align: top; }
+        th { background: #eff6ff; font-size: 10px; text-transform: uppercase; color: #334155; }
+        .section-title { font-size: 13px; font-weight: 700; margin: 18px 0 8px; }
+        .right { text-align: right; }
+        .small { font-size: 10px; color: #64748b; }
+        .pdf-footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #dbe5f0; color: #64748b; font-size: 9px; line-height: 1.5; }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="row">
-        <span style="font-size: 10px;">(zivaBooks) Sales Report for Date: {{ date|date }}</span>
-    </div>
+    <div class="title">Sales Report</div>
+    <div class="subtitle">{{ pdf_brand_name }} | Date: {{ date|date:"d M Y" }} | Staff: {{ staffName }}</div>
 
-
-    <table style="font-size: 10px">
+    <table class="meta">
         <tr>
-            <th>CreatedBy</th>
-            <th>Total(₹)</th>
-        </tr>
-        <tr>
-            <td>{{ staffName }}</td>
-            <td>{{ total|convert }}</td>
+            <td><strong>Total Sales</strong><br>{{ total|money }}</td>
+            <td><strong>Invoices</strong><br>{{ total_count }}</td>
+            <td><strong>Average Bill</strong><br>{{ avg_bill|money }}</td>
+            <td><strong>Approved / Pending</strong><br>{{ approved_count }} / {{ pending_count }}</td>
         </tr>
     </table>
-    <p style="font-size: 10px; margin: 2px;padding-top: 10px">Sales Details</p>
 
-    <table style="font-size: 10px">
+    <table class="cards">
         <tr>
-            <th>PaymentID</th>
-            <th>PartyName</th>
-            <th>InvoiceNo.</th>
-            <th>Amount(₹)</th>
-            <th>CreatedBy</th>
+            <td class="card">
+                <div class="card-label">Cash</div>
+                <div class="card-value">{{ cash_total|money }}</div>
+            </td>
+            <td class="card">
+                <div class="card-label">Online</div>
+                <div class="card-value">{{ online_total|money }}</div>
+            </td>
+            <td class="card">
+                <div class="card-label">Credit</div>
+                <div class="card-value">{{ credit_total|money }}</div>
+            </td>
+            <td class="card">
+                <div class="card-label">Mix</div>
+                <div class="card-value">{{ mix_total|money }}</div>
+            </td>
         </tr>
-        {% for foo in col %}
+    </table>
 
+    <div class="section-title">Top Customers</div>
+    <table>
+        <thead>
             <tr>
-                <td>{{ foo.paymentID }}</td>
-                <td>{{ foo.partyID.name }}</td>
-                <td>{{ foo.invoiceNumber }}</td>
-                <td>{{ foo.amount|convert }}</td>
-                <td>{{ foo.createdBy.name }}</td>
+                <th style="width: 70%;">Customer</th>
+                <th class="right">Sales Value</th>
             </tr>
-        {% endfor %}
-
+        </thead>
+        <tbody>
+            {% for customer_name, customer_total in top_customers %}
+            <tr>
+                <td>{{ customer_name }}</td>
+                <td class="right">{{ customer_total|money }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2" class="small">No customer rows for this date.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
-</div>
 
+    <div class="section-title">Invoice Detail</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Payment ID</th>
+                <th>Customer</th>
+                <th>Invoice No.</th>
+                <th>Mode</th>
+                <th class="right">Amount</th>
+                <th>Staff</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for foo in col %}
+            <tr>
+                <td>{{ foo.paymentID|default:'-' }}</td>
+                <td>{{ foo.partyID.name|default:'-' }}</td>
+                <td>{{ foo.invoiceNumber|default:'-' }}</td>
+                <td>{{ foo.modeOfPayment|default:'-' }}</td>
+                <td class="right">{{ foo.amount|money }}</td>
+                <td>{{ foo.createdBy.name|default:'-' }}</td>
+                <td>{% if foo.isApproved %}Approved{% else %}Pending{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="small">No sales were recorded for this date.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% include 'home/report/_pdfFooter.html' %}
 </body>
 </html>

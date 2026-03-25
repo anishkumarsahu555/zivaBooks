@@ -1,0 +1,198 @@
+{% extends 'home/admin/index.html' %}
+{% block title %}<title>{{ page_title }}</title>{% endblock %}
+{% block css %}
+<style>
+.shell{padding:1rem;max-width:100%;overflow-x:hidden}
+.hero,.panel,.action-grid,.action-card{box-sizing:border-box;max-width:100%}
+.hero{background:linear-gradient(135deg,#0f172a,#0f766e 58%,#2563eb);color:#f8fafc;border-radius:22px;padding:1.1rem;margin-bottom:1rem}
+.hero h1{margin:0;font-size:1.6rem;line-height:1.1}
+.hero p{margin:.35rem 0 0;color:rgba(226,232,240,.9);line-height:1.5}
+.hero-meta{margin-top:.85rem;font-size:.82rem;color:rgba(226,232,240,.84);font-weight:700;line-height:1.5}
+.panel{background:#fff;border:1px solid #dce7f3;border-radius:18px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:1rem;margin-bottom:1rem;overflow:hidden}
+.report-filter-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:.85rem;align-items:end}
+.report-filter-grid .field{grid-column:span 4;min-width:0}
+.report-filter-grid.has-four .field{grid-column:span 3}
+.action-grid{display:grid;gap:12px;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.action-card{border:1px solid #e2ebf3;border-radius:16px;padding:14px;background:linear-gradient(180deg,#fbfdff,#f8fafc);min-width:0}
+.action-card h4{margin:0 0 .35rem;line-height:1.2}
+.action-card p{margin:0 0 .8rem;color:#64748b;line-height:1.5}
+.action-buttons{display:flex;flex-wrap:wrap;gap:.55rem;min-width:0}
+.action-buttons .ui.button,.ui.small.basic.buttons .ui.button{border-radius:12px;font-weight:800;margin:0!important}
+.action-buttons .report-export-link{border-width:0;box-shadow:0 10px 22px rgba(15,23,42,.10)}
+.action-buttons .report-export-link.excel{background:linear-gradient(135deg,#166534,#16a34a);color:#fff}
+.action-buttons .report-export-link.pdf{background:linear-gradient(135deg,#9f1239,#e11d48);color:#fff}
+.action-buttons .report-export-link.linkish{background:linear-gradient(135deg,#1d4ed8,#0891b2);color:#fff}
+.helper-list{margin:0;padding-left:1.1rem;color:#475569;line-height:1.6}
+.helper-list li+li{margin-top:.35rem}
+.ui.form .fields{margin-left:0!important;margin-right:0!important;margin-bottom:0!important}
+.ui.form .fields>.field{padding-left:0!important;padding-right:0!important}
+@media (max-width:1024px){
+  .action-grid{grid-template-columns:1fr}
+}
+@media (max-width:768px){
+  .shell{padding:.25rem}
+  .hero{border-radius:16px;padding:.85rem .8rem;margin-bottom:.65rem}
+  .hero h1{font-size:1.24rem}
+  .hero p,.hero-meta{font-size:.8rem}
+  .panel{padding:.72rem;border-radius:14px;margin-bottom:.6rem}
+  .report-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+  .report-filter-grid .field{grid-column:span 1}
+  .report-filter-grid.has-four .field{grid-column:span 1}
+  .report-filter-grid .field:last-child:nth-child(3),
+  .report-filter-grid .field:last-child:nth-child(4){grid-column:1/-1}
+  .report-filter-grid .ui.button{width:100%}
+  .action-card{padding:11px;border-radius:14px}
+  .action-buttons,.ui.small.basic.buttons{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .action-buttons::-webkit-scrollbar,.ui.small.basic.buttons::-webkit-scrollbar{display:none}
+  .action-buttons .ui.button,.ui.small.basic.buttons .ui.button{white-space:nowrap;flex:0 0 auto;font-size:.78rem;padding:.58rem .72rem!important}
+  .field{margin-bottom:.42rem!important}
+}
+</style>
+{% endblock %}
+{% block body %}
+<div class="shell">
+  <div class="hero">
+    <h1>{{ page_title }}</h1>
+    <p>{{ page_subtitle|default:'Open the detailed operational report screen from here.' }}</p>
+    <div class="hero-meta">Use this launcher to set the report range first, then either open the working screen or export the document directly.</div>
+  </div>
+
+  <div class="panel">
+    <div class="ui tiny form">
+      <div class="report-filter-grid {% if show_staff_filter %}has-four{% endif %}">
+        <div class="four wide field">
+          <label>Start Date</label>
+          <div class="ui calendar" id="startDateCal"><div class="ui input"><input type="text" id="startDate" value="{{ defaultStartDate }}" placeholder="Start Date"></div></div>
+        </div>
+        {% if show_end_date %}
+        <div class="four wide field">
+          <label>End Date</label>
+          <div class="ui calendar" id="endDateCal"><div class="ui input"><input type="text" id="endDate" value="{{ defaultEndDate }}" placeholder="End Date"></div></div>
+        </div>
+        {% endif %}
+        {% if show_staff_filter %}
+        <div class="four wide field">
+          <label>Staff</label>
+          <select class="ui dropdown" id="staffID">
+            <option value="All">All Staff</option>
+            {% for staff in staffs %}
+            <option value="{{ staff.id }}">{{ staff.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% if filter_help %}
+    <div class="ui info message" style="margin-top:.85rem;">
+      <div class="header">How To Use This Report</div>
+      <p style="margin-top:.35rem;">{{ filter_help }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="action-grid">
+    <div class="action-card">
+      <h4 class="ui header">Work In Detail</h4>
+      <p>Open the full operational screen when you need row-level review, approvals, edits, or exports beyond the quick PDF.</p>
+      <div class="action-buttons">
+        <a class="ui teal button" id="openDetailLink" href="{{ open_url }}">{{ download_label }}</a>
+      </div>
+    </div>
+
+    {% if export_actions %}
+    <div class="action-card">
+      <h4 class="ui header">Quick Exports</h4>
+      <p>Use the current filters above to generate final report files immediately.</p>
+      <div class="action-buttons">
+        {% for action in export_actions %}
+        <a class="ui button report-export-link {% if 'excel' in action.icon %}excel{% elif 'pdf' in action.icon or action.label == 'Export PDF' %}pdf{% else %}linkish{% endif %}" href="{{ action.url }}" data-base-url="{{ action.url }}" data-mode="{{ action.mode|default:'single_date_staff' }}">
+          <i class="{{ action.icon|default:'download' }} icon"></i>{{ action.label }}
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if secondary_actions %}
+  <div class="panel">
+    <h4 class="ui header">Related Actions</h4>
+    <div class="ui small basic buttons">
+      {% for action in secondary_actions %}
+      <a class="ui button" href="{{ action.url }}"><i class="{{ action.icon }} icon"></i>{{ action.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <h4 class="ui header">What Makes This Useful</h4>
+    <ul class="helper-list">
+      <li>Keep the export range narrow when you need a report for reconciliation, audit, or customer sharing.</li>
+      <li>Use the detailed screen when you need approvals, edits, or supporting records behind the final total.</li>
+      <li>Export after filters are correct so the PDF matches exactly what you intend to review or send.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block js %}
+<script>
+function initReportCalendar(selector, startCalendar){
+  const config = {type:'date', formatter:{date:function(date){
+    if(!date) return '';
+    const d = String(date.getDate()).padStart(2,'0');
+    const m = String(date.getMonth()+1).padStart(2,'0');
+    const y = date.getFullYear();
+    return d + '/' + m + '/' + y;
+  }}};
+  if(startCalendar){ config.startCalendar = $(startCalendar); }
+  $(selector).calendar(config);
+}
+
+function buildReportQuery(mode){
+  const params = new URLSearchParams();
+  const startDate = $('#startDate').val() || '';
+  const endDateField = $('#endDate');
+  const endDate = endDateField.length ? (endDateField.val() || startDate) : startDate;
+  const staffField = $('#staffID');
+  const staffID = staffField.length ? (staffField.val() || 'All') : 'All';
+
+  if(mode === 'range_staff'){
+    params.set('cDate', startDate);
+    params.set('eDate', endDate);
+    params.set('staffID', staffID);
+  } else if (mode === 'month_staff') {
+    params.set('cDate', startDate);
+    params.set('staffID', staffID);
+  } else if (mode === 'month_only') {
+    params.set('cDate', startDate);
+  } else if(mode === 'range_only'){
+    params.set('cDate', startDate);
+    params.set('eDate', endDate);
+  } else {
+    params.set('cDate', startDate);
+    params.set('staffID', staffID);
+  }
+  return params.toString();
+}
+
+function refreshExportLinks(){
+  $('.report-export-link').each(function(){
+    const baseUrl = $(this).data('base-url');
+    const mode = $(this).data('mode');
+    $(this).attr('href', baseUrl + '?' + buildReportQuery(mode));
+  });
+}
+
+$(function(){
+  initReportCalendar('#startDateCal');
+  if($('#endDateCal').length){
+    initReportCalendar('#endDateCal', '#startDateCal');
+  }
+  $('.ui.dropdown').dropdown();
+  refreshExportLinks();
+  $('#startDate, #endDate, #staffID').on('change keyup', refreshExportLinks);
+});
+</script>
+{% endblock %}

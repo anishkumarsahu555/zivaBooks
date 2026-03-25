@@ -1,0 +1,231 @@
+{% extends 'home/admin/index.html' %}
+{% block title %}<title>{{ page_title }}</title>{% endblock %}
+{% block css %}
+<style>
+.page-shell{padding:1rem}.panel{background:#fff;border:1px solid #dce7f3;border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:1rem;margin-bottom:1rem}.hero{background:linear-gradient(135deg,#1e293b,#0f3d3e 58%,#0f766e);color:#f8fafc;border-radius:24px;padding:1.2rem;margin-bottom:1rem}.hero h1{margin:0;font-size:1.75rem}.hero p{margin:.35rem 0 0;color:rgba(226,232,240,.9)}.hero-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.85rem}.hero-action{display:inline-flex;align-items:center;gap:.45rem;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff!important;border-radius:999px;padding:.55rem .8rem;font-weight:700}.summary-grid,.insight-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}.summary-card,.insight-card{border:1px solid #e2ebf3;border-radius:18px;padding:14px;background:linear-gradient(180deg,#fbfdff,#f5f9fc)}.summary-label,.insight-title{font-size:.78rem;font-weight:800;text-transform:uppercase;color:#64748b}.summary-value{font-size:1.35rem;font-weight:800;color:#0f172a;margin-top:8px}.summary-subtext,.chart-caption{margin-top:8px;color:#64748b;font-weight:700;line-height:1.5}.chart-shell{height:320px;position:relative}.chart-shell.short{height:280px}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px 8px;border-bottom:1px solid #e2ebf3;text-align:left}.table th{font-size:.76rem;color:#64748b;text-transform:uppercase}.link-cell{color:#0f766e;font-weight:700;cursor:pointer}.insight-body{margin-top:8px;color:#0f172a;font-weight:700;line-height:1.5}@media (max-width:768px){.page-shell{padding:.2rem}.panel{padding:.7rem;border-radius:14px;margin-bottom:.55rem}.hero{border-radius:16px;padding:.8rem .75rem .7rem;margin-bottom:.6rem}.hero h1{font-size:1.22rem}.hero p{font-size:.82rem;line-height:1.45}.hero-actions{flex-wrap:nowrap;overflow-x:auto;gap:.4rem;padding-bottom:2px;scrollbar-width:none}.hero-actions::-webkit-scrollbar{display:none}.hero-action{width:auto;white-space:nowrap;flex:0 0 auto;padding:.42rem .62rem;font-size:.76rem;justify-content:center}.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.insight-grid{grid-template-columns:1fr;gap:8px}.summary-card,.insight-card{padding:10px;border-radius:14px}.summary-value{font-size:1.08rem;margin-top:6px}.chart-shell{height:210px}.chart-shell.short{height:180px}.ui.stackable.grid>.column{padding-left:.2rem!important;padding-right:.2rem!important}.table{display:block;overflow-x:auto;white-space:nowrap}.field{margin-bottom:.42rem!important}}
+</style>
+{% endblock %}
+{% block body %}
+<div class="page-shell">
+    <div class="hero">
+        <h1>{{ page_title }}</h1>
+        <p>{{ page_subtitle|default:'Who owes money, how old the dues are, and where follow-up pressure is building.' }}</p>
+        {% if report_actions %}
+        <div class="hero-actions">
+            {% for action in report_actions %}
+            <a class="hero-action" href="{{ action.url }}"><i class="{{ action.icon }} icon"></i>{{ action.label }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if export_actions %}
+        <div class="hero-actions">
+            {% for action in export_actions %}
+            <a class="hero-action report-export-link" href="{{ action.url }}" data-base-url="{{ action.url }}"><i class="{{ action.icon }} icon"></i>{{ action.label }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if export_help %}<p>{{ export_help }}</p>{% endif %}
+    </div>
+
+    <div class="panel">
+        <div class="ui tiny form">
+            <div class="fields">
+                <div class="four wide field">
+                    <label>As of Date</label>
+                    <div class="ui calendar" id="rangeend"><div class="ui input"><input type="text" id="endDate" value="{{ defaultEndDate }}" placeholder="End Date"></div></div>
+                </div>
+                <div class="four wide field">
+                    <label>&nbsp;</label>
+                    <button class="ui teal button" type="button" onclick="loadReceivables()">Refresh</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel"><div class="summary-grid" id="summaryGrid"></div></div>
+    <div class="panel">
+        <h3 class="ui header">Owner Notes</h3>
+        <div class="insight-grid" id="insightGrid"></div>
+    </div>
+
+    <div class="ui stackable two column grid">
+        <div class="eight wide column">
+            <div class="panel">
+                <h3 class="ui header">Aging Buckets</h3>
+                <div class="chart-shell short"><canvas id="agingChart"></canvas></div>
+                <div class="chart-caption" id="agingCaption"></div>
+            </div>
+        </div>
+        <div class="eight wide column">
+            <div class="panel">
+                <h3 class="ui header">Assigned Staff Exposure</h3>
+                <div class="chart-shell short"><canvas id="staffChart"></canvas></div>
+                <div class="chart-caption" id="staffCaption"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3 class="ui header">Top Outstanding Customers</h3>
+        <div class="chart-shell"><canvas id="customerChart"></canvas></div>
+        <div class="chart-caption" id="customerCaption"></div>
+    </div>
+
+    <div class="panel">
+        <h3 class="ui header">Customer Detail</h3>
+        <table class="table" id="detailTable"></table>
+    </div>
+</div>
+{% endblock %}
+{% block js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+let agingChart = null;
+let staffChart = null;
+let customerChart = null;
+
+function formatDate(d) {
+    return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear();
+}
+
+function numberFormat(value) {
+    return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function renderSummary(items) {
+    const target = $('#summaryGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="summary-card">' +
+            '<div class="summary-label">' + item.label + '</div>' +
+            '<div class="summary-value">' + item.value + '</div>' +
+            '</div>'
+        );
+    });
+}
+
+function renderInsights(items) {
+    const target = $('#insightGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="insight-card">' +
+            '<div class="insight-title">' + item.title + '</div>' +
+            '<div class="insight-body">' + item.body + '</div>' +
+            '</div>'
+        );
+    });
+}
+
+function destroyChart(chart) {
+    if (chart) chart.destroy();
+}
+
+function refreshExportLinks() {
+    $('.report-export-link').each(function () {
+        const params = new URLSearchParams({endDate: $('#endDate').val() || ''});
+        $(this).attr('href', $(this).data('base-url') + '?' + params.toString());
+    });
+}
+
+function loadReceivables() {
+    refreshExportLinks();
+    $.getJSON('{{ api_url }}', { endDate: $('#endDate').val() }).done(function (response) {
+        const data = response.data || {};
+        renderSummary(data.summary);
+        renderInsights(data.insights);
+        $('#agingCaption').text(data.aging_caption || '');
+        $('#staffCaption').text(data.staff_caption || '');
+        $('#customerCaption').text(data.customers_caption || '');
+
+        destroyChart(agingChart);
+        agingChart = new Chart(document.getElementById('agingChart'), {
+            type: 'doughnut',
+            data: {
+                labels: (data.aging_rows || []).map(item => item.label),
+                datasets: [{ data: (data.aging_rows || []).map(item => item.amount_raw), backgroundColor: ['#0f766e','#2563eb','#f59e0b','#ef4444','#7f1d1d'], borderWidth: 0 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: { callbacks: { label: function (context) { return context.label + ': Rs. ' + numberFormat(context.raw); } } }
+                }
+            }
+        });
+
+        destroyChart(staffChart);
+        staffChart = new Chart(document.getElementById('staffChart'), {
+            type: 'bar',
+            data: {
+                labels: (data.staff_rows || []).map(item => item.label),
+                datasets: [{ label: 'Outstanding', data: (data.staff_rows || []).map(item => item.amount), backgroundColor: '#2563eb', borderRadius: 8 }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: function (context) { return 'Outstanding: Rs. ' + numberFormat(context.raw); } } }
+                }
+            }
+        });
+
+        destroyChart(customerChart);
+        customerChart = new Chart(document.getElementById('customerChart'), {
+            type: 'bar',
+            data: {
+                labels: (data.top_customers || []).map(item => item.label),
+                datasets: [{ label: 'Outstanding', data: (data.top_customers || []).map(item => item.amount), backgroundColor: '#7c3aed', borderRadius: 8 }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: function (context) { return 'Outstanding: Rs. ' + numberFormat(context.raw); } } }
+                },
+                onClick: function (_, elements) {
+                    if (!elements.length) return;
+                    const item = (data.top_customers || [])[elements[0].index];
+                    if (item && item.action_url) window.location.href = item.action_url;
+                }
+            }
+        });
+
+        const table = $('#detailTable').empty();
+        table.append('<thead><tr><th>Customer</th><th>Staff</th><th>Outstanding</th><th>Last Activity</th><th>Age</th><th>Bucket</th></tr></thead>');
+        const body = $('<tbody></tbody>');
+        (data.table_rows || []).forEach(function (row) {
+            body.append(
+                '<tr data-url="' + (row.ledger_url || '') + '">' +
+                '<td class="link-cell">' + row.party + '</td>' +
+                '<td>' + row.staff + '</td>' +
+                '<td>' + row.closing + '</td>' +
+                '<td>' + row.last_activity + '</td>' +
+                '<td>' + row.age_days + '</td>' +
+                '<td>' + row.age_bucket + '</td>' +
+                '</tr>'
+            );
+        });
+        table.append(body);
+        $('#detailTable tbody tr').off('click').on('click', function () {
+            const url = $(this).data('url');
+            if (url) window.location.href = url;
+        });
+    });
+}
+
+$('#rangeend').calendar({
+    type: 'date',
+    monthFirst: false,
+    formatter: { date: function (date) { if (!date) return ''; return formatDate(date); } }
+});
+
+$('#endDate').on('change keyup', refreshExportLinks);
+refreshExportLinks();
+loadReceivables();
+</script>
+{% endblock %}

@@ -1,0 +1,487 @@
+{% extends 'home/admin/index.html' %}
+{% block title %}<title>{{ page_title }}</title>{% endblock %}
+{% block css %}
+<style>
+.snapshot-shell{padding:1rem}.snapshot-panel{background:#fff;border:1px solid #dce7f3;border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:1rem;margin-bottom:1rem}.snapshot-panel.sticky-panel{position:sticky;top:1rem;z-index:3}.snapshot-hero{background:linear-gradient(135deg,#0f172a,#12324a 52%,#0f766e);color:#f8fafc;border-radius:24px;padding:1.2rem 1.2rem 1rem;margin-bottom:1rem}.snapshot-title{font-size:1.8rem;font-weight:800;margin:0 0 .3rem}.snapshot-subtitle{color:rgba(226,232,240,.92);margin:0 0 .9rem}.hero-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.85rem}.hero-action{display:inline-flex;align-items:center;gap:.45rem;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff!important;border-radius:999px;padding:.55rem .8rem;font-weight:700}.hero-action.export-pdf{background:linear-gradient(135deg,#9f1239,#e11d48);border-color:rgba(251,113,133,.45);box-shadow:0 12px 24px rgba(159,18,57,.28)}.hero-action.export-excel{background:linear-gradient(135deg,#166534,#16a34a);border-color:rgba(74,222,128,.42);box-shadow:0 12px 24px rgba(22,101,52,.28)}.hero-action.export-link{background:linear-gradient(135deg,#1d4ed8,#0891b2);border-color:rgba(125,211,252,.38)}.hero-helper{margin-top:.65rem;font-size:.8rem;color:rgba(226,232,240,.84);font-weight:700}.hero-meta{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:center}.hero-meta-text{font-size:.8rem;color:rgba(226,232,240,.85);font-weight:700}.quick-range,.view-toggle{display:flex;flex-wrap:wrap;gap:.5rem}.quick-chip,.view-chip{border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:.55rem .8rem;font-weight:700;cursor:pointer}.view-chip{background:#f8fafc;color:#0f172a;border-color:#dce7f3}.view-chip.active{background:#0f172a;color:#fff;border-color:#0f172a}.kpi-grid,.health-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}.kpi-card,.health-card{border:1px solid #e2ebf3;border-radius:18px;padding:14px;background:linear-gradient(180deg,#fbfdff,#f5f9fc);cursor:pointer;transition:transform .14s ease,box-shadow .14s ease}.kpi-card:hover,.health-card:hover{transform:translateY(-1px);box-shadow:0 12px 24px rgba(15,23,42,.08)}.kpi-label,.health-label{color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase}.kpi-value,.health-value{color:#0f172a;font-size:1.35rem;font-weight:800;margin-top:8px}.kpi-delta{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:.72rem;font-weight:800;margin-top:8px}.kpi-delta.up{background:#ecfdf5;color:#047857}.kpi-delta.down{background:#fff1f2;color:#be123c}.kpi-delta.flat{background:#f8fafc;color:#475569}.kpi-subtext,.health-subtext{color:#64748b;font-size:.72rem;margin-top:8px}.health-card.teal{border-color:#99f6e4}.health-card.amber{border-color:#fde68a}.health-card.red{border-color:#fecdd3}.health-card.violet{border-color:#ddd6fe}.health-card.blue{border-color:#bfdbfe}.chart-shell{height:320px;position:relative}.chart-shell.short{height:280px}.chart-caption{margin-top:.85rem;color:#475569;font-weight:700;line-height:1.5}.exceptions-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}.exception-card{border-radius:16px;padding:14px;color:#0f172a;cursor:pointer}.exception-card.red{background:#fff1f2;border:1px solid #fecdd3}.exception-card.amber{background:#fffbeb;border:1px solid #fde68a}.exception-card.green{background:#ecfdf5;border:1px solid #a7f3d0}.exception-label{font-size:.78rem;font-weight:700;text-transform:uppercase}.exception-value{font-size:1.3rem;font-weight:800;margin-top:6px}.insight-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.insight-card{border-radius:16px;padding:14px;border:1px solid #e2ebf3;background:linear-gradient(180deg,#fbfdff,#f8fafc)}.insight-card.teal{border-color:#99f6e4;background:linear-gradient(180deg,#f0fdfa,#ecfeff)}.insight-card.red{border-color:#fecdd3;background:linear-gradient(180deg,#fff1f2,#fff7f7)}.insight-card.violet{border-color:#ddd6fe;background:linear-gradient(180deg,#f5f3ff,#faf5ff)}.insight-card.orange{border-color:#fed7aa;background:linear-gradient(180deg,#fff7ed,#fffbeb)}.insight-title{font-size:.82rem;font-weight:800;text-transform:uppercase;color:#475569}.insight-body{margin-top:8px;color:#0f172a;font-weight:700;line-height:1.5}.comparison-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.comparison-card{border:1px solid #e2ebf3;border-radius:16px;padding:14px;background:#fff}.comparison-label{color:#475569;font-size:.78rem;font-weight:800;text-transform:uppercase}.comparison-line{display:flex;justify-content:space-between;margin-top:8px;color:#0f172a;font-weight:700}
+@media (max-width: 768px){.snapshot-shell{padding:.2rem}.snapshot-panel{padding:.7rem;border-radius:14px;margin-bottom:.55rem}.snapshot-panel.sticky-panel{position:static}.snapshot-hero{border-radius:16px;padding:.8rem .75rem .7rem;margin-bottom:.6rem}.snapshot-title{font-size:1.25rem}.snapshot-subtitle{margin:0 0 .55rem;font-size:.88rem;line-height:1.4}.hero-actions{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;margin-top:.55rem;gap:.4rem}.hero-action{width:auto;justify-content:flex-start;white-space:nowrap;flex:0 0 auto;padding:.42rem .62rem;font-size:.76rem}.hero-meta{align-items:flex-start;gap:.55rem}.hero-meta-text{font-size:.74rem}.kpi-grid,.health-grid,.exceptions-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.insight-grid,.comparison-grid{grid-template-columns:1fr;gap:8px}.kpi-card,.health-card,.exception-card,.insight-card,.comparison-card{padding:10px;border-radius:14px}.kpi-value,.health-value,.exception-value{font-size:1.1rem}.chart-shell{height:220px}.chart-shell.short{height:190px}.quick-range,.view-toggle{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}.quick-chip,.view-chip{padding:.38rem .58rem;font-size:.76rem;white-space:nowrap;flex:0 0 auto}.ui.stackable.grid>.column{padding-left:.2rem!important;padding-right:.2rem!important}.fields{margin-bottom:0!important}.field{margin-bottom:.42rem!important}.ui.header{margin-bottom:.55rem!important;font-size:1rem!important}}
+@media (max-width: 768px){
+    .snapshot-panel.sticky-panel .ui.form>.fields:first-child{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:.45rem;
+        align-items:end;
+    }
+    .snapshot-panel.sticky-panel .ui.form>.fields:first-child>.field{
+        width:auto!important;
+        margin:0!important;
+    }
+    .snapshot-panel.sticky-panel .ui.form>.fields:first-child>.field:last-child{
+        grid-column:1/-1;
+    }
+    .snapshot-panel.sticky-panel .ui.form>.fields:first-child .ui.button{
+        width:100%;
+    }
+}
+</style>
+{% endblock %}
+{% block body %}
+<div class="snapshot-shell">
+    <div class="snapshot-hero">
+        <h1 class="snapshot-title">{{ page_title }}</h1>
+        <p class="snapshot-subtitle">{{ page_subtitle|default:'Daily business in one screen: money in, operating flow, exceptions, and who is driving the numbers.' }}</p>
+        {% if report_actions %}
+        <div class="hero-actions">
+            {% for action in report_actions %}
+            <a class="hero-action" href="{{ action.url }}"><i class="{{ action.icon }} icon"></i>{{ action.label }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if export_actions %}
+        <div class="hero-actions">
+            {% for action in export_actions %}
+            <a class="hero-action report-export-link {% if 'excel' in action.icon %}export-excel{% elif 'pdf' in action.icon or 'print' in action.icon %}export-pdf{% else %}export-link{% endif %}" href="{{ action.url }}" data-base-url="{{ action.url }}" data-mode="{{ action.mode|default:'single_day_all' }}"><i class="{{ action.icon|default:'download' }} icon"></i>{{ action.label }}</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if export_help %}
+        <div class="hero-helper">{{ export_help }}</div>
+        {% endif %}
+        <div class="hero-meta">
+            <div class="quick-range">
+                <button class="quick-chip" type="button" onclick="setPreset('today')">Today</button>
+                <button class="quick-chip" type="button" onclick="setPreset('7d')">7 Days</button>
+                <button class="quick-chip" type="button" onclick="setPreset('30d')">30 Days</button>
+                <button class="quick-chip" type="button" onclick="setPreset('mtd')">MTD</button>
+            </div>
+            <div class="hero-meta-text" id="lastUpdatedLabel">Refreshing snapshot...</div>
+        </div>
+    </div>
+
+    <div class="snapshot-panel sticky-panel">
+        <div class="ui tiny form">
+            <div class="fields">
+                <div class="four wide field">
+                    <label>Start Date</label>
+                    <div class="ui calendar" id="rangestart"><div class="ui input"><input type="text" id="startDate" value="{{ defaultStartDate }}" placeholder="Start Date"></div></div>
+                </div>
+                <div class="four wide field">
+                    <label>End Date</label>
+                    <div class="ui calendar" id="rangeend"><div class="ui input"><input type="text" id="endDate" value="{{ defaultEndDate }}" placeholder="End Date"></div></div>
+                </div>
+                <div class="four wide field">
+                    <label>&nbsp;</label>
+                    <button class="ui teal button" type="button" onclick="loadSnapshot()">Refresh Snapshot</button>
+                </div>
+            </div>
+            <div class="field">
+                <label>Trend View</label>
+                <div class="view-toggle">
+                    <button class="view-chip active" type="button" data-group="day">Daily</button>
+                    <button class="view-chip" type="button" data-group="week">Weekly</button>
+                    <button class="view-chip" type="button" data-group="month">Monthly</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="snapshot-panel">
+        <div class="kpi-grid" id="kpiGrid"></div>
+    </div>
+
+    <div class="snapshot-panel">
+        <h3 class="ui header">Business Health</h3>
+        <div class="health-grid" id="healthGrid"></div>
+    </div>
+
+    <div class="snapshot-panel">
+        <h3 class="ui header">What Changed</h3>
+        <div class="comparison-grid" id="comparisonGrid"></div>
+    </div>
+
+    <div class="snapshot-panel">
+        <h3 class="ui header">Owner Briefing</h3>
+        <div class="insight-grid" id="insightGrid"></div>
+    </div>
+
+    <div class="ui stackable two column grid">
+        <div class="ten wide column">
+            <div class="snapshot-panel">
+                <div class="ui clearing basic segment" style="padding:0 0 .8rem;">
+                    <h3 class="ui left floated header">Trend Overview</h3>
+                </div>
+                <div class="chart-shell"><canvas id="trendChart"></canvas></div>
+                <div class="chart-caption" id="trendCaption"></div>
+            </div>
+        </div>
+        <div class="six wide column">
+            <div class="snapshot-panel">
+                <div class="ui clearing basic segment" style="padding:0 0 .8rem;">
+                    <h3 class="ui left floated header">Business Mix</h3>
+                </div>
+                <div class="chart-shell short"><canvas id="mixChart"></canvas></div>
+                <div class="chart-caption" id="mixCaption"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui stackable two column grid">
+        <div class="eight wide column">
+            <div class="snapshot-panel">
+                <h3 class="ui header">Top Staff Contribution</h3>
+                <div class="chart-shell short"><canvas id="staffChart"></canvas></div>
+                <div class="chart-caption" id="staffCaption"></div>
+            </div>
+        </div>
+        <div class="eight wide column">
+            <div class="snapshot-panel">
+                <h3 class="ui header">Top Customers</h3>
+                <div class="chart-shell short"><canvas id="customerChart"></canvas></div>
+                <div class="chart-caption" id="customerCaption"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="snapshot-panel">
+        <h3 class="ui header">Cash Effect Waterfall</h3>
+        <div class="chart-shell short"><canvas id="waterfallChart"></canvas></div>
+        <div class="chart-caption" id="waterfallCaption"></div>
+    </div>
+
+    <div class="snapshot-panel">
+        <h3 class="ui header">Attention Needed</h3>
+        <div class="exceptions-grid" id="exceptionsGrid"></div>
+    </div>
+</div>
+{% endblock %}
+{% block js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+let trendChart = null;
+let mixChart = null;
+let staffChart = null;
+let customerChart = null;
+let waterfallChart = null;
+let currentGroupBy = 'day';
+
+function formatDate(d) {
+    return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear();
+}
+
+function formatCurrencyValue(value) {
+    try {
+        return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Number(value || 0));
+    } catch (e) {
+        return value || 0;
+    }
+}
+
+function setPreset(kind) {
+    const now = new Date();
+    let start = new Date(now);
+    let end = new Date(now);
+    if (kind === '7d') start.setDate(now.getDate() - 6);
+    if (kind === '30d') start.setDate(now.getDate() - 29);
+    if (kind === 'mtd') start = new Date(now.getFullYear(), now.getMonth(), 1);
+    $('#startDate').val(formatDate(start));
+    $('#endDate').val(formatDate(end));
+    loadSnapshot();
+}
+
+function deltaClass(delta) {
+    if (delta > 0) return 'up';
+    if (delta < 0) return 'down';
+    return 'flat';
+}
+
+function deltaLabel(delta) {
+    if (delta > 0) return '+' + delta + '% vs prev';
+    if (delta < 0) return delta + '% vs prev';
+    return 'No change';
+}
+
+function renderHealth(items) {
+    const target = $('#healthGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="health-card ' + (item.tone || '') + '" data-url="' + (item.action_url || '') + '">' +
+            '<div class="health-label">' + item.label + '</div>' +
+            '<div class="health-value">' + item.value + '</div>' +
+            '<div class="health-subtext">' + (item.subtext || '') + '</div>' +
+            '</div>'
+        );
+    });
+    $('.health-card').off('click').on('click', function () {
+        const url = $(this).data('url');
+        if (url) window.location.href = url;
+    });
+}
+
+function renderKpis(items) {
+    const target = $('#kpiGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="kpi-card" data-url="' + (item.action_url || '') + '">' +
+            '<div class="kpi-label">' + item.label + '</div>' +
+            '<div class="kpi-value">' + item.value + '</div>' +
+            '<div class="kpi-delta ' + deltaClass(item.delta || 0) + '">' + deltaLabel(item.delta || 0) + '</div>' +
+            '<div class="kpi-subtext">Previous: ' + (item.previous || '-') + '</div>' +
+            '</div>'
+        );
+    });
+    $('.kpi-card').off('click').on('click', function () {
+        const url = $(this).data('url');
+        if (url) window.location.href = url;
+    });
+}
+
+function renderExceptions(items) {
+    const target = $('#exceptionsGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="exception-card ' + (item.tone || 'amber') + '" data-url="' + (item.action_url || '') + '">' +
+            '<div class="exception-label">' + item.label + '</div>' +
+            '<div class="exception-value">' + item.value + '</div>' +
+            '</div>'
+        );
+    });
+    $('.exception-card').off('click').on('click', function () {
+        const url = $(this).data('url');
+        if (url) window.location.href = url;
+    });
+}
+
+function renderComparisons(items) {
+    const target = $('#comparisonGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="comparison-card">' +
+            '<div class="comparison-label">' + item.label + '</div>' +
+            '<div class="comparison-line"><span>Current</span><strong>' + item.current + '</strong></div>' +
+            '<div class="comparison-line"><span>Previous</span><strong>' + item.previous + '</strong></div>' +
+            '<div class="kpi-delta ' + deltaClass(item.delta || 0) + '">' + deltaLabel(item.delta || 0) + '</div>' +
+            '</div>'
+        );
+    });
+}
+
+function renderInsights(items) {
+    const target = $('#insightGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append(
+            '<div class="insight-card ' + (item.tone || 'teal') + '">' +
+            '<div class="insight-title">' + item.title + '</div>' +
+            '<div class="insight-body">' + item.body + '</div>' +
+            '</div>'
+        );
+    });
+}
+
+function destroyChart(instance) {
+    if (instance) instance.destroy();
+}
+
+function refreshReportExportLinks() {
+    $('.report-export-link').each(function () {
+        const baseUrl = $(this).data('base-url');
+        const mode = $(this).data('mode') || 'single_day_all';
+        if (mode === 'link') {
+            $(this).attr('href', baseUrl);
+            return;
+        }
+        const params = new URLSearchParams();
+        params.set('cDate', $('#endDate').val() || $('#startDate').val() || '');
+        params.set('staffID', 'All');
+        $(this).attr('href', baseUrl + '?' + params.toString());
+    });
+}
+
+function loadSnapshot() {
+    refreshReportExportLinks();
+    $.getJSON('{{ api_url }}', {
+        startDate: $('#startDate').val(),
+        endDate: $('#endDate').val(),
+        groupBy: currentGroupBy
+    }).done(function (response) {
+        const data = response.data || {};
+        renderKpis(data.summary);
+        renderHealth(data.health);
+        renderComparisons(data.comparisons);
+        renderInsights(data.insights);
+        renderExceptions(data.exceptions);
+        $('#lastUpdatedLabel').text('Last updated: ' + (data.lastUpdated || '-'));
+        $('#trendCaption').text(data.trendCaption || '');
+        $('#mixCaption').text((data.mix || {}).caption || '');
+        $('#staffCaption').text(data.top_staff_caption || '');
+        $('#customerCaption').text(data.top_customers_caption || '');
+        $('#waterfallCaption').text((data.waterfall || {}).caption || '');
+
+        destroyChart(trendChart);
+        trendChart = new Chart(document.getElementById('trendChart'), {
+            type: 'bar',
+            data: {
+                labels: data.trend.labels,
+                datasets: [
+                    { type: 'line', label: 'Sales', data: data.trend.sales, borderColor: '#0f766e', backgroundColor: 'rgba(15,118,110,0.12)', tension: 0.35, fill: true },
+                    { type: 'line', label: 'Collections', data: data.trend.collections, borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.10)', tension: 0.35, fill: true },
+                    { type: 'bar', label: 'Cash Counter', data: data.trend.cashCounter, backgroundColor: 'rgba(249,115,22,0.72)', borderRadius: 8 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return context.dataset.label + ': Rs. ' + formatCurrencyValue(context.raw);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        destroyChart(mixChart);
+        mixChart = new Chart(document.getElementById('mixChart'), {
+            type: 'doughnut',
+            data: {
+                labels: data.mix.labels,
+                datasets: [{ data: data.mix.values, backgroundColor: ['#0f766e', '#2563eb', '#f97316', '#e11d48'], borderWidth: 0 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return context.label + ': Rs. ' + formatCurrencyValue(context.raw);
+                            }
+                        }
+                    }
+                },
+                onClick: function (_, elements) {
+                    if (!elements.length) return;
+                    const idx = elements[0].index;
+                    const url = (data.mix.urls || [])[idx];
+                    if (url) window.location.href = url;
+                }
+            }
+        });
+
+        destroyChart(staffChart);
+        staffChart = new Chart(document.getElementById('staffChart'), {
+            type: 'bar',
+            data: {
+                labels: (data.top_staff || []).map(item => item.label),
+                datasets: [
+                    { label: 'Sales', data: (data.top_staff || []).map(item => item.sales), backgroundColor: '#0f766e', borderRadius: 8 },
+                    { label: 'Collections', data: (data.top_staff || []).map(item => item.collections), backgroundColor: '#2563eb', borderRadius: 8 }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return context.dataset.label + ': Rs. ' + formatCurrencyValue(context.raw);
+                            }
+                        }
+                    }
+                },
+                scales: { x: { stacked: true }, y: { stacked: true } },
+                onClick: function (_, elements) {
+                    if (!elements.length) return;
+                    const idx = elements[0].index;
+                    const row = (data.top_staff || [])[idx];
+                    if (row && row.action_url) window.location.href = row.action_url;
+                }
+            }
+        });
+
+        destroyChart(customerChart);
+        customerChart = new Chart(document.getElementById('customerChart'), {
+            type: 'bar',
+            data: {
+                labels: (data.top_customers || []).map(item => item.label),
+                datasets: [{ label: 'Business Value', data: (data.top_customers || []).map(item => item.amount), backgroundColor: '#7c3aed', borderRadius: 8 }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return 'Business Value: Rs. ' + formatCurrencyValue(context.raw);
+                            }
+                        }
+                    }
+                },
+                onClick: function (_, elements) {
+                    if (!elements.length) return;
+                    const idx = elements[0].index;
+                    const row = (data.top_customers || [])[idx];
+                    if (row && row.action_url) window.location.href = row.action_url;
+                }
+            }
+        });
+
+        destroyChart(waterfallChart);
+        waterfallChart = new Chart(document.getElementById('waterfallChart'), {
+            type: 'bar',
+            data: {
+                labels: data.waterfall.labels,
+                datasets: [{ label: 'Impact', data: data.waterfall.values, backgroundColor: data.waterfall.colors, borderRadius: 8 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                return 'Impact: Rs. ' + formatCurrencyValue(context.raw);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+}
+
+$('#rangestart').calendar({
+    type: 'date',
+    endCalendar: $('#rangeend'),
+    monthFirst: false,
+    formatter: { date: function (date) { if (!date) return ''; return formatDate(date); } }
+});
+$('#rangeend').calendar({
+    type: 'date',
+    startCalendar: $('#rangestart'),
+    monthFirst: false,
+    formatter: { date: function (date) { if (!date) return ''; return formatDate(date); } }
+});
+
+$('.view-chip').on('click', function () {
+    $('.view-chip').removeClass('active');
+    $(this).addClass('active');
+    currentGroupBy = $(this).data('group') || 'day';
+    loadSnapshot();
+});
+
+$('#startDate, #endDate').on('change keyup', refreshReportExportLinks);
+refreshReportExportLinks();
+loadSnapshot();
+</script>
+{% endblock %}

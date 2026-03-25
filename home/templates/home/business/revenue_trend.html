@@ -1,0 +1,206 @@
+{% extends 'home/admin/index.html' %}
+{% block title %}<title>{{ page_title }}</title>{% endblock %}
+{% block css %}
+<style>
+.page-shell{padding:1rem}.panel{background:#fff;border:1px solid #dce7f3;border-radius:20px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:1rem;margin-bottom:1rem}.hero{background:linear-gradient(135deg,#0f172a,#14532d 55%,#16a34a);color:#f8fafc;border-radius:24px;padding:1.2rem;margin-bottom:1rem}.hero h1{margin:0;font-size:1.75rem}.hero p{margin:.35rem 0 0;color:rgba(226,232,240,.9)}.hero-actions{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.85rem}.hero-action{display:inline-flex;align-items:center;gap:.45rem;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);color:#fff!important;border-radius:999px;padding:.55rem .8rem;font-weight:700}.summary-grid,.health-grid,.insight-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}.summary-card,.health-card,.insight-card{border:1px solid #e2ebf3;border-radius:18px;padding:14px;background:linear-gradient(180deg,#fbfdff,#f5f9fc)}.summary-label,.health-label,.insight-title{font-size:.78rem;font-weight:800;text-transform:uppercase;color:#64748b}.summary-value,.health-value{font-size:1.35rem;font-weight:800;color:#0f172a;margin-top:8px}.delta{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:.72rem;font-weight:800;margin-top:8px}.delta.up{background:#ecfdf5;color:#047857}.delta.down{background:#fff1f2;color:#be123c}.delta.flat{background:#f8fafc;color:#475569}.health-subtext,.insight-body,.chart-caption{margin-top:8px;color:#475569;font-weight:700;line-height:1.5}.chart-shell{height:320px;position:relative}.chart-shell.short{height:280px}.view-toggle{display:flex;gap:.5rem;flex-wrap:wrap}.view-chip{border:1px solid #dce7f3;background:#f8fafc;color:#0f172a;border-radius:999px;padding:.55rem .8rem;font-weight:700;cursor:pointer}.view-chip.active{background:#0f172a;color:#fff;border-color:#0f172a}@media (max-width:768px){.page-shell{padding:.2rem}.panel{padding:.7rem;border-radius:14px;margin-bottom:.55rem}.hero{border-radius:16px;padding:.8rem .75rem .7rem;margin-bottom:.6rem}.hero h1{font-size:1.22rem}.hero p{font-size:.82rem;line-height:1.45}.hero-actions,.view-toggle{flex-wrap:nowrap;overflow-x:auto;gap:.4rem;padding-bottom:2px;scrollbar-width:none}.hero-actions::-webkit-scrollbar,.view-toggle::-webkit-scrollbar{display:none}.hero-action,.view-chip{width:auto;white-space:nowrap;flex:0 0 auto;padding:.42rem .62rem;font-size:.76rem;justify-content:center}.summary-grid,.health-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.insight-grid{grid-template-columns:1fr;gap:8px}.summary-card,.health-card,.insight-card{padding:10px;border-radius:14px}.summary-value,.health-value{font-size:1.08rem;margin-top:6px}.delta{margin-top:6px}.chart-shell{height:210px}.chart-shell.short{height:180px}.ui.stackable.grid>.column{padding-left:.2rem!important;padding-right:.2rem!important}.field{margin-bottom:.42rem!important}}
+@media (max-width:768px){
+    .panel .ui.form>.fields:first-child{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:.45rem;
+        align-items:end;
+    }
+    .panel .ui.form>.fields:first-child>.field{
+        width:auto!important;
+        margin:0!important;
+    }
+    .panel .ui.form>.fields:first-child>.field:last-child{
+        grid-column:1/-1;
+    }
+    .panel .ui.form>.fields:first-child .ui.button{
+        width:100%;
+    }
+}
+</style>
+{% endblock %}
+{% block body %}
+<div class="page-shell">
+    <div class="hero">
+        <h1>{{ page_title }}</h1>
+        <p>Track revenue movement, approval quality, payment mix, and customer concentration.</p>
+        {% if export_actions %}<div class="hero-actions">{% for action in export_actions %}<a class="hero-action report-export-link" href="{{ action.url }}" data-base-url="{{ action.url }}" data-mode="{{ action.mode }}"><i class="{{ action.icon }} icon"></i>{{ action.label }}</a>{% endfor %}</div>{% endif %}
+    </div>
+
+    <div class="panel">
+        <div class="ui tiny form">
+            <div class="fields">
+                <div class="four wide field">
+                    <label>Start Date</label>
+                    <div class="ui calendar" id="rangestart"><div class="ui input"><input type="text" id="startDate" value="{{ defaultStartDate }}" placeholder="Start Date"></div></div>
+                </div>
+                <div class="four wide field">
+                    <label>End Date</label>
+                    <div class="ui calendar" id="rangeend"><div class="ui input"><input type="text" id="endDate" value="{{ defaultEndDate }}" placeholder="End Date"></div></div>
+                </div>
+                <div class="four wide field">
+                    <label>&nbsp;</label>
+                    <button class="ui teal button" type="button" onclick="loadRevenueTrend()">Refresh</button>
+                </div>
+            </div>
+            <div class="field">
+                <label>Trend View</label>
+                <div class="view-toggle">
+                    <button class="view-chip active" type="button" data-group="day">Daily</button>
+                    <button class="view-chip" type="button" data-group="week">Weekly</button>
+                    <button class="view-chip" type="button" data-group="month">Monthly</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel"><div class="summary-grid" id="summaryGrid"></div></div>
+    <div class="panel"><div class="health-grid" id="healthGrid"></div></div>
+    <div class="panel">
+        <h3 class="ui header">Owner Notes</h3>
+        <div class="insight-grid" id="insightGrid"></div>
+    </div>
+
+    <div class="ui stackable two column grid">
+        <div class="ten wide column">
+            <div class="panel">
+                <h3 class="ui header">Revenue Trend</h3>
+                <div class="chart-shell"><canvas id="trendChart"></canvas></div>
+                <div class="chart-caption" id="trendCaption"></div>
+            </div>
+        </div>
+        <div class="six wide column">
+            <div class="panel">
+                <h3 class="ui header">Payment Mode Mix</h3>
+                <div class="chart-shell short"><canvas id="modeChart"></canvas></div>
+                <div class="chart-caption" id="modeCaption"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3 class="ui header">Top Customers</h3>
+        <div class="chart-shell short"><canvas id="customerChart"></canvas></div>
+        <div class="chart-caption" id="customerCaption"></div>
+    </div>
+</div>
+{% endblock %}
+{% block js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+let trendChart = null;
+let modeChart = null;
+let customerChart = null;
+let currentGroupBy = 'day';
+
+function formatDate(d) {
+    return d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear();
+}
+
+function numberFormat(value) {
+    return new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Number(value || 0));
+}
+
+function deltaClass(delta) {
+    if (delta > 0) return 'up';
+    if (delta < 0) return 'down';
+    return 'flat';
+}
+
+function renderSummary(items) {
+    const target = $('#summaryGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append('<div class="summary-card"><div class="summary-label">' + item.label + '</div><div class="summary-value">' + item.value + '</div><div class="delta ' + deltaClass(item.delta || 0) + '">' + (item.delta > 0 ? '+' : '') + (item.delta || 0) + '% vs prev</div></div>');
+    });
+}
+
+function renderHealth(items) {
+    const target = $('#healthGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append('<div class="health-card"><div class="health-label">' + item.label + '</div><div class="health-value">' + item.value + '</div><div class="health-subtext">' + (item.subtext || '') + '</div></div>');
+    });
+}
+
+function renderInsights(items) {
+    const target = $('#insightGrid').empty();
+    (items || []).forEach(function (item) {
+        target.append('<div class="insight-card"><div class="insight-title">' + item.title + '</div><div class="insight-body">' + item.body + '</div></div>');
+    });
+}
+
+function destroyChart(chart) {
+    if (chart) chart.destroy();
+}
+
+function refreshExportLinks() {
+    $('.report-export-link').each(function () {
+        const params = new URLSearchParams({startDate: $('#startDate').val() || '', endDate: $('#endDate').val() || '', groupBy: currentGroupBy});
+        $(this).attr('href', $(this).data('base-url') + '?' + params.toString());
+    });
+}
+
+function loadRevenueTrend() {
+    refreshExportLinks();
+    $.getJSON('{{ api_url }}', {
+        startDate: $('#startDate').val(),
+        endDate: $('#endDate').val(),
+        groupBy: currentGroupBy
+    }).done(function (response) {
+        const data = response.data || {};
+        renderSummary(data.summary);
+        renderHealth(data.health);
+        renderInsights(data.insights);
+        $('#trendCaption').text(data.trend_caption || '');
+        $('#modeCaption').text(data.mode_caption || '');
+        $('#customerCaption').text(data.customer_caption || '');
+
+        destroyChart(trendChart);
+        trendChart = new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: data.trend.labels,
+                datasets: [{ label: 'Revenue', data: data.trend.sales, borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.12)', fill: true, tension: 0.35 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: function (context) { return 'Revenue: Rs. ' + numberFormat(context.raw); } } } } }
+        });
+
+        destroyChart(modeChart);
+        modeChart = new Chart(document.getElementById('modeChart'), {
+            type: 'doughnut',
+            data: {
+                labels: (data.mode_rows || []).map(item => item.label),
+                datasets: [{ data: (data.mode_rows || []).map(item => item.amount), backgroundColor: ['#16a34a','#2563eb','#f59e0b','#7c3aed','#ef4444'], borderWidth: 0 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: function (context) { return context.label + ': Rs. ' + numberFormat(context.raw); } } } } }
+        });
+
+        destroyChart(customerChart);
+        customerChart = new Chart(document.getElementById('customerChart'), {
+            type: 'bar',
+            data: {
+                labels: (data.customer_rows || []).map(item => item.label),
+                datasets: [{ label: 'Revenue', data: (data.customer_rows || []).map(item => item.amount), backgroundColor: '#2563eb', borderRadius: 8 }]
+            },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (context) { return 'Revenue: Rs. ' + numberFormat(context.raw); } } } } }
+        });
+    });
+}
+
+$('#rangestart').calendar({ type: 'date', endCalendar: $('#rangeend'), monthFirst: false, formatter: { date: function (date) { if (!date) return ''; return formatDate(date); } } });
+$('#rangeend').calendar({ type: 'date', startCalendar: $('#rangestart'), monthFirst: false, formatter: { date: function (date) { if (!date) return ''; return formatDate(date); } } });
+$('.view-chip').on('click', function () {
+    $('.view-chip').removeClass('active');
+    $(this).addClass('active');
+    currentGroupBy = $(this).data('group') || 'day';
+    loadRevenueTrend();
+});
+
+$('#startDate, #endDate').on('change keyup', refreshExportLinks);
+refreshExportLinks();
+loadRevenueTrend();
+</script>
+{% endblock %}

@@ -108,7 +108,8 @@
                                                 Search
                                             </button>
                                             {% if collection_capabilities.can_export %}
-                                                <a id="reportUrl" href="{% url 'homeApp:generate_collection_report' %}" style="float: right;" class="teal tiny ui button">Download Report</a>
+                                                <a id="reportUrl" href="{% url 'homeApp:generate_collection_report' %}" style="float: right;" class="pink tiny ui button">Download PDF</a>
+                                                <a id="excelUrl" href="{% url 'homeApp:export_collection_list_excel' %}" style="float: right; margin-right: 8px;" class="green tiny ui button">Excel Export</a>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -409,8 +410,10 @@
 
         function ChangeDate() {
             var startDateF = $('#startDateF').val();
+            var endDateF = $('#endDateF').val();
             var staffID = $('#staffID').val();
             $("#reportUrl").attr("href", "{% url 'homeApp:generate_collection_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
+            $("#excelUrl").attr("href", "{% url 'homeApp:export_collection_list_excel' %}?startDate=" + startDateF + '&endDate=' + endDateF + '&staffID=' + staffID);
         }
 
         function confirmTallyModel(id) {

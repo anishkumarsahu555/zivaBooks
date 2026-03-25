@@ -1,0 +1,140 @@
+{% extends 'home/admin/index.html' %}
+{% block title %}<title>{{ page_title }}</title>{% endblock %}
+{% block css %}
+<style>
+.shell{padding:1rem}
+.hero{background:linear-gradient(135deg,#0f172a,#0f766e 58%,#2563eb);color:#f8fafc;border-radius:22px;padding:1.1rem;margin-bottom:1rem}
+.hero h1{margin:0;font-size:1.6rem}
+.hero p{margin:.35rem 0 0;color:rgba(226,232,240,.9)}
+.panel{background:#fff;border:1px solid #dce7f3;border-radius:18px;box-shadow:0 14px 32px rgba(15,23,42,.06);padding:1rem;margin-bottom:1rem}
+.action-buttons{display:flex;flex-wrap:wrap;gap:.55rem}
+.tip-list{margin:0;padding-left:1.1rem;color:#475569;line-height:1.6}
+.tip-list li+li{margin-top:.35rem}
+@media (max-width:768px){
+  .shell{padding:.2rem}
+  .panel{padding:.7rem;border-radius:14px;margin-bottom:.55rem}
+  .hero{border-radius:16px;padding:.8rem .75rem;margin-bottom:.6rem}
+  .hero h1{font-size:1.2rem}
+  .hero p{font-size:.82rem}
+  .action-buttons{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+  .action-buttons .ui.button{width:auto;white-space:nowrap;flex:0 0 auto}
+  .field{margin-bottom:.42rem!important}
+}
+@media (max-width:768px){
+    .panel .ui.form>.fields:first-child{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:.45rem;
+    }
+    .panel .ui.form>.fields:first-child>.field{
+        width:auto!important;
+        margin:0!important;
+    }
+    .panel .ui.form>.fields:first-child>.field:first-child{
+        grid-column:1/-1;
+    }
+}
+</style>
+{% endblock %}
+{% block body %}
+<div class="shell">
+  <div class="hero">
+    <h1>{{ page_title }}</h1>
+    <p>{{ page_subtitle|default:'Select a customer and open the full ledger report.' }}</p>
+  </div>
+
+  <div class="panel">
+    <div class="ui tiny form">
+      <div class="fields">
+        <div class="six wide field">
+          <label>Select Customer</label>
+          <select class="ui dropdown" id="partyID">
+            <option value="">Select customer</option>
+            {% for party in parties %}
+            <option value="{{ party.id }}">{{ party.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="five wide field">
+          <label>Start Date</label>
+          <div class="ui calendar" id="startDateCal"><div class="ui input"><input type="text" id="startDate" value="{{ defaultStartDate }}" placeholder="Start Date"></div></div>
+        </div>
+        <div class="five wide field">
+          <label>End Date</label>
+          <div class="ui calendar" id="endDateCal"><div class="ui input"><input type="text" id="endDate" value="{{ defaultEndDate }}" placeholder="End Date"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="ui info message" style="margin-top:.85rem;">
+      <div class="header">Best Use</div>
+      <p style="margin-top:.35rem;">Use the live ledger when you want to inspect line items. Use PDF or Excel when you need a shareable customer statement.</p>
+    </div>
+    <div class="action-buttons" style="margin-top:.85rem;">
+      <button class="ui teal button" type="button" onclick="openLedger()">Open Live Ledger</button>
+      <button class="ui basic button" type="button" onclick="exportLedgerPdf()"><i class="file pdf outline icon"></i>Export Ledger PDF</button>
+      <button class="ui basic button" type="button" onclick="exportLedgerExcel()"><i class="file excel outline icon"></i>Export Ledger Excel</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h4 class="ui header">What This Report Answers</h4>
+    <ul class="tip-list">
+      <li>What was the customer opening balance, movement, and closing balance for the selected period?</li>
+      <li>Which invoices, collections, or manual entries changed the customer position?</li>
+      <li>Can I share a clean period statement without opening the full admin screen?</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block js %}
+<script>
+const ledgerPageTemplate = '{{ ledger_page_url_template }}';
+const ledgerPdfTemplate = '{{ ledger_pdf_url_template }}';
+const ledgerExcelTemplate = '{{ ledger_excel_url_template }}';
+
+function formatLedgerUrl(template){
+  const partyId = $('#partyID').val();
+  if(!partyId){
+    if ($.fn.toast) {
+      $('body').toast({class:'warning', message:'Select a customer first.'});
+    } else {
+      alert('Select a customer first.');
+    }
+    return null;
+  }
+  const baseUrl = template.replace(/0\/?$/, partyId + '/');
+  const params = new URLSearchParams({
+    startDate: $('#startDate').val() || '',
+    endDate: $('#endDate').val() || ''
+  });
+  return baseUrl + '?' + params.toString();
+}
+
+function openLedger(){
+  const url = formatLedgerUrl(ledgerPageTemplate);
+  if(url){ window.location.href = url; }
+}
+
+function exportLedgerPdf(){
+  const url = formatLedgerUrl(ledgerPdfTemplate);
+  if(url){ window.location.href = url; }
+}
+
+function exportLedgerExcel(){
+  const url = formatLedgerUrl(ledgerExcelTemplate);
+  if(url){ window.location.href = url; }
+}
+
+$(function(){
+  $('.ui.dropdown').dropdown();
+  $('#startDateCal').calendar({type:'date', formatter:{date:function(date){
+    if(!date) return '';
+    return String(date.getDate()).padStart(2,'0') + '/' + String(date.getMonth()+1).padStart(2,'0') + '/' + date.getFullYear();
+  }}});
+  $('#endDateCal').calendar({type:'date', startCalendar: $('#startDateCal'), formatter:{date:function(date){
+    if(!date) return '';
+    return String(date.getDate()).padStart(2,'0') + '/' + String(date.getMonth()+1).padStart(2,'0') + '/' + date.getFullYear();
+  }}});
+});
+</script>
+{% endblock %}

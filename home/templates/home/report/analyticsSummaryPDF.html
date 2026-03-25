@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ report_title }}</title>
+    <style>
+        @page { size: A4 portrait; margin: .7cm; @bottom-right { content: "Page " counter(page); font-size: 9px; color: #555; } }
+        body { font-family: Arial, sans-serif; color: #0f172a; font-size: 11px; }
+        .title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        .subtitle { color: #475569; margin-bottom: 12px; }
+        .cards { width: 100%; border-collapse: separate; border-spacing: 8px 0; margin: 0 -8px 14px; }
+        .card { border: 1px solid #dbe5f0; border-radius: 12px; padding: 10px; background: #f8fbff; }
+        .card-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+        .card-value { font-size: 17px; font-weight: 700; margin-top: 6px; }
+        .card-sub { margin-top: 6px; color: #64748b; font-size: 10px; }
+        .section-title { font-size: 13px; font-weight: 700; margin: 16px 0 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        th, td { border: 1px solid #dbe5f0; padding: 7px 8px; text-align: left; vertical-align: top; }
+        th { background: #eff6ff; font-size: 10px; text-transform: uppercase; color: #334155; }
+        tr:nth-child(even) { background: #f8fbff; }
+        .pdf-footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #dbe5f0; color: #64748b; font-size: 9px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="title">{{ pdf_tenant_name }}</div>
+    <div class="subtitle">{{ report_title }} | {{ report_subtitle }} | {{ pdf_brand_name }}</div>
+
+    {% if summary %}
+    <table class="cards">
+        <tr>
+            {% for item in summary %}
+            <td class="card">
+                <div class="card-label">{{ item.label }}</div>
+                <div class="card-value">{{ item.value }}</div>
+                {% if item.delta != None %}<div class="card-sub">{% if item.delta %}{{ item.delta }}% vs previous{% endif %}</div>{% endif %}
+            </td>
+            {% endfor %}
+        </tr>
+    </table>
+    {% endif %}
+
+    {% if health %}
+    <div class="section-title">Health Metrics</div>
+    <table>
+        <thead><tr><th>Metric</th><th>Value</th><th>Note</th></tr></thead>
+        <tbody>
+            {% for item in health %}
+            <tr><td>{{ item.label }}</td><td>{{ item.value }}</td><td>{{ item.subtext|default:'-' }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if insights %}
+    <div class="section-title">Insights</div>
+    <table>
+        <thead><tr><th>Topic</th><th>Observation</th></tr></thead>
+        <tbody>
+            {% for item in insights %}
+            <tr><td>{{ item.title }}</td><td>{{ item.body }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% for section in section_tables %}
+    <div class="section-title">{{ section.title }}</div>
+    <table>
+        <thead>
+            <tr>{% for header in section.headers %}<th>{{ header }}</th>{% endfor %}</tr>
+        </thead>
+        <tbody>
+            {% for row in section.rows %}
+            <tr>{% for value in row %}<td>{{ value }}</td>{% endfor %}</tr>
+            {% empty %}
+            <tr><td colspan="{{ section.headers|length }}">No rows available.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endfor %}
+
+    {% include 'home/report/_pdfFooter.html' %}
+</body>
+</html>

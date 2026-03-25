@@ -1971,6 +1971,457 @@ def audit_log_report(request):
         'audit_can_export': request.user.has_perm('home.can_export_audit_logs') or request.user.has_perm('home.can_view_party_credentials'),
     }
     return render(request, 'home/admin/auditLogReport.html', context)
+
+
+def _business_filters_context(request):
+    today = datetime.today().date().strftime('%d/%m/%Y')
+    return {
+        'staffs': tenant_qs(request, StaffUser).filter(isDeleted=False).order_by('name'),
+        'parties': tenant_qs(request, Party).filter(isDeleted=False).order_by('name'),
+        'defaultStartDate': today,
+        'defaultEndDate': today,
+    }
+
+
+def _render_business_analytics(request, title, api_name, primary_title='Primary', secondary_title='Secondary'):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': title,
+        'api_url': reverse(api_name),
+        'primary_title': primary_title,
+        'secondary_title': secondary_title,
+    })
+    return render(request, 'home/business/analytics_board.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_view_party_credentials', 'home.can_view_sales_reports', 'home.can_view_collection_reports', 'home.can_view_cash_counter_reports')
+def analytics_business_snapshot(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Business Snapshot',
+        'api_url': reverse('homeApp:api_business_snapshot'),
+        'primary_title': 'Top Sales Staff',
+        'secondary_title': 'Top Collection Staff',
+    })
+    return render(request, 'home/business/business_snapshot.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_sales', 'home.can_view_sales_reports', 'home.can_view_party_credentials')
+def analytics_revenue_trend(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Revenue Trend',
+        'api_url': reverse('homeApp:api_revenue_trend'),
+        'export_actions': [
+            {'label': 'PDF', 'url': reverse('homeApp:export_revenue_trend_pdf'), 'icon': 'file pdf outline', 'mode': 'range_group'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_revenue_trend_excel'), 'icon': 'file excel outline', 'mode': 'range_group'},
+        ],
+    })
+    return render(request, 'home/business/revenue_trend.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_approve_collection', 'home.can_view_collection_reports', 'home.can_view_party_credentials')
+def analytics_collection_trend(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Collection Trend',
+        'api_url': reverse('homeApp:api_collection_trend'),
+        'export_actions': [
+            {'label': 'PDF', 'url': reverse('homeApp:export_collection_trend_pdf'), 'icon': 'file pdf outline', 'mode': 'range_group'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_collection_trend_excel'), 'icon': 'file excel outline', 'mode': 'range_group'},
+        ],
+    })
+    return render(request, 'home/business/collection_trend.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials')
+def analytics_receivables(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Receivables',
+        'api_url': reverse('homeApp:api_receivables'),
+        'export_actions': [
+            {'label': 'PDF', 'url': reverse('homeApp:export_receivables_pdf'), 'icon': 'file pdf outline', 'mode': 'range_only'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_receivables_excel'), 'icon': 'file excel outline', 'mode': 'range_only'},
+        ],
+    })
+    return render(request, 'home/business/receivables.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_staff', 'home.can_view_party_credentials')
+def analytics_staff_productivity(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Staff Productivity',
+        'api_url': reverse('homeApp:api_staff_productivity'),
+        'export_actions': [
+            {'label': 'PDF', 'url': reverse('homeApp:export_staff_productivity_pdf'), 'icon': 'file pdf outline', 'mode': 'range_only'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_staff_productivity_excel'), 'icon': 'file excel outline', 'mode': 'range_only'},
+        ],
+    })
+    return render(request, 'home/business/staff_productivity.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_books', 'home.can_view_party_credentials')
+def analytics_cash_position(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Cash Position',
+        'api_url': reverse('homeApp:api_cash_position'),
+    })
+    return render(request, 'home/business/cash_position.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_orders', 'home.can_view_order_reports', 'home.can_view_party_credentials')
+def analytics_order_pipeline(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Order Pipeline',
+        'api_url': reverse('homeApp:api_order_pipeline'),
+        'export_actions': [
+            {'label': 'PDF', 'url': reverse('homeApp:export_order_pipeline_pdf'), 'icon': 'file pdf outline', 'mode': 'range_group'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_order_pipeline_excel'), 'icon': 'file excel outline', 'mode': 'range_group'},
+        ],
+    })
+    return render(request, 'home/business/order_pipeline.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_view_party_credentials', 'home.can_approve_collection', 'home.can_approve_sales', 'home.can_approve_orders')
+def analytics_exception_dashboard(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Exception Dashboard',
+        'api_url': reverse('homeApp:api_exception_dashboard'),
+    })
+    return render(request, 'home/business/exceptions.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_view_party_credentials', 'home.can_view_sales_reports', 'home.can_view_collection_reports', 'home.can_view_cash_counter_reports')
+def report_daily_summary(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Daily Summary Report',
+        'api_url': reverse('homeApp:api_business_snapshot'),
+        'primary_title': 'Top Sales Staff',
+        'secondary_title': 'Top Collection Staff',
+        'page_subtitle': 'Owner-facing daily summary with money, activity, and exceptions in one place.',
+        'report_actions': [
+            {'label': 'Sales List', 'url': reverse('homeApp:sales_list'), 'icon': 'shopping cart'},
+            {'label': 'Collection List', 'url': reverse('homeApp:collection_list'), 'icon': 'hand holding usd'},
+            {'label': 'Cash Counter', 'url': reverse('homeApp:my_cash_counter_list'), 'icon': 'calendar alternate'},
+        ],
+        'export_actions': [
+            {'label': 'Daily Summary PDF', 'url': reverse('homeApp:generate_daily_summary_pdf'), 'icon': 'print', 'mode': 'single_day_all'},
+            {'label': 'Daily Summary Excel', 'url': reverse('homeApp:generate_daily_summary_excel'), 'icon': 'file excel outline', 'mode': 'single_day_all'},
+            {'label': 'Monthly Summary Excel', 'url': reverse('homeApp:generate_monthly_business_summary_excel'), 'icon': 'calendar alternate outline', 'mode': 'single_day_all'},
+            {'label': 'Sales PDF', 'url': reverse('homeApp:generate_sales_report'), 'icon': 'file pdf outline', 'mode': 'single_day_all'},
+            {'label': 'Sales Excel', 'url': reverse('homeApp:generate_sales_report_excel'), 'icon': 'file excel outline', 'mode': 'single_day_all'},
+            {'label': 'Collection PDF', 'url': reverse('homeApp:generate_collection_report'), 'icon': 'file pdf outline', 'mode': 'single_day_all'},
+            {'label': 'Collection Excel', 'url': reverse('homeApp:generate_collection_report_excel'), 'icon': 'file excel outline', 'mode': 'single_day_all'},
+            {'label': 'Cash Counter PDF', 'url': reverse('homeApp:generate_cash_counter_report'), 'icon': 'file pdf outline', 'mode': 'single_day_all'},
+            {'label': 'Cash Counter Excel', 'url': reverse('homeApp:generate_cash_counter_report_excel'), 'icon': 'file excel outline', 'mode': 'single_day_all'},
+        ],
+        'export_help': 'Quick PDFs use the selected end date. Keep this report on a single day when you need a print-ready daybook.',
+    })
+    return render(request, 'home/business/daily_summary.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_staff', 'home.can_view_party_credentials')
+def report_staff_performance(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Staff Performance Report',
+        'api_url': reverse('homeApp:api_staff_productivity'),
+        'page_subtitle': 'Compare staff output across sales, collections, orders, and attendance-backed efficiency.',
+        'report_actions': [
+            {'label': 'Attendance List', 'url': reverse('homeApp:attendance_list'), 'icon': 'calendar alternate'},
+            {'label': 'Staff List', 'url': reverse('homeApp:user_list'), 'icon': 'users'},
+        ],
+        'export_actions': [
+            {'label': 'PDF', 'url': reverse('homeApp:export_staff_productivity_pdf'), 'icon': 'file pdf outline', 'mode': 'range_only'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_staff_productivity_excel'), 'icon': 'file excel outline', 'mode': 'range_only'},
+        ],
+        'export_help': 'Use the selected date range to export a printable or spreadsheet-friendly staff performance summary.',
+    })
+    return render(request, 'home/business/staff_performance_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials')
+def report_customer_outstanding(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Customer Outstanding Report',
+        'api_url': reverse('homeApp:api_receivables'),
+        'page_subtitle': 'Outstanding balances, aging pressure, and assigned follow-up responsibility.',
+        'report_actions': [
+            {'label': 'Party List', 'url': reverse('homeApp:party_list'), 'icon': 'address book'},
+            {'label': 'Customer Ledger', 'url': reverse('homeApp:report_party_ledger'), 'icon': 'book'},
+        ],
+        'export_actions': [
+            {'label': 'PDF', 'url': reverse('homeApp:export_receivables_pdf'), 'icon': 'file pdf outline', 'mode': 'range_only'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_receivables_excel'), 'icon': 'file excel outline', 'mode': 'range_only'},
+        ],
+        'export_help': 'Exports use the selected end date as the receivables cut-off.',
+    })
+    return render(request, 'home/business/customer_outstanding_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_parties', 'home.can_view_party_credentials', 'home.view_party')
+def report_customer_ledger(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Customer Ledger Report',
+        'page_subtitle': 'Select a customer, keep the date range tight, and either open the live ledger or export the PDF immediately.',
+        'ledger_page_url_template': reverse('homeApp:party_ledger', args=[0]),
+        'ledger_pdf_url_template': reverse('homeApp:generate_party_ledger_pdf', args=[0]),
+        'ledger_excel_url_template': reverse('homeApp:generate_party_ledger_excel', args=[0]),
+    })
+    return render(request, 'home/business/customer_ledger_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_approve_collection', 'home.can_view_collection_reports', 'home.can_view_party_credentials')
+def report_collection_business(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Collection Report',
+        'page_subtitle': 'Open the detailed collection list to filter, review approvals, and export the report.',
+        'open_url': reverse('homeApp:collection_list'),
+        'download_label': 'Open Collection List',
+        'filter_help': 'Pick one collection date and, if needed, narrow the export to a specific collector. Leave staff as All for a full-day report.',
+        'show_staff_filter': True,
+        'export_actions': [
+            {
+                'label': 'Export PDF',
+                'url': reverse('homeApp:generate_collection_report'),
+                'icon': 'file pdf outline',
+                'mode': 'single_date_staff',
+            },
+            {
+                'label': 'Export Excel',
+                'url': reverse('homeApp:generate_collection_report_excel'),
+                'icon': 'file excel outline',
+                'mode': 'single_date_staff',
+            },
+        ],
+        'secondary_actions': [
+            {'label': 'Cheque Reminders', 'url': reverse('homeApp:cheque_reminder_list'), 'icon': 'bell'},
+        ],
+    })
+    return render(request, 'home/business/attendance_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_sales', 'home.can_view_sales_reports', 'home.can_view_party_credentials')
+def report_sales_business(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Sales Report',
+        'page_subtitle': 'Open the detailed sales list to filter invoices and export the report.',
+        'open_url': reverse('homeApp:sales_list'),
+        'download_label': 'Open Sales List',
+        'filter_help': 'Pick one invoice date and optionally export only one staff member. Leave staff as All for the full sales daybook.',
+        'show_staff_filter': True,
+        'export_actions': [
+            {
+                'label': 'Export PDF',
+                'url': reverse('homeApp:generate_sales_report'),
+                'icon': 'file pdf outline',
+                'mode': 'single_date_staff',
+            },
+            {
+                'label': 'Export Excel',
+                'url': reverse('homeApp:generate_sales_report_excel'),
+                'icon': 'file excel outline',
+                'mode': 'single_date_staff',
+            },
+        ],
+        'secondary_actions': [
+            {'label': 'Add Sale', 'url': reverse('homeApp:add_sales'), 'icon': 'plus circle'},
+        ],
+    })
+    return render(request, 'home/business/link_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_cash_counter', 'home.can_view_cash_counter_reports', 'home.can_view_party_credentials')
+def report_cash_closing(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Cash Closing Report',
+        'api_url': reverse('homeApp:api_cash_position'),
+        'page_subtitle': 'Cash and bank movement summary with quick access to book-level detail.',
+        'report_actions': [
+            {'label': 'Cashbook', 'url': reverse('homeApp:cashbook'), 'icon': 'book'},
+            {'label': 'Bankbook', 'url': reverse('homeApp:bankbook'), 'icon': 'university'},
+            {'label': 'Cash Counter List', 'url': reverse('homeApp:my_cash_counter_list'), 'icon': 'calendar alternate'},
+        ],
+        'export_actions': [
+            {'label': 'Cash Counter PDF', 'url': reverse('homeApp:generate_cash_counter_report'), 'icon': 'file pdf outline', 'mode': 'single_day_all'},
+            {'label': 'Cash Counter Excel', 'url': reverse('homeApp:generate_cash_counter_report_excel'), 'icon': 'file excel outline', 'mode': 'single_day_all'},
+            {'label': 'Book Statements', 'url': reverse('homeApp:report_bank_cash_movement'), 'icon': 'exchange', 'mode': 'link'},
+        ],
+        'export_help': 'Use the selected end date for cash-counter closing. For full book statements across a date range, open the book-statement hub.',
+    })
+    return render(request, 'home/business/cash_closing_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_orders', 'home.can_view_order_reports', 'home.can_view_party_credentials')
+def report_order_status(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Order Status Report',
+        'api_url': reverse('homeApp:api_order_pipeline'),
+        'primary_title': 'Status Split',
+        'secondary_title': 'Top Staff',
+        'page_subtitle': 'Track order status flow and jump into the detailed order screens for action.',
+        'report_actions': [
+            {'label': 'Orders List', 'url': reverse('homeApp:orders_list'), 'icon': 'clipboard list'},
+            {'label': 'Add Order', 'url': reverse('homeApp:add_order'), 'icon': 'plus circle'},
+        ],
+        'export_actions': [
+            {'label': 'PDF', 'url': reverse('homeApp:export_order_pipeline_pdf'), 'icon': 'file pdf outline', 'mode': 'range_group'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_order_pipeline_excel'), 'icon': 'file excel outline', 'mode': 'range_group'},
+        ],
+        'report_help': 'This report is best used as a live operational tracker. Open the orders list for row-level review and per-order PDF export.',
+    })
+    return render(request, 'home/business/order_status_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_view_all_attendance', 'home.can_view_attendance_reports', 'home.can_view_party_credentials')
+def report_attendance_business(request):
+    context = _business_filters_context(request)
+    can_export_admin_attendance = request.user.has_perm('home.can_view_all_attendance') or request.user.has_perm('home.can_view_party_credentials')
+    export_actions = []
+    if can_export_admin_attendance:
+        export_actions.append({
+            'label': 'Export Admin PDF',
+            'url': reverse('homeApp:generate_attendance_pdf_admin_report'),
+            'icon': 'file pdf outline',
+            'mode': 'range_staff',
+        })
+        export_actions.append({
+            'label': 'Export Admin Excel',
+            'url': reverse('homeApp:generate_attendance_excel_admin_report'),
+            'icon': 'file excel outline',
+            'mode': 'range_staff',
+        })
+        export_actions.append({
+            'label': 'Monthly View PDF',
+            'url': reverse('homeApp:generate_attendance_monthly_pdf_admin_report'),
+            'icon': 'calendar',
+            'mode': 'month_staff',
+        })
+        export_actions.append({
+            'label': 'Monthly View Excel',
+            'url': reverse('homeApp:generate_attendance_monthly_excel_admin_report'),
+            'icon': 'file excel outline',
+            'mode': 'month_staff',
+        })
+    export_actions.append({
+        'label': 'Export My Attendance PDF',
+        'url': reverse('homeApp:generate_attendance_pdf_staff_report'),
+        'icon': 'user clock',
+        'mode': 'range_only',
+    })
+    export_actions.append({
+        'label': 'Export My Attendance Excel',
+        'url': reverse('homeApp:generate_attendance_excel_staff_report'),
+        'icon': 'file excel outline',
+        'mode': 'range_only',
+    })
+    if not can_export_admin_attendance:
+        export_actions.append({
+            'label': 'Monthly View PDF',
+            'url': reverse('homeApp:generate_attendance_monthly_pdf_staff_report'),
+            'icon': 'calendar',
+            'mode': 'month_only',
+        })
+        export_actions.append({
+            'label': 'Monthly View Excel',
+            'url': reverse('homeApp:generate_attendance_monthly_excel_staff_report'),
+            'icon': 'file excel outline',
+            'mode': 'month_only',
+        })
+    context.update({
+        'page_title': 'Attendance Report',
+        'page_subtitle': 'Open the attendance screen to filter records and export staff/admin attendance PDFs.',
+        'open_url': reverse('homeApp:attendance_list'),
+        'download_label': 'Open Attendance List',
+        'filter_help': 'Use a date range for payroll or compliance checks. Admin export can target one staff member or All.',
+        'show_end_date': True,
+        'show_staff_filter': can_export_admin_attendance,
+        'export_actions': export_actions,
+    })
+    return render(request, 'home/business/link_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_approve_collection', 'home.can_approve_sales', 'home.can_approve_orders', 'home.can_view_party_credentials')
+def report_pending_approval(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Pending Approval Report',
+        'api_url': reverse('homeApp:api_exception_dashboard'),
+        'page_subtitle': 'Review all approval backlogs and route into the operational lists that need action.',
+        'report_actions': [
+            {'label': 'Sales List', 'url': reverse('homeApp:sales_list'), 'icon': 'shopping cart'},
+            {'label': 'Collection List', 'url': reverse('homeApp:collection_list'), 'icon': 'hand holding usd'},
+            {'label': 'Orders List', 'url': reverse('homeApp:orders_list'), 'icon': 'clipboard list'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_pending_approvals_excel'), 'icon': 'file excel outline'},
+        ],
+        'report_help': 'Use this screen to spot approval backlog and then jump into the exact operational queue that needs action.',
+    })
+    return render(request, 'home/business/pending_approval_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.can_manage_books', 'home.can_view_party_credentials')
+def report_bank_cash_movement(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Bank/Cash Movement Report',
+        'page_subtitle': 'Open the detailed cashbook and bankbook statements from a single report hub.',
+        'cashbook_url': reverse('homeApp:cashbook'),
+        'bankbook_url': reverse('homeApp:bankbook'),
+        'cashbook_pdf_url': reverse('homeApp:generate_cashbook_pdf'),
+        'cashbook_excel_url': reverse('homeApp:generate_cashbook_excel'),
+        'bankbook_pdf_url': reverse('homeApp:generate_bankbook_pdf'),
+        'bankbook_excel_url': reverse('homeApp:generate_bankbook_excel'),
+        'cash_accounts': tenant_qs(request, BookAccount).filter(isDeleted=False, type=BookAccount.Type.CASH).order_by('-isDefault', 'name'),
+        'bank_accounts': tenant_qs(request, BookAccount).filter(isDeleted=False, type=BookAccount.Type.BANK).select_related('bank').order_by('name'),
+    })
+    return render(request, 'home/business/bank_cash_movement_report.html', context)
+
+
+@is_activated()
+@permission_required_any('home.view_whatsappmessagestatus', 'home.add_whatsappmessagestatus', 'home.change_whatsappmessagestatus', 'home.delete_whatsappmessagestatus')
+def report_failed_message(request):
+    context = _business_filters_context(request)
+    context.update({
+        'page_title': 'Failed Message Report',
+        'api_url': reverse('homeApp:api_failed_messages'),
+        'page_subtitle': 'Review failed delivery attempts and then continue into the full message history screen.',
+        'report_actions': [
+            {'label': 'Message List', 'url': reverse('homeApp:message_list'), 'icon': 'comment dots outline'},
+            {'label': 'Excel', 'url': reverse('homeApp:export_failed_messages_excel'), 'icon': 'file excel outline'},
+        ],
+    })
+    return render(request, 'home/business/failed_message_report.html', context)
 # -----------------------CashCounter---------------------
 @permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter')
 def cash_counter_home(request):
