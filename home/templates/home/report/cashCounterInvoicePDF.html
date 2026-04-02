@@ -1,0 +1,166 @@
+{% load formatting %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cash Counter Invoice</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #0f172a; font-size: 11px; }
+        .header { display: flex; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+        .title { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+        .subtle { color: #64748b; font-size: 10px; }
+        .panel { border: 1px solid #dbe5f0; border-radius: 10px; padding: 10px 12px; background: #fff; }
+        .grid { display: table; width: 100%; border-collapse: separate; border-spacing: 0 10px; }
+        .row { display: table-row; }
+        .cell { display: table-cell; vertical-align: top; width: 50%; padding-right: 10px; }
+        .label { color: #64748b; font-size: 10px; text-transform: uppercase; font-weight: 700; margin-bottom: 4px; }
+        .value { font-weight: 700; line-height: 1.5; }
+        table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+        th, td { border: 1px solid #dbe5f0; padding: 8px; text-align: left; vertical-align: top; }
+        th { background: #eff6ff; color: #334155; font-size: 10px; text-transform: uppercase; }
+        .right { text-align: right; }
+        .summary { width: 42%; margin-left: auto; margin-top: 16px; }
+        .summary td { padding: 7px 8px; }
+        .grand { background: #ecfeff; font-weight: 800; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <div class="title">{{ seller_name }}</div>
+            <div class="subtle">Cash Counter Invoice</div>
+            {% if seller_address %}<div>{{ seller_address|linebreaksbr }}</div>{% endif %}
+            {% if seller_gst_number %}<div><strong>GSTIN:</strong> {{ seller_gst_number }}</div>{% endif %}
+            {% if seller_phone %}<div><strong>Phone:</strong> {{ seller_phone }}</div>{% endif %}
+        </div>
+        <div class="panel">
+            <div><strong>Invoice No:</strong> {{ counter.invoiceNumber|default:"-" }}</div>
+            <div><strong>Entry Date:</strong> {{ counter.entryDate|date:"d M Y" }}</div>
+            <div><strong>Counter Mode:</strong> {{ counter.mode|default:"-" }}</div>
+            <div><strong>Invoice Type:</strong> {{ counter.get_invoiceKind_display }}</div>
+            <div><strong>GST Tax Mode:</strong> {{ tax_mode_label }}</div>
+            {% if seller_state_code %}<div><strong>Seller State Code:</strong> {{ seller_state_code }}</div>{% endif %}
+            {% if buyer_state_code %}<div><strong>Buyer State Code:</strong> {{ buyer_state_code }}</div>{% endif %}
+            {% if not buyer_state_code and place_of_supply_state_code %}<div><strong>Place Of Supply State Code:</strong> {{ place_of_supply_state_code }}</div>{% endif %}
+            {% if counter.placeOfSupply %}<div><strong>Place Of Supply:</strong> {{ counter.placeOfSupply }}</div>{% endif %}
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="row">
+            <div class="cell">
+                <div class="panel">
+                    <div class="label">Bill To</div>
+                    <div class="value">{{ buyer_name|default:"-" }}</div>
+                    {% if buyer_address %}<div>{{ buyer_address|linebreaksbr }}</div>{% endif %}
+                    {% if buyer_gst_number %}<div><strong>GSTIN:</strong> {{ buyer_gst_number }}</div>{% endif %}
+                    {% if counter.partyID.phone %}<div><strong>Phone:</strong> {{ counter.partyID.phone }}</div>{% endif %}
+                </div>
+            </div>
+            <div class="cell">
+                <div class="panel">
+                    <div class="label">Invoice Notes</div>
+                    <div class="value">{{ counter.remark|default:"-" }}</div>
+                    <div style="margin-top: 10px;"><strong>Prepared By:</strong> {{ counter.createdBy.name|default:"-" }}</div>
+                    {% if counter.mode == 'Mix' %}
+                        <div><strong>Mix Split:</strong> Cash {{ counter.mixCashAmount|money }} / Card {{ counter.mixCardAmount|money }}</div>
+                    {% elif counter.bankID %}
+                        <div><strong>Bank:</strong> {{ counter.bankID.name }}{% if counter.bankID.accountNumber %} - {{ counter.bankID.accountNumber }}{% endif %}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Item</th>
+                <th>Unit</th>
+                <th>HSN</th>
+                <th class="right">Qty</th>
+                <th class="right">Rate</th>
+                <th class="right">Disc %</th>
+                <th class="right">Taxable</th>
+                <th class="right">GST %</th>
+                <th class="right">GST Amt</th>
+                <th class="right">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line in lines %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ line.item.name }}</td>
+                <td>{{ line.item.unitName|default:"-" }}</td>
+                <td>{{ line.hsnCode|default:line.item.hsnCode|default:"-" }}</td>
+                <td class="right">{{ line.quantity|floatformat:2 }}</td>
+                <td class="right">{{ line.unitPrice|money }}</td>
+                <td class="right">{{ line.discountPercent|floatformat:2 }}</td>
+                <td class="right">{{ line.taxableAmount|money }}</td>
+                <td class="right">{{ line.gstRate|floatformat:2 }}</td>
+                <td class="right">{{ line.gstAmount|money }}</td>
+                <td class="right">{{ line.lineTotal|money }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="11">This invoice was saved without item-wise GST rows.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <table class="summary">
+        <tr>
+            <td><strong>Taxable Value</strong></td>
+            <td class="right">{{ taxable_total|money }}</td>
+        </tr>
+        {% if igst_total %}
+        <tr>
+            <td><strong>IGST</strong></td>
+            <td class="right">{{ igst_total|money }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td><strong>CGST</strong></td>
+            <td class="right">{{ cgst_total|money }}</td>
+        </tr>
+        {% if utgst_total %}
+        <tr>
+            <td><strong>UTGST</strong></td>
+            <td class="right">{{ utgst_total|money }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td><strong>SGST</strong></td>
+            <td class="right">{{ sgst_total|money }}</td>
+        </tr>
+        {% endif %}
+        {% endif %}
+        <tr>
+            <td><strong>Total GST</strong></td>
+            <td class="right">{{ gst_total|money }}</td>
+        </tr>
+        <tr>
+            <td><strong>Total Before Round Off</strong></td>
+            <td class="right">{{ total_before_round_off|money }}</td>
+        </tr>
+        <tr>
+            <td><strong>Round Off</strong></td>
+            <td class="right">{% if round_off_amount >= 0 %}+{% endif %}{{ round_off_amount|money }}</td>
+        </tr>
+        <tr class="grand">
+            <td><strong>Grand Total</strong></td>
+            <td class="right">{{ grand_total|money }}</td>
+        </tr>
+    </table>
+
+    <div class="panel" style="margin-top: 12px;">
+        <div class="label">Net Payable In Words</div>
+        <div class="value">{{ grand_total|money_words }}</div>
+    </div>
+
+    {% include 'home/report/_pdfFooter.html' %}
+</body>
+</html>

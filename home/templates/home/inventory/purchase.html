@@ -1,0 +1,764 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/4.1.0/css/fixedColumns.dataTables.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.1.0/js/dataTables.fixedColumns.min.js"></script>
+{% endblock %}
+
+{% block title %}<title>Purchases</title>{% endblock %}
+
+{% block body %}
+<style>
+    #PurchaseTable_length {
+        left: 20px;
+        position: absolute;
+    }
+
+    #PurchaseTable_filter {
+        width: 50%;
+        float: right;
+    }
+
+    .dt-buttons {
+        position: absolute;
+        left: 174px;
+    }
+
+    input[type=search] {
+        width: 100px !important;
+    }
+
+    .purchase-lines-shell {
+        border: 1px solid rgba(34, 36, 38, 0.1);
+        border-radius: 12px;
+        padding: 16px;
+        background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .purchase-lines-table td .field {
+        margin-bottom: 0;
+    }
+
+    .purchase-lines-table .ui.dropdown,
+    .purchase-lines-table input {
+        width: 100%;
+    }
+
+    .purchase-lines-table .purchase-remove {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        padding: 0;
+        margin: 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .purchase-lines-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+        border-top: 1px solid rgba(34, 36, 38, 0.08);
+        padding-top: 14px;
+    }
+
+    .purchase-lines-totals {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-left: auto;
+    }
+
+    .purchase-modal-shell {
+        display: grid;
+        gap: 16px;
+    }
+
+    .purchase-form-section {
+        border: 1px solid rgba(34, 36, 38, 0.08);
+        border-radius: 12px;
+        padding: 16px;
+        background: #fff;
+    }
+
+    .purchase-form-section .ui.small.header {
+        margin-bottom: 4px;
+    }
+
+    .purchase-form-caption {
+        margin: 0 0 14px 0;
+        color: #667085;
+        font-size: 13px;
+    }
+
+    .purchase-modal-note {
+        margin: 0;
+    }
+
+    .purchase-lines-table th {
+        background: #f8fafc;
+    }
+
+    .purchase-lines-table td {
+        vertical-align: middle;
+    }
+
+    .purchase-lines-table th:nth-child(1) { width: 32%; }
+    .purchase-lines-table th:nth-child(2) { width: 12%; }
+    .purchase-lines-table th:nth-child(3) { width: 7%; }
+    .purchase-lines-table th:nth-child(4) { width: 9%; }
+    .purchase-lines-table th:nth-child(5) { width: 9%; }
+    .purchase-lines-table th:nth-child(6) { width: 7%; }
+    .purchase-lines-table th:nth-child(7) { width: 9%; }
+    .purchase-lines-table th:nth-child(8) { width: 8%; }
+    .purchase-lines-table th:nth-child(9) { width: 7%; }
+
+    .purchase-lines-table .ui.dropdown > .text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .purchase-line-item-hint {
+        margin-top: 6px;
+        font-size: 12px;
+        line-height: 1.35;
+        color: #667085;
+        white-space: normal;
+    }
+
+    .purchase-history-list {
+        max-height: 320px;
+        overflow-y: auto;
+    }
+</style>
+
+<div class="ui right aligned basic grid">
+    <div class="sixteen wide column">
+        <div class="ui pointing secondary menu">
+            <div style="cursor: pointer;" class="item active">Purchase List</div>
+            <div style="position: absolute; right: 1.5rem; top: 18px;">
+                <button class="ui green mini plus button right" onclick="showPurchaseModal()">
+                    <i class="plus square outline icon"></i>
+                    Add Purchase
+                </button>
+            </div>
+        </div>
+
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="PurchaseTable" style="margin-top: 5px; width: 100%">
+                    <thead>
+                    <tr>
+                        <th>Invoice</th>
+                        <th>Date</th>
+                        <th>Party</th>
+                        <th>GST Treatment</th>
+                        <th>Claim Status</th>
+                        <th>Amount</th>
+                        <th>Revisions</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="ui large modal" id="purchaseModal">
+            <i class="close icon"></i>
+            <div class="header" id="purchaseModalTitle">Add Purchase Invoice</div>
+            <div class="content">
+                <form class="ui tiny form" id="purchaseForm">{% csrf_token %}
+                    <input type="hidden" id="purchaseId">
+                    <div class="purchase-modal-shell">
+                        <div class="ui tiny info message purchase-modal-note">
+                            Use this form for supplier inward entries. Inventory stock will increase from these purchase lines and GST claim changes will be tracked in revision history.
+                        </div>
+
+                        <div class="purchase-form-section">
+                            <div class="ui small header">Invoice Details</div>
+                            <p class="purchase-form-caption">Capture the source document and supplier before adding stock lines.</p>
+                            <div class="three required fields">
+                                <div class="field">
+                                    <label>Invoice Number</label>
+                                    <input type="text" id="purchaseInvoiceNumber" placeholder="Purchase invoice number">
+                                </div>
+                                <div class="field">
+                                    <label>Invoice Date</label>
+                                    <div class="ui calendar" id="purchaseDateCalendar">
+                                        <div class="ui input"><input type="text" id="purchaseInvoiceDate" placeholder="dd/mm/yyyy"></div>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label>Supplier / Party</label>
+                                    <select class="ui fluid search clearable dropdown" id="purchaseParty">
+                                        <option value="">Select party</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="purchase-form-section">
+                            <div class="ui small header">GST and Control</div>
+                            <p class="purchase-form-caption">Use revision reason when GST treatment or claim status is being corrected later.</p>
+                            {% if not non_gst_shadow_enabled %}
+                            <div class="ui tiny info message">
+                                Non-GST mode is currently hidden for this tenant. Purchase entry is restricted to GST invoices until an admin enables it from Billing -> Non-GST Control.
+                            </div>
+                            {% endif %}
+                            <div class="three fields">
+                                <div class="field">
+                                    <label>GST Treatment</label>
+                                    <select class="ui fluid dropdown" id="purchaseGstTreatment">
+                                        <option value="gst">GST Invoice</option>
+                                        {% if non_gst_shadow_enabled %}
+                                        <option value="non_gst">Non GST Invoice</option>
+                                        <option value="non_gst_claimable">Non GST Claimable</option>
+                                        {% endif %}
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Claim Status</label>
+                                    <select class="ui fluid dropdown" id="purchaseClaimStatus">
+                                        <option value="not_applicable">Not Applicable</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="claimed">Claimed</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Revision Reason</label>
+                                    <input type="text" id="purchaseRevisionReason" placeholder="Needed when changing claim / GST state">
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label>Remark</label>
+                                <textarea id="purchaseRemark" rows="2" placeholder="Internal note for this purchase invoice"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="purchase-lines-shell">
+                            <div class="ui clearing basic segment" style="padding: 0 0 12px 0;">
+                                <h4 class="ui horizontal left aligned divider header" style="margin: 0;">
+                                    <i class="left align icon"></i>
+                                    Purchase Lines
+                                </h4>
+                                <button type="button" class="ui right floated teal basic small button" onclick="addPurchaseRow()">Add Row</button>
+                            </div>
+                            <p class="purchase-form-caption">Add item-wise inward stock with bucket, quantity, cost, and tax values.</p>
+                            <table class="ui celled compact small table purchase-lines-table">
+                                <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Bucket</th>
+                                    <th>Qty</th>
+                                    <th>Unit Cost</th>
+                                    <th>Taxable</th>
+                                    <th>GST %</th>
+                                    <th>GST Amt</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                                </thead>
+                                <tbody id="purchaseLinesBody"></tbody>
+                            </table>
+                            <div class="purchase-lines-footer">
+                                <div class="purchase-lines-totals">
+                                    <span class="ui tiny label">Subtotal: ₹ <span id="purchaseSubtotal">0.00</span></span>
+                                    <span class="ui tiny label">GST: ₹ <span id="purchaseGSTTotal">0.00</span></span>
+                                    <span class="ui tiny teal label">Grand Total: ₹ <span id="purchaseGrandTotal">0.00</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="actions" style="padding-top: 20px; padding-bottom: 20px; float: right">
+                <div class="ui cancel button">Cancel</div>
+                <button class="ui right labeled icon button green saveBtn" onclick="savePurchase()">
+                    <span id="purchaseActionLabel">Submit</span>
+                    <i class="checkmark icon"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="ui basic modal custom" id="deletePurchaseModal">
+            <div class="ui icon header">
+                <i class="archive icon"></i>
+                Purchase Invoice will be Deleted
+            </div>
+            <div class="content">
+                <p style="text-align: center">The purchase invoice will be deleted. Are you sure?</p>
+            </div>
+            <div class="actions">
+                <div class="ui red basic cancel inverted button">
+                    <i class="remove icon"></i>
+                    No
+                </div>
+                <input type="hidden" id="DeletePurchaseId">
+                <div class="ui green ok inverted button" onclick="deletePurchase()">
+                    <i class="checkmark icon"></i>
+                    Yes
+                </div>
+            </div>
+        </div>
+
+        <div class="ui modal" id="purchaseHistoryModal">
+            <i class="close icon"></i>
+            <div class="header">Purchase GST / Claim History</div>
+            <div class="content">
+                <div class="ui relaxed divided list purchase-history-list" id="purchaseRevisionList">
+                    <div class="item">No history yet.</div>
+                </div>
+            </div>
+            <div class="actions">
+                <div class="ui cancel button">Close</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+    const nonGstShadowEnabled = {{ non_gst_shadow_enabled|yesno:"true,false" }};
+    $('.ui.dropdown').dropdown({fullTextSearch: true});
+    $('#purchaseDateCalendar').calendar({
+        monthFirst: false,
+        type: 'date',
+        formatter: {
+            date: function (date) {
+                if (!date) return '';
+                return date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
+            }
+        }
+    });
+
+    let purchaseCatalog = [];
+    let purchaseRows = [];
+    let purchaseTable = null;
+
+    function currentPurchaseIsNonGst() {
+        const treatment = $('#purchaseGstTreatment').dropdown('get value') || $('#purchaseGstTreatment').val() || 'gst';
+        return treatment === 'non_gst' || treatment === 'non_gst_claimable';
+    }
+
+    function purchaseOptionsHtml() {
+        return purchaseCatalog.map(function (item) {
+            return '<option value="' + item.ID + '"' +
+                ' data-gst-rate="' + (item.GSTRate || 0) + '"' +
+                ' data-gst-stock="' + (item.GSTStock || 0) + '"' +
+                ' data-non-gst-stock="' + (item.NonGSTStock || 0) + '"' +
+                ' data-purchase-price="' + (item.DefaultPurchasePrice || 0) + '"' +
+                ' data-sales-price="' + (item.DefaultSalesPrice || 0) + '"' +
+                ' data-default-bucket="' + (item.DefaultStockBucket || 'gst') + '"' +
+                '>' + item.Name + (item.SKU ? ' [' + item.SKU + ']' : '') +
+                ' | GST ' + (item.GSTStock || 0) +
+                (nonGstShadowEnabled ? (' | Non-GST ' + (item.NonGSTStock || 0)) : '') +
+                '</option>';
+        }).join('');
+    }
+
+    function updatePurchaseRowHint($row) {
+        const $selected = $row.find('.purchase-item option:selected');
+        const gstStock = Number($selected.data('gst-stock') || 0);
+        const nonGstStock = Number($selected.data('non-gst-stock') || 0);
+        const purchasePrice = Number($selected.data('purchase-price') || 0).toFixed(2);
+        const salesPrice = Number($selected.data('sales-price') || 0).toFixed(2);
+        const gstRate = Number($selected.data('gst-rate') || 0).toFixed(2);
+        const bucket = currentPurchaseIsNonGst()
+            ? 'non_gst'
+            : ($row.find('.purchase-bucket').dropdown('get value') || $row.find('.purchase-bucket').val() || 'gst');
+        const activeStock = bucket === 'non_gst' ? nonGstStock : gstStock;
+        const bucketLabel = bucket === 'non_gst' ? 'Non-GST' : 'GST';
+        let metaHtml = '| GST Stock: ' + gstStock;
+        if (nonGstShadowEnabled) {
+            metaHtml += ' | Non-GST Stock: ' + nonGstStock;
+        }
+        metaHtml += ' | Purchase Rate: ₹ ' + purchasePrice + ' | Sales Rate: ₹ ' + salesPrice + ' | GST %: ' + gstRate;
+        $row.find('.purchase-line-item-hint').html(
+            'Selected bucket: <strong>' + bucketLabel + '</strong> | Available: <strong>' + activeStock + '</strong>' +
+            ' <span style="color:#98a2b3;">' + metaHtml + '</span>'
+        );
+    }
+
+    function applyPurchaseTreatmentToRows() {
+        const nonGstMode = currentPurchaseIsNonGst();
+        $('#purchaseLinesBody .purchase-row').each(function () {
+            const $row = $(this);
+            if (nonGstMode && nonGstShadowEnabled) {
+                $row.find('.purchase-bucket').dropdown('set selected', 'non_gst');
+            }
+            if (nonGstMode) {
+                $row.find('.purchase-gst-rate').val('0.00');
+                $row.find('.purchase-gst-amount').val('0.00');
+            } else if (!$row.find('.purchase-gst-rate').val()) {
+                const $selected = $row.find('.purchase-item option:selected');
+                $row.find('.purchase-gst-rate').val(Number($selected.data('gst-rate') || 0).toFixed(2));
+            }
+            updatePurchaseRowHint($row);
+        });
+        recalcPurchaseRows();
+    }
+
+    function purchaseActionButtons(id) {
+        const detailUrl = '{% url "homeApp:purchase_detail" 0 %}'.replace('0/', id + '/');
+        return '' +
+            '<a href="' + detailUrl + '" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular teal icon button"><i class="eye icon"></i></a>' +
+            ' ' +
+            '<button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editPurchase(' + id + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button>' +
+            ' <button data-tooltip="View History" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showPurchaseHistory(' + id + ')" class="ui circular teal icon button"><i class="history icon"></i></button>' +
+            ' <button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="confirmDeletePurchase(' + id + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>';
+    }
+
+    function addPurchaseRow(row) {
+        row = row || {};
+        const bucketOptions = nonGstShadowEnabled
+            ? '<option value="gst">GST</option><option value="non_gst">Non GST</option>'
+            : '<option value="gst">GST</option>';
+        $('#purchaseLinesBody').append(
+            '<tr class="purchase-row">' +
+            '<td><div class="field"><select class="ui fluid search selection dropdown purchase-item"><option value="">Select item</option>' + purchaseOptionsHtml() + '</select><div class="purchase-line-item-hint">Selected bucket: <strong>GST</strong> | Available: <strong>0</strong> <span style="color:#98a2b3;">| GST Stock: 0' + (nonGstShadowEnabled ? ' | Non-GST Stock: 0' : '') + ' | Purchase Rate: ₹ 0.00 | Sales Rate: ₹ 0.00 | GST %: 0.00</span></div></div></td>' +
+            '<td><div class="field"><select class="ui fluid selection dropdown purchase-bucket">' + bucketOptions + '</select></div></td>' +
+            '<td><div class="ui fluid input"><input type="number" class="purchase-qty" step="0.01" value="' + (row.quantity || '') + '"></div></td>' +
+            '<td><div class="ui fluid input"><input type="number" class="purchase-unit-cost" step="0.01" value="' + (row.unitCost || '') + '"></div></td>' +
+            '<td><div class="ui fluid input"><input type="number" class="purchase-taxable" step="0.01" value="' + (row.taxableAmount || '') + '" readonly></div></td>' +
+            '<td><div class="ui fluid input"><input type="number" class="purchase-gst-rate" step="0.01" value="' + (row.gstRate || '') + '"></div></td>' +
+            '<td><div class="ui fluid input"><input type="number" class="purchase-gst-amount" step="0.01" value="' + (row.gstAmount || '') + '" readonly></div></td>' +
+            '<td><div class="ui fluid input"><input type="number" class="purchase-line-total" step="0.01" value="' + (row.lineTotal || '') + '" readonly></div></td>' +
+            '<td><button type="button" class="ui circular youtube icon button purchase-remove" data-tooltip="Remove Row" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="removePurchaseRow(this)"><i class="trash alternate icon"></i></button></td>' +
+            '</tr>'
+        );
+        const $row = $('#purchaseLinesBody .purchase-row').last();
+        $row.find('.purchase-item').dropdown({
+            fullTextSearch: true,
+            onChange: function () {
+                const $selected = $row.find('.purchase-item option:selected');
+                if (!currentPurchaseIsNonGst() && !$row.find('.purchase-gst-rate').val()) {
+                    $row.find('.purchase-gst-rate').val($selected.data('gst-rate') || 0);
+                }
+                if (!$row.find('.purchase-unit-cost').val()) {
+                    $row.find('.purchase-unit-cost').val($selected.data('purchase-price') || 0);
+                }
+                updatePurchaseRowHint($row);
+                recalcPurchaseRows();
+            }
+        });
+        $row.find('.purchase-bucket').dropdown({
+            onChange: function () {
+                updatePurchaseRowHint($row);
+            }
+        });
+        if (row.itemId) {
+            $row.find('.purchase-item').dropdown('set selected', String(row.itemId));
+        }
+        if (row.stockBucket) {
+            $row.find('.purchase-bucket').dropdown('set selected', row.stockBucket);
+        }
+        if (currentPurchaseIsNonGst() && nonGstShadowEnabled) {
+            $row.find('.purchase-bucket').dropdown('set selected', 'non_gst');
+            $row.find('.purchase-gst-rate').val('0.00');
+            $row.find('.purchase-gst-amount').val('0.00');
+        }
+        updatePurchaseRowHint($row);
+        recalcPurchaseRows();
+    }
+
+    function removePurchaseRow(button) {
+        $(button).closest('tr').remove();
+        recalcPurchaseRows();
+    }
+
+    function recalcPurchaseRows() {
+        const nonGstMode = currentPurchaseIsNonGst();
+        let subtotal = 0;
+        let gstTotal = 0;
+        let grandTotal = 0;
+        $('#purchaseLinesBody .purchase-row').each(function () {
+            const $row = $(this);
+            const qty = parseFloat($row.find('.purchase-qty').val()) || 0;
+            const unitCost = parseFloat($row.find('.purchase-unit-cost').val()) || 0;
+            const taxable = qty * unitCost;
+            const gstRate = nonGstMode ? 0 : (parseFloat($row.find('.purchase-gst-rate').val()) || 0);
+            const gstAmount = nonGstMode ? 0 : ((taxable * gstRate) / 100);
+            const total = nonGstMode ? taxable : (taxable + gstAmount);
+            $row.find('.purchase-taxable').val(taxable.toFixed(2));
+            $row.find('.purchase-gst-rate').val(gstRate.toFixed(2));
+            $row.find('.purchase-gst-amount').val(gstAmount.toFixed(2));
+            $row.find('.purchase-line-total').val(total.toFixed(2));
+            subtotal += taxable;
+            gstTotal += gstAmount;
+            grandTotal += total;
+        });
+        $('#purchaseSubtotal').text(subtotal.toFixed(2));
+        $('#purchaseGSTTotal').text(gstTotal.toFixed(2));
+        $('#purchaseGrandTotal').text(grandTotal.toFixed(2));
+    }
+
+    $(document).on('keyup change', '.purchase-row input', recalcPurchaseRows);
+
+    function collectPurchaseLines() {
+        const nonGstMode = currentPurchaseIsNonGst();
+        const lines = [];
+        $('#purchaseLinesBody .purchase-row').each(function () {
+            const $row = $(this);
+            const itemId = $row.find('.purchase-item').dropdown('get value') || $row.find('.purchase-item').val();
+            const quantity = parseFloat($row.find('.purchase-qty').val()) || 0;
+            if (!itemId || quantity <= 0) return;
+            lines.push({
+                itemId: itemId,
+                stockBucket: nonGstMode ? 'non_gst' : ($row.find('.purchase-bucket').dropdown('get value') || $row.find('.purchase-bucket').val()),
+                quantity: quantity,
+                unitCost: parseFloat($row.find('.purchase-unit-cost').val()) || 0,
+                taxableAmount: parseFloat($row.find('.purchase-taxable').val()) || 0,
+                gstRate: nonGstMode ? 0 : (parseFloat($row.find('.purchase-gst-rate').val()) || 0),
+                gstAmount: nonGstMode ? 0 : (parseFloat($row.find('.purchase-gst-amount').val()) || 0),
+                lineTotal: parseFloat($row.find('.purchase-line-total').val()) || 0
+            });
+        });
+        return lines;
+    }
+
+    function renderRevisionList(rows) {
+        $('#purchaseRevisionList').html('');
+        if (!rows.length) {
+            $('#purchaseRevisionList').html('<div class="item">No history yet.</div>');
+            return;
+        }
+        rows.forEach(function (item) {
+            $('#purchaseRevisionList').append(
+                '<div class="item"><div class="content">' +
+                '<div class="header">' + item.changedOn + '</div>' +
+                '<div class="description">' + (item.previousGstTreatment || '-') + ' -> ' + item.newGstTreatment + ' | ' + (item.previousClaimStatus || '-') + ' -> ' + item.newClaimStatus + '</div>' +
+                '<div class="description">' + (item.reason || 'No reason') + ' | by ' + item.changedBy + '</div>' +
+                '</div></div>'
+            );
+        });
+    }
+
+    function resetPurchaseForm() {
+        $('#purchaseModalTitle').text('Add Purchase Invoice');
+        $('#purchaseActionLabel').text('Submit');
+        $('#purchaseId').val('');
+        $('#purchaseForm')[0].reset();
+        $('#purchaseParty').dropdown('clear');
+        $('#purchaseGstTreatment').dropdown('set selected', 'gst');
+        $('#purchaseClaimStatus').dropdown('set selected', 'not_applicable');
+        $('#purchaseLinesBody').html('');
+        addPurchaseRow();
+        recalcPurchaseRows();
+    }
+
+    $('#purchaseGstTreatment').dropdown({
+        onChange: function () {
+            applyPurchaseTreatmentToRows();
+        }
+    });
+
+    function showPurchaseModal() {
+        resetPurchaseForm();
+        $('#purchaseModal').modal('show');
+    }
+
+    function loadParties() {
+        $.get('{% url "homeApp:list_party_api" %}', function (response) {
+            $('#purchaseParty').html('<option value="">Select party</option>');
+            (response.data || []).forEach(function (party) {
+                $('#purchaseParty').append('<option value="' + party.ID + '">' + party.DisplayDetail + '</option>');
+            });
+            $('#purchaseParty').dropdown('refresh');
+        });
+    }
+
+    function loadItems() {
+        $.get('{% url "homeApp:list_inventory_items_api" %}', function (response) {
+            purchaseCatalog = response.data || [];
+            if (!$('#purchaseLinesBody .purchase-row').length) {
+                addPurchaseRow();
+            }
+        });
+    }
+
+    function loadPurchases() {
+        $.get('{% url "homeApp:list_purchase_invoices_api" %}', function (response) {
+            purchaseRows = response.data || [];
+            const rows = purchaseRows.map(function (item) {
+                return {
+                    invoice: item.InvoiceNumber || '-',
+                    date: item.InvoiceDate || '-',
+                    party: item.Party || '-',
+                    gstTreatment: item.GSTTreatment || '-',
+                    claimStatus: item.ClaimStatus || '-',
+                    amount: '₹ ' + Number(item.TotalAmount || 0).toFixed(2),
+                    revisions: item.RevisionCount || 0,
+                    actions: purchaseActionButtons(item.ID)
+                };
+            });
+            purchaseTable.clear().rows.add(rows).draw();
+        });
+    }
+
+    function editPurchase(id) {
+        $.get('{% url "homeApp:get_purchase_invoice_detail_api" %}', {purchaseId: id}, function (response) {
+            const data = response.data || {};
+            resetPurchaseForm();
+            $('#purchaseModalTitle').text('Edit Purchase Invoice');
+            $('#purchaseActionLabel').text('Update');
+            $('#purchaseId').val(data.ID);
+            $('#purchaseInvoiceNumber').val(data.InvoiceNumber);
+            $('#purchaseInvoiceDate').val(data.InvoiceDate);
+            $('#purchaseParty').dropdown('set selected', String(data.PartyID || ''));
+            $('#purchaseGstTreatment').dropdown('set selected', data.GSTTreatment || 'gst');
+            $('#purchaseClaimStatus').dropdown('set selected', data.ClaimStatus || 'not_applicable');
+            $('#purchaseRemark').val(data.Remark || '');
+            $('#purchaseLinesBody').html('');
+            (data.Lines || []).forEach(function (line) { addPurchaseRow(line); });
+            if (!(data.Lines || []).length) {
+                addPurchaseRow();
+            }
+            recalcPurchaseRows();
+            $('#purchaseModal').modal('show');
+        });
+    }
+
+    function showPurchaseHistory(id) {
+        $.get('{% url "homeApp:get_purchase_invoice_detail_api" %}', {purchaseId: id}, function (response) {
+            renderRevisionList((response.data && response.data.Revisions) || []);
+            $('#purchaseHistoryModal').modal('show');
+        });
+    }
+
+    function savePurchase() {
+        const lines = collectPurchaseLines();
+        if (!$('#purchaseInvoiceNumber').val() || !$('#purchaseInvoiceDate').val() || !$('#purchaseParty').val() || !lines.length) {
+            $('body').toast({class: 'orange', message: 'Invoice number, date, party, and at least one line are required.'});
+            return;
+        }
+        const data = new FormData();
+        data.append('purchaseId', $('#purchaseId').val());
+        data.append('party', $('#purchaseParty').val());
+        data.append('invoiceNumber', $('#purchaseInvoiceNumber').val());
+        data.append('invoiceDate', $('#purchaseInvoiceDate').val());
+        data.append('gstTreatment', $('#purchaseGstTreatment').val());
+        data.append('claimStatus', $('#purchaseClaimStatus').val());
+        data.append('revisionReason', $('#purchaseRevisionReason').val());
+        data.append('remark', $('#purchaseRemark').val());
+        data.append('lineItems', JSON.stringify(lines));
+        const url = $('#purchaseId').val() ? '{% url "homeApp:update_purchase_invoice_api" %}' : '{% url "homeApp:add_purchase_invoice_api" %}';
+        $.ajax({
+            type: 'post',
+            url: url,
+            data: data,
+            contentType: false,
+            processData: false,
+            success: function (response) {
+                if (response.message === 'success') {
+                    $('body').toast({class: 'success', message: 'Purchase saved.'});
+                    $('#purchaseModal').modal('hide');
+                    loadPurchases();
+                    resetPurchaseForm();
+                } else {
+                    $('body').toast({class: 'error', message: response.error || 'Unable to save purchase.'});
+                }
+            },
+            error: function (xhr) {
+                $('body').toast({class: 'error', message: (xhr.responseJSON && xhr.responseJSON.error) || 'Unable to save purchase.'});
+            }
+        });
+    }
+
+    function confirmDeletePurchase(id) {
+        $('#DeletePurchaseId').val(id);
+        $('#deletePurchaseModal').modal('show');
+    }
+
+    function deletePurchase() {
+        const data = new FormData();
+        data.append('purchaseId', $('#DeletePurchaseId').val());
+        $.ajax({
+            type: 'post',
+            url: '{% url "homeApp:delete_purchase_invoice_api" %}',
+            data: data,
+            contentType: false,
+            processData: false,
+            success: function (response) {
+                if (response.message === 'success') {
+                    $('body').toast({class: 'success', message: 'Purchase deleted.'});
+                    loadPurchases();
+                    resetPurchaseForm();
+                } else {
+                    $('body').toast({class: 'error', message: response.error || 'Unable to delete purchase.'});
+                }
+            },
+            error: function (xhr) {
+                $('body').toast({class: 'error', message: (xhr.responseJSON && xhr.responseJSON.error) || 'Unable to delete purchase.'});
+            }
+        });
+    }
+
+    purchaseTable = $('#PurchaseTable').DataTable({
+        dom: 'Blfrtip',
+        scrollY: '350px',
+        scrollX: true,
+        fixedColumns: {
+            left: 0,
+            right: 1
+        },
+        buttons: [{
+            extend: 'excel',
+            exportOptions: {
+                columns: [0, 1, 2, 3, 4, 5, 6]
+            }
+        }],
+        columnDefs: [
+            {name: 'invoice', targets: 0, orderable: true},
+            {name: 'date', targets: 1, orderable: true},
+            {name: 'party', targets: 2, orderable: true},
+            {name: 'gstTreatment', targets: 3, orderable: true},
+            {name: 'claimStatus', targets: 4, orderable: true},
+            {name: 'amount', targets: 5, orderable: true},
+            {name: 'revisions', targets: 6, orderable: true},
+            {name: 'actions', targets: 7, orderable: false}
+        ],
+        aaSorting: [[1, 'desc']],
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+        pageLength: 10,
+        data: [],
+        columns: [
+            {data: 'invoice'},
+            {data: 'date'},
+            {data: 'party'},
+            {data: 'gstTreatment'},
+            {data: 'claimStatus'},
+            {data: 'amount'},
+            {data: 'revisions'},
+            {data: 'actions'}
+        ]
+    });
+
+    loadParties();
+    loadItems();
+    loadPurchases();
+    resetPurchaseForm();
+</script>
+{% endblock %}

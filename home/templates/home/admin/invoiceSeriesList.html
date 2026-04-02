@@ -45,11 +45,16 @@
                 </div>
             </div>
 
+            <h4 class="ui horizontal left aligned divider header">
+                <i class="left align icon"></i>
+                Invoice Series List
+            </h4>
             <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="UserTable" style="margin-top: 5px; width: 100%">
                 <thead>
                 <tr>
                     <th>Module</th>
                     <th>Series</th>
+                    <th>Invoice Nature</th>
                     <th>Range</th>
                     <th>Next Invoice</th>
                     <th>Padding</th>
@@ -89,6 +94,23 @@
                             <div class="field">
                                 <label>Padding Length</label>
                                 <input type="number" id="paddingLength" min="1" value="4">
+                            </div>
+                        </div>
+                        <div class="two fields">
+                            <div class="field">
+                                <label>Invoice Nature</label>
+                                <select class="ui dropdown" id="invoiceNature">
+                                    <option value="mixed">Mixed / Manual</option>
+                                    <option value="b2b">B2B</option>
+                                    <option value="b2c">B2C</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Nature Rule</label>
+                                <div class="ui checkbox" style="margin-top: 30px;">
+                                    <input type="checkbox" id="lockInvoiceNature">
+                                    <label>Lock invoice type to this series</label>
+                                </div>
                             </div>
                         </div>
                         <div class="three required fields">
@@ -167,6 +189,23 @@
                                 <input type="number" id="paddingLengthEdit" min="1">
                             </div>
                         </div>
+                        <div class="two fields">
+                            <div class="field">
+                                <label>Invoice Nature</label>
+                                <select class="ui dropdown" id="invoiceNatureEdit">
+                                    <option value="mixed">Mixed / Manual</option>
+                                    <option value="b2b">B2B</option>
+                                    <option value="b2c">B2C</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label>Nature Rule</label>
+                                <div class="ui checkbox" style="margin-top: 30px;">
+                                    <input type="checkbox" id="lockInvoiceNatureEdit">
+                                    <label>Lock invoice type to this series</label>
+                                </div>
+                            </div>
+                        </div>
                         <div class="three required fields">
                             <div class="field">
                                 <label>Start Number</label>
@@ -243,6 +282,8 @@
             data.append('startNumber', $('#startNumber' + suffix).val());
             data.append('endNumber', $('#endNumber' + suffix).val());
             data.append('paddingLength', $('#paddingLength' + suffix).val());
+            data.append('invoiceNature', $('#invoiceNature' + suffix).val());
+            data.append('lockInvoiceNature', $('#lockInvoiceNature' + suffix).is(':checked'));
             data.append('isActive', $('#isActive' + suffix).is(':checked'));
             data.append('isDefault', $('#isDefault' + suffix).is(':checked'));
             if (isEdit) {
@@ -288,17 +329,18 @@
             scrollX: true,
             stateSave: true,
             fixedColumns: {left: 1, right: 1},
-            buttons: [{extend: 'excel', exportOptions: {columns: [0,1,2,3,4,5,6,7]}}],
+            buttons: [{extend: 'excel', exportOptions: {columns: [0,1,2,3,4,5,6,7,8]}}],
             columnDefs: [
                 {name: 'module', targets: 0, orderable: true},
                 {name: 'seriesCode', targets: 1, orderable: true},
-                {name: 'range', targets: 2, orderable: false},
-                {name: 'nextInvoice', targets: 3, orderable: false},
-                {name: 'paddingLength', targets: 4, orderable: true},
-                {name: 'isActive', targets: 5, orderable: true},
-                {name: 'isDefault', targets: 6, orderable: true},
-                {name: 'datetime', targets: 7, orderable: true},
-                {name: 'action', targets: 8, orderable: false}
+                {name: 'invoiceNature', targets: 2, orderable: true},
+                {name: 'range', targets: 3, orderable: false},
+                {name: 'nextInvoice', targets: 4, orderable: false},
+                {name: 'paddingLength', targets: 5, orderable: true},
+                {name: 'isActive', targets: 6, orderable: true},
+                {name: 'isDefault', targets: 7, orderable: true},
+                {name: 'datetime', targets: 8, orderable: true},
+                {name: 'action', targets: 9, orderable: false}
             ],
             aaSorting: [[0, 'asc'], [1, 'asc']],
             lengthMenu: [[10,25,50,100,-1], [10,25,50,100,'All']],
@@ -355,6 +397,8 @@
                     $('#startNumberEdit').val(data.StartNumber);
                     $('#endNumberEdit').val(data.EndNumber);
                     $('#paddingLengthEdit').val(data.PaddingLength);
+                    $('#invoiceNatureEdit').val(data.InvoiceNature).change();
+                    $('#lockInvoiceNatureEdit').prop('checked', data.LockInvoiceNature);
                     $('#isActiveEdit').prop('checked', data.IsActive);
                     $('#isDefaultEdit').prop('checked', data.IsDefault);
                     $('.ui.checkbox').checkbox('refresh');

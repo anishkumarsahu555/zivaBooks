@@ -1,0 +1,171 @@
+<div class="ui segment inventory-line-item-box" id="{{ section_id }}" data-allow-non-gst="{% if allow_non_gst|default_if_none:True %}1{% else %}0{% endif %}">
+    <style>
+        .inventory-line-item-box .inventory-lines-wrap {
+            margin-top: 8px;
+        }
+
+        .inventory-line-item-box .inventory-help-text {
+            margin-top: 0;
+            color: #5f6b7a;
+        }
+
+        .inventory-line-item-box .inventory-line-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .inventory-line-item-box .inventory-line-card {
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 12px;
+            padding: 6px 8px;
+            background: #fff;
+        }
+
+        .inventory-line-item-box .inventory-line-card-header {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 0;
+        }
+
+        .inventory-line-item-box .inventory-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 6px 8px;
+        }
+
+        .inventory-line-item-box .inventory-span-1 { grid-column: span 1; }
+        .inventory-line-item-box .inventory-span-2 { grid-column: span 2; }
+        .inventory-line-item-box .inventory-span-3 { grid-column: span 3; }
+        .inventory-line-item-box .inventory-span-4 { grid-column: span 4; }
+        .inventory-line-item-box .inventory-span-5 { grid-column: span 5; }
+
+        .inventory-line-item-box .inventory-grid .field {
+            margin-bottom: 0;
+        }
+
+        .inventory-line-item-box .inventory-grid .field > label {
+            margin-bottom: 2px;
+            font-size: 0.74rem;
+        }
+
+        .inventory-line-item-box .inventory-grid input,
+        .inventory-line-item-box .inventory-grid .ui.dropdown {
+            min-height: 34px;
+        }
+
+        .inventory-line-item-box .inventory-inline-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 2px;
+        }
+
+        .inventory-line-item-box .inventory-unit-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: #eff6ff;
+            border: 1px solid rgba(59, 130, 246, 0.18);
+            color: #1d4ed8;
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .inventory-line-item-box .inventory-stock-hint {
+            color: #64748b;
+            font-size: 10px;
+        }
+
+        .inventory-line-item-box .inventory-line-summary {
+            margin-top: 4px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .inventory-line-item-box .inventory-summary-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 7px;
+            border-radius: 999px;
+            background: #f8fafc;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            font-weight: 600;
+            white-space: nowrap;
+            line-height: 1.2;
+            font-size: 11px;
+        }
+
+        .inventory-line-item-box .inventory-footer-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 0;
+            margin-top: 10px;
+        }
+
+        .inventory-line-item-box .inventory-footer-totals {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        @media only screen and (max-width: 767px) {
+            .inventory-line-item-box .inventory-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .inventory-line-item-box .inventory-span-1,
+            .inventory-line-item-box .inventory-span-2,
+            .inventory-line-item-box .inventory-span-3,
+            .inventory-line-item-box .inventory-span-4,
+            .inventory-line-item-box .inventory-span-5 {
+                grid-column: span 1;
+            }
+
+            .inventory-line-item-box .inventory-line-card {
+                padding: 8px;
+            }
+
+            .inventory-line-item-box .inventory-footer-bar {
+                align-items: flex-start;
+            }
+        }
+    </style>
+    {% if show_toggle|default_if_none:True %}
+    <div class="ui toggle checkbox" style="margin-bottom: 12px;">
+        <input type="checkbox" class="inventory-enable-toggle" {% if enabled %}checked{% endif %}>
+        <label>{{ title|default:"Use inventory items for this entry" }}</label>
+    </div>
+    {% elif title %}
+    <div class="ui tiny header" style="margin-top: 0; margin-bottom: 12px;">{{ title }}</div>
+    {% endif %}
+    {% if help_text|default:"" %}
+    <p class="inventory-help-text">{{ help_text }}</p>
+    {% elif show_toggle|default_if_none:True %}
+    <p class="inventory-help-text">
+        {% if allow_non_gst|default_if_none:True %}
+        Track stock separately for GST and Non-GST buckets. Leave this off to keep the old amount-only flow.
+        {% else %}
+        Track stock in the GST bucket for now. Non-GST mode is hidden for this tenant until an admin enables it.
+        {% endif %}
+    </p>
+    {% endif %}
+    <div class="ui tiny form inventory-lines-wrap inventory-table-wrap">
+        <div class="inventory-line-list"></div>
+        <div class="ui basic segment inventory-footer-bar">
+            <button type="button" class="ui teal basic small button inventory-add-row">{{ add_button_label|default:"Add Item Row" }}</button>
+            <div class="inventory-footer-totals">
+                <div class="ui tiny label inventory-total-label">Line Total: ₹ <span class="inventory-total-display">0.00</span></div>
+                <div class="ui tiny teal label inventory-payable-label">Payable: ₹ <span class="inventory-payable-display">0.00</span></div>
+            </div>
+        </div>
+    </div>
+    <input type="hidden" id="{{ hidden_input_id }}" value="[]">
+</div>

@@ -1,0 +1,504 @@
+{% extends 'home/admin/index.html' %}
+
+{% block title %}<title>Non-GST Control</title>{% endblock %}
+
+{% block body %}
+<style>
+    .non-gst-shell {
+        display: grid;
+        gap: 18px;
+    }
+
+    .non-gst-status-card,
+    .non-gst-impact-card {
+        border: 1px solid rgba(34, 36, 38, 0.08);
+        border-radius: 14px;
+        padding: 20px;
+        background: #fff;
+    }
+
+    .non-gst-hero {
+        border: 1px solid rgba(34, 36, 38, 0.08);
+        border-radius: 16px;
+        padding: 22px;
+        background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+    }
+
+    .non-gst-hero-title {
+        margin: 0 0 6px 0;
+        font-size: 24px;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .non-gst-hero-copy {
+        margin: 0;
+        color: #667085;
+        max-width: 760px;
+        line-height: 1.6;
+    }
+
+    .non-gst-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 14px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .non-gst-pill.enabled {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .non-gst-pill.hidden {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .non-gst-stat-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 16px;
+    }
+
+    .non-gst-stat {
+        border: 1px solid rgba(34, 36, 38, 0.08);
+        border-radius: 12px;
+        padding: 14px 16px;
+        background: #fbfdff;
+    }
+
+    .non-gst-stat-label {
+        font-size: 12px;
+        color: #667085;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .non-gst-stat-value {
+        margin-top: 8px;
+        font-size: 22px;
+        font-weight: 700;
+        color: #1f2937;
+    }
+
+    .non-gst-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+    }
+
+    .non-gst-step-grid {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 18px;
+    }
+
+    .non-gst-step-card {
+        border: 1px solid rgba(34, 36, 38, 0.08);
+        border-radius: 14px;
+        background: #fff;
+        padding: 18px;
+    }
+
+    .non-gst-step-no {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        background: #111827;
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .non-gst-step-copy {
+        color: #667085;
+        line-height: 1.55;
+        margin: 0 0 14px 0;
+    }
+
+    .non-gst-key-points {
+        margin: 0;
+        padding-left: 18px;
+        color: #4b5563;
+    }
+
+    .non-gst-key-points li {
+        margin-bottom: 6px;
+    }
+
+    .non-gst-callout {
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #f8fafc;
+        color: #475467;
+        font-size: 13px;
+        line-height: 1.55;
+    }
+
+    .non-gst-impact-list {
+        margin: 0;
+        padding-left: 18px;
+        color: #4b5563;
+    }
+
+    .non-gst-impact-list li {
+        margin-bottom: 6px;
+    }
+
+    @media (max-width: 900px) {
+        .non-gst-step-grid,
+        .non-gst-stat-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="ui left aligned basic grid">
+    <div class="sixteen wide column">
+        <div class="ui pointing secondary menu">
+            <div class="item active" style="cursor:pointer;">Non-GST Control</div>
+        </div>
+
+        <div class="non-gst-shell">
+            <div class="non-gst-hero">
+                <h2 class="non-gst-hero-title">Keep Non-GST Hidden Until You Intentionally Unlock It</h2>
+                <p class="non-gst-hero-copy">
+                    This control is for tenant admins only. First set the 6-digit tenant passcode, then use that passcode and your current password whenever you want to enable or hide Non-GST billing.
+                </p>
+                <div class="non-gst-pill {% if non_gst_shadow_enabled %}enabled{% else %}hidden{% endif %}" id="nonGstModePill">
+                    <i class="{% if non_gst_shadow_enabled %}unlock{% else %}eye slash{% endif %} icon" id="nonGstModePillIcon"></i>
+                    <span id="nonGstModePillText">{% if non_gst_shadow_enabled %}Non-GST Enabled{% else %}Non-GST Hidden{% endif %}</span>
+                </div>
+            </div>
+
+            <div class="non-gst-stat-grid">
+                <div class="non-gst-stat">
+                    <div class="non-gst-stat-label">Current Mode</div>
+                    <div class="non-gst-stat-value" id="nonGstModeValue">
+                        {% if non_gst_shadow_enabled %}Enabled{% else %}Hidden{% endif %}
+                    </div>
+                    <div id="nonGstModeHelp" style="margin-top:8px; color:#667085;">
+                        {% if non_gst_shadow_enabled %}
+                        Non-GST stock and billing are visible and allowed.
+                        {% else %}
+                        Non-GST stock and billing are blocked and hidden.
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="non-gst-stat">
+                    <div class="non-gst-stat-label">Tenant</div>
+                    <div class="non-gst-stat-value" id="nonGstTenantName">{{ tenant.name|default:"-" }}</div>
+                    <div style="margin-top:8px; color:#667085;">This setting affects only the current tenant.</div>
+                </div>
+                <div class="non-gst-stat">
+                    <div class="non-gst-stat-label">Passcode Status</div>
+                    <div class="non-gst-stat-value" id="nonGstPasscodeState">{% if non_gst_shadow_has_code %}Ready{% else %}Not Set{% endif %}</div>
+                    <div style="margin-top:8px; color:#667085;">Mode changes require both the passcode and your current password.</div>
+                </div>
+            </div>
+
+            <div class="non-gst-step-grid">
+                <div class="non-gst-step-card">
+                    <div class="non-gst-step-no">1</div>
+                    <div class="ui small header">Set or Change Tenant Passcode</div>
+                    <p class="non-gst-step-copy">
+                        Create the 6-digit passcode used for Non-GST control. Saving or changing the passcode also requires your current login password.
+                    </p>
+                    <form class="ui tiny form" onsubmit="return false;">
+                        {% csrf_token %}
+                        <div class="two fields">
+                            <div class="field required">
+                                <label>6-Digit Passcode</label>
+                                <input type="password" id="nonGstAccessCode" maxlength="6" inputmode="numeric" placeholder="Enter 6 digits">
+                            </div>
+                            <div class="field required">
+                                <label>Current Password</label>
+                                <input type="password" id="nonGstAccessPassword" placeholder="Enter current password">
+                            </div>
+                        </div>
+                        <button type="button" class="ui blue right labeled icon button" onclick="saveNonGstCode()">
+                            Save Passcode
+                            <i class="lock icon"></i>
+                        </button>
+                    </form>
+                    <div class="non-gst-callout">
+                        If the passcode is not set, Non-GST can still stay hidden, but no one will be able to enable it until a passcode is created.
+                    </div>
+                </div>
+
+                <div class="non-gst-step-card">
+                    <div class="non-gst-step-no">2</div>
+                    <div class="ui small header">Enable or Hide Non-GST</div>
+                    <p class="non-gst-step-copy">
+                        When you click either action, the confirmation modal will ask for both the tenant passcode and your current password.
+                    </p>
+                    <div class="non-gst-actions" style="margin-top:0;">
+                        <button type="button" class="ui green right labeled icon button" onclick="showNonGstPasswordModal(true)">
+                            Enable Non-GST
+                            <i class="unlock icon"></i>
+                        </button>
+                        <button type="button" class="ui red right labeled icon button" onclick="showNonGstPasswordModal(false)">
+                            Hide Non-GST
+                            <i class="eye slash icon"></i>
+                        </button>
+                    </div>
+                    <div class="non-gst-callout">
+                        Use <strong>Enable</strong> only when the tenant should work with Non-GST stock and bills. Use <strong>Hide</strong> to put that flow completely back into shadow.
+                    </div>
+                </div>
+            </div>
+
+            <div class="non-gst-impact-card">
+                <div class="ui small header">Tenant Feature Flags</div>
+                <p class="non-gst-step-copy" style="margin-top:0;">
+                    Control which tenants can use inventory and advanced GST invoicing. Saving feature flags requires the same passcode plus your current password.
+                </p>
+                <form class="ui tiny form" onsubmit="return false;">
+                    {% csrf_token %}
+                    <div class="two fields">
+                        <div class="field">
+                            <div class="ui checkbox">
+                                <input type="checkbox" id="inventoryEnabledToggle" {% if inventory_enabled %}checked{% endif %}>
+                                <label>Enable Inventory Module</label>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <div class="ui checkbox">
+                                <input type="checkbox" id="advancedInvoicingEnabledToggle" {% if advanced_invoicing_enabled %}checked{% endif %}>
+                                <label>Enable Advanced Invoicing</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="two fields">
+                        <div class="field required">
+                            <label>6-Digit Passcode</label>
+                            <input type="password" id="featureAccessCode" maxlength="6" inputmode="numeric" placeholder="Enter 6-digit passcode">
+                        </div>
+                        <div class="field required">
+                            <label>Current Password</label>
+                            <input type="password" id="featureAccessPassword" placeholder="Enter current password">
+                        </div>
+                    </div>
+                    <button type="button" class="ui violet right labeled icon button" onclick="saveFeatureFlags()">
+                        Save Feature Flags
+                        <i class="settings icon"></i>
+                    </button>
+                </form>
+                <div class="non-gst-callout">
+                    Inventory hides product, purchase, warehouse, and stock features. Advanced invoicing controls B2B/B2C GST buyer details and invoice-series nature rules.
+                </div>
+            </div>
+
+            <div class="non-gst-impact-card">
+                <div class="ui small header">What Changes When Mode Is Hidden</div>
+                <ul class="non-gst-impact-list">
+                    <li>Inventory and purchase screens hide Non-GST options while the mode is hidden.</li>
+                    <li>Backend posting blocks Non-GST stock bucket and Non-GST purchase treatment while hidden.</li>
+                    <li>GST flow remains available either way.</li>
+                </ul>
+                <div class="non-gst-callout">
+                    This is UI hiding plus backend enforcement. Even direct API requests cannot post Non-GST stock when the mode is hidden.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="ui tiny modal" id="nonGstPasswordModal">
+    <i class="close icon"></i>
+    <div class="header" id="nonGstPasswordModalTitle">Enable Non-GST</div>
+    <div class="content">
+        <p id="nonGstPasswordModalText" style="color:#667085;">
+            Confirm with your current password to continue.
+        </p>
+        <form class="ui tiny form" onsubmit="return false;">
+            {% csrf_token %}
+            <div class="field required">
+                <label>6-Digit Passcode</label>
+                <input type="password" id="nonGstConfirmCode" maxlength="6" inputmode="numeric" placeholder="Enter 6-digit passcode">
+            </div>
+            <div class="field required">
+                <label>Current Password</label>
+                <input type="password" id="nonGstConfirmPassword" placeholder="Enter current password">
+            </div>
+        </form>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button type="button" class="ui green right labeled icon button" id="nonGstPasswordConfirmBtn" onclick="confirmToggleNonGst()">
+            Confirm
+            <i class="checkmark icon"></i>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+    let nonGstPendingState = null;
+
+    function toastError(message) {
+        $('body').toast({class: 'error', message: message});
+    }
+
+    function toastSuccess(message) {
+        $('body').toast({class: 'success', message: message});
+    }
+
+    function setNonGstShadowStatus(data) {
+        const enabled = !!data.enabled;
+        $('#nonGstTenantName').text(data.tenantName || '-');
+        $('#nonGstPasscodeState').text(data.hasCode ? 'Ready' : 'Not Set');
+        $('#inventoryEnabledToggle').closest('.ui.checkbox').checkbox(data.inventoryEnabled ? 'check' : 'uncheck');
+        $('#advancedInvoicingEnabledToggle').closest('.ui.checkbox').checkbox(data.advancedInvoicingEnabled ? 'check' : 'uncheck');
+        $('#nonGstModeValue').text(enabled ? 'Enabled' : 'Hidden');
+        $('#nonGstModeHelp').text(
+            enabled
+                ? 'Non-GST stock and billing are visible and allowed.'
+                : 'Non-GST stock and billing are blocked and hidden.'
+        );
+        $('#nonGstModePill')
+            .toggleClass('enabled', enabled)
+            .toggleClass('hidden', !enabled);
+        $('#nonGstModePillIcon')
+            .attr('class', (enabled ? 'unlock' : 'eye slash') + ' icon');
+        $('#nonGstModePillText').text(enabled ? 'Non-GST Enabled' : 'Non-GST Hidden');
+    }
+
+    function refreshNonGstShadowStatus() {
+        $.get('{% url "homeApp:get_non_gst_shadow_status_api" %}', function (response) {
+            if (response.message === 'success') {
+                setNonGstShadowStatus(response.data || {});
+            }
+        });
+    }
+
+    function showNonGstPasswordModal(enabled) {
+        nonGstPendingState = enabled;
+        $('#nonGstConfirmCode').val('');
+        $('#nonGstConfirmPassword').val('');
+        $('#nonGstPasswordModalTitle').text(enabled ? 'Enable Non-GST' : 'Hide Non-GST');
+        $('#nonGstPasswordModalText').text(
+            enabled
+                ? 'Confirm with your current password to enable Non-GST stock and billing for this tenant.'
+                : 'Confirm with your current password to hide and block Non-GST stock and billing for this tenant.'
+        );
+        $('#nonGstPasswordConfirmBtn')
+            .toggleClass('green', enabled)
+            .toggleClass('red', !enabled)
+            .html((enabled ? 'Enable' : 'Hide') + '<i class="checkmark icon"></i>');
+        $('#nonGstPasswordModal').modal('show');
+    }
+
+    function saveNonGstCode() {
+        const accessCode = ($('#nonGstAccessCode').val() || '').trim();
+        const password = ($('#nonGstAccessPassword').val() || '').trim();
+        if (!/^\d{6}$/.test(accessCode)) {
+            toastError('Passcode must be exactly 6 digits.');
+            return;
+        }
+        if (!password) {
+            toastError('Current password is required.');
+            return;
+        }
+        $.post('{% url "homeApp:configure_non_gst_shadow_code_api" %}', {
+            csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').first().val(),
+            accessCode: accessCode,
+            password: password
+        }).done(function (response) {
+            if (response.message === 'success') {
+                $('#nonGstAccessCode').val('');
+                $('#nonGstAccessPassword').val('');
+                refreshNonGstShadowStatus();
+                toastSuccess('Non-GST passcode saved.');
+            } else {
+                toastError(response.error || 'Unable to save the passcode.');
+            }
+        }).fail(function (xhr) {
+            toastError((xhr.responseJSON && xhr.responseJSON.error) || 'Unable to save the passcode.');
+        });
+    }
+
+    function confirmToggleNonGst() {
+        const accessCode = ($('#nonGstConfirmCode').val() || '').trim();
+        const password = ($('#nonGstConfirmPassword').val() || '').trim();
+        if (!/^\d{6}$/.test(accessCode)) {
+            toastError('Valid 6-digit passcode is required.');
+            return;
+        }
+        if (!password) {
+            toastError('Current password is required.');
+            return;
+        }
+        $.post('{% url "homeApp:toggle_non_gst_shadow_api" %}', {
+            csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').first().val(),
+            accessCode: accessCode,
+            password: password,
+            enabled: nonGstPendingState ? '1' : '0'
+        }).done(function (response) {
+            if (response.message === 'success') {
+                $('#nonGstPasswordModal').modal('hide');
+                refreshNonGstShadowStatus();
+                toastSuccess(nonGstPendingState ? 'Non-GST enabled.' : 'Non-GST hidden.');
+            } else {
+                toastError(response.error || 'Unable to update Non-GST mode.');
+            }
+        }).fail(function (xhr) {
+            toastError((xhr.responseJSON && xhr.responseJSON.error) || 'Unable to update Non-GST mode.');
+        });
+    }
+
+    function saveFeatureFlags() {
+        const accessCode = ($('#featureAccessCode').val() || '').trim();
+        const password = ($('#featureAccessPassword').val() || '').trim();
+        if (!/^\d{6}$/.test(accessCode)) {
+            toastError('Valid 6-digit passcode is required.');
+            return;
+        }
+        if (!password) {
+            toastError('Current password is required.');
+            return;
+        }
+        $.post('{% url "homeApp:update_tenant_feature_flags_api" %}', {
+            csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').first().val(),
+            accessCode: accessCode,
+            password: password,
+            inventoryEnabled: $('#inventoryEnabledToggle').is(':checked') ? '1' : '0',
+            advancedInvoicingEnabled: $('#advancedInvoicingEnabledToggle').is(':checked') ? '1' : '0'
+        }).done(function (response) {
+            if (response.message === 'success') {
+                $('#featureAccessCode').val('');
+                $('#featureAccessPassword').val('');
+                refreshNonGstShadowStatus();
+                toastSuccess('Tenant feature flags updated.');
+            } else {
+                toastError(response.error || 'Unable to update tenant feature flags.');
+            }
+        }).fail(function (xhr) {
+            toastError((xhr.responseJSON && xhr.responseJSON.error) || 'Unable to update tenant feature flags.');
+        });
+    }
+
+    window.saveNonGstCode = saveNonGstCode;
+    window.showNonGstPasswordModal = showNonGstPasswordModal;
+    window.confirmToggleNonGst = confirmToggleNonGst;
+    window.saveFeatureFlags = saveFeatureFlags;
+
+    $(function () {
+        $('.ui.modal').modal({autofocus: false, allowMultiple: true, detachable: false});
+        refreshNonGstShadowStatus();
+    });
+</script>
+{% endblock %}

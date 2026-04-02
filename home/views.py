@@ -1845,8 +1845,13 @@ def attendance_report_admin(request):
 # ----------------------------- Sales ----------------------
 @permission_required_any('home.add_sales')
 def add_sales(request):
+    tenant = get_current_tenant(request)
     return render(request, 'home/sales/addSales.html', {
         'banks': tenant_qs(request, Bank).filter(isDeleted=False).order_by('name'),
+        'inventory_enabled': bool(getattr(tenant, 'inventoryEnabled', True)),
+        'advanced_invoicing_enabled': bool(getattr(tenant, 'advancedInvoicingEnabled', True)),
+        'non_gst_shadow_enabled': bool(getattr(tenant, 'nonGstShadowEnabled', False)),
+        'seller_gst_number': getattr(tenant, 'gstNumber', '') or '',
     })
 @is_activated()
 @permission_required_any('home.view_sales', 'home.add_sales', 'home.change_sales', 'home.can_manage_sales')
@@ -1864,6 +1869,7 @@ def my_sales_list(request):
 @permission_required_any('home.change_sales', 'home.can_manage_sales', 'home.can_approve_sales')
 def edit_sales(request, id=None):
     obj = get_object_or_404(tenant_qs(request, Sales), pk=id)
+    tenant = get_current_tenant(request)
     capabilities = _sales_capabilities(request.user)
     admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_sales')
     if not admin_like:
@@ -1875,8 +1881,31 @@ def edit_sales(request, id=None):
         'sales_edit_readonly': bool(obj.isApproved and not admin_like),
         'sales_return_url': reverse('homeApp:sales_list'),
         'banks': tenant_qs(request, Bank).filter(isDeleted=False).order_by('name'),
+        'sales_line_items': list(
+            obj.lines.filter(isDeleted=False).select_related('item').values(
+                'item_id', 'item__name', 'item__unitName', 'item__unit__allowsDecimal', 'stockBucket', 'quantity', 'unitPrice',
+                'discountPercent', 'taxableAmount', 'gstRate', 'gstAmount', 'lineTotal', 'remark'
+            )
+        ),
+        'inventory_enabled': bool(getattr(tenant, 'inventoryEnabled', True)),
+        'advanced_invoicing_enabled': bool(getattr(tenant, 'advancedInvoicingEnabled', True)),
+        'non_gst_shadow_enabled': bool(getattr(tenant, 'nonGstShadowEnabled', False)),
+        'seller_gst_number': getattr(tenant, 'gstNumber', '') or '',
     }
     return render(request, 'home/sales/editSales.html', context)
+
+
+@permission_required_any('home.add_inventoryitem', 'home.change_inventoryitem', 'home.view_inventoryitem', 'home.can_manage_inventory', 'home.can_view_party_credentials')
+def inventory_list(request):
+    return render(request, 'home/inventory/index.html')
+
+
+@permission_required_any('home.add_purchaseinvoice', 'home.change_purchaseinvoice', 'home.view_purchaseinvoice', 'home.can_view_party_credentials')
+def purchase_list(request):
+    context = {
+        'banks': tenant_qs(request, Bank).filter(isDeleted=False).order_by('name'),
+    }
+    return render(request, 'home/inventory/purchase.html', context)
 # ----------------------------- Orders ----------------------
 @permission_required_any('home.add_order')
 def add_order(request):
@@ -2428,9 +2457,14 @@ def cash_counter_home(request):
     return render(request, 'home/cashCounter/indexCashCounter.html')
 @permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter')
 def cash_counter(request):
+    tenant = get_current_tenant(request)
     banks = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
     context = {
-        'banks': banks
+        'banks': banks,
+        'inventory_enabled': bool(getattr(tenant, 'inventoryEnabled', True)),
+        'advanced_invoicing_enabled': bool(getattr(tenant, 'advancedInvoicingEnabled', True)),
+        'non_gst_shadow_enabled': bool(getattr(tenant, 'nonGstShadowEnabled', False)),
+        'seller_gst_number': getattr(tenant, 'gstNumber', '') or '',
     }
     return render(request, 'home/cashCounter/todaysCounter.html', context)
 @permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter', 'home.view_collectioncashcounter')
@@ -2440,12 +2474,36 @@ def my_cash_counter_list(request):
     })
 @permission_required_any('home.can_manage_cash_counter', 'home.view_cashcounter')
 def edit_cash_counter(request, id=None):
-    obj = get_object_or_404(tenant_qs(request, CashCounter), pk=id)
+    obj = get_object_or_404(
+        tenant_qs(request, CashCounter).select_related('linkedSalesReturnVoucher__sales', 'linkedSalesReturnVoucher__cashCounter'),
+        pk=id,
+    )
+    tenant = get_current_tenant(request)
     banks = tenant_qs(request, Bank).filter(isDeleted__exact=False).order_by('name')
     context = {
         'obj': obj,
         'invoice_display': obj.invoiceNumber or "",
-        'banks': banks
+        'banks': banks,
+        'cash_counter_line_items': list(
+            obj.lines.filter(isDeleted=False).select_related('item').values(
+                'item_id', 'item__name', 'item__unitName', 'item__unit__allowsDecimal', 'stockBucket', 'quantity',
+                'unitPrice', 'hsnCode', 'discountPercent', 'taxableAmount', 'gstRate', 'gstAmount', 'lineTotal', 'remark'
+            )
+        ),
+        'cash_counter_return_source_id': (
+            f"sale:{obj.linkedSalesReturnVoucher.sales_id}"
+            if getattr(getattr(obj, 'linkedSalesReturnVoucher', None), 'sales_id', None)
+            else (
+                f"cash_counter:{obj.linkedSalesReturnVoucher.cashCounter_id}"
+                if getattr(getattr(obj, 'linkedSalesReturnVoucher', None), 'cashCounter_id', None)
+                else None
+            )
+        ),
+        'cash_counter_return_voucher_id': getattr(getattr(obj, 'linkedSalesReturnVoucher', None), 'pk', None),
+        'inventory_enabled': bool(getattr(tenant, 'inventoryEnabled', True)),
+        'advanced_invoicing_enabled': bool(getattr(tenant, 'advancedInvoicingEnabled', True)),
+        'non_gst_shadow_enabled': bool(getattr(tenant, 'nonGstShadowEnabled', False)),
+        'seller_gst_number': getattr(tenant, 'gstNumber', '') or '',
     }
     return render(request, 'home/cashCounter/editCashCounter.html', context)
 @permission_required_any('home.can_manage_cash_counter', 'home.view_collectioncashcounter', 'home.add_collectioncashcounter', 'home.change_collectioncashcounter')

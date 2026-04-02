@@ -35,21 +35,297 @@
         }
 
         .invoice-chip {
-            border: 1px solid rgba(15, 118, 110, 0.18);
-            background: #f8fffe;
-            color: #0f766e;
+            border: 1px solid rgba(15, 118, 110, 0.18) !important;
+            background: #f8fffe !important;
+            color: #0f766e !important;
             border-radius: 999px;
             padding: 6px 10px;
-            font-size: 0.76rem;
+            font-size: 0.78rem;
             font-weight: 700;
             line-height: 1;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: none !important;
         }
 
         .invoice-chip.active {
-            background: #0f766e;
-            color: #fff;
-            border-color: #0f766e;
+            background: #0f766e !important;
+            color: #fff !important;
+            border-color: #0f766e !important;
+        }
+
+        .cash-counter-panel {
+            padding: 0.9rem;
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 14px;
+            background: #fbfffe;
+        }
+
+        .cash-counter-mode-menu {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            margin-bottom: 8px;
+            border-bottom: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .cash-counter-mode-menu .item {
+            border: 1px solid #d4e7e6;
+            background: #fff;
+            color: #0f766e;
+            border-radius: 999px !important;
+            padding: 8px 12px !important;
+            font-size: 0.82rem;
+            font-weight: 700;
+            line-height: 1;
+            white-space: nowrap;
+            margin: 0 !important;
+        }
+
+        .cash-counter-mode-menu .item.active,
+        .cash-counter-mode-menu .item.active:hover {
+            background: #0f766e !important;
+            color: #fff !important;
+            border-color: #0f766e !important;
+            box-shadow: none !important;
+        }
+
+        .cash-counter-panel .ui.tab.segment {
+            margin: 0 0 8px !important;
+            padding: 0.9rem !important;
+            border: 1px solid rgba(15, 118, 110, 0.12) !important;
+            border-radius: 12px !important;
+            box-shadow: none !important;
+        }
+
+        .cash-counter-panel .ui.tab.segment:last-of-type {
+            margin-bottom: 0 !important;
+        }
+
+        .cash-counter-panel .content > form.ui.small.form {
+            margin: 0;
+        }
+
+        .cash-counter-panel .ui.divider {
+            display: none;
+        }
+
+        .cash-section-card {
+            padding: 0.8rem;
+            border: 1px solid rgba(15, 118, 110, 0.1);
+            border-radius: 12px;
+            background: #fff;
+            margin-top: 8px;
+        }
+
+        .cash-section-card:first-of-type {
+            margin-top: 0;
+        }
+
+        .cash-section-help {
+            margin: -4px 0 8px;
+            font-size: 0.78rem;
+            color: #5f6b7a;
+        }
+
+        .cash-invoice-layout .field {
+            margin-bottom: 0.75rem;
+        }
+
+        .cash-invoice-picker {
+            width: 100%;
+        }
+
+        .cash-invoice-picker .ui.left.labeled.input {
+            width: 100%;
+        }
+
+        .cash-invoice-picker .ui.selection.dropdown.teal.label {
+            min-width: 225px !important;
+            width: 225px !important;
+            background: #18b3ae !important;
+            color: #fff !important;
+            border-color: #18b3ae !important;
+            border-top-right-radius: 0 !important;
+            border-bottom-right-radius: 0 !important;
+            font-weight: 700 !important;
+            box-shadow: none !important;
+        }
+
+        .cash-invoice-picker .ui.selection.dropdown.teal.label > .text,
+        .cash-invoice-picker .ui.selection.dropdown.teal.label > .dropdown.icon,
+        .cash-invoice-picker .ui.selection.dropdown.teal.label .default.text {
+            color: #fff !important;
+        }
+
+        .cash-invoice-picker .ui.selection.dropdown.teal.label > .text,
+        .cash-invoice-picker .ui.selection.dropdown.teal.label .default.text {
+            display: block;
+            max-width: calc(100% - 18px);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 1.2;
+        }
+
+        .cash-invoice-picker .ui.selection.dropdown.teal.label .menu > .item,
+        .cash-invoice-picker .ui.selection.dropdown.teal.label .menu > .item .description,
+        .cash-invoice-picker .ui.selection.dropdown.teal.label .menu > .selected.item,
+        .cash-invoice-picker .ui.selection.dropdown.teal.label .menu > .active.item {
+            color: #1f2937 !important;
+        }
+
+        .cash-invoice-picker .ui.selection.dropdown.teal.label .menu > .item {
+            padding-top: 0.75rem !important;
+            padding-bottom: 0.75rem !important;
+        }
+
+        .invoice-series-option {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .invoice-series-option-code {
+            font-size: 0.92rem;
+            font-weight: 800;
+            line-height: 1.1;
+            color: #111827;
+        }
+
+        .invoice-series-option-next {
+            font-size: 0.78rem;
+            line-height: 1.2;
+            color: #667085;
+            white-space: nowrap;
+        }
+
+        .cash-invoice-picker .cash-invoice-input {
+            flex: 1 1 auto !important;
+            width: calc(100% - 225px) !important;
+            font-size: 1rem !important;
+            font-weight: 700 !important;
+            color: #1f2937 !important;
+            background: #fff !important;
+            border-left: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .sales-gst-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .sales-gst-summary {
+            color: #5f6b7a;
+            font-size: 0.8rem;
+        }
+
+        .sales-gst-extra-fields {
+            display: none;
+            margin-top: 8px;
+        }
+
+        .cash-counter-shared-billing {
+            margin-top: 8px;
+        }
+
+        .cash-counter-shared-billing .ui.form .field > label {
+            margin-bottom: 0.45rem;
+        }
+
+        @media only screen and (max-width: 767px) {
+            .ui.aligned.basic.grid > .sixteen.wide.column {
+                padding-left: 0.4rem !important;
+                padding-right: 0.4rem !important;
+            }
+
+            .ui.row.teal.stacked.segment.padded {
+                padding: 0.55rem !important;
+            }
+
+            .cash-counter-panel {
+                padding: 0.55rem;
+                border-radius: 10px;
+            }
+
+            .cash-counter-mode-menu .item {
+                padding: 6px 9px !important;
+                font-size: 0.72rem;
+            }
+
+            .cash-counter-panel .ui.tab.segment {
+                margin: 0 0 6px !important;
+                padding: 0.65rem !important;
+                border-radius: 9px !important;
+            }
+
+            .cash-section-card {
+                padding: 0.6rem;
+                margin-top: 6px;
+                border-radius: 9px;
+            }
+
+            .cash-section-help {
+                margin: -2px 0 6px;
+                font-size: 0.71rem;
+                line-height: 1.3;
+            }
+
+            .cash-invoice-layout .field {
+                margin-bottom: 0.55rem;
+            }
+
+            .sales-gst-toolbar {
+                align-items: flex-start;
+            }
+
+            .cash-invoice-picker .ui.selection.dropdown.teal.label {
+                min-width: 120px !important;
+                width: 120px !important;
+            }
+
+            .cash-invoice-picker .cash-invoice-input {
+                width: calc(100% - 120px) !important;
+                font-size: 0.92rem !important;
+            }
+
+            .invoice-chip-wrap {
+                gap: 6px;
+                margin-top: 6px;
+                max-height: 82px;
+            }
+
+            .invoice-chip {
+                padding: 5px 9px;
+                font-size: 0.74rem;
+            }
+
+            .cash-counter-panel h4.ui.header {
+                margin-top: 0.1rem !important;
+                margin-bottom: 0.55rem !important;
+                font-size: 0.92rem !important;
+            }
+
+            .cash-counter-panel .ui.form .field > label {
+                margin-bottom: 0.3rem;
+                font-size: 0.8rem;
+            }
+
+            .cash-counter-panel textarea,
+            .cash-counter-panel input,
+            .cash-counter-panel .ui.selection.dropdown {
+                min-height: 2.45rem;
+            }
         }
     </style>
 {% endblock %}
@@ -71,16 +347,18 @@
             </div>
             <div class="ui active tab " data-tab="user">
 
-                <div class="ui row teal stacked segment ">
-                    <div class="ui divider"></div>
-                    <div class="context">
-                        <div class="ui secondary menu" style="overflow-x: scroll">
+                <div class="ui row teal stacked segment padded">
+                    <input type="hidden" id="advancedInvoicingEnabled" value="{% if advanced_invoicing_enabled %}1{% else %}0{% endif %}">
+                    <div class="context cash-counter-panel">
+                        <div class="ui secondary menu cash-counter-mode-menu">
                             <a class="item active" data-tab="cash" onclick="selectTab('Cash')">Cash</a>
                             <a class="item" data-tab="credit" onclick="selectTab('Credit')">Credit</a>
                             <a class="item" data-tab="card" onclick="selectTab('Card')">Card/Online</a>
                             <a class="item" data-tab="mix" onclick="selectTab('Mix')">Mix</a>
                             {#                            <a class="item" data-tab="collection" onclick="selectTab('Collection')">Collection</a>#}
-                            <a class="item" data-tab="return" onclick="selectTab('Return')">Return</a>
+                            {% if inventory_enabled %}
+                            <a class="item" data-tab="return" onclick="selectTab('Return')">Sales Return</a>
+                            {% endif %}
                             <a class="item" data-tab="expense" onclick="selectTab('Expense')">Expense</a>
                             <a class="item" data-tab="advance" onclick="selectTab('Advance')">Advance</a>
                         </div>
@@ -88,56 +366,46 @@
                             <div class="ui row  ">
                                 <div class="content">
                                     <form class="ui  small form " id="addFormCash" name="addFormCash">{% csrf_token %}
-                                        <div class="two fields">
-                                            <div class="eight wide field required">
-                                                <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
-                                                    <div class="ui selection dropdown teal label" id="invoiceSeriesCash">
-                                                        <input type="hidden" id="invoiceSeriesIdCash" name="invoiceSeriesIdCash">
-                                                        <div class="default text">Select Series</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu"></div>
-                                                    </div>
-                                                    <input type="text" placeholder="Invoice Number" id="invoiceNoCash"
-                                                           name="invoiceNoCash">
-                                                    <div class="ui dropdown blue label" id="invoiceYearCash">
-                                                        <div class="text" id="invoiceYearSelectCash">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
+                                        <div class="cash-section-card">
+                                            <h4 class="ui horizontal left aligned divider header"><i class="file alternate outline icon"></i>Invoice Setup</h4>
+                                            <div class="cash-invoice-layout">
+                                                <div class="field required">
+                                                    <label>Invoice Number</label>
+                                                    <div class="cash-invoice-picker">
+                                                    <div class="ui left labeled input">
+                                                        <div class="ui selection dropdown teal label" id="invoiceSeriesCash">
+                                                            <input type="hidden" id="invoiceSeriesIdCash" name="invoiceSeriesIdCash">
+                                                            <div class="default text">Select Series</div>
+                                                            <i class="dropdown icon"></i>
+                                                            <div class="menu"></div>
                                                         </div>
+                                                        <input class="cash-invoice-input" type="text" placeholder="Invoice Number" id="invoiceNoCash"
+                                                               name="invoiceNoCash">
                                                     </div>
-
+                                                    </div>
+                                                    <input type="hidden" id="requestedInvoiceNumberCash" name="requestedInvoiceNumberCash">
+                                                    <div class="invoice-chip-wrap" id="invoiceChipWrapCash"></div>
                                                 </div>
-                                                <input type="hidden" id="requestedInvoiceNumberCash" name="requestedInvoiceNumberCash">
-                                                <div class="invoice-chip-wrap" id="invoiceChipWrapCash"></div>
-
+                                                <div class="field required">
+                                                    <label>Amount (₹ <a class="ui violet label currency" id="moneyCash">0.0</a>)</label>
+                                                    <input type="number" name="amountCash" id="amountCash" placeholder="Amount" onkeyup="toIndianCurrency()">
+                                                </div>
                                             </div>
-                                            <div class="eight wide field required">
-                                                <label>Amount (₹ <a class="ui violet label currency"
-                                                                    id="moneyCash">0.0</a>
-                                                    )</label>
-                                                <input type="number" name="amountCash" id="amountCash"
-                                                       placeholder="Amount"
-                                                       onkeyup="toIndianCurrency()">
-                                            </div>
-
                                         </div>
-                                        <div class="two fields">
-                                            <div class="eight wide field">
-                                                <label>Party Name</label>
-                                                <select class="ui clearable search dropdown" id="partyCash"
-                                                        name="partyCash">
-                                                    <option value="">Search By Party Name</option>
-                                                </select>
-                                            </div>
-                                            <div class="eight wide field">
-                                                <label>Remark</label>
-                                                <textarea name="remarkCash" id="remarkCash" placeholder="Any Remark"
-                                                          rows="1"></textarea>
+                                        <div class="cash-section-card">
+                                            <h4 class="ui horizontal left aligned divider header"><i class="users icon"></i>Party And Note</h4>
+                                            <div class="cash-section-help">Select the party only if needed for this counter entry, then add an optional short remark.</div>
+                                            <div class="two fields">
+                                                <div class="eight wide field">
+                                                    <label>Party Name</label>
+                                                    <select class="ui clearable search dropdown" id="partyCash" name="partyCash">
+                                                        <option value="">Search By Party Name</option>
+                                                    </select>
+                                                </div>
+                                                <div class="eight wide field">
+                                                    <label>Remark</label>
+                                                    <textarea name="remarkCash" id="remarkCash" placeholder="Any Remark" rows="1"></textarea>
+                                                </div>
                                             </div>
                                         </div>
                                     </form>
@@ -149,44 +417,39 @@
                                 <div class="content">
                                     <form class="ui  small form " id="addFormCredit"
                                           name="addFormCredit">{% csrf_token %}
-                                        <div class="two fields">
-                                            <div class="eight wide field required">
-                                                <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="reply icon"></i>Sales Return Setup</h4>
+                                        <div class="cash-invoice-layout">
+                                            <div class="field required">
+                                                <label>Return Invoice Number</label>
+                                                <div class="cash-invoice-picker">
+                                                <div class="ui left labeled input">
                                                     <div class="ui selection dropdown teal label" id="invoiceSeriesCredit">
                                                         <input type="hidden" id="invoiceSeriesIdCredit" name="invoiceSeriesIdCredit">
                                                         <div class="default text">Select Series</div>
                                                         <i class="dropdown icon"></i>
                                                         <div class="menu"></div>
                                                     </div>
-                                                    <input type="text" placeholder="Invoice Number"
+                                                    <input class="cash-invoice-input" type="text" placeholder="Invoice Number"
                                                            id="invoiceNoCredit"
                                                            name="invoiceNoCredit">
-                                                    <div class="ui dropdown blue label" id="invoiceYearCredit">
-                                                        <div class="text" id="invoiceYearSelectCredit">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
-                                                        </div>
-                                                    </div>
-
+                                                </div>
                                                 </div>
                                                 <input type="hidden" id="requestedInvoiceNumberCredit" name="requestedInvoiceNumberCredit">
                                                 <div class="invoice-chip-wrap" id="invoiceChipWrapCredit"></div>
-
                                             </div>
-                                            <div class="eight wide field required">
+                                            <div class="field required">
                                                 <label>Amount (₹ <a class="ui violet label currency" id="moneyCredit">0.0</a>
                                                     )</label>
                                                 <input type="number" name="amountCredit" id="amountCredit"
                                                        placeholder="Amount"
                                                        onkeyup="toIndianCurrency()">
                                             </div>
-
                                         </div>
+                                        </div>
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="users icon"></i>Party And Note</h4>
+                                        <div class="cash-section-help">Credit entries should be linked to a party. Add a note only when needed.</div>
                                         <div class="two  fields">
                                             <div class="eight wide field required">
                                                 <label>Party Name</label>
@@ -201,6 +464,7 @@
                                                           rows="1"></textarea>
                                             </div>
                                         </div>
+                                        </div>
                                     </form>
                                 </div>
                             </div>
@@ -209,35 +473,27 @@
                             <div class="ui row  ">
                                 <div class="content">
                                     <form class="ui  small form " id="addFormCard" name="addFormCard">{% csrf_token %}
-                                        <div class="two fields">
-                                            <div class="eight wide field required">
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="file alternate outline icon"></i>Invoice Setup</h4>
+                                        <div class="cash-invoice-layout">
+                                            <div class="field required">
                                                 <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
+                                                <div class="cash-invoice-picker">
+                                                <div class="ui left labeled input">
                                                     <div class="ui selection dropdown teal label" id="invoiceSeriesCard">
                                                         <input type="hidden" id="invoiceSeriesIdCard" name="invoiceSeriesIdCard">
                                                         <div class="default text">Select Series</div>
                                                         <i class="dropdown icon"></i>
                                                         <div class="menu"></div>
                                                     </div>
-                                                    <input type="text" placeholder="Invoice Number" id="invoiceNoCard"
+                                                    <input class="cash-invoice-input" type="text" placeholder="Invoice Number" id="invoiceNoCard"
                                                            name="invoiceNoCard">
-                                                    <div class="ui dropdown blue label" id="invoiceYearCard">
-                                                        <div class="text" id="invoiceYearSelectCard">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
-                                                        </div>
-                                                    </div>
-
+                                                </div>
                                                 </div>
                                                 <input type="hidden" id="requestedInvoiceNumberCard" name="requestedInvoiceNumberCard">
                                                 <div class="invoice-chip-wrap" id="invoiceChipWrapCard"></div>
-
                                             </div>
-                                            <div class="eight wide field required">
+                                            <div class="field required">
                                                 <label>Amount (₹ <a class="ui violet label currency"
                                                                     id="moneyCard">0.0</a>
                                                     )</label>
@@ -245,8 +501,11 @@
                                                        placeholder="Amount"
                                                        onkeyup="toIndianCurrency()">
                                             </div>
-
                                         </div>
+                                        </div>
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="users icon"></i>Party And Payment</h4>
+                                        <div class="cash-section-help">Select the party if needed, choose the bank, and add an optional short remark.</div>
                                         <div class="three fields">
                                             <div class="six wide field">
                                                 <label>Party Name</label>
@@ -271,6 +530,7 @@
                                                           rows="1"></textarea>
                                             </div>
                                         </div>
+                                        </div>
                                     </form>
                                 </div>
                             </div>
@@ -279,35 +539,28 @@
                             <div class="ui row  ">
                                 <div class="content">
                                     <form class="ui  small form " id="addFormMix" name="addFormMix">{% csrf_token %}
-                                        <div class="three fields">
-                                            <div class="five wide field required">
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="file alternate outline icon"></i>Invoice Setup</h4>
+                                        <div class="cash-invoice-layout">
+                                            <div class="field required">
                                                 <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
+                                                <div class="cash-invoice-picker">
+                                                <div class="ui left labeled input">
                                                     <div class="ui selection dropdown teal label" id="invoiceSeriesMix">
                                                         <input type="hidden" id="invoiceSeriesIdMix" name="invoiceSeriesIdMix">
                                                         <div class="default text">Select Series</div>
                                                         <i class="dropdown icon"></i>
                                                         <div class="menu"></div>
                                                     </div>
-                                                    <input type="text" placeholder="Invoice Number" id="invoiceNoMix"
+                                                    <input class="cash-invoice-input" type="text" placeholder="Invoice Number" id="invoiceNoMix"
                                                            name="invoiceNoMix">
-                                                    <div class="ui dropdown blue label" id="invoiceYearMix">
-                                                        <div class="text" id="invoiceYearSelectMix">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
-                                                        </div>
-                                                    </div>
-
+                                                </div>
                                                 </div>
                                                 <input type="hidden" id="requestedInvoiceNumberMix" name="requestedInvoiceNumberMix">
                                                 <div class="invoice-chip-wrap" id="invoiceChipWrapMix"></div>
-
                                             </div>
-                                            <div class="four wide field required">
+                                            <div class="two fields">
+                                            <div class="field required">
                                                 <label>Amount Cash (₹ <a class="ui violet label currency"
                                                                          id="moneyCashMix">0.0</a>
                                                     )</label>
@@ -315,7 +568,7 @@
                                                        placeholder="Amount"
                                                        onkeyup="toIndianCurrency()">
                                             </div>
-                                            <div class="four wide field required">
+                                            <div class="field required">
                                                 <label>Amount Card (₹ <a class="ui violet label currency"
                                                                          id="moneyCardMix">0.0</a>
                                                     )</label>
@@ -323,7 +576,12 @@
                                                        placeholder="Amount"
                                                        onkeyup="toIndianCurrency()">
                                             </div>
+                                            </div>
                                         </div>
+                                        </div>
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="users icon"></i>Party And Payment</h4>
+                                        <div class="cash-section-help">Link the party, choose the bank for the card portion, and keep the note short.</div>
                                         <div class="three fields">
                                             <div class="six wide field required">
                                                 <label>Party Name</label>
@@ -347,6 +605,7 @@
                                                 <textarea name="remarkMix" id="remarkMix" placeholder="Any Remark"
                                                           rows="1"></textarea>
                                             </div>
+                                        </div>
                                         </div>
                                     </form>
                                 </div>
@@ -530,72 +789,79 @@
                                 </div>
                             </div>
                         </div>
+                        {% if inventory_enabled %}
                         <div class="ui tab segment" data-tab="return">
                             <div class="ui row  ">
                                 <div class="content">
                                     <form class="ui  small form " id="addFormReturn"
                                           name="addFormReturn">{% csrf_token %}
-                                        <div class="two fields">
-                                            <div class="eight wide field required">
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="file alternate outline icon"></i>Invoice Setup</h4>
+                                        <div class="cash-invoice-layout">
+                                            <div class="field required">
                                                 <label>Invoice Number</label>
-                                                <div class="ui left labeled  input">
+                                                <div class="cash-invoice-picker">
+                                                <div class="ui left labeled input">
                                                     <div class="ui selection dropdown teal label" id="invoiceSeriesReturn">
                                                         <input type="hidden" id="invoiceSeriesIdReturn" name="invoiceSeriesIdReturn">
                                                         <div class="default text">Select Series</div>
                                                         <i class="dropdown icon"></i>
                                                         <div class="menu"></div>
                                                     </div>
-                                                    <input type="text" placeholder="Invoice Number"
+                                                    <input class="cash-invoice-input" type="text" placeholder="Invoice Number"
                                                            id="invoiceNoReturn"
                                                            name="invoiceNoReturn">
-                                                    <div class="ui dropdown blue label" id="invoiceYearReturn">
-                                                        <div class="text" id="invoiceYearSelectReturn">25-26</div>
-                                                        <i class="dropdown icon"></i>
-                                                        <div class="menu">
-                                                            <div class="item">25-26</div>
-                                                            <div class="item">24-25</div>
-                                                            <div class="item">23-24</div>
-                                                            <div class="item">22-23</div>
-                                                        </div>
-                                                    </div>
-
+                                                </div>
                                                 </div>
                                                 <input type="hidden" id="requestedInvoiceNumberReturn" name="requestedInvoiceNumberReturn">
                                                 <div class="invoice-chip-wrap" id="invoiceChipWrapReturn"></div>
-
                                             </div>
-                                            <div class="eight wide field required">
-                                                <label>Amount (₹ <a class="ui violet label currency" id="moneyReturn">0.0</a>
+                                            <div class="field required">
+                                                <label>Return Amount (₹ <a class="ui violet label currency" id="moneyReturn">0.0</a>
                                                     )</label>
                                                 <input type="number" name="amountReturn" id="amountReturn"
                                                        placeholder="Amount"
                                                        onkeyup="toIndianCurrency()">
                                             </div>
-
+                                        </div>
+                                        </div>
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="undo alternate icon"></i>Customer And Return Note</h4>
+                                        <div class="cash-section-help">Use this only when goods are coming back from the customer. The entry will also create a linked sales return record for stock and audit history.</div>
+                                        <div class="field required">
+                                            <label>Against Sales Invoice</label>
+                                            <select class="ui clearable search dropdown" id="salesIdReturn" name="salesIdReturn" onchange="applyReturnSalesSource(this.value)">
+                                                <option value="">Select original sales invoice</option>
+                                            </select>
                                         </div>
                                         <div class="two fields">
                                             <div class="eight wide field">
-                                                <label>Party Name</label>
+                                                <label>Customer / Party</label>
                                                 <select class="ui clearable search dropdown" id="partyReturn"
                                                         name="partyReturn">
                                                     <option value="">Search By Party Name</option>
                                                 </select>
                                             </div>
                                             <div class="eight wide field">
-                                                <label>Remark</label>
-                                                <textarea name="remarkReturn" id="remarkReturn" placeholder="Any Remark"
+                                                <label>Return Note</label>
+                                                <textarea name="remarkReturn" id="remarkReturn" placeholder="Reason for return"
                                                           rows="1"></textarea>
                                             </div>
+                                        </div>
                                         </div>
                                     </form>
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                         <div class="ui tab segment" data-tab="expense">
                             <div class="ui row  ">
                                 <div class="content">
                                     <form class="ui  small form " id="addFormExpense"
                                           name="addFormExpense">{% csrf_token %}
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="receipt icon"></i>Expense Entry</h4>
+                                        <div class="cash-section-help">Choose the expense head, enter the amount, and keep the note specific.</div>
                                         <div class="three fields">
                                             <div class="field required">
                                                 <label>Expense Type</label>
@@ -634,6 +900,7 @@
                                             </div>
 
                                         </div>
+                                        </div>
 
                                     </form>
                                 </div>
@@ -644,6 +911,9 @@
                                 <div class="content">
                                     <form class="ui  small form " id="addFormAdvance"
                                           name="addFormAdvance">{% csrf_token %}
+                                        <div class="cash-section-card">
+                                        <h4 class="ui horizontal left aligned divider header"><i class="hand holding usd icon"></i>Advance Entry</h4>
+                                        <div class="cash-section-help">Select the party receiving the advance and enter the amount with an optional note.</div>
                                         <div class="two fields">
                                             <div class="eight wide field required">
                                                 <label>Party Name</label>
@@ -670,9 +940,65 @@
                                                           rows="1"></textarea>
                                             </div>
                                         </div>
+                                        </div>
                                     </form>
                                 </div>
                             </div>
+                        </div>
+                        <div class="cash-counter-shared-billing ui small form">
+                        {% if advanced_invoicing_enabled %}
+                            <div class="cash-section-card" id="cashCounterAdvancedInvoiceCard" style="display:none;">
+                                <div class="sales-gst-toolbar">
+                                    <div>
+                                        <h4 class="ui horizontal left aligned divider header" style="margin:0 0 6px;">
+                                            <i class="percent icon"></i>
+                                            GST Billing
+                                        </h4>
+                                        <div class="sales-gst-summary" id="advancedInvoiceSummary">B2C quick billing. Expand only when buyer GST details are needed.</div>
+                                    </div>
+                                    <button type="button" class="ui mini basic teal button" id="advancedInvoiceToggleBtn" onclick="toggleAdvancedInvoiceFields()">Show Details</button>
+                                </div>
+                                <div class="two fields">
+                                    <div class="eight wide field">
+                                        <label>Invoice Type</label>
+                                        <select class="ui dropdown" id="invoiceKind">
+                                            <option value="b2c">B2C</option>
+                                            <option value="b2b">B2B</option>
+                                        </select>
+                                        <small id="invoiceNatureHelp" style="display:block; margin-top:6px; color:#667085;">Invoice series can default this value for GST billing.</small>
+                                    </div>
+                                    <div class="eight wide field">
+                                        <label>Place Of Supply</label>
+                                        <input type="text" id="placeOfSupply" placeholder="Optional place of supply">
+                                    </div>
+                                </div>
+                                <div class="three fields sales-gst-extra-fields" id="buyerInvoiceFields">
+                                    <div class="field">
+                                        <label>Buyer Legal Name</label>
+                                        <input type="text" id="buyerLegalName" placeholder="Auto-filled from party">
+                                    </div>
+                                    <div class="field">
+                                        <label>Buyer GST Number</label>
+                                        <input type="text" id="buyerGstNumber" placeholder="Optional GSTIN for B2B">
+                                    </div>
+                                    <div class="field">
+                                        <label>Buyer Billing Address</label>
+                                        <input type="text" id="buyerBillingAddress" placeholder="Billing address">
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <input type="hidden" id="invoiceKind" value="b2c">
+                            <input type="hidden" id="placeOfSupply" value="">
+                            <input type="hidden" id="buyerLegalName" value="">
+                            <input type="hidden" id="buyerGstNumber" value="">
+                            <input type="hidden" id="buyerBillingAddress" value="">
+                        {% endif %}
+                        {% if inventory_enabled %}
+                            {% include 'home/includes/sales_invoice_lines.html' with section_id='cashCounterSalesLineItemBox' hidden_input_id='cashCounterLineItems' title='Track GST invoice rows for this cash counter bill' enabled=False allow_non_gst=non_gst_shadow_enabled seller_gst_number=seller_gst_number %}
+                        {% else %}
+                            <input type="hidden" id="cashCounterLineItems" value="[]">
+                        {% endif %}
                         </div>
                     </div>
                     <div class="ui  aligned basic  grid">
@@ -695,6 +1021,37 @@
                 </div>
 
 
+                <div class="ui tiny modal" id="returnSourceLineModal">
+                    <i class="close icon"></i>
+                    <div class="header">Choose Return Lines</div>
+                    <div class="content">
+                        <div class="ui small form">
+                            <div class="field">
+                                <div class="ui message" id="returnSourceSummaryText">Select the sold lines and adjust the quantity if only part of the invoice is being returned.</div>
+                            </div>
+                            <table class="ui very compact celled table">
+                                <thead>
+                                <tr>
+                                    <th style="width: 48px;">Use</th>
+                                    <th>Item</th>
+                                    <th style="width: 95px;">Sold</th>
+                                    <th style="width: 95px;">Returned</th>
+                                    <th style="width: 95px;">Balance</th>
+                                    <th style="width: 130px;">Return Qty</th>
+                                    <th style="width: 110px;">Rate</th>
+                                </tr>
+                                </thead>
+                                <tbody id="returnSourceLineTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <div class="ui button">Cancel</div>
+                        <div class="ui teal right labeled icon button" onclick="applySelectedReturnLines()">
+                            <i class="check icon"></i>Apply Lines
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -705,19 +1062,97 @@
 {% endblock %}
 
 {% block js %}
+    <script src="{% static 'js/sales-gst-lines.js' %}"></script>
     <script>
         var mode = 'Cash';
+        var eligibleInventoryModes = ['Cash', 'Credit', 'Card', 'Mix'{% if inventory_enabled %}, 'Return'{% endif %}];
+        var cashCounterSalesWidget = null;
+        var advancedInvoiceExpanded = false;
+        var cashCounterInvoiceSeriesCatalog = {};
+        var partyCatalog = [];
+        var salesReturnSourceCatalog = [];
+        var pendingReturnSourceSale = null;
+
+        function currentCashCounterPartyId() {
+            const $party = $('#party' + mode);
+            let rawValue = '';
+            try {
+                rawValue = String($party.dropdown('get value') || '').trim();
+            } catch (e) {
+                rawValue = '';
+            }
+            if (!rawValue) {
+                rawValue = String($party.val() || '').trim();
+            }
+            if (!rawValue) {
+                return '';
+            }
+            if (rawValue.indexOf('@') >= 0) {
+                const parts = rawValue.split('@');
+                return String(parts[1] || '').trim();
+            }
+            const trailingId = rawValue.match(/(\d+)\s*$/);
+            if (trailingId) {
+                return String(trailingId[1] || '').trim();
+            }
+            return rawValue;
+        }
+
+        function selectedCashCounterPartyMeta(selectedValueArg) {
+            const $party = $('#party' + mode);
+            const selectedValue = String(selectedValueArg || currentCashCounterPartyId() || '');
+            if (!$party.length || !selectedValue) {
+                return null;
+            }
+            const $option = $party.find('option').filter(function () {
+                const optionValue = String($(this).val() || '').trim();
+                if (!optionValue) {
+                    return false;
+                }
+                if (optionValue === selectedValue) {
+                    return true;
+                }
+                if (optionValue.indexOf('@') >= 0) {
+                    return String(optionValue.split('@').pop() || '').trim() === selectedValue;
+                }
+                const trailingId = optionValue.match(/(\d+)\s*$/);
+                return trailingId ? String(trailingId[1] || '').trim() === selectedValue : false;
+            }).first();
+            if ($option.length) {
+                return {
+                    id: selectedValue,
+                    legalName: String($option.data('legalName') || '').trim(),
+                    gstNumber: String($option.data('gstNumber') || '').trim(),
+                    billingAddress: String($option.data('billingAddress') || '').trim(),
+                    isB2b: String($option.data('isB2b') || '0') === '1',
+                    name: String($option.data('name') || '').trim()
+                };
+            }
+            const selected = partyCatalog.find(function (row) { return String(row.ID) === selectedValue; });
+            if (!selected) {
+                return null;
+            }
+            return {
+                id: selectedValue,
+                legalName: selected.LegalName || selected.Name || '',
+                gstNumber: selected.GSTNumber || '',
+                billingAddress: selected.BillingAddress || selected.Address || '',
+                isB2b: Boolean(selected.IsB2B || selected.GSTNumber),
+                name: selected.Name || ''
+            };
+        }
 
         function selectTab(newMode) {
             mode = newMode
             resetForm()
+            syncCashCounterInventoryState();
 
             return mode
 
         }
 
         $(getCustomerList());
-        $(getPartyList());
+        $(initCashCounterInventory());
 
 
         function getCustomerList() {
@@ -727,6 +1162,8 @@
 
                 success: function (response) {
                     localStorage.setItem('response', JSON.stringify(response));
+                    partyCatalog = response.data || [];
+                    getPartyList(response.data || []);
 
                 },
 
@@ -742,6 +1179,172 @@
 
 
         }
+
+        function loadSalesReturnSourceSales() {
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:list_sales_return_source_sales_api' %}",
+                success: function (response) {
+                    if (response.message !== 'success') {
+                        return;
+                    }
+                    salesReturnSourceCatalog = response.data || [];
+                    const $select = $('#salesIdReturn');
+                    if (!$select.length) {
+                        return;
+                    }
+                    $select.html('<option value="">Select original sales invoice</option>');
+                    salesReturnSourceCatalog.forEach(function (row) {
+                        $select.append('<option value="' + row.SourceValue + '">' + row.DisplayDetail + '</option>');
+                    });
+                    $select.dropdown('refresh');
+                    $select.dropdown({
+                        fullTextSearch: true,
+                        onChange: function (value) {
+                            applyReturnSalesSource(value);
+                        }
+                    }).off('change.returnSourceNative').on('change.returnSourceNative', function () {
+                        applyReturnSalesSource($(this).val());
+                    });
+                }
+            });
+        }
+
+        function applyReturnSalesSource(saleId) {
+            const normalized = String(saleId || '').trim();
+            if (!normalized) {
+                return;
+            }
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:get_sales_return_source_detail_api' %}",
+                data: {sourceId: normalized},
+                success: function (response) {
+                    if (response.message !== 'success') {
+                        $('body').toast({class: 'error', message: response.error || 'Unable to load sales invoice.'});
+                        return;
+                    }
+                    const sale = response.data || {};
+                    if (sale.PartyID) {
+                        $('#partyReturn').dropdown('set selected', String(sale.PartyID));
+                        syncPartyInvoiceFields(String(sale.PartyID));
+                    }
+                    if ($('#advancedInvoicingEnabled').val() === '1') {
+                        if ($('#invoiceKind').is('select')) {
+                            $('#invoiceKind').dropdown('set selected', sale.InvoiceKind || 'b2c');
+                        } else {
+                            $('#invoiceKind').val(sale.InvoiceKind || 'b2c');
+                        }
+                        $('#buyerLegalName').val(sale.BuyerLegalName || '');
+                        $('#buyerGstNumber').val(sale.BuyerGstNumber || '');
+                        $('#buyerBillingAddress').val(sale.BuyerBillingAddress || '');
+                        $('#placeOfSupply').val(sale.PlaceOfSupply || '');
+                        advancedInvoiceExpanded = true;
+                        updateInvoiceKindUI();
+                    }
+                    pendingReturnSourceSale = sale;
+                    openReturnSourceLineModal(sale);
+                }
+            });
+        }
+        window.applyReturnSalesSource = applyReturnSalesSource;
+
+        function openReturnSourceLineModal(sale) {
+            var lines = (sale && sale.Lines) || [];
+            var $tbody = $('#returnSourceLineTableBody');
+            $tbody.html('');
+            $('#returnSourceSummaryText').text('Invoice ' + (sale.InvoiceNumber || '-') + ' | Choose the sold lines and edit only the quantities being returned.');
+            if (!lines.length) {
+                $tbody.html(
+                    '<tr>' +
+                    '<td colspan="7">' +
+                    '<div class="ui warning message" style="margin:0;">' +
+                    '<div class="header">No item-wise sale lines found</div>' +
+                    '<p>This original invoice was saved without item-wise billing rows. Add the return rows manually in the bill section below.</p>' +
+                    '</div>' +
+                    '</td>' +
+                    '</tr>'
+                );
+            }
+            lines.forEach(function (line, index) {
+                var soldQty = Number(line.quantity || 0);
+                var returnedQty = Number(line.returnedQuantity || 0);
+                var remainingQty = Number(line.remainingQuantity || 0);
+                $tbody.append(
+                    '<tr>' +
+                    '<td class="center aligned"><div class="ui checkbox"><input type="checkbox" class="return-source-use" checked data-index="' + index + '"><label></label></div></td>' +
+                    '<td><div><strong>' + (line.itemName || '') + '</strong></div><div style="font-size:11px;color:#64748b;">Bucket: ' + (line.stockBucket || 'gst').replace('_', ' ') + '</div></td>' +
+                    '<td>' + soldQty.toFixed(2).replace(/\.00$/, '') + '</td>' +
+                    '<td>' + returnedQty.toFixed(2).replace(/\.00$/, '') + '</td>' +
+                    '<td>' + remainingQty.toFixed(2).replace(/\.00$/, '') + '</td>' +
+                    '<td><div class="ui input"><input type="number" class="return-source-qty" data-index="' + index + '" min="0" max="' + remainingQty.toFixed(2) + '" step="0.01" value="' + remainingQty.toFixed(2).replace(/\.00$/, '') + '"></div></td>' +
+                    '<td>' + Number(line.unitPrice || 0).toFixed(2) + '</td>' +
+                    '</tr>'
+                );
+            });
+            $('#returnSourceLineModal .ui.checkbox').checkbox();
+            $('#returnSourceLineModal').modal({
+                autofocus: false,
+                observeChanges: true,
+                detachable: true
+            }).modal('show');
+        }
+        window.openReturnSourceLineModal = openReturnSourceLineModal;
+
+        window.applySelectedReturnLines = function () {
+            var sale = pendingReturnSourceSale;
+            if (!sale) {
+                $('#returnSourceLineModal').modal('hide');
+                return;
+            }
+            var allowNonGst = $('#cashCounterSalesLineItemBox').attr('data-allow-non-gst') === '1' || $('#cashCounterSalesLineItemBox').data('allowNonGst') === 1;
+            var selectedRows = [];
+            $('#returnSourceLineTableBody tr').each(function () {
+                var $tr = $(this);
+                var index = Number($tr.find('.return-source-use').data('index'));
+                var checked = $tr.find('.return-source-use').is(':checked');
+                var sourceLine = (sale.Lines || [])[index];
+                var returnQty = Number($tr.find('.return-source-qty').val() || 0);
+                if (!checked || !sourceLine || returnQty <= 0) {
+                    return;
+                }
+                if (returnQty > Number(sourceLine.remainingQuantity || 0)) {
+                    $('body').toast({class: 'orange', message: 'Return quantity cannot exceed remaining balance for ' + (sourceLine.itemName || 'selected item') + '.'});
+                    selectedRows = null;
+                    return false;
+                }
+                var unitPrice = Number(sourceLine.unitPrice || 0);
+                var discountPercent = Number(sourceLine.discountPercent || 0);
+                var gross = returnQty * unitPrice;
+                var taxable = gross - ((gross * discountPercent) / 100);
+                var gstRate = Number(sourceLine.gstRate || 0);
+                var gstAmount = taxable * gstRate / 100;
+                selectedRows.push({
+                    itemId: sourceLine.itemId,
+                    stockBucket: allowNonGst ? (sourceLine.stockBucket || 'gst') : 'gst',
+                    quantity: returnQty,
+                    unitPrice: unitPrice,
+                    discountPercent: discountPercent,
+                    taxableAmount: Number(taxable.toFixed(2)),
+                    gstRate: gstRate,
+                    gstAmount: Number(gstAmount.toFixed(2)),
+                    lineTotal: Number((taxable + gstAmount).toFixed(2)),
+                    remark: sourceLine.remark || ''
+                });
+            });
+            if (selectedRows === null) {
+                return;
+            }
+            if (!selectedRows.length) {
+                $('body').toast({class: 'orange', message: 'Choose at least one return line.'});
+                return;
+            }
+            if (cashCounterSalesWidget) {
+                cashCounterSalesWidget.setRows(selectedRows);
+                $('#cashCounterSalesLineItemBox .sales-lines-enable-toggle').prop('checked', true).trigger('change');
+            }
+            $('#returnSourceLineModal').modal('hide');
+        };
 
         const toIndianCurrency = () => {
             if (mode === 'Mix') {
@@ -759,6 +1362,212 @@
 
         };
 
+        function gstStateCodeFromNumber(value) {
+            const normalized = String(value || '').replace(/\s+/g, '').toUpperCase();
+            if (/^\d{2}/.test(normalized)) {
+                return normalized.slice(0, 2);
+            }
+            return '';
+        }
+
+        function isUtgstStateCode(code) {
+            return ['04', '26', '31', '35', '38', '97'].indexOf(String(code || '').padStart(2, '0')) >= 0;
+        }
+
+        function gstStateCodeFromPlaceOfSupply(value) {
+            const normalized = String(value || '').trim().toLowerCase().replace(/&/g, 'and').replace(/-/g, ' ').replace(/,/g, ' ');
+            const compact = normalized.replace(/\s+/g, ' ').trim();
+            const stateMap = {
+                '01': 'jammu and kashmir', '02': 'himachal pradesh', '03': 'punjab', '04': 'chandigarh',
+                '05': 'uttarakhand', '06': 'haryana', '07': 'delhi', '08': 'rajasthan', '09': 'uttar pradesh',
+                '10': 'bihar', '11': 'sikkim', '12': 'arunachal pradesh', '13': 'nagaland', '14': 'manipur',
+                '15': 'mizoram', '16': 'tripura', '17': 'meghalaya', '18': 'assam', '19': 'west bengal',
+                '20': 'jharkhand', '21': 'odisha', '22': 'chhattisgarh', '23': 'madhya pradesh', '24': 'gujarat',
+                '25': 'daman and diu', '26': 'dadra and nagar haveli and daman and diu', '27': 'maharashtra',
+                '29': 'karnataka', '30': 'goa', '31': 'lakshadweep', '32': 'kerala', '33': 'tamil nadu',
+                '34': 'puducherry', '35': 'andaman and nicobar islands', '36': 'telangana', '37': 'andhra pradesh',
+                '38': 'ladakh', '97': 'other territory'
+            };
+            if (/^\d{2}/.test(compact)) {
+                return compact.slice(0, 2);
+            }
+            for (const code in stateMap) {
+                const name = stateMap[code];
+                if (compact === name || compact.indexOf(name) >= 0) {
+                    return code;
+                }
+            }
+            return '';
+        }
+
+        function updateLiveCashCounterTaxBreakup(totals) {
+            const $box = $('#cashCounterSalesLineItemBox');
+            if (!$box.length) {
+                return;
+            }
+            const sellerStateCode = gstStateCodeFromNumber($box.data('sellerGstNumber'));
+            const buyerStateCode = gstStateCodeFromNumber($('#buyerGstNumber').val());
+            const placeOfSupplyStateCode = gstStateCodeFromPlaceOfSupply($('#placeOfSupply').val());
+            const effectiveBuyerStateCode = buyerStateCode || placeOfSupplyStateCode;
+            const gstTotal = Number((totals && totals.gstTotal) || 0);
+            const isInterState = Boolean(sellerStateCode && effectiveBuyerStateCode && sellerStateCode !== effectiveBuyerStateCode);
+            const halfTax = gstTotal / 2;
+            const taxMode = isInterState ? 'IGST' : (isUtgstStateCode(sellerStateCode) ? 'CGST + UTGST' : 'CGST + SGST');
+
+            $box.find('.sales-tax-mode-label').text(taxMode);
+            $box.find('.sales-cgst-total').text((isInterState ? 0 : halfTax).toFixed(2));
+            $box.find('.sales-sgst-total').text((!isInterState && !isUtgstStateCode(sellerStateCode) ? (gstTotal - halfTax) : 0).toFixed(2));
+            $box.find('.sales-utgst-total').text((!isInterState && isUtgstStateCode(sellerStateCode) ? (gstTotal - halfTax) : 0).toFixed(2));
+            $box.find('.sales-igst-total').text((isInterState ? gstTotal : 0).toFixed(2));
+            $box.find('.sales-igst-label').toggle(isInterState);
+            $box.find('.sales-cgst-label').toggle(!isInterState);
+            $box.find('.sales-sgst-label').toggle(!isInterState && !isUtgstStateCode(sellerStateCode));
+            $box.find('.sales-utgst-label').toggle(!isInterState && isUtgstStateCode(sellerStateCode));
+        }
+
+        function resetBuyerInvoiceFields() {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            $('#buyerLegalName').val('');
+            $('#buyerGstNumber').val('');
+            $('#buyerBillingAddress').val('');
+            if ($('#invoiceKind').is('select') && !$('#invoiceKind').dropdown('is disabled')) {
+                $('#invoiceKind').dropdown('set selected', 'b2c');
+            } else if (!$('#invoiceKind').is('select')) {
+                $('#invoiceKind').val('b2c');
+            }
+            advancedInvoiceExpanded = false;
+            updateInvoiceKindUI();
+        }
+
+        function syncPartyInvoiceFields(selectedValueArg) {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            const selected = selectedCashCounterPartyMeta(selectedValueArg);
+            if (!selected) {
+                if (!String(selectedValueArg || currentCashCounterPartyId() || '').trim()) {
+                    resetBuyerInvoiceFields();
+                }
+                return;
+            }
+            if (!$('#buyerLegalName').val()) {
+                $('#buyerLegalName').val(selected.legalName || selected.name || '');
+            }
+            if (!$('#buyerGstNumber').val()) {
+                $('#buyerGstNumber').val(selected.gstNumber || '');
+            }
+            if (!$('#buyerBillingAddress').val()) {
+                $('#buyerBillingAddress').val(selected.billingAddress || '');
+            }
+            if (selected.isB2b || selected.gstNumber) {
+                $('#invoiceKind').dropdown('set selected', 'b2b');
+                advancedInvoiceExpanded = true;
+            }
+            updateInvoiceKindUI();
+            updateLiveCashCounterTaxBreakup({gstTotal: Number($('#cashCounterSalesLineItemBox .sales-gst-total').text() || 0)});
+        }
+
+        function toggleAdvancedInvoiceFields(forceValue) {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            if (typeof forceValue === 'boolean') {
+                advancedInvoiceExpanded = forceValue;
+            } else {
+                advancedInvoiceExpanded = !advancedInvoiceExpanded;
+            }
+            updateInvoiceKindUI();
+        }
+
+        function updateInvoiceKindUI() {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            const invoiceKind = ($('#invoiceKind').val() || 'b2c');
+            $('#buyerInvoiceFields').toggle(advancedInvoiceExpanded);
+            $('#advancedInvoiceToggleBtn').text(advancedInvoiceExpanded ? 'Hide Details' : 'Show Details');
+            $('#advancedInvoiceSummary').text(
+                invoiceKind === 'b2b'
+                    ? 'B2B selected. Buyer GST details will print on the invoice.'
+                    : (advancedInvoiceExpanded
+                        ? 'Optional GST overrides are open. Leave them blank to use party defaults.'
+                        : 'B2C quick billing. Expand only when buyer GST details are needed.')
+            );
+        }
+
+        function applyInvoiceSeriesRule(meta) {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            const help = $('#invoiceNatureHelp');
+            if (!meta) {
+                $('#invoiceKind').dropdown('set enabled');
+                help.text('Invoice series can default this value for GST billing.');
+                updateInvoiceKindUI();
+                return;
+            }
+            if (meta.invoiceNature && meta.invoiceNature !== 'mixed') {
+                $('#invoiceKind').dropdown('set selected', meta.invoiceNature);
+            }
+            if (meta.lockInvoiceNature && meta.invoiceNature && meta.invoiceNature !== 'mixed') {
+                $('#invoiceKind').dropdown('set disabled');
+                help.text('Invoice type is locked by the selected series: ' + meta.invoiceNatureLabel + '.');
+            } else {
+                $('#invoiceKind').dropdown('set enabled');
+                help.text(meta.invoiceNature && meta.invoiceNature !== 'mixed'
+                    ? 'Invoice type defaults from the selected series: ' + meta.invoiceNatureLabel + '.'
+                    : 'Invoice series can default this value for GST billing.');
+            }
+            updateInvoiceKindUI();
+        }
+
+        function syncCashCounterInventoryState() {
+            const eligible = eligibleInventoryModes.indexOf(mode) >= 0;
+            $('#cashCounterAdvancedInvoiceCard').toggle(eligible && $('#advancedInvoicingEnabled').val() === '1');
+            $('#cashCounterSalesLineItemBox').toggle(eligible);
+            if (!eligible) {
+                $('#cashCounterLineItems').val('[]');
+                updateLiveCashCounterTaxBreakup({gstTotal: 0});
+                return;
+            }
+            const checked = $('#cashCounterSalesLineItemBox .sales-lines-enable-toggle').is(':checked');
+            $('#cashCounterSalesLineItemBox .sales-lines-wrap').toggle(checked);
+            if (!checked) {
+                $('#cashCounterLineItems').val('[]');
+                updateLiveCashCounterTaxBreakup({gstTotal: 0});
+            }
+            updateInvoiceKindUI();
+        }
+
+        function initCashCounterInventory() {
+            if (!window.SalesInvoiceLines || !$('#cashCounterSalesLineItemBox').length) {
+                return;
+            }
+            cashCounterSalesWidget = window.SalesInvoiceLines.init({
+                containerSelector: '#cashCounterSalesLineItemBox',
+                hiddenInputSelector: '#cashCounterLineItems',
+                catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+                syncTotals: function (totals) {
+                    if (mode !== 'Mix' && eligibleInventoryModes.indexOf(mode) >= 0) {
+                        $('#amount' + mode).val(Number((totals && totals.roundedPayable) || 0).toFixed(2));
+                        toIndianCurrency();
+                    }
+                    updateLiveCashCounterTaxBreakup(totals || {gstTotal: 0});
+                }
+            });
+            $('#cashCounterSalesLineItemBox .sales-lines-enable-toggle').on('change', syncCashCounterInventoryState);
+            syncCashCounterInventoryState();
+        }
+
+        function getCashCounterLineItems() {
+            if (!cashCounterSalesWidget) {
+                return [];
+            }
+            return cashCounterSalesWidget.collect() || [];
+        }
+
         function resetForm() {
             $('#addForm' + mode).trigger('reset');
             $('#invoiceNo' + mode).val('');
@@ -773,12 +1582,18 @@
             $('#partyAdvance').dropdown('clear');
             $('#partyMix').dropdown('clear');
             $('#partyReturn').dropdown('clear');
+            $('#salesIdReturn').dropdown('clear');
             $('#bank' + mode).dropdown('clear');
+            resetBuyerInvoiceFields();
+            $('#placeOfSupply').val('');
+            if (cashCounterSalesWidget && eligibleInventoryModes.indexOf(mode) >= 0) {
+                cashCounterSalesWidget.setRows([]);
+            }
             loadCashCounterInvoiceSeries();
         }
 
-        function getPartyList() {
-            let response = JSON.parse(localStorage.getItem('response'))
+        function getPartyList(rows) {
+            let responseRows = rows || partyCatalog || [];
 
             $('#partyCash').html('');
             $('#partyCredit').html('');
@@ -795,16 +1610,30 @@
             $('#partyMix').append(' <option value="">Search By Party Name</option>');
             $('#partyReturn').append(' <option value="">Search By Party Name</option>');
             var j;
-            for (j = 0; j < response.data.length; j++) {
-                $('#partyCash').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
-                $('#partyCredit').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
-                $('#partyCard').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
-                $('#partyCollection').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
-                $('#partyAdvance').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
-                $('#partyMix').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
-                $('#partyReturn').append('<option value="' + response.data[j]['Detail'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
+            for (j = 0; j < responseRows.length; j++) {
+                const optionHtml = '<option value="' + responseRows[j]['Detail'] + '" data-name="' + (responseRows[j]['Name'] || '') + '" data-legal-name="' + (responseRows[j]['LegalName'] || '') + '" data-gst-number="' + (responseRows[j]['GSTNumber'] || '') + '" data-billing-address="' + (responseRows[j]['BillingAddress'] || '') + '" data-is-b2b="' + (responseRows[j]['IsB2B'] ? '1' : '0') + '">' + responseRows[j]['DisplayDetail'] + '</option>';
+                $('#partyCash').append(optionHtml);
+                $('#partyCredit').append(optionHtml);
+                $('#partyCard').append(optionHtml);
+                $('#partyCollection').append(optionHtml);
+                $('#partyAdvance').append(optionHtml);
+                $('#partyMix').append(optionHtml);
+                $('#partyReturn').append(optionHtml);
 
             }
+
+            $('#partyCash, #partyCredit, #partyCard, #partyCollection, #partyAdvance, #partyMix, #partyReturn').each(function () {
+                const $dropdown = $(this);
+                $dropdown.dropdown('refresh');
+                $dropdown.dropdown({
+                    fullTextSearch: true,
+                    onChange: function (value) {
+                        syncPartyInvoiceFields(value);
+                    }
+                }).off('change.cashCounterPartyNative').on('change.cashCounterPartyNative', function () {
+                    syncPartyInvoiceFields($(this).val());
+                });
+            });
 
         }
 
@@ -820,7 +1649,27 @@
             let bank = $('#bank' + mode).val();
             let amountMixCash = $('#amountCash' + mode).val();
             let amountMixCard = $('#amountCard' + mode).val();
+            let invoiceKind = $('#invoiceKind').val();
+            let buyerLegalName = $('#buyerLegalName').val();
+            let buyerGstNumber = $('#buyerGstNumber').val();
+            let buyerBillingAddress = $('#buyerBillingAddress').val();
+            let placeOfSupply = $('#placeOfSupply').val();
+            let salesId = $('#salesIdReturn').val();
+            let lineItems = [];
             let canSave = false;
+
+            if (eligibleInventoryModes.indexOf(mode) >= 0 && $('#cashCounterSalesLineItemBox').length) {
+                if ($('#cashCounterSalesLineItemBox .sales-lines-enable-toggle').is(':checked')) {
+                    lineItems = getCashCounterLineItems();
+                    if (!lineItems.length) {
+                        $('body').toast({class: 'orange', message: 'Add at least one valid GST item row before saving.'});
+                        hideLoading();
+                        return;
+                    }
+                } else {
+                    $('#cashCounterLineItems').val('[]');
+                }
+            }
 
             if (mode === 'Cash') {
                 if (invoiceSeriesId === '' || invoiceNo === '' || amount === '' || party === ''
@@ -900,7 +1749,7 @@
                     canSave = true
                 }
             } else if (mode === 'Return') {
-                if (invoiceSeriesId === '' || invoiceNo === '' || amount === '' || party === ''
+                if (invoiceSeriesId === '' || invoiceNo === '' || amount === '' || party === '' || salesId === ''
                 ) {
                     $('body')
                         .toast({
@@ -957,6 +1806,13 @@
                 data.append('expenseType', expenseType);
                 data.append('bank', bank);
                 data.append('mode', mode);
+                data.append('invoiceKind', invoiceKind);
+                data.append('buyerLegalName', buyerLegalName);
+                data.append('buyerGstNumber', buyerGstNumber);
+                data.append('buyerBillingAddress', buyerBillingAddress);
+                data.append('placeOfSupply', placeOfSupply);
+                data.append('salesId', salesId);
+                data.append('lineItems', JSON.stringify(lineItems));
 
                 $.ajax({
                     type: 'post',
@@ -1031,9 +1887,13 @@
                         }
 
                         response.data.forEach(function (item) {
+                            cashCounterInvoiceSeriesCatalog[modeName + ':' + item.id] = item;
                             menu.append(
-                                '<div class="item" data-value="' + item.id + '" data-next-number="' + item.nextNumber + '" data-upcoming=\'' + JSON.stringify(item.upcomingNumbers || []) + '\'>' +
-                                item.seriesCode + '<span class="description">Next ' + item.invoiceNumber + '</span></div>'
+                                '<div class="item" data-value="' + item.id + '" data-next-number="' + item.nextNumber + '" data-upcoming=\'' + JSON.stringify(item.upcomingNumbers || []) + '\' data-invoice-nature="' + (item.invoiceNature || 'mixed') + '" data-lock-invoice-nature="' + (item.lockInvoiceNature ? '1' : '0') + '" data-invoice-nature-label="' + (item.invoiceNatureLabel || 'Mixed') + '">' +
+                                '<div class="invoice-series-option">' +
+                                '<span class="invoice-series-option-code">' + item.seriesCode + '</span>' +
+                                '<span class="invoice-series-option-next">Next ' + item.invoiceNumber + '</span>' +
+                                '</div></div>'
                             );
                         });
 
@@ -1044,9 +1904,19 @@
                                     $('#invoiceNo' + modeName).val('');
                                     $('#requestedInvoiceNumber' + modeName).val('');
                                     $('#invoiceChipWrap' + modeName).html('');
+                                    applyInvoiceSeriesRule(null);
                                     return;
                                 }
+                                const selectedSeries = cashCounterInvoiceSeriesCatalog[modeName + ':' + value];
+                                if (selectedSeries && selectedSeries.seriesCode) {
+                                    dropdown.dropdown('set text', selectedSeries.seriesCode);
+                                }
                                 $('#invoiceNo' + modeName).val($choice.data('next-number'));
+                                applyInvoiceSeriesRule({
+                                    invoiceNature: String($choice.data('invoice-nature') || 'mixed'),
+                                    lockInvoiceNature: String($choice.data('lock-invoice-nature') || '0') === '1',
+                                    invoiceNatureLabel: String($choice.data('invoice-nature-label') || 'Mixed')
+                                });
                                 renderCashCounterInvoiceChips(modeName, $choice.data('upcoming') || []);
                             }
                         });
@@ -1065,6 +1935,31 @@
                 }
             });
         }
+
+        $(document).on('click', '[id^="invoiceSeries"] .menu .item', function () {
+            const $item = $(this);
+            const $dropdown = $item.closest('.ui.dropdown');
+            const dropdownId = $dropdown.attr('id') || '';
+            const modeName = dropdownId.replace('invoiceSeries', '');
+            const selectedValue = $item.attr('data-value');
+            if (!modeName || !selectedValue) {
+                return;
+            }
+            setTimeout(function () {
+                const selectedSeries = cashCounterInvoiceSeriesCatalog[modeName + ':' + selectedValue];
+                if (!selectedSeries) {
+                    return;
+                }
+                $dropdown.dropdown('set text', selectedSeries.seriesCode);
+                $('#invoiceNo' + modeName).val(selectedSeries.nextNumber);
+                applyInvoiceSeriesRule({
+                    invoiceNature: String(selectedSeries.invoiceNature || 'mixed'),
+                    lockInvoiceNature: !!selectedSeries.lockInvoiceNature,
+                    invoiceNatureLabel: String(selectedSeries.invoiceNatureLabel || 'Mixed')
+                });
+                renderCashCounterInvoiceChips(modeName, selectedSeries.upcomingNumbers || []);
+            }, 0);
+        });
 
         function renderCashCounterInvoiceChips(modeName, upcomingNumbers) {
             const wrap = $('#invoiceChipWrap' + modeName);
@@ -1093,6 +1988,21 @@
         }
 
         $(loadCashCounterInvoiceSeries());
+        $(loadSalesReturnSourceSales());
+        $('#salesIdReturn').off('change.returnSourceDirect').on('change.returnSourceDirect', function () {
+            applyReturnSalesSource($(this).val());
+        });
+
+        if ($('#invoiceKind').is('select')) {
+            $('#invoiceKind').dropdown({
+                onChange: function () {
+                    updateInvoiceKindUI();
+                }
+            });
+        }
+        $('#buyerGstNumber, #placeOfSupply').on('input change', function () {
+            updateLiveCashCounterTaxBreakup({gstTotal: Number($('#cashCounterSalesLineItemBox .sales-gst-total').text() || 0)});
+        });
 
 
     </script>

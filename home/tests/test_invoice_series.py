@@ -99,6 +99,8 @@ class InvoiceSeriesTests(TestCase):
         payload = response.json()["data"]
         self.assertEqual(payload[0]["nextNumber"], "0002")
         self.assertEqual(payload[0]["invoiceNumber"], "BCS0002")
+        self.assertEqual(payload[0]["invoiceNature"], "mixed")
+        self.assertFalse(payload[0]["lockInvoiceNature"])
 
     def test_sales_series_suggestion_includes_previous_unused_numbers(self):
         self.sales_series.nextNumber = 6
@@ -238,6 +240,48 @@ class InvoiceSeriesTests(TestCase):
         self.assertEqual(sale.mixCashAmount, 0.0)
         self.assertEqual(sale.mixOnlineAmount, 0.0)
         self.assertFalse(BookTransaction.objects.filter(source_object_id=sale.pk, isDeleted=False).exists())
+
+    def test_locked_b2b_series_forces_invoice_kind(self):
+        self.sales_series.invoiceNature = InvoiceSeries.InvoiceNature.B2B
+        self.sales_series.lockInvoiceNature = True
+        self.sales_series.save(update_fields=["invoiceNature", "lockInvoiceNature", "lastUpdatedOn"])
+
+        response = self.client.post(
+            reverse("homeApp:add_sales_by_admin_api"),
+            data={
+                "invoiceSeriesId": str(self.sales_series.pk),
+                "colDate": "21/03/2026",
+                "party": str(self.party.pk),
+                "amount": "250",
+                "invoiceKind": "b2c",
+                "buyerLegalName": "Locked Buyer",
+                "buyerGstNumber": "22AAAAA0000A1Z5",
+                "remark": "series locked",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, msg=getattr(response, "content", b""))
+        self.assertEqual(response.json()["message"], "error")
+        self.assertIn("locked for B2B", response.json()["error"])
+
+        response = self.client.post(
+            reverse("homeApp:add_sales_by_admin_api"),
+            data={
+                "invoiceSeriesId": str(self.sales_series.pk),
+                "colDate": "21/03/2026",
+                "party": str(self.party.pk),
+                "amount": "250",
+                "invoiceKind": "b2b",
+                "buyerLegalName": "Locked Buyer",
+                "buyerGstNumber": "22AAAAA0000A1Z5",
+                "remark": "series locked",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, msg=getattr(response, "content", b""))
+        self.assertEqual(response.json()["message"], "success", msg=response.json())
+        sale = Sales.objects.get(invoiceNumber="BCS0001")
+        self.assertEqual(sale.invoiceKind, Sales.InvoiceKind.B2B)
 
     def test_add_mix_sale_saves_split_amounts(self):
         response = self.client.post(

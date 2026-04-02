@@ -72,6 +72,49 @@
             color: #fff !important;
         }
 
+        .ui.form .invoice-picker #invoiceSeries > .text,
+        .ui.form .invoice-picker #invoiceSeries .default.text {
+            display: block;
+            max-width: calc(100% - 18px);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.2;
+        }
+
+        .ui.form .invoice-picker #invoiceSeries .menu > .item,
+        .ui.form .invoice-picker #invoiceSeries .menu > .item .description,
+        .ui.form .invoice-picker #invoiceSeries .menu > .selected.item,
+        .ui.form .invoice-picker #invoiceSeries .menu > .active.item {
+            color: #1f2937 !important;
+        }
+
+        .ui.form .invoice-picker #invoiceSeries .menu > .item {
+            padding-top: 0.75rem !important;
+            padding-bottom: 0.75rem !important;
+        }
+
+        .invoice-series-option {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+
+        .invoice-series-option-code {
+            font-size: 0.92rem;
+            font-weight: 800;
+            line-height: 1.1;
+            color: #111827;
+        }
+
+        .invoice-series-option-next {
+            font-size: 0.78rem;
+            line-height: 1.2;
+            color: #667085;
+            white-space: nowrap;
+        }
+
         .ui.form .invoice-picker #invoiceNo {
             flex: 1 1 auto !important;
             width: calc(100% - 225px) !important;
@@ -84,23 +127,113 @@
         }
 
         @media only screen and (max-width: 767px) {
+            .ui.aligned.basic.grid > .sixteen.wide.column {
+                padding-left: 0.7rem !important;
+                padding-right: 0.7rem !important;
+            }
+
             .ui.form .invoice-chip-wrap {
-                gap: 8px;
-                max-height: none;
+                gap: 6px;
+                max-height: 82px;
+                overflow-y: auto;
+                margin-top: 6px;
             }
 
             .ui.form .invoice-chip {
-                padding: 6px 10px;
-                font-size: 0.78rem;
+                padding: 5px 9px;
+                font-size: 0.74rem;
             }
 
             .ui.form .invoice-picker #invoiceSeries.ui.selection.dropdown {
-                min-width: 150px !important;
-                width: 150px !important;
+                min-width: 120px !important;
+                width: 120px !important;
             }
 
             .ui.form .invoice-picker #invoiceNo {
-                width: calc(100% - 150px) !important;
+                width: calc(100% - 120px) !important;
+                font-size: 0.92rem !important;
+            }
+
+            .ui.row.teal.stacked.segment.padded {
+                padding: 0.8rem !important;
+            }
+
+            .sales-mode-menu {
+                margin-bottom: 8px;
+                gap: 6px;
+            }
+
+            .sales-mode-chip {
+                padding: 7px 10px;
+                font-size: 0.76rem;
+            }
+
+            .sales-mode-panel {
+                padding: 0.7rem;
+                border-radius: 12px;
+            }
+
+            .sales-mode-note {
+                margin: 0 0 8px;
+                font-size: 0.75rem;
+                line-height: 1.35;
+            }
+
+            .sales-section-card,
+            .sales-advanced-card {
+                margin-top: 8px;
+                padding: 0.7rem;
+                border-radius: 10px;
+            }
+
+            .sales-section-help {
+                margin: -2px 0 8px;
+                font-size: 0.74rem;
+                line-height: 1.3;
+            }
+
+            .sales-mobile-stack .field,
+            .sales-compact-fields .field {
+                margin-bottom: 0.7rem;
+            }
+
+            .sales-inline-meta {
+                gap: 6px;
+                margin-top: 6px;
+            }
+
+            .sales-inline-pill {
+                padding: 5px 8px;
+                font-size: 0.72rem;
+            }
+
+            .sales-gst-toolbar {
+                align-items: flex-start;
+                margin-bottom: 8px;
+            }
+
+            .sales-gst-summary {
+                font-size: 0.74rem;
+            }
+
+            .sales-gst-extra-fields {
+                margin-top: 6px;
+            }
+
+            #singleAmountField label,
+            #onlineFields label,
+            #mixFields label {
+                margin-bottom: 4px;
+            }
+
+            .ui.row.teal.stacked.segment.padded .row {
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+
+            #saveBtn {
+                width: 100%;
+                margin-top: 2px;
             }
         }
 
@@ -136,36 +269,92 @@
         }
 
         .sales-mode-panel {
-            padding: 1rem;
+            padding: 0.85rem;
             border: 1px solid rgba(15, 118, 110, 0.12);
             border-radius: 14px;
             background: #fbfffe;
         }
 
         .sales-mode-note {
-            margin: -2px 0 12px;
-            font-size: 0.82rem;
+            margin: -2px 0 10px;
+            font-size: 0.8rem;
             color: #5f6b7a;
         }
 
-        @media only screen and (max-width: 767px) {
-            .ui.row.teal.stacked.segment.padded {
-                padding: 1rem !important;
-            }
+        .sales-advanced-card {
+            margin-top: 10px;
+            padding: 0.85rem;
+            border: 1px dashed rgba(15, 118, 110, 0.2);
+            border-radius: 12px;
+            background: #fff;
+        }
 
-            .sales-mode-menu {
-                margin-bottom: 12px;
-            }
+        .sales-section-card {
+            margin-top: 10px;
+            padding: 0.85rem;
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 12px;
+            background: #fff;
+        }
 
-            .sales-mode-chip {
-                padding: 8px 12px;
-                font-size: 0.8rem;
-            }
+        .sales-section-card:first-of-type {
+            margin-top: 0;
+        }
 
-            .sales-mode-panel {
-                padding: 0.9rem;
-                border-radius: 12px;
-            }
+        .sales-section-help {
+            margin: -4px 0 10px;
+            color: #667085;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .sales-inline-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .sales-inline-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #f7fbfb;
+            border: 1px solid rgba(15, 118, 110, 0.1);
+            color: #334155;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .sales-inline-pill strong {
+            color: #111827;
+            font-weight: 800;
+        }
+
+        .sales-compact-fields .field {
+            margin-bottom: 0.75rem;
+        }
+
+        .sales-gst-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .sales-gst-summary {
+            color: #5f6b7a;
+            font-size: 0.8rem;
+        }
+
+        .sales-gst-extra-fields {
+            display: none;
+            margin-top: 8px;
         }
 
     </style>
@@ -192,11 +381,16 @@
                                     <button type="button" class="sales-mode-chip" data-mode="Online" onclick="selectSalesMode('Online')">Online</button>
                                     <button type="button" class="sales-mode-chip" data-mode="Mix" onclick="selectSalesMode('Mix')">Mix</button>
                                 </div>
-                                <div class="sales-mode-note">Choose the sale mode first. The form stays compact on mobile and only shows the fields needed for that mode.</div>
                                 <input type="hidden" id="salesMode" value="Cash">
+                                <input type="hidden" id="advancedInvoicingEnabled" value="{% if advanced_invoicing_enabled %}1{% else %}0{% endif %}">
 
-                                <div class="two fields">
-                                    <div class="eight wide field required">
+                                <div class="sales-section-card">
+                                    <h4 class="ui horizontal left aligned divider header">
+                                        <i class="file alternate outline icon"></i>
+                                        Invoice Setup
+                                    </h4>
+                                    <div class="sales-section-help">Pick the invoice series first, confirm the generated number, then choose the invoice date.</div>
+                                    <div class="field required">
                                         <label>Invoice Number</label>
                                         <div class="invoice-picker">
                                             <div class="ui left labeled input" style="width:100%;">
@@ -211,10 +405,11 @@
                                             </div>
                                         </div>
                                         <input type="hidden" id="requestedInvoiceNumber" name="requestedInvoiceNumber">
+                                        <div class="sales-section-help" style="margin-top:8px;">Tap any available invoice below if you want to use a visible gap number.</div>
                                         <div class="invoice-chip-wrap" id="invoiceChipWrap"></div>
                                     </div>
 
-                                    <div class="eight wide field required">
+                                    <div class="field required">
                                         <label>Invoice Date</label>
                                         <div class="ui calendar" id="cDate">
                                             <div class="ui input">
@@ -224,69 +419,132 @@
                                     </div>
                                 </div>
 
-                                <div class="two fields">
-                                    <div class="eight wide field required">
-                                        <label>Party Name</label>
-                                        <select class="ui clearable search dropdown" id="party">
-                                            <option value="">Search By Party Name</option>
-                                        </select>
+                                <div class="sales-section-card">
+                                    <h4 class="ui horizontal left aligned divider header">
+                                        <i class="users icon"></i>
+                                        Party And Payment
+                                    </h4>
+                                    <div class="sales-section-help">Select the customer, then fill only the payment fields needed for the chosen sale mode.</div>
+                                    <div class="two fields sales-compact-fields">
+                                        <div class="eight wide field required">
+                                            <label>Party Name</label>
+                                            <select class="ui clearable search dropdown" id="party">
+                                                <option value="">Search By Party Name</option>
+                                            </select>
+                                        </div>
+                                        <div class="eight wide field required" id="singleAmountField">
+                                            <label>Amount (₹ <a class="ui violet label" id="money">0.0</a>)</label>
+                                            <input type="number" name="amount" id="amount" placeholder="Amount" onkeyup="toIndianCurrency()">
+                                        </div>
                                     </div>
-                                    <div class="eight wide field required" id="singleAmountField">
-                                        <label>Amount (₹ <a class="ui violet label" id="money">0.0</a>)</label>
-                                        <input type="number" name="amount" id="amount" placeholder="Amount" onkeyup="toIndianCurrency()">
-                                    </div>
-                                </div>
 
-                                <div class="two fields" id="onlineFields" style="display:none;">
-                                    <div class="eight wide field required">
-                                        <label>Bank</label>
-                                        <select class="ui search dropdown" id="bank">
-                                            <option value="">Select Bank</option>
-                                            {% for foo in banks %}
-                                                <option value="{{ foo.id }}">{{ foo.name }} - {{ foo.accountNumber }}</option>
-                                            {% endfor %}
-                                        </select>
+                                    <div class="two fields" id="onlineFields" style="display:none;">
+                                        <div class="eight wide field required">
+                                            <label>Bank</label>
+                                            <select class="ui search dropdown" id="bank">
+                                                <option value="">Select Bank</option>
+                                                {% for foo in banks %}
+                                                    <option value="{{ foo.id }}">{{ foo.name }} - {{ foo.accountNumber }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="eight wide field"></div>
                                     </div>
-                                    <div class="eight wide field"></div>
-                                </div>
 
-                                <div class="three fields" id="mixFields" style="display:none;">
-                                    <div class="five wide field required">
-                                        <label>Cash Amount (₹ <a class="ui violet label" id="moneyMixCash">0.0</a>)</label>
-                                        <input type="number" id="amountMixCash" placeholder="Cash amount" onkeyup="toIndianCurrency()">
+                                    <div class="three fields" id="mixFields" style="display:none;">
+                                        <div class="five wide field required">
+                                            <label>Cash Amount (₹ <a class="ui violet label" id="moneyMixCash">0.0</a>)</label>
+                                            <input type="number" id="amountMixCash" placeholder="Cash amount" onkeyup="toIndianCurrency()">
+                                        </div>
+                                        <div class="five wide field required">
+                                            <label>Online Amount (₹ <a class="ui violet label" id="moneyMixOnline">0.0</a>)</label>
+                                            <input type="number" id="amountMixOnline" placeholder="Online amount" onkeyup="toIndianCurrency()">
+                                        </div>
+                                        <div class="six wide field required">
+                                            <label>Bank</label>
+                                            <select class="ui search dropdown" id="bankMix">
+                                                <option value="">Select Bank</option>
+                                                {% for foo in banks %}
+                                                    <option value="{{ foo.id }}">{{ foo.name }} - {{ foo.accountNumber }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
                                     </div>
-                                    <div class="five wide field required">
-                                        <label>Online Amount (₹ <a class="ui violet label" id="moneyMixOnline">0.0</a>)</label>
-                                        <input type="number" id="amountMixOnline" placeholder="Online amount" onkeyup="toIndianCurrency()">
-                                    </div>
-                                    <div class="six wide field required">
-                                        <label>Bank</label>
-                                        <select class="ui search dropdown" id="bankMix">
-                                            <option value="">Select Bank</option>
-                                            {% for foo in banks %}
-                                                <option value="{{ foo.id }}">{{ foo.name }} - {{ foo.accountNumber }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
 
-                                <div class="one fields">
-                                    <div class="sixteen wide field">
+                                    <div class="field" style="margin-top:8px;">
                                         <label>Remark</label>
-                                        <textarea id="remark" placeholder="Any Remark" rows="3"></textarea>
+                                        <textarea id="remark" placeholder="Any Remark" rows="2"></textarea>
                                     </div>
                                 </div>
+
+                                {% if advanced_invoicing_enabled %}
+                                    <div class="sales-advanced-card" id="advancedInvoiceCard">
+                                        <div class="sales-gst-toolbar">
+                                            <div>
+                                                <h4 class="ui horizontal left aligned divider header" style="margin:0 0 6px;">
+                                                    <i class="percent icon"></i>
+                                                    GST Billing
+                                                </h4>
+                                                <div class="sales-gst-summary" id="advancedInvoiceSummary">B2C quick billing. Expand only when buyer GST details are needed.</div>
+                                            </div>
+                                            <button type="button" class="ui mini basic teal button" id="advancedInvoiceToggleBtn" onclick="toggleAdvancedInvoiceFields()">Show Details</button>
+                                        </div>
+                                        <div class="two fields">
+                                            <div class="eight wide field">
+                                                <label>Invoice Type</label>
+                                                <select class="ui dropdown" id="invoiceKind">
+                                                    <option value="b2c">B2C</option>
+                                                    <option value="b2b">B2B</option>
+                                                </select>
+                                                <small id="invoiceNatureHelp" style="display:block; margin-top:6px; color:#667085;">Invoice series can default this value for GST billing.</small>
+                                            </div>
+                                            <div class="eight wide field">
+                                                <label>Place Of Supply</label>
+                                                <input type="text" id="placeOfSupply" placeholder="Optional place of supply">
+                                            </div>
+                                        </div>
+
+                                        <div class="three fields sales-gst-extra-fields" id="buyerInvoiceFields">
+                                            <div class="field">
+                                                <label>Buyer Legal Name</label>
+                                                <input type="text" id="buyerLegalName" placeholder="Auto-filled from party">
+                                            </div>
+                                            <div class="field">
+                                                <label>Buyer GST Number</label>
+                                                <input type="text" id="buyerGstNumber" placeholder="Optional GSTIN for B2B">
+                                            </div>
+                                            <div class="field">
+                                                <label>Buyer Billing Address</label>
+                                                <input type="text" id="buyerBillingAddress" placeholder="Billing address">
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <input type="hidden" id="invoiceKind" value="b2c">
+                                    <input type="hidden" id="placeOfSupply" value="">
+                                    <input type="hidden" id="buyerLegalName" value="">
+                                    <input type="hidden" id="buyerGstNumber" value="">
+                                    <input type="hidden" id="buyerBillingAddress" value="">
+                                {% endif %}
+                                {% if inventory_enabled %}
+                                    {% include 'home/includes/sales_invoice_lines.html' with section_id='salesLineItemBox' hidden_input_id='salesLineItems' title='Track GST invoice rows for this sale' enabled=False allow_non_gst=non_gst_shadow_enabled seller_gst_number=seller_gst_number %}
+                                {% else %}
+                                    <input type="hidden" id="salesLineItems" value="[]">
+                                {% endif %}
                             </div>
                         </form>
                     </div>
                     <div class="ui  aligned basic  grid">
                         <div class="row" style="padding-left: 5px;padding-right: 5px">
                             <div class="16 wide column center aligned">
-                                <button onclick="salesSave()" id="saveBtn" class="ui green  button saveBtn">
+                                <button type="button" onclick="salesSave()" id="saveBtn" class="ui green  button saveBtn">
                                     Submit Detail
                                 </button>
                                 <button style="display: none;" class="ui teal double loading button saveBtnLoad">
                                     Saving ....
+                                </button>
+                                <button class="ui teal double button" type="button" onclick="resetSalesForm()">
+                                    Reset
                                 </button>
                             </div>
                         </div>
@@ -312,12 +570,18 @@
 {% endblock %}
 
 {% block js %}
+    <script src="{% static 'js/sales-gst-lines.js' %}"></script>
     <script type="text/javascript">
         $('.ui.dropdown').dropdown({fullTextSearch: true});
     </script>
 
     <script>
         var salesMode = 'Cash';
+        var salesInventoryWidget = null;
+        var partyCatalog = [];
+        var selectedInvoiceSeriesMeta = null;
+        var invoiceSeriesCatalog = {};
+        var advancedInvoiceExpanded = false;
 
         var today = new Date();
         $('#cDate')
@@ -361,6 +625,235 @@
             }
         }
 
+        function syncSalesInventoryToggle() {
+            const checked = $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked');
+            $('#salesLineItemBox .sales-lines-wrap').toggle(checked);
+            if (!checked) {
+                $('#salesLineItems').val('[]');
+            }
+        }
+
+        function collectSalesLineItemsBeforeSave() {
+            if (!$('#salesLineItemBox').length) {
+                return [];
+            }
+            const enabled = $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked');
+            if (!enabled) {
+                $('#salesLineItems').val('[]');
+                return [];
+            }
+            if (salesInventoryWidget && typeof salesInventoryWidget.collect === 'function') {
+                return salesInventoryWidget.collect() || [];
+            }
+            const api = $('#salesLineItemBox').data('salesInvoiceLinesApi');
+            if (api && typeof api.collect === 'function') {
+                return api.collect() || [];
+            }
+            try {
+                return JSON.parse($('#salesLineItems').val() || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function gstStateCodeFromNumber(value) {
+            const gst = String(value || '').trim().toUpperCase();
+            return /^\d{2}/.test(gst) ? gst.slice(0, 2) : '';
+        }
+
+        function isUtgstStateCode(code) {
+            return ['04', '26', '31', '35', '38', '97'].indexOf(String(code || '').padStart(2, '0')) >= 0;
+        }
+
+        function gstStateCodeFromPlaceOfSupply(value) {
+            const raw = String(value || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[-,]/g, ' ');
+            const normalized = raw.replace(/\s+/g, ' ').trim();
+            const stateMap = {
+                '01': 'jammu and kashmir',
+                '02': 'himachal pradesh',
+                '03': 'punjab',
+                '04': 'chandigarh',
+                '05': 'uttarakhand',
+                '06': 'haryana',
+                '07': 'delhi',
+                '08': 'rajasthan',
+                '09': 'uttar pradesh',
+                '10': 'bihar',
+                '11': 'sikkim',
+                '12': 'arunachal pradesh',
+                '13': 'nagaland',
+                '14': 'manipur',
+                '15': 'mizoram',
+                '16': 'tripura',
+                '17': 'meghalaya',
+                '18': 'assam',
+                '19': 'west bengal',
+                '20': 'jharkhand',
+                '21': 'odisha',
+                '22': 'chhattisgarh',
+                '23': 'madhya pradesh',
+                '24': 'gujarat',
+                '26': 'dadra and nagar haveli and daman and diu',
+                '27': 'maharashtra',
+                '29': 'karnataka',
+                '30': 'goa',
+                '31': 'lakshadweep',
+                '32': 'kerala',
+                '33': 'tamil nadu',
+                '34': 'puducherry',
+                '35': 'andaman and nicobar islands',
+                '36': 'telangana',
+                '37': 'andhra pradesh',
+                '38': 'ladakh',
+                '97': 'other territory'
+            };
+            if (/^\d{2}/.test(normalized)) {
+                return normalized.slice(0, 2);
+            }
+            for (const code in stateMap) {
+                const name = stateMap[code];
+                if (normalized === name || normalized.indexOf(name) >= 0) {
+                    return code;
+                }
+            }
+            return '';
+        }
+
+        function updateLiveSalesTaxBreakup(totals) {
+            const $box = $('#salesLineItemBox');
+            if (!$box.length) {
+                return;
+            }
+            const sellerStateCode = gstStateCodeFromNumber($box.data('sellerGstNumber'));
+            const buyerStateCode = gstStateCodeFromNumber($('#buyerGstNumber').val());
+            const placeOfSupplyStateCode = gstStateCodeFromPlaceOfSupply($('#placeOfSupply').val());
+            const effectiveBuyerStateCode = buyerStateCode || placeOfSupplyStateCode;
+            const gstTotal = Number((totals && totals.gstTotal) || 0);
+            const isInterState = Boolean(sellerStateCode && effectiveBuyerStateCode && sellerStateCode !== effectiveBuyerStateCode);
+            const halfTax = gstTotal / 2;
+            const taxMode = isInterState ? 'IGST' : (isUtgstStateCode(sellerStateCode) ? 'CGST + UTGST' : 'CGST + SGST');
+
+            $box.find('.sales-tax-mode-label').text(taxMode);
+            $box.find('.sales-cgst-total').text((isInterState ? 0 : halfTax).toFixed(2));
+            $box.find('.sales-sgst-total').text((!isInterState && !isUtgstStateCode(sellerStateCode) ? (gstTotal - halfTax) : 0).toFixed(2));
+            $box.find('.sales-utgst-total').text((!isInterState && isUtgstStateCode(sellerStateCode) ? (gstTotal - halfTax) : 0).toFixed(2));
+            $box.find('.sales-igst-total').text((isInterState ? gstTotal : 0).toFixed(2));
+
+            $box.find('.sales-igst-label').toggle(isInterState);
+            $box.find('.sales-cgst-label').toggle(!isInterState);
+            $box.find('.sales-sgst-label').toggle(!isInterState && !isUtgstStateCode(sellerStateCode));
+            $box.find('.sales-utgst-label').toggle(!isInterState && isUtgstStateCode(sellerStateCode));
+        }
+
+        function syncPartyInvoiceFields(partyId) {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            const selected = partyCatalog.find(function (row) { return String(row.ID) === String(partyId || ''); });
+            if (!selected) {
+                return;
+            }
+            if (!$('#buyerLegalName').val()) {
+                $('#buyerLegalName').val(selected.LegalName || selected.Name || '');
+            }
+            if (!$('#buyerGstNumber').val()) {
+                $('#buyerGstNumber').val(selected.GSTNumber || '');
+            }
+            if (!$('#buyerBillingAddress').val()) {
+                $('#buyerBillingAddress').val(selected.BillingAddress || selected.Address || '');
+            }
+            if (selected.IsB2B || selected.GSTNumber) {
+                $('#invoiceKind').dropdown('set selected', 'b2b');
+                advancedInvoiceExpanded = true;
+            }
+            updateInvoiceKindUI();
+        }
+
+        function toggleAdvancedInvoiceFields(forceValue) {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            if (typeof forceValue === 'boolean') {
+                advancedInvoiceExpanded = forceValue;
+            } else {
+                advancedInvoiceExpanded = !advancedInvoiceExpanded;
+            }
+            updateInvoiceKindUI();
+        }
+
+        function updateInvoiceKindUI() {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            const invoiceKind = ($('#invoiceKind').val() || 'b2c');
+            if (invoiceKind === 'b2b') {
+                advancedInvoiceExpanded = true;
+            }
+            $('#buyerInvoiceFields').toggle(advancedInvoiceExpanded);
+            $('#advancedInvoiceToggleBtn').text(advancedInvoiceExpanded ? 'Hide Details' : 'Show Details');
+            $('#advancedInvoiceSummary').text(
+                invoiceKind === 'b2b'
+                    ? 'B2B selected. Buyer GST details will print on the invoice.'
+                    : (advancedInvoiceExpanded
+                        ? 'Optional GST overrides are open. Leave them blank to use party defaults.'
+                        : 'B2C quick billing. Expand only when buyer GST details are needed.')
+            );
+        }
+
+        function applyInvoiceSeriesRule(meta) {
+            selectedInvoiceSeriesMeta = meta || null;
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            const help = $('#invoiceNatureHelp');
+            if (!meta) {
+                $('#invoiceKind').dropdown('set enabled');
+                help.text('Invoice series can default this value for GST billing.');
+                updateInvoiceKindUI();
+                return;
+            }
+            if (meta.invoiceNature && meta.invoiceNature !== 'mixed') {
+                $('#invoiceKind').dropdown('set selected', meta.invoiceNature);
+            }
+            if (meta.lockInvoiceNature && meta.invoiceNature && meta.invoiceNature !== 'mixed') {
+                $('#invoiceKind').dropdown('set disabled');
+                help.text('Invoice type is locked by the selected series: ' + meta.invoiceNatureLabel + '.');
+            } else {
+                $('#invoiceKind').dropdown('set enabled');
+                help.text(meta.invoiceNature && meta.invoiceNature !== 'mixed'
+                    ? 'Invoice type defaults from the selected series: ' + meta.invoiceNatureLabel + '.'
+                    : 'Invoice series can default this value for GST billing.');
+            }
+            updateInvoiceKindUI();
+        }
+
+        function applySelectedInvoiceSeries(meta) {
+            if (!meta) {
+                $('#invoiceSeriesId').val('');
+                $('#invoiceNo').val('');
+                $('#requestedInvoiceNumber').val('');
+                $('#invoiceChipWrap').html('');
+                $('#invoiceSeries .text').text('Select Series');
+                applyInvoiceSeriesRule(null);
+                return;
+            }
+            $('#invoiceSeriesId').val(meta.id);
+            $('#invoiceNo').val(meta.invoiceNumber || '');
+            $('#requestedInvoiceNumber').val('');
+            $('#invoiceSeries .text').text(meta.seriesCode || 'Series');
+            applyInvoiceSeriesRule(meta);
+            renderInvoiceChips(meta.upcomingNumbers || []);
+        }
+
+        function syncInvoiceSeriesFromSelection(value) {
+            const selectedValue = String(value || $('#invoiceSeries').dropdown('get value') || '').trim();
+            if (!selectedValue) {
+                applySelectedInvoiceSeries(null);
+                return;
+            }
+            applySelectedInvoiceSeries(invoiceSeriesCatalog[selectedValue] || null);
+        }
+
 
         function salesSave() {
             showLoading();
@@ -375,6 +868,12 @@
             var amountMixCash = $('#amountMixCash').val();
             var amountMixOnline = $('#amountMixOnline').val();
             var remark = $('#remark').val();
+            var invoiceKind = $('#invoiceKind').val();
+            var buyerLegalName = $('#buyerLegalName').val();
+            var buyerGstNumber = $('#buyerGstNumber').val();
+            var buyerBillingAddress = $('#buyerBillingAddress').val();
+            var placeOfSupply = $('#placeOfSupply').val();
+            var lineItems = collectSalesLineItemsBeforeSave();
 
             if (party === '' || invoiceSeriesId === '' || invoiceNo === '' || colDate === '') {
                 $('body')
@@ -393,6 +892,9 @@
             } else if (paymentMode !== 'Mix' && amount === '') {
                 $('body').toast({class: 'orange', message: 'Amount is required.'});
                 hideLoading();
+            } else if ($('#salesLineItemBox').length && $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked') && !lineItems.length) {
+                $('body').toast({class: 'orange', message: 'Add at least one valid GST item row before saving.'});
+                hideLoading();
             } else {
                 data = new FormData();
                 data.append('invoiceSeriesId', invoiceSeriesId);
@@ -405,6 +907,12 @@
                 data.append('amountMixCash', amountMixCash);
                 data.append('amountMixOnline', amountMixOnline);
                 data.append('remark', remark);
+                data.append('invoiceKind', invoiceKind);
+                data.append('buyerLegalName', buyerLegalName);
+                data.append('buyerGstNumber', buyerGstNumber);
+                data.append('buyerBillingAddress', buyerBillingAddress);
+                data.append('placeOfSupply', placeOfSupply);
+                data.append('lineItems', JSON.stringify(lineItems || []));
 
                 $.ajax({
                     type: 'post',
@@ -456,6 +964,26 @@
 
         }
 
+        function initSalesInventory() {
+            if (!window.SalesInvoiceLines || !$('#salesLineItemBox').length) {
+                return;
+            }
+            salesInventoryWidget = window.SalesInvoiceLines.init({
+                containerSelector: '#salesLineItemBox',
+                hiddenInputSelector: '#salesLineItems',
+                catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+                syncTotals: function (totals) {
+                    updateLiveSalesTaxBreakup(totals);
+                    if ($('#salesMode').val() !== 'Mix') {
+                        $('#amount').val((totals.roundedPayable || 0).toFixed(2));
+                        toIndianCurrency();
+                    }
+                }
+            });
+            $('#salesLineItemBox .sales-lines-enable-toggle').on('change', syncSalesInventoryToggle);
+            syncSalesInventoryToggle();
+        }
+
         function loadInvoiceSeries() {
             $.ajax({
                 type: 'get',
@@ -463,6 +991,7 @@
                 data: {module: 'sales'},
                 success: function (response) {
                     const menu = $('#invoiceSeries .menu');
+                    invoiceSeriesCatalog = {};
                     menu.html('');
                     $('#invoiceSeriesId').val('');
                     $('#invoiceNo').val('');
@@ -475,17 +1004,19 @@
                     }
 
                     response.data.forEach(function (item) {
+                        invoiceSeriesCatalog[String(item.id)] = item;
                         menu.append(
-                            '<div class="item" data-value="' + item.id + '" data-next-number="' + item.nextNumber + '" data-invoice="' + item.invoiceNumber + '" data-upcoming=\'' + JSON.stringify(item.upcomingNumbers || []) + '\'>' +
-                            item.seriesCode + ' <span class="description">Next ' + item.invoiceNumber + '</span></div>'
+                            '<div class="item" data-value="' + item.id + '">' +
+                            '<div class="invoice-series-option">' +
+                            '<span class="invoice-series-option-code">' + item.seriesCode + '</span>' +
+                            '<span class="invoice-series-option-next">Next ' + item.invoiceNumber + '</span>' +
+                            '</div></div>'
                         );
                     });
                     $('#invoiceSeries').dropdown('refresh');
                     const preferred = response.data.find(function (item) { return item.isDefault; }) || response.data[0];
                     $('#invoiceSeries').dropdown('set selected', String(preferred.id));
-                    $('#invoiceSeriesId').val(preferred.id);
-                    $('#invoiceNo').val(preferred.nextNumber);
-                    renderInvoiceChips(preferred.upcomingNumbers || []);
+                    syncInvoiceSeriesFromSelection(preferred.id);
                 },
                 error: function () {}
             });
@@ -493,19 +1024,19 @@
 
         $('#invoiceSeries').dropdown({
             fullTextSearch: true,
-            onChange: function (value, text, $choice) {
-                if (!$choice || !$choice.length) {
-                    $('#invoiceSeriesId').val('');
-                    $('#invoiceNo').val('');
-                    $('#requestedInvoiceNumber').val('');
-                    $('#invoiceChipWrap').html('');
-                    return;
-                }
-                $('#invoiceSeriesId').val(value);
-                $('#invoiceNo').val($choice.data('next-number'));
-                $('#requestedInvoiceNumber').val('');
-                renderInvoiceChips($choice.data('upcoming') || []);
+            onChange: function (value) {
+                syncInvoiceSeriesFromSelection(value);
             }
+        });
+
+        $(document).on('click', '#invoiceSeries .menu .item', function () {
+            const selectedValue = $(this).attr('data-value');
+            if (!selectedValue) {
+                return;
+            }
+            setTimeout(function () {
+                syncInvoiceSeriesFromSelection(selectedValue);
+            }, 0);
         });
 
         function renderInvoiceChips(upcomingNumbers) {
@@ -515,8 +1046,8 @@
                 display: 'flex',
                 flexWrap: 'wrap',
                 gap: '8px',
-                marginTop: '10px',
-                maxHeight: '120px',
+                marginTop: '8px',
+                maxHeight: '92px',
                 overflowY: 'auto',
                 paddingRight: '4px'
             });
@@ -550,7 +1081,7 @@
                         borderColor: '#0f766e'
                     });
                     $('#requestedInvoiceNumber').val(item.sequenceNumber);
-                    $('#invoiceNo').val(item.displayNumber);
+                    $('#invoiceNo').val(item.invoiceNumber);
                 }
                 chip.on('click', function () {
                     $('.invoice-chip').removeClass('active');
@@ -566,7 +1097,7 @@
                         borderColor: '#0f766e'
                     });
                     $('#requestedInvoiceNumber').val(item.sequenceNumber);
-                    $('#invoiceNo').val(item.displayNumber);
+                    $('#invoiceNo').val(item.invoiceNumber);
                 });
                 wrap.append(chip);
             });
@@ -577,6 +1108,41 @@
 
 
         $(getCustomerList());
+        $(initSalesInventory());
+
+        function resetSalesForm() {
+            $('#addForm')[0].reset();
+            $('#party').dropdown('clear');
+            $('#bank').dropdown('clear');
+            $('#bankMix').dropdown('clear');
+            if ($('#invoiceKind').is('select')) {
+                $('#invoiceKind').dropdown('set selected', 'b2c');
+                $('#invoiceKind').dropdown('set enabled');
+            } else {
+                $('#invoiceKind').val('b2c');
+            }
+            $('#placeOfSupply').val('');
+            $('#buyerLegalName').val('');
+            $('#buyerGstNumber').val('');
+            $('#buyerBillingAddress').val('');
+            $('#requestedInvoiceNumber').val('');
+            $('#invoiceNo').val('');
+            $('#invoiceChipWrap').html('');
+            $('#amount').val('');
+            $('#amountMixCash').val('');
+            $('#amountMixOnline').val('');
+            $('#remark').val('');
+            advancedInvoiceExpanded = false;
+            updateInvoiceKindUI();
+            if (salesLineWidget) {
+                salesLineWidget.replace([]);
+            }
+            $('#salesLineItems').val('[]');
+            updateLiveSalesTaxBreakup({gstTotal: 0});
+            toIndianCurrency();
+            selectSalesMode('Cash');
+            loadInvoiceSeries();
+        }
 
 
         function getCustomerList() {
@@ -586,6 +1152,7 @@
 
                 success: function (response) {
 
+                    partyCatalog = response.data || [];
                     $('#party').html('');
                     $('#party').append(' <option value="">Search By Party Name</option>');
                     var j;
@@ -594,6 +1161,10 @@
                         $('#party').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
 
                     }
+                    $('#party').dropdown('refresh');
+                    $('#party').off('change.salesParty').on('change.salesParty', function () {
+                        syncPartyInvoiceFields($(this).val());
+                    });
 
                 },
 
@@ -618,5 +1189,29 @@
             $('#moneyMixCash').html(mixCash.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
             $('#moneyMixOnline').html(mixOnline.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
         };
+
+        if ($('#invoiceKind').is('select')) {
+            $('#invoiceKind').dropdown({
+                onChange: function () {
+                    updateInvoiceKindUI();
+                    updateLiveSalesTaxBreakup({
+                        gstTotal: parseFloat($('#salesLineItemBox .sales-gst-total').text() || '0') || 0
+                    });
+                }
+            });
+        }
+
+        $('#buyerGstNumber').on('input change', function () {
+            updateLiveSalesTaxBreakup({
+                gstTotal: parseFloat($('#salesLineItemBox .sales-gst-total').text() || '0') || 0
+            });
+        });
+        $('#placeOfSupply').on('input change', function () {
+            updateLiveSalesTaxBreakup({
+                gstTotal: parseFloat($('#salesLineItemBox .sales-gst-total').text() || '0') || 0
+            });
+        });
+
+        updateInvoiceKindUI();
     </script>
 {% endblock %}

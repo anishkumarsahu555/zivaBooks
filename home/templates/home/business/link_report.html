@@ -93,7 +93,10 @@
 
   <div class="action-grid">
     <div class="action-card">
-      <h4 class="ui header">Work In Detail</h4>
+      <h4 class="ui horizontal left aligned divider header">
+        <i class="left align icon"></i>
+        Work In Detail
+      </h4>
       <p>Open the full operational screen when you need row-level review, approvals, edits, or exports beyond the quick PDF.</p>
       <div class="action-buttons">
         <a class="ui teal button" id="openDetailLink" href="{{ open_url }}">{{ download_label }}</a>
@@ -102,7 +105,10 @@
 
     {% if export_actions %}
     <div class="action-card">
-      <h4 class="ui header">Quick Exports</h4>
+      <h4 class="ui horizontal left aligned divider header">
+        <i class="left align icon"></i>
+        Quick Exports
+      </h4>
       <p>Use the current filters above to generate final report files immediately.</p>
       <div class="action-buttons">
         {% for action in export_actions %}
@@ -117,7 +123,10 @@
 
   {% if secondary_actions %}
   <div class="panel">
-    <h4 class="ui header">Related Actions</h4>
+    <h4 class="ui horizontal left aligned divider header">
+      <i class="left align icon"></i>
+      Related Actions
+    </h4>
     <div class="ui small basic buttons">
       {% for action in secondary_actions %}
       <a class="ui button" href="{{ action.url }}"><i class="{{ action.icon }} icon"></i>{{ action.label }}</a>
@@ -127,7 +136,10 @@
   {% endif %}
 
   <div class="panel">
-    <h4 class="ui header">What Makes This Useful</h4>
+    <h4 class="ui horizontal left aligned divider header">
+      <i class="left align icon"></i>
+      What Makes This Useful
+    </h4>
     <ul class="helper-list">
       <li>Keep the export range narrow when you need a report for reconciliation, audit, or customer sharing.</li>
       <li>Use the detailed screen when you need approvals, edits, or supporting records behind the final total.</li>

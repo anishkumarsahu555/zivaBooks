@@ -79,3 +79,70 @@ def convert(value):
 def money(value):
     """Formats money in INR style with exactly 2 decimal places."""
     return _format_money(value, places=2)
+
+
+_ONES = [
+    "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+    "Seventeen", "Eighteen", "Nineteen",
+]
+
+_TENS = [
+    "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety",
+]
+
+
+def _two_digit_words(number: int) -> str:
+    if number < 20:
+        return _ONES[number]
+    tens = _TENS[number // 10]
+    remainder = number % 10
+    return tens if remainder == 0 else f"{tens} {_ONES[remainder]}"
+
+
+def _three_digit_words(number: int) -> str:
+    if number < 100:
+        return _two_digit_words(number)
+    hundreds = f"{_ONES[number // 100]} Hundred"
+    remainder = number % 100
+    return hundreds if remainder == 0 else f"{hundreds} {_two_digit_words(remainder)}"
+
+
+def _integer_to_indian_words(number: int) -> str:
+    if number == 0:
+        return _ONES[0]
+    parts = []
+    crore = number // 10000000
+    if crore:
+        parts.append(f"{_integer_to_indian_words(crore)} Crore")
+        number %= 10000000
+    lakh = number // 100000
+    if lakh:
+        parts.append(f"{_integer_to_indian_words(lakh)} Lakh")
+        number %= 100000
+    thousand = number // 1000
+    if thousand:
+        parts.append(f"{_integer_to_indian_words(thousand)} Thousand")
+        number %= 1000
+    if number:
+        parts.append(_three_digit_words(number))
+    return " ".join(parts)
+
+
+@register.filter(name="money_words")
+def money_words(value):
+    """Converts an INR amount into words using Indian numbering style."""
+    try:
+        dec = value if isinstance(value, Decimal) else Decimal(str(value).strip())
+    except (InvalidOperation, ValueError, TypeError, AttributeError):
+        return ""
+    dec = dec.quantize(Decimal("0.01"))
+    sign = "Minus " if dec < 0 else ""
+    dec = abs(dec)
+    rupees = int(dec)
+    paise = int((dec - Decimal(rupees)) * 100)
+    rupee_words = _integer_to_indian_words(rupees) + (" Rupee" if rupees == 1 else " Rupees")
+    if paise:
+        paise_words = _integer_to_indian_words(paise) + (" Paisa" if paise == 1 else " Paise")
+        return f"{sign}{rupee_words} and {paise_words} Only"
+    return f"{sign}{rupee_words} Only"

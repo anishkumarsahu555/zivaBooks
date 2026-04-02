@@ -1,0 +1,223 @@
+<div class="ui segment sales-gst-box" id="{{ section_id }}" data-allow-non-gst="{% if allow_non_gst|default_if_none:True %}1{% else %}0{% endif %}" data-seller-gst-number="{{ seller_gst_number|default:'' }}">
+    <style>
+        .sales-gst-box .sales-lines-wrap {
+            margin-top: 8px;
+        }
+
+        .sales-gst-box .sales-line-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .sales-gst-box .sales-line-card {
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 12px;
+            padding: 6px 8px;
+            background: #fff;
+        }
+
+        .sales-gst-box .sales-line-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0;
+            margin-bottom: 0;
+        }
+
+        .sales-gst-box .sales-line-card-title {
+            display: none;
+        }
+
+        .sales-gst-box .sales-line-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 6px 8px;
+        }
+
+        .sales-gst-box .sales-inline-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 2px;
+        }
+
+        .sales-gst-box .sales-span-2 { grid-column: span 2; }
+        .sales-gst-box .sales-span-3 { grid-column: span 3; }
+        .sales-gst-box .sales-span-1 { grid-column: span 1; }
+        .sales-gst-box .sales-span-4 { grid-column: span 4; }
+        .sales-gst-box .sales-span-5 { grid-column: span 5; }
+        .sales-gst-box .sales-span-6 { grid-column: span 6; }
+        .sales-gst-box .sales-span-12 { grid-column: span 12; }
+
+        .sales-gst-box .sales-line-grid .field {
+            margin-bottom: 0;
+        }
+
+        .sales-gst-box .sales-line-grid .field > label {
+            margin-bottom: 2px;
+            font-size: 0.74rem;
+        }
+
+        .sales-gst-box .sales-line-grid input,
+        .sales-gst-box .sales-line-grid .ui.dropdown {
+            min-height: 34px;
+        }
+
+        .sales-gst-box .sales-stock-hint,
+        .sales-gst-box .sales-line-summary-meta {
+            color: #64748b;
+            font-size: 10px;
+        }
+
+        .sales-gst-box .sales-stock-hint {
+            margin-top: 1px;
+        }
+
+        .sales-gst-box .sales-unit-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 7px;
+            border-radius: 999px;
+            background: #eff6ff;
+            border: 1px solid rgba(59, 130, 246, 0.18);
+            color: #1d4ed8;
+            font-size: 10px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .sales-gst-box .sales-line-summary {
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .sales-gst-box .sales-line-summary-meta {
+            display: none;
+        }
+
+        .sales-gst-box .sales-line-summary-pills {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .sales-gst-box .sales-summary-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 7px;
+            border-radius: 999px;
+            background: #f8fafc;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            font-weight: 600;
+            white-space: nowrap;
+            line-height: 1.2;
+            font-size: 11px;
+        }
+
+        .sales-gst-box .sales-remark-input input {
+            font-size: 12px;
+        }
+
+        .sales-gst-box .sales-footer-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .sales-gst-box .sales-footer-totals {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .sales-gst-box .sales-tax-breakup-summary {
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .sales-gst-box .sales-tax-breakup-mode {
+            color: #5f6b7a;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .sales-gst-box .sales-tax-breakup-lines {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        @media only screen and (max-width: 767px) {
+            .sales-gst-box .sales-line-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .sales-gst-box .sales-span-1,
+            .sales-gst-box .sales-span-2,
+            .sales-gst-box .sales-span-3 {
+                grid-column: span 1;
+            }
+
+            .sales-gst-box .sales-span-4,
+            .sales-gst-box .sales-span-5,
+            .sales-gst-box .sales-span-6,
+            .sales-gst-box .sales-span-12 {
+                grid-column: span 2;
+            }
+
+            .sales-gst-box .sales-line-card {
+                padding: 8px;
+            }
+
+            .sales-gst-box .sales-line-summary {
+                align-items: flex-start;
+            }
+
+            .sales-gst-box .sales-line-summary-pills {
+                justify-content: flex-start;
+            }
+        }
+    </style>
+    <div class="ui toggle checkbox" style="margin-bottom: 12px;">
+        <input type="checkbox" class="sales-lines-enable-toggle" {% if enabled %}checked{% endif %}>
+        <label>{{ title|default:"Use GST item rows for this invoice" }}</label>
+    </div>
+    <p style="margin-top: 0; color: #5f6b7a;">Add item-wise taxable value and GST so the invoice prints correctly. Leave this off to keep the older amount-only flow.</p>
+    <div class="ui tiny form sales-lines-wrap">
+        <div class="sales-line-list"></div>
+        <div class="sales-footer-bar">
+            <button type="button" class="ui teal basic small button sales-add-row">{{ add_button_label|default:"Add Item Row" }}</button>
+            <div class="sales-footer-totals">
+                <div class="ui tiny label">Taxable: ₹ <span class="sales-taxable-total">0.00</span></div>
+                <div class="ui tiny label">GST: ₹ <span class="sales-gst-total">0.00</span></div>
+                <div class="ui tiny label">Round Off: <span class="sales-roundoff-sign">+</span>₹ <span class="sales-roundoff-total">0.00</span></div>
+                <div class="ui tiny teal label">Payable: ₹ <span class="sales-grand-total">0.00</span></div>
+            </div>
+        </div>
+        <div class="sales-tax-breakup-summary">
+            <div class="sales-tax-breakup-mode">Tax Mode: <span class="sales-tax-mode-label">CGST + SGST</span></div>
+            <div class="sales-tax-breakup-lines">
+                <div class="ui tiny label sales-cgst-label">CGST: ₹ <span class="sales-cgst-total">0.00</span></div>
+                <div class="ui tiny label sales-sgst-label">SGST: ₹ <span class="sales-sgst-total">0.00</span></div>
+                <div class="ui tiny label sales-utgst-label" style="display:none;">UTGST: ₹ <span class="sales-utgst-total">0.00</span></div>
+                <div class="ui tiny label sales-igst-label" style="display:none;">IGST: ₹ <span class="sales-igst-total">0.00</span></div>
+            </div>
+        </div>
+    </div>
+    <input type="hidden" id="{{ hidden_input_id }}" value="[]">
+</div>

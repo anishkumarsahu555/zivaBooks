@@ -9,6 +9,7 @@ import json
 import requests
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import check_password
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
@@ -31,6 +32,12 @@ from weasyprint import CSS, HTML
 from home.models import *
 from home.books import ensure_bank_account, ensure_books_for_tenant, sync_book_transactions
 from home.credential_links import DEFAULT_CREDENTIAL_LINK_MINUTES, create_credential_share_token
+from home.inventory import (
+    get_or_create_default_warehouse,
+    rebuild_inventory_stock,
+    stock_snapshot_for_tenant,
+    validate_non_negative_inventory,
+)
 from home.otp import (
     OTP_TTL_SECONDS,
     clear_collection_otp,
@@ -42,6 +49,7 @@ from home.otp import (
 from home.party_ledger import sync_party_ledger_entries_for_object
 from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_qs
 from home.audit import log_audit_event, snapshot_instance
+from home.navigation import _effective_permission_names
 User = get_user_model()
 BASE_URL_WHATSAPP = "https://bot.betablaster.in/api/"
 DEFAULT_AVATAR_URL = "/static/images/default-avatar.svg"
@@ -498,6 +506,9 @@ def _invoice_series_payload_for_module(request, module):
             ],
             'rangeLabel': f'{str(series.startNumber).zfill(series.paddingLength)} - {str(series.endNumber).zfill(series.paddingLength)}',
             'isDefault': series.isDefault,
+            'invoiceNature': getattr(series, 'invoiceNature', InvoiceSeries.InvoiceNature.MIXED),
+            'invoiceNatureLabel': getattr(series, 'get_invoiceNature_display', lambda: 'Mixed / Manual')(),
+            'lockInvoiceNature': bool(getattr(series, 'lockInvoiceNature', False)),
         })
     return payload
 def _invoice_series_payload_obj(series):
@@ -520,6 +531,9 @@ def _invoice_series_payload_obj(series):
         'NextInvoice': next_invoice,
         'IsActive': series.isActive,
         'IsDefault': series.isDefault,
+        'InvoiceNature': getattr(series, 'invoiceNature', InvoiceSeries.InvoiceNature.MIXED),
+        'InvoiceNatureLabel': getattr(series, 'get_invoiceNature_display', lambda: 'Mixed / Manual')(),
+        'LockInvoiceNature': bool(getattr(series, 'lockInvoiceNature', False)),
         'RangeLabel': f'{str(series.startNumber).zfill(series.paddingLength)} - {str(series.endNumber).zfill(series.paddingLength)}',
     }
 def _normalize_bool(raw):
@@ -533,6 +547,8 @@ def _validate_invoice_series_form(request, *, instance=None):
     padding_length = int(request.POST.get('paddingLength') or 0)
     is_active = _normalize_bool(request.POST.get('isActive'))
     is_default = _normalize_bool(request.POST.get('isDefault'))
+    invoice_nature = (request.POST.get('invoiceNature') or InvoiceSeries.InvoiceNature.MIXED).strip().lower()
+    lock_invoice_nature = _normalize_bool(request.POST.get('lockInvoiceNature'))
 
     if module not in INVOICE_MODULE_MODEL_MAP:
         raise ValueError('Please select a valid module.')
@@ -544,6 +560,9 @@ def _validate_invoice_series_form(request, *, instance=None):
         raise ValueError('Start number cannot be greater than end number.')
     if padding_length < len(str(end_number)):
         raise ValueError('Padding length must fit the end number.')
+    valid_natures = {choice[0] for choice in InvoiceSeries.InvoiceNature.choices}
+    if invoice_nature not in valid_natures:
+        invoice_nature = InvoiceSeries.InvoiceNature.MIXED
 
     qs = tenant_qs(request, InvoiceSeries).filter(
         isDeleted=False,
@@ -570,6 +589,8 @@ def _validate_invoice_series_form(request, *, instance=None):
         'paddingLength': padding_length,
         'isActive': is_active,
         'isDefault': is_default,
+        'invoiceNature': invoice_nature,
+        'lockInvoiceNature': lock_invoice_nature,
     }
 def _apply_invoice_series_default(series):
     if series.isDefault:
@@ -679,6 +700,13 @@ def _has_any_permission(user, *perm_names):
     if len(perm_names) == 1 and isinstance(perm_names[0], (list, tuple, set)):
         perm_names = tuple(perm_names[0])
     return any(user.has_perm(perm_name) for perm_name in perm_names)
+
+
+def _request_has_any_permission(request, *perm_names):
+    if len(perm_names) == 1 and isinstance(perm_names[0], (list, tuple, set)):
+        perm_names = tuple(perm_names[0])
+    effective_permissions = _effective_permission_names(request)
+    return any(perm_name in effective_permissions for perm_name in perm_names)
 def _is_admin_like(user):
     return _has_any_permission(user, ADMIN_LIKE_PERMS)
 def _can_manage_staff(user):
@@ -687,6 +715,93 @@ def _can_manage_party_records(user):
     return _has_any_permission(user, 'home.can_manage_parties', 'home.can_view_party_credentials')
 def _can_view_party_credentials(user):
     return user.has_perm('home.can_view_party_credentials')
+
+
+def _request_can_manage_inventory_records(request):
+    return _request_has_any_permission(
+        request,
+        'home.can_manage_inventory',
+        'home.add_inventoryitem',
+        'home.change_inventoryitem',
+        'home.can_view_party_credentials',
+    )
+
+
+def _request_can_manage_purchase_records(request):
+    return _request_has_any_permission(
+        request,
+        'home.add_purchaseinvoice',
+        'home.change_purchaseinvoice',
+        'home.delete_purchaseinvoice',
+        'home.can_view_party_credentials',
+    )
+
+
+def _request_can_manage_non_gst_shadow(request):
+    return _request_has_any_permission(
+        request,
+        'home.can_view_party_credentials',
+        'home.can_manage_staff',
+    )
+
+
+def _non_gst_shadow_enabled(request_or_user) -> bool:
+    tenant = get_current_tenant(request_or_user)
+    if tenant is None:
+        return True
+    return bool(getattr(tenant, 'nonGstShadowEnabled', False))
+
+
+def _inventory_feature_enabled(request_or_user) -> bool:
+    tenant = get_current_tenant(request_or_user)
+    if tenant is None:
+        return True
+    return bool(getattr(tenant, 'inventoryEnabled', True))
+
+
+def _advanced_invoicing_enabled(request_or_user) -> bool:
+    tenant = get_current_tenant(request_or_user)
+    if tenant is None:
+        return True
+    return bool(getattr(tenant, 'advancedInvoicingEnabled', True))
+
+
+def _assert_inventory_enabled(request, *, label='Inventory feature'):
+    if _inventory_feature_enabled(request):
+        return
+    raise ValueError(f'{label} is disabled for this tenant. Ask an admin to enable Inventory from Billing > Non-GST Control.')
+
+
+def _assert_advanced_invoicing_enabled(request, *, label='Advanced invoicing'):
+    if _advanced_invoicing_enabled(request):
+        return
+    raise ValueError(f'{label} is disabled for this tenant. Ask an admin to enable Invoicing from Billing > Non-GST Control.')
+
+
+def _assert_non_gst_enabled(request, *, label='Non-GST mode'):
+    if _non_gst_shadow_enabled(request):
+        return
+    raise ValueError(f'{label} is disabled for this tenant. Ask an admin to enable it from Billing > Non-GST Control.')
+
+
+def _normalize_purchase_gst_treatment(request, raw_treatment: str | None) -> str:
+    treatment = str(raw_treatment or PurchaseInvoice.GstTreatment.GST).strip()
+    valid = {choice[0] for choice in PurchaseInvoice.GstTreatment.choices}
+    if treatment not in valid:
+        return PurchaseInvoice.GstTreatment.GST
+    if treatment in {PurchaseInvoice.GstTreatment.NON_GST, PurchaseInvoice.GstTreatment.NON_GST_CLAIMABLE}:
+        _assert_non_gst_enabled(request, label='Non-GST purchase flow')
+    return treatment
+
+
+def _normalize_purchase_claim_status(treatment: str, raw_claim_status: str | None) -> str:
+    status = str(raw_claim_status or PurchaseInvoice.ClaimStatus.NOT_APPLICABLE).strip()
+    valid = {choice[0] for choice in PurchaseInvoice.ClaimStatus.choices}
+    if status not in valid:
+        status = PurchaseInvoice.ClaimStatus.NOT_APPLICABLE
+    if treatment == PurchaseInvoice.GstTreatment.GST:
+        return PurchaseInvoice.ClaimStatus.NOT_APPLICABLE
+    return status
 def _can_add_party(user):
     return user.has_perm('home.add_party') or _can_view_party_credentials(user)
 def _can_edit_party(user):
@@ -789,6 +904,8 @@ def _can_approve_sales(user):
     return user.has_perm('home.can_approve_sales')
 def _has_sales_access(user):
     return _has_any_permission(user, 'home.can_manage_sales', 'home.can_approve_sales', 'home.view_sales', 'home.add_sales', 'home.change_sales')
+def _has_return_source_access(user):
+    return _has_sales_access(user) or _has_any_permission(user, 'home.can_manage_cash_counter', 'home.view_cashcounter', 'home.can_view_party_credentials')
 def _can_manage_cash_counter_records(user):
     return user.has_perm('home.can_view_party_credentials')
 def _can_filter_all_collections(user):
@@ -806,6 +923,10 @@ def _can_edit_sales(user):
     return user.has_perm('home.change_sales') or _can_manage_sales(user) or _can_approve_sales(user) or user.has_perm('home.can_view_party_credentials')
 def _can_delete_sales(user):
     return user.has_perm('home.can_view_party_credentials')
+def _can_manage_inventory_records(user):
+    return _has_any_permission(user, 'home.can_manage_inventory', 'home.add_inventoryitem', 'home.change_inventoryitem', 'home.can_view_party_credentials')
+def _can_manage_purchase_records(user):
+    return _has_any_permission(user, 'home.add_purchaseinvoice', 'home.change_purchaseinvoice', 'home.delete_purchaseinvoice', 'home.can_view_party_credentials')
 def _can_manage_orders(user):
     return _has_any_permission(user, 'home.can_manage_orders', 'home.can_approve_orders')
 def _can_filter_all_orders(user):
@@ -1608,14 +1729,14 @@ def get_bank_detail(request):
     }
     return JsonResponse({'data': data}, safe=False)
 class InvoiceSeriesListJson(BaseDatatableView):
-    order_columns = ['module', 'seriesCode', 'startNumber', 'nextNumber', 'paddingLength', 'isActive', 'isDefault', 'datetime']
+    order_columns = ['module', 'seriesCode', 'invoiceNature', 'startNumber', 'nextNumber', 'paddingLength', 'isActive', 'isDefault', 'datetime']
     def get_initial_queryset(self):
         if not getattr(self.request, 'user', None) or not self.request.user.is_authenticated:
             return InvoiceSeries.objects.none()
         if not _has_any_permission(self.request.user, 'home.view_invoiceseries', 'home.add_invoiceseries', 'home.change_invoiceseries', 'home.delete_invoiceseries'):
             return InvoiceSeries.objects.none()
         return tenant_qs(self.request, InvoiceSeries).filter(isDeleted=False).only(
-            'id', 'name', 'module', 'seriesCode', 'startNumber', 'endNumber', 'nextNumber', 'paddingLength', 'isActive', 'isDefault', 'datetime'
+            'id', 'name', 'module', 'seriesCode', 'startNumber', 'endNumber', 'nextNumber', 'paddingLength', 'isActive', 'isDefault', 'invoiceNature', 'lockInvoiceNature', 'datetime'
         )
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
@@ -1636,9 +1757,13 @@ class InvoiceSeriesListJson(BaseDatatableView):
                 action += ''' <button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk)
             status = '''<div class="ui tiny green label">Active</div>''' if item.isActive else '''<div class="ui tiny grey label">Inactive</div>'''
             default = '''<div class="ui tiny blue label">Default</div>''' if item.isDefault else '-'
+            nature = escape(payload['InvoiceNatureLabel'])
+            if payload['LockInvoiceNature'] and payload['InvoiceNature'] != InvoiceSeries.InvoiceNature.MIXED:
+                nature = nature + ' <div class="ui tiny teal label">Locked</div>'
             json_data.append([
                 escape(payload['Module']),
                 escape(payload['SeriesCode']),
+                nature,
                 escape(payload['RangeLabel']),
                 escape(payload['NextInvoice']),
                 escape(str(payload['PaddingLength'])),
@@ -1716,18 +1841,26 @@ def add_party_api(request):
             phoneNumber = request.POST.get("phoneNumber")
             openingBalance = request.POST.get("openingBalance")
             partyGroup = request.POST.get("partyGroup")
-            # address = request.POST.get("address")
+            address = request.POST.get("address")
+            legalName = request.POST.get("legalName")
+            gstNumber = request.POST.get("gstNumber")
+            isB2B = str(request.POST.get("isB2B") or '').lower() in {'1', 'true', 'yes', 'on'}
+            billingAddress = request.POST.get("billingAddress")
             staffID = request.POST.get("staffID")
             obj = Party()
             assign_tenant(obj, request)
             obj.name = partyName
+            obj.legalName = (legalName or '').strip() or None
             obj.phone = phoneNumber
+            obj.gstNumber = _normalize_gst_number(gstNumber) or None
+            obj.isB2B = isB2B
             obj.openingBalance = _decimal_from_request(openingBalance)
             try:
                 obj.assignTo = tenant_qs(request, StaffUser).get(pk=int(staffID))
             except:
                 pass
-            # obj.address = address
+            obj.address = (address or '').strip() or None
+            obj.billingAddress = (billingAddress or '').strip() or None
             try:
                 obj.partyGroupID_id = int(partyGroup)
             except:
@@ -1818,17 +1951,17 @@ def generate_party_access_link_api(request):
 
 
 class PartyListJson(BaseDatatableView):
-    order_columns = ['name', 'phone', 'openingBalance', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
+    order_columns = ['name', 'phone', 'gstNumber', 'openingBalance', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
     def get_initial_queryset(self):
         return tenant_qs(self.request, Party).select_related('partyGroupID', 'assignTo').filter(isDeleted__exact=False).only(
-            'id', 'name', 'phone', 'openingBalance', 'username', 'password', 'address', 'datetime',
+            'id', 'name', 'legalName', 'phone', 'gstNumber', 'isB2B', 'openingBalance', 'username', 'password', 'address', 'billingAddress', 'datetime',
             'partyGroupID__name', 'assignTo__name'
         )
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
-                Q(name__icontains=search) | Q(phone__icontains=search) | Q(username__icontains=search)
+                Q(name__icontains=search) | Q(legalName__icontains=search) | Q(phone__icontains=search) | Q(gstNumber__icontains=search) | Q(username__icontains=search)
                 | Q(password__icontains=search) | Q(address__icontains=search) | Q(openingBalance__icontains=search)
                 | Q(partyGroupID__name__icontains=search) | Q(assignTo__name__icontains=search) | Q(
                     datetime__icontains=search)
@@ -1889,6 +2022,7 @@ class PartyListJson(BaseDatatableView):
             json_data.append([
                 escape(item.name),
                 escape(item.phone),
+                escape(item.gstNumber or ('B2B' if item.isB2B else '-')),
                 formatINR(format(item.openingBalance, '.2f')),
                 username,
                 password,
@@ -1899,6 +2033,10 @@ class PartyListJson(BaseDatatableView):
             ])
         return json_data
 def get_party_detail(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized', 'error': 'Login required.'}, status=401)
+    if not _can_manage_party_records(request.user):
+        return JsonResponse({'message': 'forbidden', 'error': 'You do not have permission to view party details.'}, status=403)
     id = request.GET.get('id')
     instance = get_object_or_404(tenant_qs(request, Party), id=id)
     # instance = BankDetails.objects.get(companyID_id=company.pk)
@@ -1913,9 +2051,13 @@ def get_party_detail(request):
     data = {
         'ID': instance.pk,
         'Name': instance.name,
+        'LegalName': instance.legalName,
         'PhoneNumber': instance.phone,
+        'GSTNumber': instance.gstNumber,
+        'IsB2B': bool(instance.isB2B),
         'OpeningBalance': str(instance.openingBalance),
         'Address': instance.address,
+        'BillingAddress': instance.billingAddress,
         'PartyGroup': party,
         'AssignTo': usr,
     }
@@ -1932,14 +2074,22 @@ def edit_party_api(request):
             name = request.POST.get("partyName")
             phoneNumber = request.POST.get("phoneNumber")
             openingBalance = request.POST.get("openingBalance")
-            # address = request.POST.get("address")
+            address = request.POST.get("address")
+            legalName = request.POST.get("legalName")
+            gstNumber = request.POST.get("gstNumber")
+            isB2B = str(request.POST.get("isB2B") or '').lower() in {'1', 'true', 'yes', 'on'}
+            billingAddress = request.POST.get("billingAddress")
             partyGroup = request.POST.get("partyGroup")
             staffID = request.POST.get("staffID")
             obj = tenant_qs(request, Party).select_related().get(id=int(Id))
             obj.name = name
+            obj.legalName = (legalName or '').strip() or None
             obj.phone = phoneNumber
+            obj.gstNumber = _normalize_gst_number(gstNumber) or None
+            obj.isB2B = isB2B
             obj.openingBalance = _decimal_from_request(openingBalance)
-            # obj.address = address
+            obj.address = (address or '').strip() or None
+            obj.billingAddress = (billingAddress or '').strip() or None
             try:
                 obj.partyGroupID_id = int(partyGroup)
             except:
@@ -1977,17 +2127,22 @@ def list_party_api(request):
         if o_list is None:
             o_list = []
             obj_list = tenant_qs(request, Party).select_related('partyGroupID').filter(isDeleted__exact=False).only(
-                'id', 'name', 'phone', 'partyGroupID__name'
+                'id', 'name', 'legalName', 'phone', 'gstNumber', 'isB2B', 'address', 'billingAddress', 'partyGroupID__name'
             ).order_by('name')
             for obj in obj_list:
                 party = obj.partyGroupID.name if obj.partyGroupID else 'N/A'
                 obj_dic = {
                     'ID': obj.pk,
                     'Name': obj.name,
+                    'LegalName': obj.legalName or obj.name,
                     'PartyGroup': party,
                     'Phone': obj.phone,
+                    'GSTNumber': obj.gstNumber or '',
+                    'IsB2B': bool(obj.isB2B),
+                    'Address': obj.address or '',
+                    'BillingAddress': obj.billingAddress or obj.address or '',
                     'Detail': obj.name + ' - ' + party + ' @ ' + str(obj.pk),
-                    'DisplayDetail': obj.name + ' - ' + party
+                    'DisplayDetail': obj.name + ' - ' + party + ((' | GSTIN: ' + obj.gstNumber) if obj.gstNumber else '')
                 }
                 o_list.append(obj_dic)
             cache.set(cache_key, o_list, timeout=60 * 30)
@@ -5443,6 +5598,1524 @@ def generate_order_pdf(request):
     HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 1cm; }')])
     return response
 # ----------------------Sales-----------------
+@transaction.atomic
+def add_inventory_item_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        item = InventoryItem()
+        assign_tenant(item, request)
+        _apply_inventory_item_payload(request, item)
+        item.save()
+        rebuild_inventory_stock(item.tenant, [item.pk])
+        return JsonResponse({'message': 'success', 'itemId': item.pk}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_inventory_item_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        item = tenant_qs(request, InventoryItem).get(pk=int(request.POST.get('itemId')), isDeleted=False)
+        _apply_inventory_item_payload(request, item)
+        item.save()
+        rebuild_inventory_stock(item.tenant, [item.pk])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_inventory_item_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        item = tenant_qs(request, InventoryItem).get(pk=int(request.POST.get('itemId')), isDeleted=False)
+        item.isDeleted = True
+        item.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        InventoryStock.objects.filter(tenant=item.tenant, item=item).update(isDeleted=True)
+        InventoryLedgerEntry.objects.filter(tenant=item.tenant, item=item).update(isDeleted=True)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def get_inventory_snapshot_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    tenant = get_current_tenant(request)
+    return JsonResponse({'message': 'success', 'data': stock_snapshot_for_tenant(tenant)}, safe=False)
+
+
+def list_inventory_items_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    tenant = get_current_tenant(request)
+    non_gst_enabled = bool(getattr(tenant, 'nonGstShadowEnabled', False))
+    items = tenant_qs(request, InventoryItem).filter(isDeleted=False).order_by('name')
+    stock_map = {
+        row['item_id']: row
+        for row in InventoryStock.objects.filter(
+            tenant=tenant,
+            isDeleted=False,
+            item_id__in=items.values_list('id', flat=True),
+        ).values('item_id', 'stockBucket', 'quantityOnHand')
+    }
+    payload = []
+    stocks = defaultdict(lambda: {'gst': 0.0, 'non_gst': 0.0})
+    for row in InventoryStock.objects.filter(tenant=tenant, isDeleted=False, item__isDeleted=False):
+        stocks[row.item_id][row.stockBucket] = float(row.quantityOnHand or 0.0)
+    for item in items:
+        payload.append({
+            'ID': item.pk,
+            'Name': item.name,
+            'SKU': item.sku or '',
+            'Barcode': item.barcode or '',
+            'CategoryID': item.category_id,
+            'CategoryName': item.categoryName or '',
+            'BrandName': item.brandName or '',
+            'UnitID': item.unit_id,
+            'UnitName': item.unitName or 'pcs',
+            'UnitAllowsDecimal': bool(getattr(item.unit, 'allowsDecimal', False)) if item.unit_id else True,
+            'TaxProfileID': item.taxProfile_id,
+            'HSN': item.hsnCode or '',
+            'Description': item.description or '',
+            'GSTRate': float(item.gstRate or 0.0),
+            'DefaultStockBucket': item.defaultStockBucket if non_gst_enabled else InventoryItem.StockBucket.GST,
+            'DefaultPurchasePrice': float(item.defaultPurchasePrice or 0.0),
+            'DefaultSalesPrice': float(item.defaultSalesPrice or 0.0),
+            'MRP': float(item.mrp or 0.0),
+            'MinimumStockLevel': float(item.minimumStockLevel or 0.0),
+            'ReorderLevel': float(item.reorderLevel or 0.0),
+            'IsSaleBlocked': bool(item.isSaleBlocked),
+            'GSTStock': stocks[item.pk]['gst'],
+            'NonGSTStock': stocks[item.pk]['non_gst'] if non_gst_enabled else 0.0,
+            'IsLowStock': (stocks[item.pk]['gst'] + stocks[item.pk]['non_gst']) <= float(item.minimumStockLevel or 0.0),
+        })
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+@transaction.atomic
+def add_inventory_category_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        category = InventoryCategory()
+        assign_tenant(category, request)
+        _apply_inventory_category_payload(request, category)
+        category.save()
+        return JsonResponse({'message': 'success', 'categoryId': category.pk}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_inventory_category_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        category = tenant_qs(request, InventoryCategory).get(pk=int(request.POST.get('categoryId')), isDeleted=False)
+        _apply_inventory_category_payload(request, category)
+        category.save()
+        InventoryItem.objects.filter(tenant=category.tenant, category=category, isDeleted=False).update(categoryName=category.name)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_inventory_category_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        category = tenant_qs(request, InventoryCategory).get(pk=int(request.POST.get('categoryId')), isDeleted=False)
+        InventoryItem.objects.filter(tenant=category.tenant, category=category, isDeleted=False).update(category=None)
+        category.isDeleted = True
+        category.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_inventory_categories_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    rows = tenant_qs(request, InventoryCategory).filter(isDeleted=False).order_by('name')
+    payload = [{
+        'ID': row.pk,
+        'Name': row.name,
+        'Code': row.code or '',
+        'Description': row.description or '',
+        'IsActive': bool(row.isActive),
+        'ItemCount': row.items.filter(isDeleted=False).count(),
+    } for row in rows]
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+@transaction.atomic
+def add_inventory_unit_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        unit = InventoryUnit()
+        assign_tenant(unit, request)
+        _apply_inventory_unit_payload(request, unit)
+        unit.save()
+        return JsonResponse({'message': 'success', 'unitId': unit.pk}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_inventory_unit_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        unit = tenant_qs(request, InventoryUnit).get(pk=int(request.POST.get('unitId')), isDeleted=False)
+        _apply_inventory_unit_payload(request, unit)
+        unit.save()
+        InventoryItem.objects.filter(tenant=unit.tenant, unit=unit, isDeleted=False).update(unitName=unit.symbol)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_inventory_unit_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        unit = tenant_qs(request, InventoryUnit).get(pk=int(request.POST.get('unitId')), isDeleted=False)
+        InventoryItem.objects.filter(tenant=unit.tenant, unit=unit, isDeleted=False).update(unit=None)
+        unit.isDeleted = True
+        unit.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_inventory_units_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    rows = tenant_qs(request, InventoryUnit).filter(isDeleted=False).order_by('name')
+    payload = [{
+        'ID': row.pk,
+        'Name': row.name,
+        'Symbol': row.symbol,
+        'AllowsDecimal': bool(row.allowsDecimal),
+        'Description': row.description or '',
+        'IsActive': bool(row.isActive),
+        'ItemCount': row.items.filter(isDeleted=False).count(),
+    } for row in rows]
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+@transaction.atomic
+def add_inventory_tax_profile_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        tax_profile = InventoryTaxProfile()
+        assign_tenant(tax_profile, request)
+        _apply_inventory_tax_profile_payload(request, tax_profile)
+        tax_profile.save()
+        return JsonResponse({'message': 'success', 'taxProfileId': tax_profile.pk}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_inventory_tax_profile_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        tax_profile = tenant_qs(request, InventoryTaxProfile).get(pk=int(request.POST.get('taxProfileId')), isDeleted=False)
+        _apply_inventory_tax_profile_payload(request, tax_profile)
+        tax_profile.save()
+        InventoryItem.objects.filter(tenant=tax_profile.tenant, taxProfile=tax_profile, isDeleted=False).update(
+            hsnCode=tax_profile.hsnCode,
+            gstRate=tax_profile.gstRate,
+        )
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_inventory_tax_profile_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        tax_profile = tenant_qs(request, InventoryTaxProfile).get(pk=int(request.POST.get('taxProfileId')), isDeleted=False)
+        InventoryItem.objects.filter(tenant=tax_profile.tenant, taxProfile=tax_profile, isDeleted=False).update(taxProfile=None)
+        tax_profile.isDeleted = True
+        tax_profile.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_inventory_tax_profiles_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    rows = tenant_qs(request, InventoryTaxProfile).filter(isDeleted=False).order_by('name')
+    payload = [{
+        'ID': row.pk,
+        'Name': row.name,
+        'HSNCode': row.hsnCode,
+        'GSTRate': float(row.gstRate or 0.0),
+        'CessRate': float(row.cessRate or 0.0),
+        'Description': row.description or '',
+        'IsActive': bool(row.isActive),
+        'ItemCount': row.items.filter(isDeleted=False).count(),
+    } for row in rows]
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+@transaction.atomic
+def add_inventory_warehouse_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        warehouse = InventoryWarehouse()
+        assign_tenant(warehouse, request)
+        warehouse.name = (request.POST.get('name') or '').strip()
+        warehouse.code = (request.POST.get('code') or '').strip() or None
+        warehouse.address = (request.POST.get('address') or '').strip() or None
+        warehouse.isActive = str(request.POST.get('isActive') or '1').lower() not in {'0', 'false', 'no', 'off'}
+        warehouse.isDefault = str(request.POST.get('isDefault') or '').lower() in {'1', 'true', 'yes', 'on'}
+        if not warehouse.name:
+            raise ValueError('Warehouse name is required.')
+        warehouse.save()
+        if warehouse.isDefault:
+            InventoryWarehouse.objects.filter(
+                tenant=warehouse.tenant,
+                isDeleted=False,
+            ).exclude(pk=warehouse.pk).update(isDefault=False)
+        elif not InventoryWarehouse.objects.filter(tenant=warehouse.tenant, isDeleted=False, isDefault=True).exists():
+            warehouse.isDefault = True
+            warehouse.save(update_fields=['isDefault', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success', 'warehouseId': warehouse.pk}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_inventory_warehouse_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        warehouse = tenant_qs(request, InventoryWarehouse).get(pk=int(request.POST.get('warehouseId')), isDeleted=False)
+        warehouse.name = (request.POST.get('name') or '').strip()
+        warehouse.code = (request.POST.get('code') or '').strip() or None
+        warehouse.address = (request.POST.get('address') or '').strip() or None
+        warehouse.isDefault = str(request.POST.get('isDefault') or '').lower() in {'1', 'true', 'yes', 'on'}
+        if not warehouse.name:
+            raise ValueError('Warehouse name is required.')
+        warehouse.save()
+        if warehouse.isDefault:
+            InventoryWarehouse.objects.filter(tenant=warehouse.tenant, isDeleted=False).exclude(pk=warehouse.pk).update(isDefault=False)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_inventory_warehouse_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        warehouse = tenant_qs(request, InventoryWarehouse).get(pk=int(request.POST.get('warehouseId')), isDeleted=False)
+        replacement = InventoryWarehouse.objects.filter(tenant=warehouse.tenant, isDeleted=False).exclude(pk=warehouse.pk).order_by('-isDefault', 'id').first()
+        InventoryOpeningLine.objects.filter(tenant=warehouse.tenant, warehouse=warehouse, isDeleted=False).update(warehouse=replacement)
+        PurchaseLine.objects.filter(tenant=warehouse.tenant, warehouse=warehouse, isDeleted=False).update(warehouse=replacement)
+        SalesLine.objects.filter(tenant=warehouse.tenant, warehouse=warehouse, isDeleted=False).update(warehouse=replacement)
+        CashCounterLine.objects.filter(tenant=warehouse.tenant, warehouse=warehouse, isDeleted=False).update(warehouse=replacement)
+        InventoryLedgerEntry.objects.filter(tenant=warehouse.tenant, warehouse=warehouse, isDeleted=False).update(warehouse=replacement)
+        warehouse.isDeleted = True
+        warehouse.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        if replacement and not InventoryWarehouse.objects.filter(tenant=warehouse.tenant, isDeleted=False, isDefault=True).exists():
+            replacement.isDefault = True
+            replacement.save(update_fields=['isDefault', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_inventory_warehouses_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    tenant = get_current_tenant(request)
+    warehouses = InventoryWarehouse.objects.filter(
+        tenant=tenant,
+        isDeleted=False,
+        isActive=True,
+    ).order_by('-isDefault', 'name')
+    if not warehouses.exists():
+        get_or_create_default_warehouse(tenant)
+        warehouses = InventoryWarehouse.objects.filter(
+            tenant=tenant,
+            isDeleted=False,
+            isActive=True,
+        ).order_by('-isDefault', 'name')
+    payload = [{
+        'ID': warehouse.pk,
+        'Name': warehouse.name,
+        'Code': warehouse.code or '',
+        'Address': warehouse.address or '',
+        'IsDefault': bool(warehouse.isDefault),
+    } for warehouse in warehouses]
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+def list_inventory_ledger_entries_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    tenant = get_current_tenant(request)
+    rows = InventoryLedgerEntry.objects.filter(
+        tenant=tenant,
+        isDeleted=False,
+        item__isDeleted=False,
+    ).select_related('item', 'warehouse').order_by('-entryDate', '-id')[:200]
+    source_ids = defaultdict(list)
+    for row in rows:
+        if row.source_object_id:
+            source_ids[row.sourceType].append(row.source_object_id)
+
+    detail_map = {}
+    if source_ids.get(InventoryLedgerEntry.SourceType.PURCHASE):
+        for line in PurchaseLine.objects.filter(pk__in=source_ids[InventoryLedgerEntry.SourceType.PURCHASE]).values('id', 'purchaseInvoice_id'):
+            detail_map[(InventoryLedgerEntry.SourceType.PURCHASE, line['id'])] = {
+                'DetailUrl': reverse('homeApp:purchase_detail', args=[line['purchaseInvoice_id']]),
+                'DetailLabel': 'View Purchase',
+            }
+    if source_ids.get(InventoryLedgerEntry.SourceType.SALES):
+        for line in SalesLine.objects.filter(pk__in=source_ids[InventoryLedgerEntry.SourceType.SALES]).values('id', 'sales_id'):
+            detail_map[(InventoryLedgerEntry.SourceType.SALES, line['id'])] = {
+                'DetailUrl': reverse('homeApp:edit_sales', args=[line['sales_id']]),
+                'DetailLabel': 'View Sale',
+            }
+    if source_ids.get(InventoryLedgerEntry.SourceType.CASH_COUNTER):
+        for line in CashCounterLine.objects.filter(pk__in=source_ids[InventoryLedgerEntry.SourceType.CASH_COUNTER]).values('id', 'cashCounter_id'):
+            detail_map[(InventoryLedgerEntry.SourceType.CASH_COUNTER, line['id'])] = {
+                'DetailUrl': reverse('homeApp:edit_cash_counter', args=[line['cashCounter_id']]),
+                'DetailLabel': 'View Counter',
+            }
+    if source_ids.get(InventoryLedgerEntry.SourceType.ADJUSTMENT):
+        for line in InventoryAdjustmentLine.objects.filter(pk__in=source_ids[InventoryLedgerEntry.SourceType.ADJUSTMENT]).values('id', 'voucher_id'):
+            detail_map[(InventoryLedgerEntry.SourceType.ADJUSTMENT, line['id'])] = {
+                'DetailAction': 'adjustment',
+                'DetailId': line['voucher_id'],
+                'DetailLabel': 'View Adjustment',
+            }
+    transfer_source_ids = source_ids.get(InventoryLedgerEntry.SourceType.TRANSFER_OUT, []) + source_ids.get(InventoryLedgerEntry.SourceType.TRANSFER_IN, [])
+    if transfer_source_ids:
+        for line in InventoryTransferLine.objects.filter(pk__in=transfer_source_ids).values('id', 'voucher_id'):
+            detail_map[(InventoryLedgerEntry.SourceType.TRANSFER_OUT, line['id'])] = {
+                'DetailAction': 'transfer',
+                'DetailId': line['voucher_id'],
+                'DetailLabel': 'View Transfer',
+            }
+            detail_map[(InventoryLedgerEntry.SourceType.TRANSFER_IN, line['id'])] = {
+                'DetailAction': 'transfer',
+                'DetailId': line['voucher_id'],
+                'DetailLabel': 'View Transfer',
+            }
+    if source_ids.get(InventoryLedgerEntry.SourceType.PURCHASE_RETURN):
+        for line in PurchaseReturnLine.objects.filter(pk__in=source_ids[InventoryLedgerEntry.SourceType.PURCHASE_RETURN]).values('id', 'voucher_id'):
+            detail_map[(InventoryLedgerEntry.SourceType.PURCHASE_RETURN, line['id'])] = {
+                'DetailAction': 'purchase_return',
+                'DetailId': line['voucher_id'],
+                'DetailLabel': 'View Purchase Return',
+            }
+    if source_ids.get(InventoryLedgerEntry.SourceType.SALES_RETURN):
+        for line in SalesReturnLine.objects.filter(pk__in=source_ids[InventoryLedgerEntry.SourceType.SALES_RETURN]).values('id', 'voucher_id'):
+            detail_map[(InventoryLedgerEntry.SourceType.SALES_RETURN, line['id'])] = {
+                'DetailAction': 'sales_return',
+                'DetailId': line['voucher_id'],
+                'DetailLabel': 'View Sales Return',
+            }
+    payload = [{
+        'ID': row.pk,
+        'EntryDate': row.entryDate.strftime('%d/%m/%Y') if row.entryDate else '',
+        'EntryDateSort': row.entryDate.isoformat() if row.entryDate else '',
+        'ItemName': row.item.name,
+        'WarehouseName': row.warehouse.name if row.warehouse_id else '',
+        'StockBucket': row.stockBucket,
+        'SourceType': row.sourceType,
+        'QuantityDelta': float(row.quantityDelta or 0.0),
+        'UnitRate': float(row.unitRate or 0.0),
+        'TotalValue': float(row.totalValue or 0.0),
+        'ReferenceNumber': row.referenceNumber or '',
+        'Remark': row.remark or '',
+        'DetailUrl': (detail_map.get((row.sourceType, row.source_object_id)) or {}).get('DetailUrl', ''),
+        'DetailAction': (detail_map.get((row.sourceType, row.source_object_id)) or {}).get('DetailAction', ''),
+        'DetailId': (detail_map.get((row.sourceType, row.source_object_id)) or {}).get('DetailId', ''),
+        'DetailLabel': (detail_map.get((row.sourceType, row.source_object_id)) or {}).get('DetailLabel', ''),
+    } for row in rows]
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+@transaction.atomic
+def add_inventory_opening_stock_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one opening stock line is required.')
+        voucher = InventoryOpeningVoucher()
+        assign_tenant(voucher, request)
+        voucher.entryDate = datetime.strptime(request.POST.get('entryDate'), '%d/%m/%Y').date()
+        voucher.remark = request.POST.get('remark')
+        voucher.createdBy = _staff_for_request(request)
+        voucher.save()
+        voucher.voucherNumber = 'OS' + str(voucher.pk).zfill(6)
+        voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
+        warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+        item_ids = []
+        for row in lines_payload:
+            item = _parse_inventory_item(request, row.get('itemId'))
+            quantity = _safe_sales_float(row.get('quantity'))
+            if quantity <= 0:
+                raise ValueError('Opening quantity must be greater than zero.')
+            stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+            unit_cost = _safe_sales_float(row.get('unitCost') or row.get('unitPrice'))
+            line_total = _safe_sales_float(row.get('lineTotal')) or round(quantity * unit_cost, 2)
+            InventoryOpeningLine.objects.create(
+                tenant=voucher.tenant,
+                voucher=voucher,
+                warehouse=warehouse,
+                item=item,
+                stockBucket=stock_bucket,
+                quantity=quantity,
+                unitCost=unit_cost,
+                lineTotal=line_total,
+                remark=(row.get('remark') or '')[:500],
+            )
+            item_ids.append(item.pk)
+        rebuild_inventory_stock(voucher.tenant, item_ids)
+        validate_non_negative_inventory(voucher.tenant, item_ids)
+        return JsonResponse({'message': 'success', 'voucherNumber': voucher.voucherNumber}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_inventory_opening_vouchers_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    rows = tenant_qs(request, InventoryOpeningVoucher).filter(isDeleted=False).select_related('createdBy').order_by('-entryDate', '-id')[:100]
+    payload = []
+    for voucher in rows:
+        payload.append({
+            'ID': voucher.pk,
+            'VoucherNumber': voucher.voucherNumber or '',
+            'EntryDate': voucher.entryDate.strftime('%d/%m/%Y') if voucher.entryDate else '',
+            'Remark': voucher.remark or '',
+            'CreatedBy': voucher.createdBy.name if voucher.createdBy_id else '-',
+            'LineCount': voucher.lines.filter(isDeleted=False).count(),
+        })
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+def _voucher_line_rows_from_payload(request, lines_payload, *, quantity_field='quantity', rate_field='unitCost'):
+    rows = []
+    item_ids = []
+    for row in lines_payload:
+        item = _parse_inventory_item(request, row.get('itemId'))
+        quantity = _safe_sales_float(row.get(quantity_field))
+        if quantity <= 0:
+            raise ValueError('Voucher quantity must be greater than zero.')
+        stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        unit_rate = _safe_sales_float(row.get(rate_field) or row.get('unitPrice') or row.get('unitCost'))
+        line_total = _safe_sales_float(row.get('lineTotal')) or round(quantity * unit_rate, 2)
+        rows.append({
+            'item': item,
+            'quantity': quantity,
+            'stockBucket': stock_bucket,
+            'unitRate': unit_rate,
+            'lineTotal': line_total,
+            'remark': (row.get('remark') or '')[:500],
+        })
+        item_ids.append(item.pk)
+    return rows, item_ids
+
+
+def _serialize_voucher_lines(lines_qs, *, quantity_field='quantity', rate_field='unitCost'):
+    payload = []
+    for line in lines_qs.select_related('item').order_by('id'):
+        payload.append({
+            'itemId': line.item_id,
+            'itemName': line.item.name,
+            'stockBucket': line.stockBucket,
+            'quantity': float(getattr(line, quantity_field) or 0.0),
+            'unitCost': float(getattr(line, rate_field) or 0.0),
+            'unitPrice': float(getattr(line, rate_field) or 0.0),
+            'lineTotal': float(line.lineTotal or 0.0),
+            'remark': line.remark or '',
+        })
+    return payload
+
+
+@transaction.atomic
+def add_inventory_adjustment_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one adjustment line is required.')
+        voucher = InventoryAdjustmentVoucher()
+        assign_tenant(voucher, request)
+        voucher.entryDate = datetime.strptime(request.POST.get('entryDate'), '%d/%m/%Y').date()
+        voucher.remark = request.POST.get('remark')
+        voucher.createdBy = _staff_for_request(request)
+        voucher.save()
+        voucher.voucherNumber = 'ADJ' + str(voucher.pk).zfill(6)
+        voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
+        warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        for row in rows:
+            quantity_delta = row['quantity']
+            if str(request.POST.get('direction') or 'increase').lower() == 'decrease':
+                quantity_delta = -quantity_delta
+            InventoryAdjustmentLine.objects.create(
+                tenant=voucher.tenant,
+                voucher=voucher,
+                warehouse=warehouse,
+                item=row['item'],
+                stockBucket=row['stockBucket'],
+                quantityDelta=quantity_delta,
+                unitCost=row['unitRate'],
+                lineTotal=row['lineTotal'] if quantity_delta >= 0 else -row['lineTotal'],
+                remark=row['remark'],
+            )
+        rebuild_inventory_stock(voucher.tenant, item_ids)
+        validate_non_negative_inventory(voucher.tenant, item_ids)
+        return JsonResponse({'message': 'success', 'voucherId': voucher.pk, 'voucherNumber': voucher.voucherNumber}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_inventory_adjustment_vouchers_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    rows = tenant_qs(request, InventoryAdjustmentVoucher).filter(isDeleted=False).order_by('-entryDate', '-id')[:100]
+    payload = [{
+        'ID': row.pk,
+        'VoucherNumber': row.voucherNumber or '',
+        'EntryDate': row.entryDate.strftime('%d/%m/%Y') if row.entryDate else '',
+        'Remark': row.remark or '',
+        'LineCount': row.lines.filter(isDeleted=False).count(),
+    } for row in rows]
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+def get_inventory_adjustment_voucher_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, InventoryAdjustmentVoucher).get(pk=int(request.GET.get('voucherId')), isDeleted=False)
+        lines = _serialize_voucher_lines(voucher.lines.filter(isDeleted=False), quantity_field='quantityDelta', rate_field='unitCost')
+        for line in lines:
+            line['quantity'] = abs(float(line.get('quantity') or 0.0))
+        return JsonResponse({'message': 'success', 'data': {
+            'ID': voucher.pk,
+            'VoucherNumber': voucher.voucherNumber or '',
+            'EntryDate': voucher.entryDate.strftime('%d/%m/%Y') if voucher.entryDate else '',
+            'WarehouseID': voucher.lines.filter(isDeleted=False).values_list('warehouse_id', flat=True).first(),
+            'Direction': 'decrease' if voucher.lines.filter(isDeleted=False, quantityDelta__lt=0).exists() else 'increase',
+            'Remark': voucher.remark or '',
+            'Lines': lines,
+        }}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_inventory_adjustment_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, InventoryAdjustmentVoucher).get(pk=int(request.POST.get('voucherId')), isDeleted=False)
+        prior_item_ids = list(voucher.lines.filter(isDeleted=False).values_list('item_id', flat=True))
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one adjustment line is required.')
+        voucher.entryDate = datetime.strptime(request.POST.get('entryDate'), '%d/%m/%Y').date()
+        voucher.remark = request.POST.get('remark')
+        voucher.save(update_fields=['entryDate', 'remark', 'lastUpdatedOn'])
+        voucher.lines.filter(isDeleted=False).update(isDeleted=True)
+        warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        for row in rows:
+            quantity_delta = row['quantity']
+            if str(request.POST.get('direction') or 'increase').lower() == 'decrease':
+                quantity_delta = -quantity_delta
+            InventoryAdjustmentLine.objects.create(
+                tenant=voucher.tenant,
+                voucher=voucher,
+                warehouse=warehouse,
+                item=row['item'],
+                stockBucket=row['stockBucket'],
+                quantityDelta=quantity_delta,
+                unitCost=row['unitRate'],
+                lineTotal=row['lineTotal'] if quantity_delta >= 0 else -row['lineTotal'],
+                remark=row['remark'],
+            )
+        rebuild_inventory_stock(voucher.tenant, list(set(prior_item_ids + item_ids)))
+        validate_non_negative_inventory(voucher.tenant, list(set(prior_item_ids + item_ids)))
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_inventory_adjustment_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, InventoryAdjustmentVoucher).get(pk=int(request.POST.get('voucherId')), isDeleted=False)
+        item_ids = list(voucher.lines.filter(isDeleted=False).values_list('item_id', flat=True))
+        voucher.isDeleted = True
+        voucher.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        rebuild_inventory_stock(voucher.tenant, item_ids)
+        validate_non_negative_inventory(voucher.tenant, item_ids)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def add_inventory_transfer_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one transfer line is required.')
+        voucher = InventoryTransferVoucher()
+        assign_tenant(voucher, request)
+        voucher.entryDate = datetime.strptime(request.POST.get('entryDate'), '%d/%m/%Y').date()
+        voucher.fromWarehouse = _parse_inventory_warehouse(request, request.POST.get('fromWarehouseId'))
+        voucher.toWarehouse = _parse_inventory_warehouse(request, request.POST.get('toWarehouseId'))
+        if voucher.fromWarehouse_id == voucher.toWarehouse_id:
+            raise ValueError('From and To warehouse cannot be same.')
+        voucher.remark = request.POST.get('remark')
+        voucher.createdBy = _staff_for_request(request)
+        voucher.save()
+        voucher.voucherNumber = 'TRN' + str(voucher.pk).zfill(6)
+        voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        for row in rows:
+            InventoryTransferLine.objects.create(
+                tenant=voucher.tenant,
+                voucher=voucher,
+                item=row['item'],
+                stockBucket=row['stockBucket'],
+                quantity=row['quantity'],
+                unitCost=row['unitRate'],
+                lineTotal=row['lineTotal'],
+                remark=row['remark'],
+            )
+        rebuild_inventory_stock(voucher.tenant, item_ids)
+        validate_non_negative_inventory(voucher.tenant, item_ids)
+        return JsonResponse({'message': 'success', 'voucherId': voucher.pk, 'voucherNumber': voucher.voucherNumber}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_inventory_transfer_vouchers_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    rows = tenant_qs(request, InventoryTransferVoucher).filter(isDeleted=False).select_related('fromWarehouse', 'toWarehouse').order_by('-entryDate', '-id')[:100]
+    payload = [{
+        'ID': row.pk,
+        'VoucherNumber': row.voucherNumber or '',
+        'EntryDate': row.entryDate.strftime('%d/%m/%Y') if row.entryDate else '',
+        'FromWarehouse': row.fromWarehouse.name if row.fromWarehouse_id else '-',
+        'ToWarehouse': row.toWarehouse.name if row.toWarehouse_id else '-',
+        'Remark': row.remark or '',
+        'LineCount': row.lines.filter(isDeleted=False).count(),
+    } for row in rows]
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+def get_inventory_transfer_voucher_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, InventoryTransferVoucher).select_related('fromWarehouse', 'toWarehouse').get(pk=int(request.GET.get('voucherId')), isDeleted=False)
+        return JsonResponse({'message': 'success', 'data': {
+            'ID': voucher.pk,
+            'VoucherNumber': voucher.voucherNumber or '',
+            'EntryDate': voucher.entryDate.strftime('%d/%m/%Y') if voucher.entryDate else '',
+            'FromWarehouseID': voucher.fromWarehouse_id,
+            'ToWarehouseID': voucher.toWarehouse_id,
+            'Remark': voucher.remark or '',
+            'Lines': _serialize_voucher_lines(voucher.lines.filter(isDeleted=False), quantity_field='quantity', rate_field='unitCost'),
+        }}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_inventory_transfer_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, InventoryTransferVoucher).get(pk=int(request.POST.get('voucherId')), isDeleted=False)
+        prior_item_ids = list(voucher.lines.filter(isDeleted=False).values_list('item_id', flat=True))
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one transfer line is required.')
+        voucher.entryDate = datetime.strptime(request.POST.get('entryDate'), '%d/%m/%Y').date()
+        voucher.fromWarehouse = _parse_inventory_warehouse(request, request.POST.get('fromWarehouseId'))
+        voucher.toWarehouse = _parse_inventory_warehouse(request, request.POST.get('toWarehouseId'))
+        if voucher.fromWarehouse_id == voucher.toWarehouse_id:
+            raise ValueError('From and To warehouse cannot be same.')
+        voucher.remark = request.POST.get('remark')
+        voucher.save(update_fields=['entryDate', 'fromWarehouse', 'toWarehouse', 'remark', 'lastUpdatedOn'])
+        voucher.lines.filter(isDeleted=False).update(isDeleted=True)
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        for row in rows:
+            InventoryTransferLine.objects.create(
+                tenant=voucher.tenant,
+                voucher=voucher,
+                item=row['item'],
+                stockBucket=row['stockBucket'],
+                quantity=row['quantity'],
+                unitCost=row['unitRate'],
+                lineTotal=row['lineTotal'],
+                remark=row['remark'],
+            )
+        rebuild_inventory_stock(voucher.tenant, list(set(prior_item_ids + item_ids)))
+        validate_non_negative_inventory(voucher.tenant, list(set(prior_item_ids + item_ids)))
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_inventory_transfer_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, InventoryTransferVoucher).get(pk=int(request.POST.get('voucherId')), isDeleted=False)
+        item_ids = list(voucher.lines.filter(isDeleted=False).values_list('item_id', flat=True))
+        voucher.isDeleted = True
+        voucher.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        rebuild_inventory_stock(voucher.tenant, item_ids)
+        validate_non_negative_inventory(voucher.tenant, item_ids)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def add_purchase_return_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one purchase return line is required.')
+        voucher = PurchaseReturnVoucher()
+        assign_tenant(voucher, request)
+        voucher.entryDate = datetime.strptime(request.POST.get('entryDate'), '%d/%m/%Y').date()
+        raw_purchase_id = str(request.POST.get('purchaseInvoiceId') or '').strip()
+        if raw_purchase_id.isdigit():
+            voucher.purchaseInvoice = tenant_qs(request, PurchaseInvoice).filter(pk=int(raw_purchase_id), isDeleted=False).first()
+        voucher.partyID = _parse_sales_party(request, request.POST.get('party')) if request.POST.get('party') else None
+        if voucher.partyID_id is None and voucher.purchaseInvoice_id:
+            voucher.partyID = voucher.purchaseInvoice.partyID
+        voucher.remark = request.POST.get('remark')
+        voucher.createdBy = _staff_for_request(request)
+        voucher.save()
+        voucher.voucherNumber = 'PRN' + str(voucher.pk).zfill(6)
+        voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
+        warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        voucher.totalAmount = 0.0
+        for row in rows:
+            PurchaseReturnLine.objects.create(
+                tenant=voucher.tenant,
+                voucher=voucher,
+                warehouse=warehouse,
+                item=row['item'],
+                stockBucket=row['stockBucket'],
+                quantity=row['quantity'],
+                unitCost=row['unitRate'],
+                lineTotal=row['lineTotal'],
+                remark=row['remark'],
+            )
+            voucher.totalAmount += row['lineTotal']
+        voucher.save(update_fields=['totalAmount', 'lastUpdatedOn'])
+        rebuild_inventory_stock(voucher.tenant, item_ids)
+        validate_non_negative_inventory(voucher.tenant, item_ids)
+        return JsonResponse({'message': 'success', 'voucherId': voucher.pk, 'voucherNumber': voucher.voucherNumber}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_purchase_return_vouchers_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    rows = tenant_qs(request, PurchaseReturnVoucher).filter(isDeleted=False).select_related('partyID', 'purchaseInvoice').order_by('-entryDate', '-id')[:100]
+    payload = [{
+        'ID': row.pk,
+        'VoucherNumber': row.voucherNumber or '',
+        'EntryDate': row.entryDate.strftime('%d/%m/%Y') if row.entryDate else '',
+        'Party': row.partyID.name if row.partyID_id else '-',
+        'PurchaseInvoice': row.purchaseInvoice.invoiceNumber if row.purchaseInvoice_id else '-',
+        'TotalAmount': float(row.totalAmount or 0.0),
+        'LineCount': row.lines.filter(isDeleted=False).count(),
+    } for row in rows]
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+def get_purchase_return_voucher_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, PurchaseReturnVoucher).select_related('partyID', 'purchaseInvoice').get(pk=int(request.GET.get('voucherId')), isDeleted=False)
+        warehouse_id = voucher.lines.filter(isDeleted=False).values_list('warehouse_id', flat=True).first()
+        return JsonResponse({'message': 'success', 'data': {
+            'ID': voucher.pk,
+            'VoucherNumber': voucher.voucherNumber or '',
+            'EntryDate': voucher.entryDate.strftime('%d/%m/%Y') if voucher.entryDate else '',
+            'WarehouseID': warehouse_id,
+            'PurchaseInvoiceID': voucher.purchaseInvoice_id,
+            'PartyID': voucher.partyID_id,
+            'Remark': voucher.remark or '',
+            'Lines': _serialize_voucher_lines(voucher.lines.filter(isDeleted=False), quantity_field='quantity', rate_field='unitCost'),
+        }}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_purchase_return_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, PurchaseReturnVoucher).get(pk=int(request.POST.get('voucherId')), isDeleted=False)
+        prior_item_ids = list(voucher.lines.filter(isDeleted=False).values_list('item_id', flat=True))
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one purchase return line is required.')
+        voucher.entryDate = datetime.strptime(request.POST.get('entryDate'), '%d/%m/%Y').date()
+        raw_purchase_id = str(request.POST.get('purchaseInvoiceId') or '').strip()
+        voucher.purchaseInvoice = tenant_qs(request, PurchaseInvoice).filter(pk=int(raw_purchase_id), isDeleted=False).first() if raw_purchase_id.isdigit() else None
+        voucher.partyID = _parse_sales_party(request, request.POST.get('party')) if request.POST.get('party') else None
+        if voucher.partyID_id is None and voucher.purchaseInvoice_id:
+            voucher.partyID = voucher.purchaseInvoice.partyID
+        voucher.remark = request.POST.get('remark')
+        voucher.save(update_fields=['entryDate', 'purchaseInvoice', 'partyID', 'remark', 'lastUpdatedOn'])
+        voucher.lines.filter(isDeleted=False).update(isDeleted=True)
+        warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        voucher.totalAmount = 0.0
+        for row in rows:
+            PurchaseReturnLine.objects.create(
+                tenant=voucher.tenant,
+                voucher=voucher,
+                warehouse=warehouse,
+                item=row['item'],
+                stockBucket=row['stockBucket'],
+                quantity=row['quantity'],
+                unitCost=row['unitRate'],
+                lineTotal=row['lineTotal'],
+                remark=row['remark'],
+            )
+            voucher.totalAmount += row['lineTotal']
+        voucher.save(update_fields=['totalAmount', 'lastUpdatedOn'])
+        rebuild_inventory_stock(voucher.tenant, list(set(prior_item_ids + item_ids)))
+        validate_non_negative_inventory(voucher.tenant, list(set(prior_item_ids + item_ids)))
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_purchase_return_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, PurchaseReturnVoucher).get(pk=int(request.POST.get('voucherId')), isDeleted=False)
+        item_ids = list(voucher.lines.filter(isDeleted=False).values_list('item_id', flat=True))
+        voucher.isDeleted = True
+        voucher.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        rebuild_inventory_stock(voucher.tenant, item_ids)
+        validate_non_negative_inventory(voucher.tenant, item_ids)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def add_sales_return_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one sales return line is required.')
+        voucher = SalesReturnVoucher()
+        assign_tenant(voucher, request)
+        voucher.entryDate = datetime.strptime(request.POST.get('entryDate'), '%d/%m/%Y').date()
+        source_type, source_id = _parse_return_source_ref(request.POST.get('salesId'))
+        if source_type == 'cash_counter' and source_id:
+            voucher.cashCounter = tenant_qs(request, CashCounter).filter(pk=source_id, isDeleted=False).first()
+        elif source_id:
+            voucher.sales = tenant_qs(request, Sales).filter(pk=source_id, isDeleted=False).first()
+        voucher.partyID = _parse_sales_party(request, request.POST.get('party')) if request.POST.get('party') else None
+        if voucher.partyID_id is None and voucher.sales_id:
+            voucher.partyID = voucher.sales.partyID
+        if voucher.partyID_id is None and voucher.cashCounter_id:
+            voucher.partyID = voucher.cashCounter.partyID
+        voucher.remark = request.POST.get('remark')
+        voucher.createdBy = _staff_for_request(request)
+        voucher.save()
+        voucher.voucherNumber = 'SRN' + str(voucher.pk).zfill(6)
+        voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
+        warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice')
+        voucher.totalAmount = 0.0
+        for row in rows:
+            SalesReturnLine.objects.create(
+                tenant=voucher.tenant,
+                voucher=voucher,
+                warehouse=warehouse,
+                item=row['item'],
+                stockBucket=row['stockBucket'],
+                quantity=row['quantity'],
+                unitPrice=row['unitRate'],
+                lineTotal=row['lineTotal'],
+                remark=row['remark'],
+            )
+            voucher.totalAmount += row['lineTotal']
+        voucher.save(update_fields=['totalAmount', 'lastUpdatedOn'])
+        rebuild_inventory_stock(voucher.tenant, item_ids)
+        validate_non_negative_inventory(voucher.tenant, item_ids)
+        return JsonResponse({'message': 'success', 'voucherId': voucher.pk, 'voucherNumber': voucher.voucherNumber}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_sales_return_vouchers_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    rows = tenant_qs(request, SalesReturnVoucher).filter(isDeleted=False).select_related('partyID', 'sales', 'cashCounter').order_by('-entryDate', '-id')[:100]
+    payload = [{
+        'ID': row.pk,
+        'VoucherNumber': row.voucherNumber or '',
+        'EntryDate': row.entryDate.strftime('%d/%m/%Y') if row.entryDate else '',
+        'Party': row.partyID.name if row.partyID_id else '-',
+        'SalesInvoice': row.sales.invoiceNumber if row.sales_id else (row.cashCounter.invoiceNumber if row.cashCounter_id else '-'),
+        'TotalAmount': float(row.totalAmount or 0.0),
+        'LineCount': row.lines.filter(isDeleted=False).count(),
+    } for row in rows]
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+def get_sales_return_voucher_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, SalesReturnVoucher).select_related('partyID', 'sales', 'cashCounter').get(pk=int(request.GET.get('voucherId')), isDeleted=False)
+        warehouse_id = voucher.lines.filter(isDeleted=False).values_list('warehouse_id', flat=True).first()
+        return JsonResponse({'message': 'success', 'data': {
+            'ID': voucher.pk,
+            'VoucherNumber': voucher.voucherNumber or '',
+            'EntryDate': voucher.entryDate.strftime('%d/%m/%Y') if voucher.entryDate else '',
+            'WarehouseID': warehouse_id,
+            'SalesID': voucher.sales_id if voucher.sales_id else (f'cash_counter:{voucher.cashCounter_id}' if voucher.cashCounter_id else None),
+            'PartyID': voucher.partyID_id,
+            'Remark': voucher.remark or '',
+            'Lines': _serialize_voucher_lines(voucher.lines.filter(isDeleted=False), quantity_field='quantity', rate_field='unitPrice'),
+        }}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_sales_return_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, SalesReturnVoucher).get(pk=int(request.POST.get('voucherId')), isDeleted=False)
+        prior_item_ids = list(voucher.lines.filter(isDeleted=False).values_list('item_id', flat=True))
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one sales return line is required.')
+        voucher.entryDate = datetime.strptime(request.POST.get('entryDate'), '%d/%m/%Y').date()
+        source_type, source_id = _parse_return_source_ref(request.POST.get('salesId'))
+        voucher.sales = None
+        voucher.cashCounter = None
+        if source_type == 'cash_counter' and source_id:
+            voucher.cashCounter = tenant_qs(request, CashCounter).filter(pk=source_id, isDeleted=False).first()
+        elif source_id:
+            voucher.sales = tenant_qs(request, Sales).filter(pk=source_id, isDeleted=False).first()
+        voucher.partyID = _parse_sales_party(request, request.POST.get('party')) if request.POST.get('party') else None
+        if voucher.partyID_id is None and voucher.sales_id:
+            voucher.partyID = voucher.sales.partyID
+        if voucher.partyID_id is None and voucher.cashCounter_id:
+            voucher.partyID = voucher.cashCounter.partyID
+        voucher.remark = request.POST.get('remark')
+        voucher.save(update_fields=['entryDate', 'sales', 'cashCounter', 'partyID', 'remark', 'lastUpdatedOn'])
+        voucher.lines.filter(isDeleted=False).update(isDeleted=True)
+        warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice')
+        voucher.totalAmount = 0.0
+        for row in rows:
+            SalesReturnLine.objects.create(
+                tenant=voucher.tenant,
+                voucher=voucher,
+                warehouse=warehouse,
+                item=row['item'],
+                stockBucket=row['stockBucket'],
+                quantity=row['quantity'],
+                unitPrice=row['unitRate'],
+                lineTotal=row['lineTotal'],
+                remark=row['remark'],
+            )
+            voucher.totalAmount += row['lineTotal']
+        voucher.save(update_fields=['totalAmount', 'lastUpdatedOn'])
+        rebuild_inventory_stock(voucher.tenant, list(set(prior_item_ids + item_ids)))
+        validate_non_negative_inventory(voucher.tenant, list(set(prior_item_ids + item_ids)))
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_sales_return_voucher_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        voucher = tenant_qs(request, SalesReturnVoucher).get(pk=int(request.POST.get('voucherId')), isDeleted=False)
+        item_ids = list(voucher.lines.filter(isDeleted=False).values_list('item_id', flat=True))
+        voucher.isDeleted = True
+        voucher.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        rebuild_inventory_stock(voucher.tenant, item_ids)
+        validate_non_negative_inventory(voucher.tenant, item_ids)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def list_purchase_invoices_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_purchase_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    rows = tenant_qs(request, PurchaseInvoice).filter(isDeleted=False).select_related('partyID', 'createdBy').order_by('-buildDate', '-id')[:100]
+    payload = []
+    for purchase in rows:
+        payload.append({
+            'ID': purchase.pk,
+            'InvoiceNumber': purchase.invoiceNumber,
+            'InvoiceDate': purchase.buildDate.strftime('%d/%m/%Y') if purchase.buildDate else '',
+            'Party': purchase.partyID.name if purchase.partyID_id else '-',
+            'GSTTreatment': purchase.gstTreatment,
+            'ClaimStatus': purchase.claimStatus,
+            'TotalAmount': float(purchase.totalAmount or 0.0),
+            'LineCount': purchase.lines.filter(isDeleted=False).count(),
+            'RevisionCount': purchase.revisions.filter(isDeleted=False).count(),
+        })
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+def get_purchase_invoice_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_purchase_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        purchase = tenant_qs(request, PurchaseInvoice).select_related('partyID', 'createdBy').get(pk=int(request.GET.get('purchaseId')), isDeleted=False)
+        lines = [{
+            'itemId': line.item_id,
+            'itemName': line.item.name,
+            'stockBucket': line.stockBucket,
+            'quantity': float(line.quantity or 0.0),
+            'unitCost': float(line.unitCost or 0.0),
+            'taxableAmount': float(line.taxableAmount or 0.0),
+            'gstRate': float(line.gstRate or 0.0),
+            'gstAmount': float(line.gstAmount or 0.0),
+            'lineTotal': float(line.lineTotal or 0.0),
+            'remark': line.remark or '',
+        } for line in purchase.lines.filter(isDeleted=False).select_related('item').order_by('id')]
+        revisions = [{
+            'changedOn': revision.datetime.strftime('%d/%m/%Y %I:%M %p') if revision.datetime else '',
+            'previousGstTreatment': revision.previousGstTreatment or '',
+            'newGstTreatment': revision.newGstTreatment,
+            'previousClaimStatus': revision.previousClaimStatus or '',
+            'newClaimStatus': revision.newClaimStatus,
+            'reason': revision.reason or '',
+            'changedBy': revision.changedBy.name if revision.changedBy_id else '-',
+        } for revision in purchase.revisions.filter(isDeleted=False).select_related('changedBy').order_by('-datetime')]
+        return JsonResponse({'message': 'success', 'data': {
+            'ID': purchase.pk,
+            'PartyID': purchase.partyID_id,
+            'InvoiceNumber': purchase.invoiceNumber,
+            'InvoiceDate': purchase.buildDate.strftime('%d/%m/%Y') if purchase.buildDate else '',
+            'GSTTreatment': purchase.gstTreatment,
+            'ClaimStatus': purchase.claimStatus,
+            'Remark': purchase.remark or '',
+            'Lines': lines,
+            'Revisions': revisions,
+        }}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def add_purchase_invoice_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_purchase_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one purchase line is required.')
+        purchase = PurchaseInvoice()
+        assign_tenant(purchase, request)
+        purchase.partyID = _parse_sales_party(request, request.POST.get('party'))
+        purchase.invoiceNumber = (request.POST.get('invoiceNumber') or '').strip()
+        if not purchase.invoiceNumber:
+            raise ValueError('Purchase invoice number is required.')
+        purchase.buildDate = datetime.strptime(request.POST.get('invoiceDate'), '%d/%m/%Y').date()
+        purchase.gstTreatment = _normalize_purchase_gst_treatment(request, request.POST.get('gstTreatment'))
+        lines_payload = _normalize_purchase_lines_for_treatment(purchase.gstTreatment, lines_payload)
+        purchase.claimStatus = _normalize_purchase_claim_status(purchase.gstTreatment, request.POST.get('claimStatus'))
+        purchase.remark = request.POST.get('remark')
+        purchase.createdBy = _staff_for_request(request)
+        purchase.subtotalAmount, purchase.gstAmount, purchase.totalAmount = _purchase_totals_from_lines(lines_payload)
+        purchase.save()
+        _sync_purchase_lines(request, purchase, lines_payload)
+        return JsonResponse({'message': 'success', 'purchaseId': purchase.pk}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_purchase_invoice_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_purchase_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        purchase = tenant_qs(request, PurchaseInvoice).get(pk=int(request.POST.get('purchaseId')))
+        previous_treatment = purchase.gstTreatment
+        previous_claim_status = purchase.claimStatus
+        previous_snapshot = snapshot_instance(purchase)
+        lines_payload = _request_line_items_payload(request)
+        if not lines_payload:
+            raise ValueError('At least one purchase line is required.')
+        purchase.partyID = _parse_sales_party(request, request.POST.get('party'))
+        purchase.invoiceNumber = (request.POST.get('invoiceNumber') or '').strip()
+        purchase.buildDate = datetime.strptime(request.POST.get('invoiceDate'), '%d/%m/%Y').date()
+        purchase.gstTreatment = _normalize_purchase_gst_treatment(request, request.POST.get('gstTreatment'))
+        lines_payload = _normalize_purchase_lines_for_treatment(purchase.gstTreatment, lines_payload)
+        purchase.claimStatus = _normalize_purchase_claim_status(purchase.gstTreatment, request.POST.get('claimStatus'))
+        purchase.remark = request.POST.get('remark')
+        purchase.subtotalAmount, purchase.gstAmount, purchase.totalAmount = _purchase_totals_from_lines(lines_payload)
+        purchase.save()
+        if previous_treatment != purchase.gstTreatment or previous_claim_status != purchase.claimStatus:
+            PurchaseInvoiceRevision.objects.create(
+                tenant=purchase.tenant,
+                purchaseInvoice=purchase,
+                previousGstTreatment=previous_treatment,
+                newGstTreatment=purchase.gstTreatment,
+                previousClaimStatus=previous_claim_status,
+                newClaimStatus=purchase.claimStatus,
+                reason=(request.POST.get('revisionReason') or '')[:500],
+                snapshot=previous_snapshot,
+                changedBy=_staff_for_request(request),
+            )
+        _sync_purchase_lines(request, purchase, lines_payload)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_purchase_invoice_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_purchase_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    try:
+        purchase = tenant_qs(request, PurchaseInvoice).get(pk=int(request.POST.get('purchaseId')))
+        item_ids = list(purchase.lines.filter(isDeleted=False).values_list('item_id', flat=True))
+        purchase.isDeleted = True
+        purchase.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        rebuild_inventory_stock(purchase.tenant, item_ids)
+        validate_non_negative_inventory(purchase.tenant, item_ids)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def get_non_gst_shadow_status_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_non_gst_shadow(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    tenant = get_current_tenant(request)
+    return JsonResponse({'message': 'success', 'data': {
+        'enabled': bool(getattr(tenant, 'nonGstShadowEnabled', False)),
+        'hasCode': bool(getattr(tenant, 'nonGstShadowCodeHash', '')),
+        'tenantName': getattr(tenant, 'name', ''),
+        'inventoryEnabled': bool(getattr(tenant, 'inventoryEnabled', True)),
+        'advancedInvoicingEnabled': bool(getattr(tenant, 'advancedInvoicingEnabled', True)),
+    }}, safe=False)
+
+
+@transaction.atomic
+def configure_non_gst_shadow_code_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_non_gst_shadow(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    tenant = get_current_tenant(request)
+    if tenant is None:
+        return JsonResponse({'message': 'error', 'error': 'Tenant not found.'}, status=400)
+    raw_code = str(request.POST.get('accessCode') or '').strip()
+    password = str(request.POST.get('password') or '')
+    if len(raw_code) != 6 or not raw_code.isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Access code must be exactly 6 digits.'}, safe=False)
+    if not password:
+        return JsonResponse({'message': 'error', 'error': 'Current password is required.'}, safe=False)
+    if not request.user.check_password(password):
+        return JsonResponse({'message': 'error', 'error': 'Current password is incorrect.'}, safe=False)
+    before_snapshot = snapshot_instance(tenant)
+    tenant.set_non_gst_shadow_code(raw_code)
+    tenant.save(update_fields=['nonGstShadowCodeHash', 'lastUpdatedOn'])
+    log_audit_event(
+        tenant,
+        AuditLog.Action.UPDATE,
+        actor=request.user,
+        changes={'nonGstShadowCodeHash': {'from': bool(before_snapshot.get('nonGstShadowCodeHash')), 'to': True}},
+        snapshot=snapshot_instance(tenant),
+    )
+    return JsonResponse({'message': 'success'}, safe=False)
+
+
+@transaction.atomic
+def toggle_non_gst_shadow_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_non_gst_shadow(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    tenant = get_current_tenant(request)
+    if tenant is None:
+        return JsonResponse({'message': 'error', 'error': 'Tenant not found.'}, status=400)
+    desired_state = _normalize_bool(request.POST.get('enabled'))
+    password = str(request.POST.get('password') or '')
+    raw_code = str(request.POST.get('accessCode') or '').strip()
+    if not password:
+        return JsonResponse({'message': 'error', 'error': 'Current password is required.'}, safe=False)
+    if not request.user.check_password(password):
+        return JsonResponse({'message': 'error', 'error': 'Current password is incorrect.'}, safe=False)
+    if not tenant.nonGstShadowCodeHash:
+        return JsonResponse({'message': 'error', 'error': 'Set the 6-digit Non-GST passcode first.'}, safe=False)
+    if len(raw_code) != 6 or not raw_code.isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Enter the valid 6-digit passcode.'}, safe=False)
+    if not check_password(raw_code, tenant.nonGstShadowCodeHash):
+        return JsonResponse({'message': 'error', 'error': 'Invalid 6-digit passcode.'}, safe=False)
+    before_enabled = bool(tenant.nonGstShadowEnabled)
+    tenant.nonGstShadowEnabled = desired_state
+    tenant.save(update_fields=['nonGstShadowEnabled', 'lastUpdatedOn'])
+    log_audit_event(
+        tenant,
+        AuditLog.Action.UPDATE,
+        actor=request.user,
+        changes={'nonGstShadowEnabled': {'from': before_enabled, 'to': desired_state}},
+        snapshot=snapshot_instance(tenant),
+    )
+    return JsonResponse({'message': 'success', 'enabled': desired_state}, safe=False)
+
+
+@transaction.atomic
+def update_tenant_feature_flags_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_non_gst_shadow(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    tenant = get_current_tenant(request)
+    if tenant is None:
+        return JsonResponse({'message': 'error', 'error': 'Tenant not found.'}, status=400)
+    password = str(request.POST.get('password') or '')
+    raw_code = str(request.POST.get('accessCode') or '').strip()
+    if not password:
+        return JsonResponse({'message': 'error', 'error': 'Current password is required.'}, safe=False)
+    if not request.user.check_password(password):
+        return JsonResponse({'message': 'error', 'error': 'Current password is incorrect.'}, safe=False)
+    if not tenant.nonGstShadowCodeHash:
+        return JsonResponse({'message': 'error', 'error': 'Set the 6-digit Non-GST passcode first.'}, safe=False)
+    if len(raw_code) != 6 or not raw_code.isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Enter the valid 6-digit passcode.'}, safe=False)
+    if not check_password(raw_code, tenant.nonGstShadowCodeHash):
+        return JsonResponse({'message': 'error', 'error': 'Invalid 6-digit passcode.'}, safe=False)
+    before_snapshot = snapshot_instance(tenant)
+    tenant.inventoryEnabled = _normalize_bool(request.POST.get('inventoryEnabled'))
+    tenant.advancedInvoicingEnabled = _normalize_bool(request.POST.get('advancedInvoicingEnabled'))
+    tenant.save(update_fields=['inventoryEnabled', 'advancedInvoicingEnabled', 'lastUpdatedOn'])
+    log_audit_event(
+        tenant,
+        AuditLog.Action.UPDATE,
+        actor=request.user,
+        changes={
+            'inventoryEnabled': {'from': bool(before_snapshot.get('inventoryEnabled', True)), 'to': tenant.inventoryEnabled},
+            'advancedInvoicingEnabled': {'from': bool(before_snapshot.get('advancedInvoicingEnabled', True)), 'to': tenant.advancedInvoicingEnabled},
+        },
+        snapshot=snapshot_instance(tenant),
+    )
+    return JsonResponse({'message': 'success', 'data': {
+        'inventoryEnabled': tenant.inventoryEnabled,
+        'advancedInvoicingEnabled': tenant.advancedInvoicingEnabled,
+    }}, safe=False)
+
+
 def _normalize_sales_mode(mode: str | None) -> str:
     value = str(mode or Sales.Mode.CASH).strip()
     aliases = {
@@ -5485,6 +7158,941 @@ def _safe_sales_float(value) -> float:
         return 0.0
 
 
+def _normalize_gst_number(raw_value) -> str:
+    return str(raw_value or '').strip().upper()
+
+
+UNION_TERRITORY_GST_STATE_CODES = {'04', '26', '31', '35', '38', '97'}
+GST_STATE_CODE_NAME_MAP = {
+    '01': 'jammu and kashmir',
+    '02': 'himachal pradesh',
+    '03': 'punjab',
+    '04': 'chandigarh',
+    '05': 'uttarakhand',
+    '06': 'haryana',
+    '07': 'delhi',
+    '08': 'rajasthan',
+    '09': 'uttar pradesh',
+    '10': 'bihar',
+    '11': 'sikkim',
+    '12': 'arunachal pradesh',
+    '13': 'nagaland',
+    '14': 'manipur',
+    '15': 'mizoram',
+    '16': 'tripura',
+    '17': 'meghalaya',
+    '18': 'assam',
+    '19': 'west bengal',
+    '20': 'jharkhand',
+    '21': 'odisha',
+    '22': 'chhattisgarh',
+    '23': 'madhya pradesh',
+    '24': 'gujarat',
+    '26': 'dadra and nagar haveli and daman and diu',
+    '27': 'maharashtra',
+    '29': 'karnataka',
+    '30': 'goa',
+    '31': 'lakshadweep',
+    '32': 'kerala',
+    '33': 'tamil nadu',
+    '34': 'puducherry',
+    '35': 'andaman and nicobar islands',
+    '36': 'telangana',
+    '37': 'andhra pradesh',
+    '38': 'ladakh',
+    '97': 'other territory',
+}
+
+
+def _gst_state_code_from_number(gst_number: str | None) -> str:
+    gst_number = _normalize_gst_number(gst_number)
+    if len(gst_number) >= 2 and gst_number[:2].isdigit():
+        return gst_number[:2]
+    return ''
+
+
+def _is_utgst_state_code(state_code: str | None) -> bool:
+    return str(state_code or '').zfill(2) in UNION_TERRITORY_GST_STATE_CODES
+
+
+def _normalize_place_of_supply_value(value: str | None) -> str:
+    normalized = str(value or '').strip().lower()
+    normalized = normalized.replace('&', 'and')
+    normalized = ' '.join(normalized.replace('-', ' ').replace(',', ' ').split())
+    return normalized
+
+
+def _gst_state_code_from_place_of_supply(place_of_supply: str | None) -> str:
+    normalized = _normalize_place_of_supply_value(place_of_supply)
+    if not normalized:
+        return ''
+    if len(normalized) >= 2 and normalized[:2].isdigit():
+        return normalized[:2]
+    for code, state_name in GST_STATE_CODE_NAME_MAP.items():
+        if normalized == state_name or normalized.startswith(state_name + ' ') or state_name in normalized:
+            return code
+    return ''
+
+
+def _gst_breakup_from_sale(sale: Sales, tenant) -> dict:
+    seller_state_code = _gst_state_code_from_number(getattr(tenant, 'gstNumber', None))
+    buyer_state_code = _gst_state_code_from_number(getattr(sale, 'buyerGstNumber', None))
+    place_of_supply_state_code = _gst_state_code_from_place_of_supply(getattr(sale, 'placeOfSupply', None))
+    effective_buyer_state_code = buyer_state_code or place_of_supply_state_code
+    taxable_total = round(float(sale.taxableAmount or 0.0), 2)
+    gst_total = round(float(sale.gstAmount or 0.0), 2)
+    is_interstate = bool(seller_state_code and effective_buyer_state_code and seller_state_code != effective_buyer_state_code)
+    breakdown = {
+        'seller_state_code': seller_state_code,
+        'buyer_state_code': buyer_state_code,
+        'place_of_supply_state_code': place_of_supply_state_code,
+        'effective_buyer_state_code': effective_buyer_state_code,
+        'tax_mode_label': 'IGST' if is_interstate else ('CGST + UTGST' if _is_utgst_state_code(seller_state_code) else 'CGST + SGST'),
+        'cgst_total': 0.0,
+        'sgst_total': 0.0,
+        'utgst_total': 0.0,
+        'igst_total': 0.0,
+        'taxable_total': taxable_total,
+        'gst_total': gst_total,
+    }
+    if is_interstate:
+        breakdown['igst_total'] = gst_total
+        return breakdown
+    half_tax = round(gst_total / 2.0, 2)
+    breakdown['cgst_total'] = half_tax
+    other_half = round(gst_total - half_tax, 2)
+    if _is_utgst_state_code(seller_state_code):
+        breakdown['utgst_total'] = other_half
+    else:
+        breakdown['sgst_total'] = other_half
+    return breakdown
+
+
+def _gst_breakup_from_cash_counter(counter: CashCounter, tenant) -> dict:
+    seller_state_code = _gst_state_code_from_number(getattr(tenant, 'gstNumber', None))
+    buyer_state_code = _gst_state_code_from_number(getattr(counter, 'buyerGstNumber', None))
+    place_of_supply_state_code = _gst_state_code_from_place_of_supply(getattr(counter, 'placeOfSupply', None))
+    effective_buyer_state_code = buyer_state_code or place_of_supply_state_code
+    taxable_total = round(float(counter.taxableAmount or 0.0), 2)
+    gst_total = round(float(counter.gstAmount or 0.0), 2)
+    is_interstate = bool(seller_state_code and effective_buyer_state_code and seller_state_code != effective_buyer_state_code)
+    breakdown = {
+        'seller_state_code': seller_state_code,
+        'buyer_state_code': buyer_state_code,
+        'place_of_supply_state_code': place_of_supply_state_code,
+        'effective_buyer_state_code': effective_buyer_state_code,
+        'tax_mode_label': 'IGST' if is_interstate else ('CGST + UTGST' if _is_utgst_state_code(seller_state_code) else 'CGST + SGST'),
+        'cgst_total': 0.0,
+        'sgst_total': 0.0,
+        'utgst_total': 0.0,
+        'igst_total': 0.0,
+        'taxable_total': taxable_total,
+        'gst_total': gst_total,
+    }
+    if is_interstate:
+        breakdown['igst_total'] = gst_total
+        return breakdown
+    half_tax = round(gst_total / 2.0, 2)
+    breakdown['cgst_total'] = half_tax
+    other_half = round(gst_total - half_tax, 2)
+    if _is_utgst_state_code(seller_state_code):
+        breakdown['utgst_total'] = other_half
+    else:
+        breakdown['sgst_total'] = other_half
+    return breakdown
+
+
+def _cash_counter_invoice_action_buttons(item: CashCounter, user) -> str:
+    actions = []
+    if item.mode in _cash_counter_billing_modes() and getattr(item, 'invoiceNumber', None):
+        actions.append(
+            '''<a href="/api/generate_cash_counter_invoice_pdf/?id={}" data-inverted="" data-tooltip="Download Invoice" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular teal icon button"><i class="file pdf outline icon"></i></a>'''.format(item.pk)
+        )
+    if _can_manage_cash_counter_records(user):
+        actions.append(
+            '''<a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk)
+        )
+        actions.append(
+            '''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk)
+        )
+    elif not actions:
+        return '<div class="ui tiny label">Denied</div>'
+    return ''.join(actions)
+
+
+def _normalize_invoice_kind(raw_value: str | None, party: Party | None = None, *, series: InvoiceSeries | None = None, request=None) -> str:
+    value = str(raw_value or '').strip().lower()
+    valid = {choice[0] for choice in Sales.InvoiceKind.choices}
+    series_nature = getattr(series, 'invoiceNature', InvoiceSeries.InvoiceNature.MIXED)
+    advanced_enabled = _advanced_invoicing_enabled(request) if request is not None else True
+    if advanced_enabled and series is not None and getattr(series, 'lockInvoiceNature', False) and series_nature in valid:
+        if value in valid and value != series_nature:
+            raise ValueError(f'Invoice series {series.seriesCode} is locked for {series.get_invoiceNature_display()} invoices.')
+        return series_nature
+    if value in valid:
+        return value
+    if advanced_enabled and series_nature in valid:
+        return series_nature
+    if party and getattr(party, 'isB2B', False):
+        return Sales.InvoiceKind.B2B
+    return Sales.InvoiceKind.B2C
+
+
+def _request_line_items_present(request) -> bool:
+    return 'lineItems' in request.POST
+
+
+def _request_line_items_payload(request):
+    raw = request.POST.get('lineItems')
+    if raw is None or str(raw).strip() == '':
+        return []
+    try:
+        payload = json.loads(raw)
+    except Exception as exc:
+        raise ValueError('Invalid lineItems payload.') from exc
+    if not isinstance(payload, list):
+        raise ValueError('lineItems payload must be a list.')
+    return payload
+
+
+def _parse_inventory_category(request, raw_category_id):
+    raw = str(raw_category_id or '').strip()
+    if not raw:
+        return None
+    if not raw.isdigit():
+        raise ValueError('Invalid category selection.')
+    category = tenant_qs(request, InventoryCategory).filter(isDeleted=False, pk=int(raw)).first()
+    if category is None:
+        raise ValueError('Inventory category not found.')
+    return category
+
+
+def _parse_inventory_tax_profile(request, raw_tax_profile_id):
+    raw = str(raw_tax_profile_id or '').strip()
+    if not raw:
+        return None
+    if not raw.isdigit():
+        raise ValueError('Invalid HSN / tax selection.')
+    tax_profile = tenant_qs(request, InventoryTaxProfile).filter(isDeleted=False, pk=int(raw)).first()
+    if tax_profile is None:
+        raise ValueError('Inventory tax profile not found.')
+    return tax_profile
+
+
+def _parse_inventory_unit(request, raw_unit_id):
+    raw = str(raw_unit_id or '').strip()
+    if not raw:
+        return None
+    if not raw.isdigit():
+        raise ValueError('Invalid unit selection.')
+    unit = tenant_qs(request, InventoryUnit).filter(isDeleted=False, pk=int(raw)).first()
+    if unit is None:
+        raise ValueError('Inventory unit not found.')
+    return unit
+
+
+def _apply_inventory_category_payload(request, category):
+    category.name = (request.POST.get('name') or '').strip()
+    if not category.name:
+        raise ValueError('Category name is required.')
+    category.code = (request.POST.get('code') or '').strip() or None
+    category.description = (request.POST.get('description') or '').strip() or None
+    category.isActive = str(request.POST.get('isActive') or '1').lower() not in {'0', 'false', 'no', 'off'}
+
+
+def _apply_inventory_tax_profile_payload(request, tax_profile):
+    tax_profile.name = (request.POST.get('name') or '').strip()
+    if not tax_profile.name:
+        raise ValueError('Tax profile name is required.')
+    tax_profile.hsnCode = (request.POST.get('hsnCode') or '').strip()
+    if not tax_profile.hsnCode:
+        raise ValueError('HSN code is required.')
+    tax_profile.gstRate = _safe_sales_float(request.POST.get('gstRate'))
+    tax_profile.cessRate = _safe_sales_float(request.POST.get('cessRate'))
+    tax_profile.description = (request.POST.get('description') or '').strip() or None
+    tax_profile.isActive = str(request.POST.get('isActive') or '1').lower() not in {'0', 'false', 'no', 'off'}
+
+
+def _apply_inventory_unit_payload(request, unit):
+    unit.name = (request.POST.get('name') or '').strip()
+    if not unit.name:
+        raise ValueError('Unit name is required.')
+    unit.symbol = (request.POST.get('symbol') or '').strip()
+    if not unit.symbol:
+        raise ValueError('Unit symbol is required.')
+    unit.allowsDecimal = str(request.POST.get('allowsDecimal') or '').lower() in {'1', 'true', 'yes', 'on'}
+    unit.description = (request.POST.get('description') or '').strip() or None
+    unit.isActive = str(request.POST.get('isActive') or '1').lower() not in {'0', 'false', 'no', 'off'}
+
+
+def _apply_inventory_item_payload(request, item):
+    item.name = (request.POST.get('name') or '').strip()
+    if not item.name:
+        raise ValueError('Item name is required.')
+    item.sku = (request.POST.get('sku') or '').strip() or None
+    item.barcode = (request.POST.get('barcode') or '').strip() or None
+    item.category = _parse_inventory_category(request, request.POST.get('categoryId'))
+    item.unit = _parse_inventory_unit(request, request.POST.get('unitId'))
+    item.taxProfile = _parse_inventory_tax_profile(request, request.POST.get('taxProfileId'))
+    item.categoryName = (request.POST.get('categoryName') or '').strip() or None
+    if item.category_id:
+        item.categoryName = item.category.name
+    item.brandName = (request.POST.get('brandName') or '').strip() or None
+    item.unitName = (request.POST.get('unitName') or '').strip() or 'pcs'
+    if item.unit_id:
+        item.unitName = item.unit.symbol
+    item.hsnCode = (request.POST.get('hsnCode') or '').strip() or None
+    item.description = (request.POST.get('description') or '').strip() or None
+    item.defaultStockBucket = _normalize_stock_bucket(request, request.POST.get('defaultStockBucket'), item)
+    item.gstRate = _safe_sales_float(request.POST.get('gstRate'))
+    if item.taxProfile_id:
+        item.hsnCode = item.taxProfile.hsnCode
+        item.gstRate = item.taxProfile.gstRate
+    item.defaultPurchasePrice = _safe_sales_float(request.POST.get('defaultPurchasePrice'))
+    item.defaultSalesPrice = _safe_sales_float(request.POST.get('defaultSalesPrice'))
+    item.mrp = _safe_sales_float(request.POST.get('mrp'))
+    item.minimumStockLevel = _safe_sales_float(request.POST.get('minimumStockLevel'))
+    item.reorderLevel = _safe_sales_float(request.POST.get('reorderLevel'))
+    item.isSaleBlocked = str(request.POST.get('isSaleBlocked') or '').lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _line_items_total(request) -> float:
+    total = 0.0
+    for row in _request_line_items_payload(request):
+        total += _safe_sales_float(row.get('lineTotal'))
+    return round(total, 2)
+
+
+def _sales_totals_from_lines(lines):
+    taxable_total = 0.0
+    gst_total = 0.0
+    grand_total = 0.0
+    for row in lines:
+        taxable_total += _safe_sales_float(row.get('taxableAmount'))
+        gst_total += _safe_sales_float(row.get('gstAmount'))
+        grand_total += _safe_sales_float(row.get('lineTotal'))
+    return round(taxable_total, 2), round(gst_total, 2), round(grand_total, 2)
+
+
+def _validate_inventory_quantity_for_unit(item: InventoryItem, quantity: float, *, label='Quantity'):
+    if quantity <= 0:
+        return
+    unit = getattr(item, 'unit', None)
+    allows_decimal = True if unit is None else bool(getattr(unit, 'allowsDecimal', False))
+    if allows_decimal:
+        return
+    if abs(quantity - round(quantity)) > 0.000001:
+        unit_label = getattr(unit, 'symbol', None) or item.unitName or 'unit'
+        raise ValueError(f'{label} for {item.name} must be a whole number because unit {unit_label} does not allow decimals.')
+
+
+def _parse_inventory_item(request, raw_item_id):
+    _assert_inventory_enabled(request)
+    raw = str(raw_item_id or '').strip()
+    if not raw.isdigit():
+        raise ValueError('Invalid inventory item.')
+    item = tenant_qs(request, InventoryItem).filter(isDeleted=False, pk=int(raw)).first()
+    if item is None:
+        raise ValueError('Inventory item not found.')
+    return item
+
+
+def _parse_inventory_warehouse(request, raw_warehouse_id=None):
+    _assert_inventory_enabled(request)
+    tenant = get_current_tenant(request)
+    raw = str(raw_warehouse_id or '').strip()
+    if not raw:
+        return get_or_create_default_warehouse(tenant)
+    if not raw.isdigit():
+        raise ValueError('Invalid warehouse selection.')
+    warehouse = InventoryWarehouse.objects.filter(
+        tenant=tenant,
+        isDeleted=False,
+        isActive=True,
+        pk=int(raw),
+    ).first()
+    if warehouse is None:
+        raise ValueError('Warehouse not found.')
+    return warehouse
+
+
+def _normalize_stock_bucket(request, raw_bucket, item: InventoryItem) -> str:
+    bucket = str(raw_bucket or '').strip().lower()
+    valid = {choice[0] for choice in InventoryItem.StockBucket.choices}
+    if bucket in valid:
+        if bucket == InventoryItem.StockBucket.NON_GST:
+            _assert_non_gst_enabled(request, label='Non-GST stock bucket')
+        return bucket
+    bucket = item.defaultStockBucket or InventoryItem.StockBucket.GST
+    if bucket == InventoryItem.StockBucket.NON_GST:
+        _assert_non_gst_enabled(request, label='Non-GST stock bucket')
+    return bucket
+
+
+def _staff_for_request(request):
+    return tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
+
+
+def _apply_sales_invoice_payload(request, sale: Sales, party: Party | None, *, line_items=None) -> None:
+    line_items = line_items if line_items is not None else (_request_line_items_payload(request) if _request_line_items_present(request) else [])
+    if _advanced_invoicing_enabled(request):
+        sale.invoiceKind = _normalize_invoice_kind(
+            request.POST.get('invoiceKind'),
+            party,
+            series=getattr(sale, 'invoiceSeries', None),
+            request=request,
+        )
+        buyer_legal_name = (request.POST.get('buyerLegalName') or '').strip()
+        if not buyer_legal_name and party:
+            buyer_legal_name = (party.legalName or party.name or '').strip()
+        sale.buyerLegalName = buyer_legal_name or None
+
+        buyer_gst_number = _normalize_gst_number(request.POST.get('buyerGstNumber'))
+        if not buyer_gst_number and party:
+            buyer_gst_number = _normalize_gst_number(party.gstNumber)
+        sale.buyerGstNumber = buyer_gst_number or None
+
+        buyer_billing_address = (request.POST.get('buyerBillingAddress') or '').strip()
+        if not buyer_billing_address and party:
+            buyer_billing_address = (party.billingAddress or party.address or '').strip()
+        sale.buyerBillingAddress = buyer_billing_address or None
+
+        sale.placeOfSupply = (request.POST.get('placeOfSupply') or '').strip() or None
+    else:
+        sale.invoiceKind = Sales.InvoiceKind.B2C
+        sale.buyerLegalName = None
+        sale.buyerGstNumber = None
+        sale.buyerBillingAddress = None
+        sale.placeOfSupply = None
+
+    if line_items:
+        sale.taxableAmount, sale.gstAmount, computed_total = _sales_totals_from_lines(line_items)
+        sale.roundOffAmount, payable_total = _sales_round_off_from_total(computed_total)
+        if sale.modeOfPayment != Sales.Mode.MIX:
+            sale.amount = payable_total
+        elif abs(_safe_sales_float(sale.amount) - payable_total) > 0.01:
+            raise ValueError(f'Mix sales total must match rounded payable amount of {payable_total:.2f}.')
+    else:
+        sale.taxableAmount = round(float(sale.amount or 0.0), 2)
+        sale.gstAmount = 0.0
+        sale.roundOffAmount = 0.0
+
+    if sale.invoiceKind == Sales.InvoiceKind.B2C:
+        sale.buyerGstNumber = None
+
+
+def _cash_counter_billing_modes() -> set[str]:
+    return {'Cash', 'Credit', 'Card', 'Mix', 'Return'}
+
+
+def _cash_counter_return_source_modes() -> set[str]:
+    return {'Cash', 'Credit', 'Card', 'Mix'}
+
+
+def _parse_return_source_ref(raw_value: str | None):
+    raw = str(raw_value or '').strip()
+    if not raw:
+        return None, None
+    if ':' in raw:
+        source_type, raw_id = raw.split(':', 1)
+        source_type = str(source_type or '').strip().lower()
+        raw_id = str(raw_id or '').strip()
+        if raw_id.isdigit() and source_type in {'sale', 'cash_counter'}:
+            return source_type, int(raw_id)
+        return None, None
+    if raw.isdigit():
+        return 'sale', int(raw)
+    return None, None
+
+
+def list_sales_return_source_sales_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _has_return_source_access(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    allow_non_gst = _non_gst_shadow_enabled(request)
+    data = []
+    if _has_sales_access(request.user):
+        qs = _sales_list_base_qs(request).filter(isDeleted=False).order_by('-buildDate', '-id')[:150]
+        if not _can_filter_all_sales(request.user):
+            qs = qs.filter(createdBy__user_ID_id=request.user.pk)
+        for sale in qs:
+            line_qs = sale.lines.filter(isDeleted=False)
+            if not allow_non_gst:
+                line_qs = line_qs.exclude(stockBucket=InventoryItem.StockBucket.NON_GST)
+            if not line_qs.exists():
+                continue
+            party_name = getattr(getattr(sale, 'partyID', None), 'name', None) or 'Walk-in'
+            invoice_no = sale.invoiceNumber or sale.paymentID or f'Sale#{sale.pk}'
+            build_date = sale.buildDate.strftime('%d/%m/%Y') if sale.buildDate else ''
+            data.append({
+                'ID': sale.pk,
+                'SourceType': 'sale',
+                'SourceValue': f'sale:{sale.pk}',
+                'InvoiceNumber': invoice_no,
+                'PartyName': party_name,
+                'BuildDate': build_date,
+                'Amount': float(sale.amount or 0.0),
+                'DisplayDetail': f'{invoice_no} | {party_name} | {build_date}',
+            })
+    cash_qs = tenant_qs(request, CashCounter).filter(
+        isDeleted=False,
+        mode__in=_cash_counter_return_source_modes(),
+    ).order_by('-entryDate', '-id')[:150]
+    if not _can_filter_all_cash_counter(request.user):
+        cash_qs = cash_qs.filter(createdBy__user_ID_id=request.user.pk)
+    for counter in cash_qs:
+        line_qs = counter.lines.filter(isDeleted=False)
+        if not allow_non_gst:
+            line_qs = line_qs.exclude(stockBucket=InventoryItem.StockBucket.NON_GST)
+        if not line_qs.exists():
+            continue
+        party_name = getattr(getattr(counter, 'partyID', None), 'name', None) or 'Walk-in'
+        invoice_no = counter.invoiceNumber or counter.counterID or f'Counter#{counter.pk}'
+        build_date = counter.entryDate.strftime('%d/%m/%Y') if counter.entryDate else ''
+        data.append({
+            'ID': counter.pk,
+            'SourceType': 'cash_counter',
+            'SourceValue': f'cash_counter:{counter.pk}',
+            'InvoiceNumber': invoice_no,
+            'PartyName': party_name,
+            'BuildDate': build_date,
+            'Amount': float(counter.amount or 0.0),
+            'DisplayDetail': f'{invoice_no} | {party_name} | {build_date} | Cash Counter',
+        })
+    data.sort(key=lambda row: (row.get('BuildDate') or '', row.get('ID') or 0), reverse=True)
+    return JsonResponse({'message': 'success', 'data': data}, safe=False)
+
+
+def get_sales_return_source_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _has_return_source_access(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    source_type, source_id = _parse_return_source_ref(request.GET.get('sourceId') or request.GET.get('saleId'))
+    if not source_id:
+        return JsonResponse({'message': 'error', 'error': 'Original invoice is required.'}, status=400, safe=False)
+    allow_non_gst = _non_gst_shadow_enabled(request)
+    exclude_voucher_id = request.GET.get('excludeVoucherId')
+    if source_type == 'cash_counter':
+        source_obj = get_object_or_404(
+            tenant_qs(request, CashCounter).select_related('partyID', 'createdBy', 'invoiceSeries'),
+            pk=source_id,
+            isDeleted=False,
+        )
+        if not _can_filter_all_cash_counter(request.user):
+            if getattr(getattr(source_obj, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
+                return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+        return_qs = tenant_qs(request, SalesReturnVoucher).filter(isDeleted=False, cashCounter=source_obj)
+        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item').order_by('id')
+        if not allow_non_gst:
+            line_qs = line_qs.exclude(stockBucket=InventoryItem.StockBucket.NON_GST)
+    else:
+        source_obj = get_object_or_404(
+            tenant_qs(request, Sales).select_related('partyID', 'createdBy', 'invoiceSeries'),
+            pk=source_id,
+            isDeleted=False,
+        )
+        if not _can_filter_all_sales(request.user):
+            if getattr(getattr(source_obj, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
+                return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+        return_qs = tenant_qs(request, SalesReturnVoucher).filter(isDeleted=False, sales=source_obj)
+        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item').order_by('id')
+        if not allow_non_gst:
+            line_qs = line_qs.exclude(stockBucket=InventoryItem.StockBucket.NON_GST)
+    if exclude_voucher_id and str(exclude_voucher_id).isdigit():
+        return_qs = return_qs.exclude(pk=int(exclude_voucher_id))
+    returned_map = defaultdict(float)
+    for row in SalesReturnLine.objects.filter(
+        tenant=source_obj.tenant,
+        isDeleted=False,
+        voucher__in=return_qs,
+    ).values('item_id', 'stockBucket').annotate(total_qty=Sum('quantity')):
+        returned_map[(row['item_id'], row['stockBucket'])] = float(row['total_qty'] or 0.0)
+
+    lines = []
+    for line in line_qs:
+        key = (line.item_id, line.stockBucket)
+        sold_qty = float(line.quantity or 0.0)
+        prior_remaining = float(returned_map.get(key, 0.0))
+        already_returned = min(prior_remaining, sold_qty)
+        returned_map[key] = max(0.0, prior_remaining - already_returned)
+        remaining_qty = max(0.0, sold_qty - already_returned)
+        lines.append({
+            'itemId': line.item_id,
+            'itemName': line.item.name,
+            'stockBucket': line.stockBucket,
+            'quantity': sold_qty,
+            'returnedQuantity': already_returned,
+            'remainingQuantity': remaining_qty,
+            'unitPrice': float(line.unitPrice or 0.0),
+            'discountPercent': float(line.discountPercent or 0.0),
+            'taxableAmount': float(line.taxableAmount or 0.0),
+            'gstRate': float(line.gstRate or 0.0),
+            'gstAmount': float(line.gstAmount or 0.0),
+            'lineTotal': float(line.lineTotal or 0.0),
+            'remark': line.remark or '',
+        })
+    return JsonResponse({'message': 'success', 'data': {
+        'ID': source_obj.pk,
+        'SourceType': source_type or 'sale',
+        'SourceValue': f'{source_type or "sale"}:{source_obj.pk}',
+        'InvoiceNumber': (
+            source_obj.invoiceNumber or source_obj.paymentID or f'Sale#{source_obj.pk}'
+            if source_type != 'cash_counter'
+            else source_obj.invoiceNumber or source_obj.counterID or f'Counter#{source_obj.pk}'
+        ),
+        'BuildDate': (
+            source_obj.buildDate.strftime('%d/%m/%Y') if getattr(source_obj, 'buildDate', None)
+            else (source_obj.entryDate.strftime('%d/%m/%Y') if getattr(source_obj, 'entryDate', None) else '')
+        ),
+        'PartyID': source_obj.partyID_id,
+        'PartyName': getattr(getattr(source_obj, 'partyID', None), 'name', None) or '',
+        'BuyerLegalName': source_obj.buyerLegalName or getattr(getattr(source_obj, 'partyID', None), 'legalName', None) or '',
+        'BuyerGstNumber': source_obj.buyerGstNumber or getattr(getattr(source_obj, 'partyID', None), 'gstNumber', None) or '',
+        'BuyerBillingAddress': source_obj.buyerBillingAddress or getattr(getattr(source_obj, 'partyID', None), 'billingAddress', None) or getattr(getattr(source_obj, 'partyID', None), 'address', None) or '',
+        'PlaceOfSupply': source_obj.placeOfSupply or '',
+        'InvoiceKind': source_obj.invoiceKind or Sales.InvoiceKind.B2C,
+        'Lines': lines,
+    }}, safe=False)
+
+
+def _apply_cash_counter_invoice_payload(request, counter: CashCounter, party: Party | None, *, line_items=None) -> None:
+    line_items = line_items if line_items is not None else (_request_line_items_payload(request) if _request_line_items_present(request) else [])
+    billing_mode = str(counter.mode or '') in _cash_counter_billing_modes()
+    if billing_mode and _advanced_invoicing_enabled(request):
+        counter.invoiceKind = _normalize_invoice_kind(
+            request.POST.get('invoiceKind'),
+            party,
+            series=getattr(counter, 'invoiceSeries', None),
+            request=request,
+        )
+        buyer_legal_name = (request.POST.get('buyerLegalName') or '').strip()
+        if not buyer_legal_name and party:
+            buyer_legal_name = (party.legalName or party.name or '').strip()
+        counter.buyerLegalName = buyer_legal_name or None
+
+        buyer_gst_number = _normalize_gst_number(request.POST.get('buyerGstNumber'))
+        if not buyer_gst_number and party:
+            buyer_gst_number = _normalize_gst_number(party.gstNumber)
+        counter.buyerGstNumber = buyer_gst_number or None
+
+        buyer_billing_address = (request.POST.get('buyerBillingAddress') or '').strip()
+        if not buyer_billing_address and party:
+            buyer_billing_address = (party.billingAddress or party.address or '').strip()
+        counter.buyerBillingAddress = buyer_billing_address or None
+
+        counter.placeOfSupply = (request.POST.get('placeOfSupply') or '').strip() or None
+    else:
+        counter.invoiceKind = CashCounter.InvoiceKind.B2C
+        counter.buyerLegalName = None
+        counter.buyerGstNumber = None
+        counter.buyerBillingAddress = None
+        counter.placeOfSupply = None
+
+    if billing_mode and line_items:
+        counter.taxableAmount, counter.gstAmount, computed_total = _sales_totals_from_lines(line_items)
+        counter.roundOffAmount, payable_total = _sales_round_off_from_total(computed_total)
+        if counter.mode != 'Mix':
+            counter.amount = payable_total
+        elif abs((_safe_sales_float(counter.mixCashAmount) + _safe_sales_float(counter.mixCardAmount)) - payable_total) > 0.01:
+            raise ValueError(f'Mix cash counter total must match rounded payable amount of {payable_total:.2f}.')
+    else:
+        base_amount = _safe_sales_float(counter.amount if counter.mode != 'Mix' else (_safe_sales_float(counter.mixCashAmount) + _safe_sales_float(counter.mixCardAmount)))
+        counter.taxableAmount = round(base_amount, 2)
+        counter.gstAmount = 0.0
+        counter.roundOffAmount = 0.0
+
+    if counter.invoiceKind == CashCounter.InvoiceKind.B2C:
+        counter.buyerGstNumber = None
+
+
+def _sync_sales_lines(request, sale: Sales):
+    if not _inventory_feature_enabled(request) or not _request_line_items_present(request):
+        return
+    existing_pairs = list(sale.lines.filter(isDeleted=False).values_list('item_id', 'stockBucket'))
+    existing_item_ids = [item_id for item_id, _bucket in existing_pairs]
+    sale.lines.filter(isDeleted=False).update(isDeleted=True)
+    new_item_ids = []
+    new_pairs = []
+    warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+    for row in _request_line_items_payload(request):
+        item = _parse_inventory_item(request, row.get('itemId'))
+        if item.isSaleBlocked:
+            raise ValueError(f'Sale is blocked for inventory item: {item.name}.')
+        quantity = _safe_sales_float(row.get('quantity'))
+        if quantity <= 0:
+            raise ValueError('Sales quantity must be greater than zero.')
+        _validate_inventory_quantity_for_unit(item, quantity, label='Sales quantity')
+        stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        unit_price = _safe_sales_float(row.get('unitPrice'))
+        discount_percent = max(0.0, min(100.0, _safe_sales_float(row.get('discountPercent'))))
+        gross_amount = round(quantity * unit_price, 2)
+        discounted_taxable = round(gross_amount - ((gross_amount * discount_percent) / 100.0), 2)
+        taxable_amount = discounted_taxable
+        gst_rate = _safe_sales_float(row.get('gstRate'))
+        if stock_bucket == InventoryItem.StockBucket.NON_GST:
+            gst_rate = 0.0
+            gst_amount = 0.0
+        else:
+            gst_amount = round(taxable_amount * gst_rate / 100.0, 2)
+        line_total = round(taxable_amount + gst_amount, 2)
+        SalesLine.objects.create(
+            tenant=sale.tenant,
+            sales=sale,
+            warehouse=warehouse,
+            item=item,
+            hsnCode=item.hsnCode,
+            stockBucket=stock_bucket,
+            quantity=quantity,
+            unitPrice=unit_price,
+            discountPercent=discount_percent,
+            taxableAmount=taxable_amount,
+            gstRate=gst_rate,
+            gstAmount=gst_amount,
+            lineTotal=line_total,
+            remark=(row.get('remark') or '')[:500],
+        )
+        new_item_ids.append(item.pk)
+        new_pairs.append((item.pk, stock_bucket))
+    affected_item_ids = set(existing_item_ids + new_item_ids)
+    rebuild_inventory_stock(sale.tenant, affected_item_ids)
+    validate_non_negative_inventory(sale.tenant, affected_item_ids, item_bucket_pairs=list(set(existing_pairs + new_pairs)))
+
+
+def _sync_cash_counter_lines(request, counter: CashCounter):
+    if not _request_line_items_present(request):
+        return
+    existing_pairs = list(counter.lines.filter(isDeleted=False).values_list('item_id', 'stockBucket'))
+    existing_item_ids = [item_id for item_id, _bucket in existing_pairs]
+    counter.lines.filter(isDeleted=False).update(isDeleted=True)
+    new_item_ids = []
+    new_pairs = []
+    warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+    for row in _request_line_items_payload(request):
+        item = _parse_inventory_item(request, row.get('itemId'))
+        if item.isSaleBlocked:
+            raise ValueError(f'Sale is blocked for inventory item: {item.name}.')
+        quantity = _safe_sales_float(row.get('quantity'))
+        if quantity <= 0:
+            raise ValueError('Cash counter quantity must be greater than zero.')
+        _validate_inventory_quantity_for_unit(item, quantity, label='Cash counter quantity')
+        stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        unit_price = _safe_sales_float(row.get('unitPrice'))
+        discount_percent = max(0.0, min(100.0, _safe_sales_float(row.get('discountPercent'))))
+        gross_amount = round(quantity * unit_price, 2)
+        discounted_taxable = round(gross_amount - ((gross_amount * discount_percent) / 100.0), 2)
+        taxable_amount = discounted_taxable
+        gst_rate = _safe_sales_float(row.get('gstRate'))
+        if stock_bucket == InventoryItem.StockBucket.NON_GST:
+            gst_rate = 0.0
+            gst_amount = 0.0
+        else:
+            gst_amount = round(taxable_amount * gst_rate / 100.0, 2)
+        line_total = round(taxable_amount + gst_amount, 2)
+        CashCounterLine.objects.create(
+            tenant=counter.tenant,
+            cashCounter=counter,
+            warehouse=warehouse,
+            item=item,
+            hsnCode=item.hsnCode,
+            stockBucket=stock_bucket,
+            quantity=quantity,
+            unitPrice=unit_price,
+            discountPercent=discount_percent,
+            taxableAmount=taxable_amount,
+            gstRate=gst_rate,
+            gstAmount=gst_amount,
+            lineTotal=line_total,
+            remark=(row.get('remark') or '')[:500],
+        )
+        new_item_ids.append(item.pk)
+        new_pairs.append((item.pk, stock_bucket))
+    affected_item_ids = set(existing_item_ids + new_item_ids)
+    rebuild_inventory_stock(counter.tenant, affected_item_ids)
+    validate_non_negative_inventory(counter.tenant, affected_item_ids, item_bucket_pairs=list(set(existing_pairs + new_pairs)))
+
+
+def _sync_cash_counter_return_voucher(request, counter: CashCounter):
+    linked_voucher = getattr(counter, 'linkedSalesReturnVoucher', None)
+    prior_pairs = list(linked_voucher.lines.filter(isDeleted=False).values_list('item_id', 'stockBucket')) if linked_voucher else []
+    prior_item_ids = [item_id for item_id, _bucket in prior_pairs]
+    current_lines = list(counter.lines.filter(isDeleted=False).select_related('item', 'warehouse').order_by('id'))
+    current_item_ids = [line.item_id for line in current_lines]
+    current_pairs = [(line.item_id, line.stockBucket) for line in current_lines]
+
+    if (counter.mode or '') != 'Return' or not current_lines:
+        if linked_voucher and not linked_voucher.isDeleted:
+            linked_voucher.isDeleted = True
+            linked_voucher.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        if counter.linkedSalesReturnVoucher_id:
+            counter.linkedSalesReturnVoucher = None
+            counter.save(update_fields=['linkedSalesReturnVoucher', 'lastUpdatedOn'])
+        affected_item_ids = set(prior_item_ids + current_item_ids)
+        if affected_item_ids:
+            rebuild_inventory_stock(counter.tenant, affected_item_ids)
+            validate_non_negative_inventory(
+                counter.tenant,
+                affected_item_ids,
+                item_bucket_pairs=list(set(prior_pairs + current_pairs)),
+            )
+        return
+
+    voucher = linked_voucher or SalesReturnVoucher(tenant=counter.tenant)
+    source_type, source_id = _parse_return_source_ref(request.POST.get('salesId'))
+    if not source_id:
+        raise ValueError('Original invoice is required for sales return.')
+    voucher.sales = None
+    voucher.cashCounter = None
+    if source_type == 'cash_counter':
+        voucher.cashCounter = tenant_qs(request, CashCounter).filter(
+            pk=source_id,
+            isDeleted=False,
+            mode__in=_cash_counter_return_source_modes(),
+        ).first()
+        if voucher.cashCounter is None:
+            raise ValueError('Selected cash counter invoice was not found.')
+    else:
+        voucher.sales = tenant_qs(request, Sales).filter(pk=source_id, isDeleted=False).first()
+        if voucher.sales is None:
+            raise ValueError('Selected sales invoice was not found.')
+    voucher.entryDate = counter.entryDate.date() if getattr(counter, 'entryDate', None) and hasattr(counter.entryDate, 'date') else getattr(counter, 'entryDate', None)
+    voucher.partyID = counter.partyID
+    voucher.remark = counter.remark
+    voucher.createdBy = counter.createdBy
+    voucher.totalAmount = 0.0
+    voucher.isDeleted = False
+    if voucher.pk:
+        voucher.save(update_fields=['sales', 'cashCounter', 'entryDate', 'partyID', 'remark', 'createdBy', 'totalAmount', 'isDeleted', 'lastUpdatedOn'])
+    else:
+        voucher.save()
+        voucher.voucherNumber = 'SRN' + str(voucher.pk).zfill(6)
+        voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
+
+    voucher.lines.filter(isDeleted=False).update(isDeleted=True)
+    total_amount = 0.0
+    for line in current_lines:
+        SalesReturnLine.objects.create(
+            tenant=voucher.tenant,
+            voucher=voucher,
+            warehouse=line.warehouse,
+            item=line.item,
+            stockBucket=line.stockBucket,
+            quantity=line.quantity,
+            unitPrice=line.unitPrice,
+            lineTotal=line.lineTotal,
+            remark=line.remark,
+        )
+        total_amount += float(line.lineTotal or 0.0)
+    voucher.totalAmount = round(total_amount, 2)
+    voucher.save(update_fields=['totalAmount', 'lastUpdatedOn'])
+
+    if counter.linkedSalesReturnVoucher_id != voucher.pk:
+        counter.linkedSalesReturnVoucher = voucher
+        counter.save(update_fields=['linkedSalesReturnVoucher', 'lastUpdatedOn'])
+
+    affected_item_ids = set(prior_item_ids + current_item_ids)
+    if affected_item_ids:
+        rebuild_inventory_stock(counter.tenant, affected_item_ids)
+        validate_non_negative_inventory(
+            counter.tenant,
+            affected_item_ids,
+            item_bucket_pairs=list(set(prior_pairs + current_pairs)),
+        )
+
+
+def _purchase_totals_from_lines(lines):
+    subtotal = 0.0
+    gst_total = 0.0
+    grand_total = 0.0
+    for row in lines:
+        subtotal += _safe_sales_float(row.get('taxableAmount'))
+        gst_total += _safe_sales_float(row.get('gstAmount'))
+        grand_total += _safe_sales_float(row.get('lineTotal'))
+    return round(subtotal, 2), round(gst_total, 2), round(grand_total, 2)
+
+
+def _normalize_purchase_lines_for_treatment(gst_treatment, lines):
+    normalized = []
+    force_non_gst = gst_treatment in {'non_gst', 'non_gst_claimable'}
+    for row in lines:
+        quantity = _safe_sales_float(row.get('quantity'))
+        unit_cost = _safe_sales_float(row.get('unitCost'))
+        taxable_amount = round(quantity * unit_cost, 2)
+        gst_rate = _safe_sales_float(row.get('gstRate'))
+        gst_amount = _safe_sales_float(row.get('gstAmount'))
+        stock_bucket = row.get('stockBucket')
+        if force_non_gst:
+            gst_rate = 0.0
+            gst_amount = 0.0
+            stock_bucket = 'non_gst'
+        else:
+            gst_amount = round(taxable_amount * gst_rate / 100.0, 2)
+        line_total = round(taxable_amount + gst_amount, 2)
+        normalized.append({
+            'itemId': row.get('itemId'),
+            'stockBucket': stock_bucket,
+            'quantity': quantity,
+            'unitCost': unit_cost,
+            'taxableAmount': round(taxable_amount, 2),
+            'gstRate': round(gst_rate, 2),
+            'gstAmount': round(gst_amount, 2),
+            'lineTotal': round(line_total, 2),
+            'remark': row.get('remark') or '',
+        })
+    return normalized
+
+
+def _sales_round_off_from_total(total_amount):
+    total_amount = round(_safe_sales_float(total_amount), 2)
+    rounded_total = float(round(total_amount))
+    round_off = round(rounded_total - total_amount, 2)
+    return round_off, round(total_amount + round_off, 2)
+
+
+def _sync_purchase_lines(request, purchase: PurchaseInvoice, lines_payload):
+    existing_pairs = list(purchase.lines.filter(isDeleted=False).values_list('item_id', 'stockBucket'))
+    existing_item_ids = [item_id for item_id, _bucket in existing_pairs]
+    purchase.lines.filter(isDeleted=False).update(isDeleted=True)
+    new_item_ids = []
+    new_pairs = []
+    warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+    for row in lines_payload:
+        item = _parse_inventory_item(request, row.get('itemId'))
+        quantity = _safe_sales_float(row.get('quantity'))
+        if quantity <= 0:
+            raise ValueError('Purchase quantity must be greater than zero.')
+        stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        unit_cost = _safe_sales_float(row.get('unitCost'))
+        taxable_amount = _safe_sales_float(row.get('taxableAmount')) or round(quantity * unit_cost, 2)
+        gst_rate = _safe_sales_float(row.get('gstRate'))
+        gst_amount = _safe_sales_float(row.get('gstAmount'))
+        line_total = _safe_sales_float(row.get('lineTotal')) or round(taxable_amount + gst_amount, 2)
+        PurchaseLine.objects.create(
+            tenant=purchase.tenant,
+            purchaseInvoice=purchase,
+            warehouse=warehouse,
+            item=item,
+            stockBucket=stock_bucket,
+            quantity=quantity,
+            unitCost=unit_cost,
+            taxableAmount=taxable_amount,
+            gstRate=gst_rate,
+            gstAmount=gst_amount,
+            lineTotal=line_total,
+            remark=(row.get('remark') or '')[:500],
+        )
+        new_item_ids.append(item.pk)
+        new_pairs.append((item.pk, stock_bucket))
+    affected_item_ids = set(existing_item_ids + new_item_ids)
+    rebuild_inventory_stock(purchase.tenant, affected_item_ids)
+    validate_non_negative_inventory(
+        purchase.tenant,
+        affected_item_ids,
+        item_bucket_pairs=list(set(existing_pairs + new_pairs)),
+    )
+
+
 def _apply_sales_mode_payload(request, obj: Sales) -> None:
     mode = _normalize_sales_mode(
         request.POST.get("paymentMode")
@@ -5492,6 +8100,8 @@ def _apply_sales_mode_payload(request, obj: Sales) -> None:
         or request.POST.get("modeOfPayment")
     )
     amount = _safe_sales_float(request.POST.get("amount"))
+    if amount <= 0 and _inventory_feature_enabled(request) and _request_line_items_present(request):
+        amount = _line_items_total(request)
     mix_cash = _safe_sales_float(request.POST.get("amountMixCash"))
     mix_online = _safe_sales_float(request.POST.get("amountMixOnline"))
     bank_id = _parse_sales_bank_id(request, request.POST.get("bank"))
@@ -5532,6 +8142,8 @@ def add_sales_by_admin_api(request):
             party = request.POST.get("party")
             remark = request.POST.get("remark")
             cus = _parse_sales_party(request, party)
+            inventory_enabled = _inventory_feature_enabled(request)
+            line_items = _request_line_items_payload(request) if (inventory_enabled and _request_line_items_present(request)) else []
             obj = Sales()
             assign_tenant(obj, request)
             obj.partyID_id = cus.pk
@@ -5547,11 +8159,14 @@ def add_sales_by_admin_api(request):
             _apply_sales_mode_payload(request, obj)
             obj.remark = remark
             obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y').date()
-            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
+            _apply_sales_invoice_payload(request, obj, cus, line_items=line_items)
+            user = _staff_for_request(request)
             obj.createdBy_id = user.pk
             obj.save()
             obj.paymentID = 'S' + str(obj.pk).zfill(8)
             obj.save(update_fields=['paymentID', 'lastUpdatedOn'])
+            if inventory_enabled:
+                _sync_sales_lines(request, obj)
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             # try:
@@ -5607,6 +8222,7 @@ class SalesByAdminListJson(BaseDatatableView):
                 action_parts.append('''<button data-inverted="" data-tooltip="Make Approval" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConfirmationModal('{}')" class="ui circular facebook icon button purple"><i class="check circle icon"></i></button>'''.format(item.pk))
             if _can_edit_sales(self.request.user):
                 action_parts.append('''<a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
+            action_parts.append('''<button data-inverted="" data-tooltip="Download Invoice" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="downloadSalesInvoice('{}')" class="ui circular blue icon button"><i class="file pdf outline icon"></i></button>'''.format(item.pk))
             if _can_delete_sales(self.request.user):
                 action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
@@ -5702,6 +8318,7 @@ class SalesByStaffListJson(BaseDatatableView):
                     action_parts.append('<div class="ui tiny orange label">Approved</div>')
                 else:
                     action_parts.append('''<a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
+            action_parts.append('''<button data-inverted="" data-tooltip="Download Invoice" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="downloadSalesInvoice('{}')" class="ui circular blue icon button"><i class="file pdf outline icon"></i></button>'''.format(item.pk))
             if _can_delete_sales(self.request.user):
                 action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
@@ -5807,6 +8424,133 @@ def generate_sales_report(request):
     response['Content-Disposition'] = "report.pdf"
     html = render_to_string("home/report/salesReportPDF.html", context)
     HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A4 portrait; margin: .65cm; }')])
+    return response
+
+
+def generate_sales_invoice_pdf(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_sales_access(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    sale_id = request.GET.get('id')
+    if not sale_id or not str(sale_id).isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Sale id is required.'}, status=400, safe=False)
+
+    sale = get_object_or_404(
+        tenant_qs(request, Sales).select_related('partyID', 'createdBy', 'approvedBy', 'bankID', 'tenant'),
+        pk=int(sale_id),
+        isDeleted=False,
+    )
+    if not _can_filter_all_sales(request.user):
+        if getattr(getattr(sale, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+    tenant = get_current_tenant(request)
+    lines = list(sale.lines.filter(isDeleted=False).select_related('item').order_by('id'))
+    gst_breakup = _gst_breakup_from_sale(sale, tenant)
+    total_before_round_off = round(float(gst_breakup['taxable_total'] or 0.0) + float(gst_breakup['gst_total'] or 0.0), 2)
+    round_off_amount = round(float(getattr(sale, 'roundOffAmount', 0.0) or 0.0), 2)
+    context = {
+        'sale': sale,
+        'lines': lines,
+        'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
+        'seller_gst_number': getattr(tenant, 'gstNumber', None) or '',
+        'seller_address': getattr(tenant, 'billingAddress', None) or '',
+        'seller_phone': getattr(tenant, 'phone', None) or '',
+        'buyer_name': sale.buyerLegalName or getattr(getattr(sale, 'partyID', None), 'legalName', None) or getattr(getattr(sale, 'partyID', None), 'name', None) or '-',
+        'buyer_gst_number': sale.buyerGstNumber or '',
+        'buyer_address': sale.buyerBillingAddress or getattr(getattr(sale, 'partyID', None), 'billingAddress', None) or getattr(getattr(sale, 'partyID', None), 'address', None) or '',
+        'gst_total': gst_breakup['gst_total'],
+        'taxable_total': gst_breakup['taxable_total'],
+        'total_before_round_off': total_before_round_off,
+        'round_off_amount': round_off_amount,
+        'grand_total': float(sale.amount or 0.0),
+        'tax_mode_label': gst_breakup['tax_mode_label'],
+        'seller_state_code': gst_breakup['seller_state_code'],
+        'buyer_state_code': gst_breakup['buyer_state_code'],
+        'place_of_supply_state_code': gst_breakup['place_of_supply_state_code'],
+        'effective_buyer_state_code': gst_breakup['effective_buyer_state_code'],
+        'cgst_total': gst_breakup['cgst_total'],
+        'sgst_total': gst_breakup['sgst_total'],
+        'utgst_total': gst_breakup['utgst_total'],
+        'igst_total': gst_breakup['igst_total'],
+    }
+    context.update(_pdf_base_context(request, [
+        f'Invoice: {sale.invoiceNumber or sale.pk}',
+        f'Buyer: {context["buyer_name"]}',
+        f'Kind: {sale.get_invoiceKind_display()}',
+    ]))
+    response = HttpResponse(content_type="application/pdf")
+    response['Content-Disposition'] = f'attachment; filename=sales-invoice-{sale.invoiceNumber or sale.pk}.pdf'
+    html = render_to_string("home/report/salesInvoicePDF.html", context)
+    base_url = request.build_absolute_uri('/')
+    HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 0.9cm; }')])
+    return response
+
+
+def generate_cash_counter_invoice_pdf(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.can_manage_cash_counter', 'home.view_cashcounter'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    counter_id = request.GET.get('id')
+    if not counter_id or not str(counter_id).isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Cash counter id is required.'}, status=400, safe=False)
+
+    counter = get_object_or_404(
+        tenant_qs(request, CashCounter).select_related('partyID', 'createdBy', 'bankID', 'tenant'),
+        pk=int(counter_id),
+        isDeleted=False,
+    )
+    if counter.mode not in _cash_counter_billing_modes() or not getattr(counter, 'invoiceNumber', None):
+        return JsonResponse({'message': 'error', 'error': 'Invoice download is only available for billing entries.'}, status=400, safe=False)
+    if not _can_filter_all_cash_counter(request.user):
+        if getattr(getattr(counter, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+    tenant = get_current_tenant(request)
+    lines = list(counter.lines.filter(isDeleted=False).select_related('item').order_by('id'))
+    gst_breakup = _gst_breakup_from_cash_counter(counter, tenant)
+    total_before_round_off = round(float(gst_breakup['taxable_total'] or 0.0) + float(gst_breakup['gst_total'] or 0.0), 2)
+    round_off_amount = round(float(getattr(counter, 'roundOffAmount', 0.0) or 0.0), 2)
+    grand_total = round(float(counter.amount or 0.0), 2)
+    if counter.mode == 'Mix':
+        grand_total = round(float(counter.mixCashAmount or 0.0) + float(counter.mixCardAmount or 0.0), 2)
+    context = {
+        'counter': counter,
+        'lines': lines,
+        'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
+        'seller_gst_number': getattr(tenant, 'gstNumber', None) or '',
+        'seller_address': getattr(tenant, 'billingAddress', None) or '',
+        'seller_phone': getattr(tenant, 'phone', None) or '',
+        'buyer_name': counter.buyerLegalName or getattr(getattr(counter, 'partyID', None), 'legalName', None) or getattr(getattr(counter, 'partyID', None), 'name', None) or '-',
+        'buyer_gst_number': counter.buyerGstNumber or '',
+        'buyer_address': counter.buyerBillingAddress or getattr(getattr(counter, 'partyID', None), 'billingAddress', None) or getattr(getattr(counter, 'partyID', None), 'address', None) or '',
+        'gst_total': gst_breakup['gst_total'],
+        'taxable_total': gst_breakup['taxable_total'],
+        'total_before_round_off': total_before_round_off,
+        'round_off_amount': round_off_amount,
+        'grand_total': grand_total,
+        'tax_mode_label': gst_breakup['tax_mode_label'],
+        'seller_state_code': gst_breakup['seller_state_code'],
+        'buyer_state_code': gst_breakup['buyer_state_code'],
+        'place_of_supply_state_code': gst_breakup['place_of_supply_state_code'],
+        'effective_buyer_state_code': gst_breakup['effective_buyer_state_code'],
+        'cgst_total': gst_breakup['cgst_total'],
+        'sgst_total': gst_breakup['sgst_total'],
+        'utgst_total': gst_breakup['utgst_total'],
+        'igst_total': gst_breakup['igst_total'],
+    }
+    context.update(_pdf_base_context(request, [
+        f'Invoice: {counter.invoiceNumber or counter.pk}',
+        f'Buyer: {context["buyer_name"]}',
+        f'Mode: {counter.mode or "-"}',
+    ]))
+    response = HttpResponse(content_type="application/pdf")
+    response['Content-Disposition'] = f'attachment; filename=cash-counter-invoice-{counter.invoiceNumber or counter.pk}.pdf'
+    html = render_to_string("home/report/cashCounterInvoicePDF.html", context)
+    base_url = request.build_absolute_uri('/')
+    HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 0.9cm; }')])
     return response
 
 
@@ -5975,8 +8719,11 @@ def delete_sales(request):
         try:
             id = request.POST.get("userID")
             obj = tenant_qs(request, Sales).select_related().get(pk=int(id))
+            item_ids = list(obj.lines.filter(isDeleted=False).values_list('item_id', flat=True))
             obj.isDeleted = True
             obj.save()
+            rebuild_inventory_stock(obj.tenant, item_ids)
+            validate_non_negative_inventory(obj.tenant, item_ids)
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
@@ -5993,6 +8740,8 @@ def update_sales_by_admin_api(request):
             remark = request.POST.get("remark")
             ID = request.POST.get("ID")
             cus = _parse_sales_party(request, party)
+            inventory_enabled = _inventory_feature_enabled(request)
+            line_items = _request_line_items_payload(request) if (inventory_enabled and _request_line_items_present(request)) else []
             obj = tenant_qs(request, Sales).get(pk=int(ID))
             if not _can_edit_sales_record(request.user, obj):
                 return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
@@ -6000,7 +8749,10 @@ def update_sales_by_admin_api(request):
             _apply_sales_mode_payload(request, obj)
             obj.remark = remark
             obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y').date()
+            _apply_sales_invoice_payload(request, obj, cus, line_items=line_items)
             obj.save()
+            if inventory_enabled:
+                _sync_sales_lines(request, obj)
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
@@ -6113,12 +8865,15 @@ def add_cash_counter_entry_api(request):
             expenseType = request.POST.get("expenseType")
             bank = request.POST.get("bank")
             mode = request.POST.get("mode")
+            inventory_enabled = _inventory_feature_enabled(request)
+            line_items_total = _line_items_total(request) if (inventory_enabled and _request_line_items_present(request)) else 0.0
+            party_obj = None
             obj = CashCounter()
             assign_tenant(obj, request)
             if mode in {"Cash", "Credit", "Card", "Collection", "Advance", "Mix", "Return"}:
                 c = str(party).split('@')
-                cus = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
-                obj.partyID_id = cus.pk
+                party_obj = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
+                obj.partyID_id = party_obj.pk
             else:
                 obj.partyID = None
             if mode == "Cash" or mode == "Mix" or mode == "Card" or mode == "Credit" or mode == "Return":
@@ -6136,7 +8891,7 @@ def add_cash_counter_entry_api(request):
                 obj.mixCardAmount = float(amountMixCard)
                 obj.amount = 0.0
             else:
-                obj.amount = float(amount)
+                obj.amount = float(amount or line_items_total or 0.0)
                 obj.mixCashAmount = 0.0
                 obj.mixCardAmount = 0.0
             if mode == "Expense":
@@ -6150,11 +8905,15 @@ def add_cash_counter_entry_api(request):
             obj.mode = mode
             obj.remark = remark
             obj.entryDate = datetime.now()
-            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
+            user = _staff_for_request(request)
             obj.createdBy_id = user.pk
+            _apply_cash_counter_invoice_payload(request, obj, party_obj)
             obj.save()
             obj.counterID = 'CC' + str(obj.pk).zfill(8)
             obj.save()
+            if inventory_enabled:
+                _sync_cash_counter_lines(request, obj)
+                _sync_cash_counter_return_voucher(request, obj)
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success', 'invoiceNumber': obj.invoiceNumber}, safe=False)
@@ -6198,18 +8957,7 @@ class CashCounterByStaffListJson(BaseDatatableView):
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
-            if _can_manage_cash_counter_records(self.request.user):
-                action = '''
-              <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
-                <i class="pen icon"></i>
-              </a>
-              <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                <i class="trash alternate icon"></i>
-              </button>'''.format(item.pk, item.pk, item.pk),
-            else:
-                action = '''<div class="ui tiny label">
-              Denied
-            </div>'''
+            action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
                 createdBy = item.createdBy.name
             except:
@@ -6262,18 +9010,7 @@ class CardCounterByStaffListJson(BaseDatatableView):
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
-            if _can_manage_cash_counter_records(self.request.user):
-                action = '''
-              <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
-                <i class="pen icon"></i>
-              </a>
-              <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                <i class="trash alternate icon"></i>
-              </button>'''.format(item.pk, item.pk, item.pk),
-            else:
-                action = '''<div class="ui tiny label">
-              Denied
-            </div>'''
+            action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
                 createdBy = item.createdBy.name
             except:
@@ -6331,18 +9068,7 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
-            if _can_manage_cash_counter_records(self.request.user):
-                action = '''
-              <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
-                <i class="pen icon"></i>
-              </a>
-              <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                <i class="trash alternate icon"></i>
-              </button>'''.format(item.pk, item.pk, item.pk),
-            else:
-                action = '''<div class="ui tiny label">
-              Denied
-            </div>'''
+            action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
                 createdBy = item.createdBy.name
             except:
@@ -6396,18 +9122,7 @@ class CreditCounterByStaffListJson(BaseDatatableView):
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
-            if _can_manage_cash_counter_records(self.request.user):
-                action = '''
-              <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
-                <i class="pen icon"></i>
-              </a>
-              <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                <i class="trash alternate icon"></i>
-              </button>'''.format(item.pk, item.pk, item.pk),
-            else:
-                action = '''<div class="ui tiny label">
-              Denied
-            </div>'''
+            action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
                 createdBy = item.createdBy.name
             except:
@@ -6467,18 +9182,7 @@ class MixCounterByStaffListJson(BaseDatatableView):
     def prepare_results(self, qs):
         json_data = []
         for item in qs:
-            if _can_manage_cash_counter_records(self.request.user):
-                action = '''
-              <a href="/edit_cash_counter/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;"  class="ui circular facebook icon button green">
-                <i class="pen icon"></i>
-              </a>
-              <button  data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini"  style="font-size:10px;" onclick ="delUser('{}')" class="ui circular youtube icon button" style="margin-left: 3px">
-                <i class="trash alternate icon"></i>
-              </button>'''.format(item.pk, item.pk, item.pk),
-            else:
-                action = '''<div class="ui tiny label">
-              Denied
-            </div>'''
+            action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
                 createdBy = item.createdBy.name
             except:
@@ -6767,10 +9471,21 @@ def delete_cash_counter(request):
                 obj = tenant_qs(request, CollectionCashCounter).get(pk=int(id))
             else:
                 id = id
-                obj = tenant_qs(request, CashCounter).get(pk=int(id))
+                obj = tenant_qs(request, CashCounter).select_related('linkedSalesReturnVoucher').get(pk=int(id))
             # Output: 56
+            item_ids = list(getattr(obj, 'lines', CashCounterLine.objects.none()).filter(isDeleted=False).values_list('item_id', flat=True)) if isinstance(obj, CashCounter) else []
+            if isinstance(obj, CashCounter) and getattr(obj, 'linkedSalesReturnVoucher_id', None):
+                item_ids.extend(
+                    obj.linkedSalesReturnVoucher.lines.filter(isDeleted=False).values_list('item_id', flat=True)
+                )
             obj.isDeleted = True
             obj.save()
+            if isinstance(obj, CashCounter):
+                if getattr(obj, 'linkedSalesReturnVoucher', None) and not obj.linkedSalesReturnVoucher.isDeleted:
+                    obj.linkedSalesReturnVoucher.isDeleted = True
+                    obj.linkedSalesReturnVoucher.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+                rebuild_inventory_stock(obj.tenant, item_ids)
+                validate_non_negative_inventory(obj.tenant, item_ids)
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)
@@ -6789,10 +9504,13 @@ def update_cash_counter_by_admin_api(request):
             mode = request.POST.get("mode")
             editID = request.POST.get("editID")
             bank = request.POST.get("bank")
+            inventory_enabled = _inventory_feature_enabled(request)
+            line_items_total = _line_items_total(request) if (inventory_enabled and _request_line_items_present(request)) else 0.0
+            party_obj = None
             obj = tenant_qs(request, CashCounter).get(pk=int(editID))
             if mode in {"Cash", "Credit", "Card", "Collection", "Advance", "Mix", "Return"}:
-                cus = tenant_qs(request, Party).select_related().get(pk=int(party))
-                obj.partyID_id = cus.pk
+                party_obj = tenant_qs(request, Party).select_related().get(pk=int(party))
+                obj.partyID_id = party_obj.pk
             else:
                 obj.partyID = None
             if mode == "Mix":
@@ -6800,7 +9518,7 @@ def update_cash_counter_by_admin_api(request):
                 obj.mixCardAmount = float(amountMixCard)
                 obj.amount = 0.0
             else:
-                obj.amount = float(amount)
+                obj.amount = float(amount or line_items_total or 0.0)
                 obj.mixCashAmount = 0.0
                 obj.mixCardAmount = 0.0
             if mode == "Expense":
@@ -6814,9 +9532,13 @@ def update_cash_counter_by_admin_api(request):
             obj.mode = mode
             obj.remark = remark
             obj.entryDate = datetime.now()
-            user = tenant_qs(request, StaffUser).get(user_ID_id=request.user.pk)
+            user = _staff_for_request(request)
             obj.createdBy_id = user.pk
+            _apply_cash_counter_invoice_payload(request, obj, party_obj)
             obj.save()
+            if inventory_enabled:
+                _sync_cash_counter_lines(request, obj)
+                _sync_cash_counter_return_voucher(request, obj)
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success'}, safe=False)

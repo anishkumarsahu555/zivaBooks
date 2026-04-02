@@ -70,6 +70,14 @@
             color: #5f6b7a;
         }
 
+        .sales-advanced-card {
+            margin-top: 14px;
+            padding: 1rem;
+            border: 1px dashed rgba(15, 118, 110, 0.2);
+            border-radius: 12px;
+            background: #fff;
+        }
+
     </style>
 {% endblock %}
 {% block body %}
@@ -96,22 +104,21 @@
                                 </div>
                                 <div class="sales-mode-note">Invoice stays locked after creation. You can still update the sale mode and payment details until approval.</div>
                                 <input type="hidden" id="salesMode" value="{{ obj.modeOfPayment|default:'Cash' }}">
+                                <input type="hidden" id="advancedInvoicingEnabled" value="{% if advanced_invoicing_enabled %}1{% else %}0{% endif %}">
 
-                                <div class="two fields">
-                                    <div class="eight wide field required">
-                                        <label>Invoice Number</label>
-                                        <input type="hidden" id="invoiceNo" value="{{ invoice_display }}">
-                                        <div class="invoice-chip-wrap">
-                                            <span class="invoice-chip active" id="invoiceChipDisplay">{{ invoice_display }}</span>
-                                        </div>
+                                <div class="field required">
+                                    <label>Invoice Number</label>
+                                    <input type="hidden" id="invoiceNo" value="{{ invoice_display }}">
+                                    <div class="invoice-chip-wrap">
+                                        <span class="invoice-chip active" id="invoiceChipDisplay">{{ invoice_display }}</span>
                                     </div>
+                                </div>
 
-                                    <div class="eight wide field required">
-                                        <label>Invoice Date</label>
-                                        <div class="ui calendar" id="cDate">
-                                            <div class="ui input">
-                                                <input type="text" placeholder="Date/Time" id="colDate">
-                                            </div>
+                                <div class="field required">
+                                    <label>Invoice Date</label>
+                                    <div class="ui calendar" id="cDate">
+                                        <div class="ui input">
+                                            <input type="text" placeholder="Date/Time" id="colDate">
                                         </div>
                                     </div>
                                 </div>
@@ -162,12 +169,58 @@
                                     </div>
                                 </div>
 
+                                {% if advanced_invoicing_enabled %}
+                                    <div class="sales-advanced-card" id="advancedInvoiceCard">
+                                        <div class="two fields">
+                                            <div class="eight wide field">
+                                                <label>Invoice Type</label>
+                                                <select class="ui dropdown" id="invoiceKind">
+                                                    <option value="b2c" {% if obj.invoiceKind == 'b2c' %}selected{% endif %}>B2C</option>
+                                                    <option value="b2b" {% if obj.invoiceKind == 'b2b' %}selected{% endif %}>B2B</option>
+                                                </select>
+                                                <small id="invoiceNatureHelp" style="display:block; margin-top:6px; color:#667085;">Invoice series can default this value for GST billing.</small>
+                                            </div>
+                                            <div class="eight wide field">
+                                                <label>Place Of Supply</label>
+                                                <input type="text" id="placeOfSupply" placeholder="Optional place of supply" value="{{ obj.placeOfSupply|default:'' }}">
+                                            </div>
+                                        </div>
+
+                                        <div class="three fields" id="buyerInvoiceFields">
+                                            <div class="field">
+                                                <label>Buyer Legal Name</label>
+                                                <input type="text" id="buyerLegalName" placeholder="Auto-filled from party" value="{{ obj.buyerLegalName|default:'' }}">
+                                            </div>
+                                            <div class="field">
+                                                <label>Buyer GST Number</label>
+                                                <input type="text" id="buyerGstNumber" placeholder="Optional GSTIN for B2B" value="{{ obj.buyerGstNumber|default:'' }}">
+                                            </div>
+                                            <div class="field">
+                                                <label>Buyer Billing Address</label>
+                                                <input type="text" id="buyerBillingAddress" placeholder="Billing address" value="{{ obj.buyerBillingAddress|default:'' }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <input type="hidden" id="invoiceKind" value="b2c">
+                                    <input type="hidden" id="placeOfSupply" value="">
+                                    <input type="hidden" id="buyerLegalName" value="">
+                                    <input type="hidden" id="buyerGstNumber" value="">
+                                    <input type="hidden" id="buyerBillingAddress" value="">
+                                {% endif %}
+
                                 <div class="one fields">
                                     <div class="sixteen wide field">
                                         <label>Remark</label>
                                         <textarea id="remark" placeholder="Any Remark" rows="3">{{ obj.remark }}</textarea>
                                     </div>
                                 </div>
+
+                                {% if inventory_enabled %}
+                                    {% include 'home/includes/sales_invoice_lines.html' with section_id='salesLineItemBox' hidden_input_id='salesLineItems' title='Track GST invoice rows for this sale' enabled=sales_line_items allow_non_gst=non_gst_shadow_enabled seller_gst_number=seller_gst_number %}
+                                {% else %}
+                                    <input type="hidden" id="salesLineItems" value="[]">
+                                {% endif %}
 
                                 <input type="hidden" id="ID" value="{{ obj.pk }}">
                             </div>
@@ -211,6 +264,8 @@
 {% endblock %}
 
 {% block js %}
+    {{ sales_line_items|json_script:"sales-line-items-data" }}
+    <script src="{% static 'js/sales-gst-lines.js' %}"></script>
     <script type="text/javascript">
         $('.ui.dropdown').dropdown({fullTextSearch: true});
     </script>
@@ -219,6 +274,28 @@
         var salesEditReadOnly = {{ sales_edit_readonly|yesno:"true,false" }};
         var salesReturnUrl = "{{ sales_return_url|default:'' }}";
         var selectedPartyId = "{{ obj.partyID_id|default:'' }}";
+        var selectedInvoiceSeriesMeta = {
+            invoiceNature: "{{ obj.invoiceSeries.invoiceNature|default:'mixed' }}",
+            invoiceNatureLabel: "{{ obj.invoiceSeries.get_invoiceNature_display|default:'Mixed / Manual'|escapejs }}",
+            lockInvoiceNature: {{ obj.invoiceSeries.lockInvoiceNature|yesno:"true,false" }}
+        };
+        var partyCatalog = [];
+        var salesInitialLineItems = JSON.parse(document.getElementById('sales-line-items-data').textContent || '[]').map(function (row) {
+            return {
+                itemId: row.item_id,
+                unitName: row.item__unitName,
+                unitAllowsDecimal: row.item__unit__allowsDecimal,
+                stockBucket: row.stockBucket,
+                quantity: row.quantity,
+                unitPrice: row.unitPrice,
+                discountPercent: row.discountPercent,
+                taxableAmount: row.taxableAmount,
+                gstRate: row.gstRate,
+                gstAmount: row.gstAmount,
+                lineTotal: row.lineTotal,
+                remark: row.remark
+            };
+        });
 
         var today = new Date();
         $('#cDate')
@@ -249,10 +326,184 @@
             $('#mixFields').toggle(newMode === 'Mix');
         }
 
+        function syncSalesInventoryToggle() {
+            const checked = $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked');
+            $('#salesLineItemBox .sales-lines-wrap').toggle(checked);
+            if (!checked) {
+                $('#salesLineItems').val('[]');
+            }
+        }
+
+        function collectSalesLineItemsBeforeSave() {
+            if (!$('#salesLineItemBox').length) {
+                return [];
+            }
+            const enabled = $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked');
+            if (!enabled) {
+                $('#salesLineItems').val('[]');
+                return [];
+            }
+            const api = $('#salesLineItemBox').data('salesInvoiceLinesApi');
+            if (api && typeof api.collect === 'function') {
+                return api.collect() || [];
+            }
+            try {
+                return JSON.parse($('#salesLineItems').val() || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function gstStateCodeFromNumber(value) {
+            const gst = String(value || '').trim().toUpperCase();
+            return /^\d{2}/.test(gst) ? gst.slice(0, 2) : '';
+        }
+
+        function isUtgstStateCode(code) {
+            return ['04', '26', '31', '35', '38', '97'].indexOf(String(code || '').padStart(2, '0')) >= 0;
+        }
+
+        function gstStateCodeFromPlaceOfSupply(value) {
+            const raw = String(value || '').trim().toLowerCase().replace(/&/g, 'and').replace(/[-,]/g, ' ');
+            const normalized = raw.replace(/\s+/g, ' ').trim();
+            const stateMap = {
+                '01': 'jammu and kashmir',
+                '02': 'himachal pradesh',
+                '03': 'punjab',
+                '04': 'chandigarh',
+                '05': 'uttarakhand',
+                '06': 'haryana',
+                '07': 'delhi',
+                '08': 'rajasthan',
+                '09': 'uttar pradesh',
+                '10': 'bihar',
+                '11': 'sikkim',
+                '12': 'arunachal pradesh',
+                '13': 'nagaland',
+                '14': 'manipur',
+                '15': 'mizoram',
+                '16': 'tripura',
+                '17': 'meghalaya',
+                '18': 'assam',
+                '19': 'west bengal',
+                '20': 'jharkhand',
+                '21': 'odisha',
+                '22': 'chhattisgarh',
+                '23': 'madhya pradesh',
+                '24': 'gujarat',
+                '26': 'dadra and nagar haveli and daman and diu',
+                '27': 'maharashtra',
+                '29': 'karnataka',
+                '30': 'goa',
+                '31': 'lakshadweep',
+                '32': 'kerala',
+                '33': 'tamil nadu',
+                '34': 'puducherry',
+                '35': 'andaman and nicobar islands',
+                '36': 'telangana',
+                '37': 'andhra pradesh',
+                '38': 'ladakh',
+                '97': 'other territory'
+            };
+            if (/^\d{2}/.test(normalized)) {
+                return normalized.slice(0, 2);
+            }
+            for (const code in stateMap) {
+                const name = stateMap[code];
+                if (normalized === name || normalized.indexOf(name) >= 0) {
+                    return code;
+                }
+            }
+            return '';
+        }
+
+        function updateLiveSalesTaxBreakup(totals) {
+            const $box = $('#salesLineItemBox');
+            if (!$box.length) {
+                return;
+            }
+            const sellerStateCode = gstStateCodeFromNumber($box.data('sellerGstNumber'));
+            const buyerStateCode = gstStateCodeFromNumber($('#buyerGstNumber').val());
+            const placeOfSupplyStateCode = gstStateCodeFromPlaceOfSupply($('#placeOfSupply').val());
+            const effectiveBuyerStateCode = buyerStateCode || placeOfSupplyStateCode;
+            const gstTotal = Number((totals && totals.gstTotal) || 0);
+            const isInterState = Boolean(sellerStateCode && effectiveBuyerStateCode && sellerStateCode !== effectiveBuyerStateCode);
+            const halfTax = gstTotal / 2;
+            const taxMode = isInterState ? 'IGST' : (isUtgstStateCode(sellerStateCode) ? 'CGST + UTGST' : 'CGST + SGST');
+
+            $box.find('.sales-tax-mode-label').text(taxMode);
+            $box.find('.sales-cgst-total').text((isInterState ? 0 : halfTax).toFixed(2));
+            $box.find('.sales-sgst-total').text((!isInterState && !isUtgstStateCode(sellerStateCode) ? (gstTotal - halfTax) : 0).toFixed(2));
+            $box.find('.sales-utgst-total').text((!isInterState && isUtgstStateCode(sellerStateCode) ? (gstTotal - halfTax) : 0).toFixed(2));
+            $box.find('.sales-igst-total').text((isInterState ? gstTotal : 0).toFixed(2));
+
+            $box.find('.sales-igst-label').toggle(isInterState);
+            $box.find('.sales-cgst-label').toggle(!isInterState);
+            $box.find('.sales-sgst-label').toggle(!isInterState && !isUtgstStateCode(sellerStateCode));
+            $box.find('.sales-utgst-label').toggle(!isInterState && isUtgstStateCode(sellerStateCode));
+        }
+
+        function syncPartyInvoiceFields(partyId) {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            const selected = partyCatalog.find(function (row) { return String(row.ID) === String(partyId || ''); });
+            if (!selected) {
+                return;
+            }
+            if (!$('#buyerLegalName').val()) {
+                $('#buyerLegalName').val(selected.LegalName || selected.Name || '');
+            }
+            if (!$('#buyerGstNumber').val()) {
+                $('#buyerGstNumber').val(selected.GSTNumber || '');
+            }
+            if (!$('#buyerBillingAddress').val()) {
+                $('#buyerBillingAddress').val(selected.BillingAddress || selected.Address || '');
+            }
+            if (selected.IsB2B || selected.GSTNumber) {
+                $('#invoiceKind').dropdown('set selected', 'b2b');
+            }
+            updateInvoiceKindUI();
+        }
+
+        function updateInvoiceKindUI() {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            $('#buyerInvoiceFields').toggle(($('#invoiceKind').val() || 'b2c') === 'b2b');
+        }
+
+        function applyInvoiceSeriesRule(meta) {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            const help = $('#invoiceNatureHelp');
+            if (!meta) {
+                $('#invoiceKind').dropdown('set enabled');
+                help.text('Invoice series can default this value for GST billing.');
+                updateInvoiceKindUI();
+                return;
+            }
+            if (meta.invoiceNature && meta.invoiceNature !== 'mixed') {
+                $('#invoiceKind').dropdown('set selected', meta.invoiceNature);
+            }
+            if (meta.lockInvoiceNature && meta.invoiceNature && meta.invoiceNature !== 'mixed') {
+                $('#invoiceKind').dropdown('set disabled');
+                help.text('Invoice type is locked by the selected series: ' + meta.invoiceNatureLabel + '.');
+            } else {
+                $('#invoiceKind').dropdown('set enabled');
+                help.text(meta.invoiceNature && meta.invoiceNature !== 'mixed'
+                    ? 'Invoice type defaults from the selected series: ' + meta.invoiceNatureLabel + '.'
+                    : 'Invoice series can default this value for GST billing.');
+            }
+            updateInvoiceKindUI();
+        }
+
         $(loadDetail());
 
         function loadDetail() {
             selectSalesMode($('#salesMode').val() || 'Cash');
+            applyInvoiceSeriesRule(selectedInvoiceSeriesMeta);
             if (salesEditReadOnly) {
                 // Disable form and hide update button for staff once approved.
                 $('#addForm input, #addForm select, #addForm textarea').prop('disabled', true);
@@ -274,7 +525,13 @@
             var amountMixCash = $('#amountMixCash').val();
             var amountMixOnline = $('#amountMixOnline').val();
             var remark = $('#remark').val();
+            var invoiceKind = $('#invoiceKind').val();
+            var buyerLegalName = $('#buyerLegalName').val();
+            var buyerGstNumber = $('#buyerGstNumber').val();
+            var buyerBillingAddress = $('#buyerBillingAddress').val();
+            var placeOfSupply = $('#placeOfSupply').val();
             var ID = $('#ID').val();
+            var lineItems = collectSalesLineItemsBeforeSave();
 
             if (ID === '' || party === '' || colDate === '') {
                 $('body')
@@ -293,6 +550,9 @@
             } else if (paymentMode !== 'Mix' && amount === '') {
                 $('body').toast({class: 'orange', message: 'Amount is required.'});
                 hideLoading();
+            } else if ($('#salesLineItemBox').length && $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked') && !lineItems.length) {
+                $('body').toast({class: 'orange', message: 'Add at least one valid GST item row before saving.'});
+                hideLoading();
             } else {
                 data = new FormData();
                 data.append('colDate', colDate);
@@ -303,7 +563,13 @@
                 data.append('amountMixCash', amountMixCash);
                 data.append('amountMixOnline', amountMixOnline);
                 data.append('remark', remark);
+                data.append('invoiceKind', invoiceKind);
+                data.append('buyerLegalName', buyerLegalName);
+                data.append('buyerGstNumber', buyerGstNumber);
+                data.append('buyerBillingAddress', buyerBillingAddress);
+                data.append('placeOfSupply', placeOfSupply);
                 data.append('ID', ID);
+                data.append('lineItems', JSON.stringify(lineItems || []));
 
                 $.ajax({
                     type: 'post',
@@ -369,8 +635,30 @@
 
         }
 
+        function initSalesInventory() {
+            if (!window.SalesInvoiceLines || !$('#salesLineItemBox').length) {
+                return;
+            }
+            window.SalesInvoiceLines.init({
+                containerSelector: '#salesLineItemBox',
+                hiddenInputSelector: '#salesLineItems',
+                catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+                initialRows: salesInitialLineItems,
+                syncTotals: function (totals) {
+                    updateLiveSalesTaxBreakup(totals);
+                    if ($('#salesMode').val() !== 'Mix') {
+                        $('#amount').val((totals.roundedPayable || 0).toFixed(2));
+                        toIndianCurrency();
+                    }
+                }
+            });
+            $('#salesLineItemBox .sales-lines-enable-toggle').on('change', syncSalesInventoryToggle);
+            syncSalesInventoryToggle();
+        }
+
 
         $(getCustomerList());
+        $(initSalesInventory());
 
 
         function getCustomerList() {
@@ -380,6 +668,7 @@
 
                 success: function (response) {
 
+                    partyCatalog = response.data || [];
                     $('#party').html('');
                     $('#party').append(' <option value="">Search By Party Name</option>');
                     var j;
@@ -388,10 +677,18 @@
                         $('#party').append('<option value="' + response.data[j]['ID'] + '" >' + response.data[j]['DisplayDetail'] + '</option>');
 
                     }
+                    $('#party').dropdown({
+                        fullTextSearch: true
+                    });
                     $('#party').dropdown('refresh');
                     if (selectedPartyId) {
+                        $('#party').val(String(selectedPartyId));
                         $('#party').dropdown('set selected', selectedPartyId);
+                        syncPartyInvoiceFields(selectedPartyId);
                     }
+                    $('#party').off('change.salesParty').on('change.salesParty', function () {
+                        syncPartyInvoiceFields($(this).val());
+                    });
 
                 },
 
@@ -416,5 +713,31 @@
             $('#moneyMixCash').html(mixCash.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
             $('#moneyMixOnline').html(mixOnline.replace(/(\d)(?=(\d\d)+\d$)/g, "$1,"));
         };
+
+        $('#buyerGstNumber').on('input change', function () {
+            updateLiveSalesTaxBreakup({
+                gstTotal: parseFloat($('#salesLineItemBox .sales-gst-total').text() || '0') || 0
+            });
+        });
+        $('#placeOfSupply').on('input change', function () {
+            updateLiveSalesTaxBreakup({
+                gstTotal: parseFloat($('#salesLineItemBox .sales-gst-total').text() || '0') || 0
+            });
+        });
+
+        if ($('#invoiceKind').is('select')) {
+            $('#invoiceKind').dropdown({
+                onChange: function () {
+                    updateInvoiceKindUI();
+                    updateLiveSalesTaxBreakup({
+                        gstTotal: parseFloat($('#salesLineItemBox .sales-gst-total').text() || '0') || 0
+                    });
+                }
+            });
+        }
+
+        updateLiveSalesTaxBreakup({
+            gstTotal: parseFloat($('#salesLineItemBox .sales-gst-total').text() || '0') || 0
+        });
     </script>
 {% endblock %}

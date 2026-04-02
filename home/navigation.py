@@ -1,6 +1,7 @@
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.urls import reverse
 
+from .models import TenantMembership
 from .tenancy import get_current_tenant
 
 
@@ -17,6 +18,20 @@ ADMIN_LIKE_PERMS = {
 def _tenant_admin_group_name(tenant):
     tenant_slug = getattr(tenant, 'slug', 'tenant')
     return f'{tenant_slug}:Tenant Admin'
+
+
+def _tenant_feature_enabled(request_or_user, attr_name, default=True):
+    tenant = get_current_tenant(request_or_user)
+    if tenant is None:
+        return default
+    return bool(getattr(tenant, attr_name, default))
+
+
+def _show_non_gst_control_nav(request_or_user):
+    return (
+        _tenant_feature_enabled(request_or_user, 'inventoryEnabled', True)
+        or _tenant_feature_enabled(request_or_user, 'advancedInvoicingEnabled', True)
+    )
 
 
 def _all_permission_names(user):
@@ -60,6 +75,29 @@ def _tenant_permission_names(request_or_user, tenant):
     return permissions
 
 
+def _tenant_membership_role(request_or_user, tenant):
+    user = getattr(request_or_user, 'user', request_or_user)
+    if not getattr(user, 'is_authenticated', False) or tenant is None:
+        return None
+    request = request_or_user if hasattr(request_or_user, 'META') else None
+    if request is not None and hasattr(request, '_tenant_membership_role_cache'):
+        return request._tenant_membership_role_cache
+    cached = getattr(user, '_tenant_membership_role_cache', None)
+    if cached is not None:
+        return cached
+    membership = (
+        TenantMembership.objects
+        .filter(user=user, tenant=tenant)
+        .order_by('-isDefault', 'id')
+        .values_list('role', flat=True)
+        .first()
+    )
+    if request is not None:
+        request._tenant_membership_role_cache = membership
+    user._tenant_membership_role_cache = membership
+    return membership
+
+
 def _effective_permission_names(request_or_user):
     user = getattr(request_or_user, 'user', request_or_user)
     if not getattr(user, 'is_authenticated', False):
@@ -79,6 +117,22 @@ def _effective_permission_names(request_or_user):
         return user_permissions
 
     tenant_permissions = _tenant_permission_names(request_or_user, tenant)
+    membership_role = _tenant_membership_role(request_or_user, tenant)
+    if not tenant_permissions:
+        if hasattr(request_or_user, 'META'):
+            request_or_user._tenant_effective_perm_cache = user_permissions
+        user._tenant_effective_perm_cache = user_permissions
+        return user_permissions
+    if membership_role in {TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN}:
+        owner_admin_permissions = {
+            f'{permission.content_type.app_label}.{permission.codename}'
+            for permission in Permission.objects.select_related('content_type').filter(content_type__app_label='home')
+        }
+        effective_permissions = user_permissions | tenant_permissions | owner_admin_permissions
+        if hasattr(request_or_user, 'META'):
+            request_or_user._tenant_effective_perm_cache = effective_permissions
+        user._tenant_effective_perm_cache = effective_permissions
+        return effective_permissions
     effective_permissions = tenant_permissions if user.is_superuser else user_permissions & tenant_permissions
     if hasattr(request_or_user, 'META'):
         request_or_user._tenant_effective_perm_cache = effective_permissions
@@ -147,7 +201,7 @@ def _admin_sections(user):
             ]),
         },
         {
-            'title': 'Billing',
+            'title': 'Inventory & Purchases',
             'items': _filter_items(user, [
                 _nav_item('Invoice Series', 'homeApp:invoice_series_list', 'hashtag', (
                     'home.view_invoiceseries',
@@ -155,6 +209,44 @@ def _admin_sections(user):
                     'home.change_invoiceseries',
                     'home.delete_invoiceseries',
                 )),
+                *([_nav_item('Items', 'homeApp:inventory_items_page', 'boxes', (
+                    'home.view_inventoryitem',
+                    'home.add_inventoryitem',
+                    'home.change_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Masters', 'homeApp:inventory_masters_page', 'tags', (
+                    'home.view_inventoryitem',
+                    'home.add_inventoryitem',
+                    'home.change_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Stock', 'homeApp:inventory_stock_page', 'warehouse', (
+                    'home.view_inventoryitem',
+                    'home.add_inventoryitem',
+                    'home.change_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Adjustments', 'homeApp:inventory_vouchers_page', 'exchange', (
+                    'home.view_inventoryitem',
+                    'home.add_inventoryitem',
+                    'home.change_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Purchases', 'homeApp:purchase_list', 'truck', (
+                    'home.view_purchaseinvoice',
+                    'home.add_purchaseinvoice',
+                    'home.change_purchaseinvoice',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Settings', 'homeApp:non_gst_shadow_page', 'user secret', (
+                    'home.can_view_party_credentials',
+                    'home.can_manage_staff',
+                ))] if _show_non_gst_control_nav(user) else []),
             ]),
         },
         {
@@ -613,7 +705,7 @@ def build_sidebar_sections(request_or_user):
             ]),
         },
         {
-            'title': 'Billing',
+            'title': 'Inventory & Purchases',
             'items': _filter_items(request_or_user, [
                 _nav_item('Invoice Series', 'homeApp:invoice_series_list', 'hashtag', (
                     'home.view_invoiceseries',
@@ -621,6 +713,44 @@ def build_sidebar_sections(request_or_user):
                     'home.change_invoiceseries',
                     'home.delete_invoiceseries',
                 )),
+                *([_nav_item('Items', 'homeApp:inventory_items_page', 'boxes', (
+                    'home.view_inventoryitem',
+                    'home.add_inventoryitem',
+                    'home.change_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(request_or_user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Masters', 'homeApp:inventory_masters_page', 'tags', (
+                    'home.view_inventoryitem',
+                    'home.add_inventoryitem',
+                    'home.change_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(request_or_user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Stock', 'homeApp:inventory_stock_page', 'warehouse', (
+                    'home.view_inventoryitem',
+                    'home.add_inventoryitem',
+                    'home.change_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(request_or_user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Adjustments', 'homeApp:inventory_vouchers_page', 'exchange', (
+                    'home.view_inventoryitem',
+                    'home.add_inventoryitem',
+                    'home.change_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(request_or_user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Purchases', 'homeApp:purchase_list', 'truck', (
+                    'home.view_purchaseinvoice',
+                    'home.add_purchaseinvoice',
+                    'home.change_purchaseinvoice',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(request_or_user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Settings', 'homeApp:non_gst_shadow_page', 'user secret', (
+                    'home.can_view_party_credentials',
+                    'home.can_manage_staff',
+                ))] if _show_non_gst_control_nav(request_or_user) else []),
             ]),
         },
         {

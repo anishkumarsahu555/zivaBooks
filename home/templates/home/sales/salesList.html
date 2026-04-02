@@ -110,6 +110,10 @@
                             <input type="hidden" id="staffID" value="All">
                         {% endif %}
 
+                        <h4 class="ui horizontal left aligned divider header">
+                            <i class="left align icon"></i>
+                            Sales List
+                        </h4>
                         <table class="ui unstackable sortable celled very nowrap very small compact table" id="UserTable" style="margin-top: 5px; width: 100%">
                             <thead>
                             <tr>
@@ -314,6 +318,17 @@
             var endDate = $('#endDateF').val();
             var staffID = $('#staffID').val();
             userTab.ajax.url('{% if sales_capabilities.can_filter_staff %}{% url 'homeApp:SalesByAdminListJson' %}{% else %}{% url 'homeApp:SalesByStaffListJson' %}{% endif %}?startDate=' + startDate + '&endDate=' + endDate + '&staffID=' + staffID).load();
+        }
+
+        function downloadSalesInvoice(id) {
+            var baseUrl = "{% url 'homeApp:generate_sales_invoice_pdf' %}";
+            $('body').toast({class: 'info', message: 'Preparing invoice PDF...'});
+            var a = document.createElement('a');
+            a.href = baseUrl + '?id=' + encodeURIComponent(id);
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { document.body.removeChild(a); }, 1000);
         }
 
         {% if sales_capabilities.can_message %}

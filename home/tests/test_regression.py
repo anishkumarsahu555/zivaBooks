@@ -23,9 +23,10 @@ class SeedMockDataCommandTests(TestCase):
         call_command("seed_mock_data", stdout=stdout)
 
         self.assertEqual(Tenant.objects.count(), 2)
-        self.assertGreaterEqual(TenantMembership.objects.count(), 4)
-        self.assertEqual(Party.objects.count(), 2)
-        self.assertEqual(Collection.objects.count(), 2)
+        self.assertGreaterEqual(TenantMembership.objects.count(), 12)
+        self.assertGreaterEqual(Party.objects.count(), 60)
+        self.assertGreaterEqual(Collection.objects.count(), 48)
+        self.assertGreaterEqual(Sales.objects.count(), 48)
         self.assertGreaterEqual(StaffGroup.objects.count(), 10)
         owner = User.objects.get(username="alpha.owner")
         collector = User.objects.get(username="alphatraders.collector")
@@ -45,10 +46,23 @@ class SeedMockDataCommandTests(TestCase):
 
     def test_seed_mock_data_is_rerunnable(self):
         call_command("seed_mock_data")
+        counts_after_first_run = {
+            "tenants": Tenant.objects.count(),
+            "parties": Party.objects.count(),
+            "collections": Collection.objects.count(),
+            "sales": Sales.objects.count(),
+        }
         call_command("seed_mock_data")
 
-        self.assertEqual(Tenant.objects.count(), 2)
-        self.assertEqual(Party.objects.count(), 2)
+        self.assertEqual(
+            counts_after_first_run,
+            {
+                "tenants": Tenant.objects.count(),
+                "parties": Party.objects.count(),
+                "collections": Collection.objects.count(),
+                "sales": Sales.objects.count(),
+            },
+        )
 
 
 class AuditLogSerializationTests(TestCase):
