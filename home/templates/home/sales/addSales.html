@@ -231,9 +231,22 @@
                 padding-right: 0 !important;
             }
 
-            #saveBtn {
-                width: 100%;
+            .sales-form-actions {
+                display: flex;
+                align-items: stretch;
+                gap: 8px;
                 margin-top: 2px;
+            }
+
+            .sales-form-actions .button {
+                margin: 0 !important;
+            }
+
+            .sales-form-actions .saveBtn,
+            .sales-form-actions .saveBtnLoad,
+            .sales-form-actions .sales-reset-btn {
+                flex: 1 1 0;
+                width: auto;
             }
         }
 
@@ -537,15 +550,17 @@
                     <div class="ui  aligned basic  grid">
                         <div class="row" style="padding-left: 5px;padding-right: 5px">
                             <div class="16 wide column center aligned">
+                                <div class="sales-form-actions">
+                                    <button class="ui teal double button sales-reset-btn" type="button" onclick="resetSalesForm()">
+                                        Reset
+                                    </button>
                                 <button type="button" onclick="salesSave()" id="saveBtn" class="ui green  button saveBtn">
                                     Submit Detail
                                 </button>
                                 <button style="display: none;" class="ui teal double loading button saveBtnLoad">
                                     Saving ....
                                 </button>
-                                <button class="ui teal double button" type="button" onclick="resetSalesForm()">
-                                    Reset
-                                </button>
+                                </div>
                             </div>
                         </div>
                     </div>

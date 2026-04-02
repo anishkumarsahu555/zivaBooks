@@ -326,6 +326,24 @@
             .cash-counter-panel .ui.selection.dropdown {
                 min-height: 2.45rem;
             }
+
+            .cash-counter-form-actions {
+                display: flex;
+                align-items: stretch;
+                gap: 8px;
+                margin-top: 2px;
+            }
+
+            .cash-counter-form-actions .button {
+                margin: 0 !important;
+            }
+
+            .cash-counter-form-actions .saveBtn,
+            .cash-counter-form-actions .saveBtnLoad,
+            .cash-counter-form-actions .cash-reset-btn {
+                flex: 1 1 0;
+                width: auto;
+            }
         }
     </style>
 {% endblock %}
@@ -1004,15 +1022,17 @@
                     <div class="ui  aligned basic  grid">
                         <div class="row" style="padding-left: 5px;padding-right: 5px">
                             <div class="16 wide column center aligned">
+                                <div class="cash-counter-form-actions">
+                                <button class="ui teal double button cash-reset-btn" type="reset" onclick="resetForm()">
+                                    Reset
+                                </button>
                                 <button onclick="salesSave()" id="saveBtn" class="ui green  button saveBtn">
                                     Save
                                 </button>
                                 <button style="display: none;" class="ui teal double loading button saveBtnLoad">
                                     Saving ....
                                 </button>
-                                <button class="ui teal double button" type="reset" onclick="resetForm()">
-                                    Reset
-                                </button>
+                                </div>
                             </div>
                         </div>
                     </div>

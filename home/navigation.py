@@ -649,6 +649,7 @@ def build_sidebar_sections(request_or_user):
     sections = [
         {
             'title': 'General',
+            'group_break_after': True,
             'items': [
                 _nav_item('Dashboard', 'homeApp:homepage', 'tachometer alternate'),
             ],
@@ -669,6 +670,7 @@ def build_sidebar_sections(request_or_user):
         },
         {
             'title': 'Banks',
+            'group_break_after': True,
             'items': _filter_items(request_or_user, [
                 _nav_item('Bank List', 'homeApp:bank_list', 'university', bank_perms),
             ]),
@@ -768,6 +770,7 @@ def build_sidebar_sections(request_or_user):
         },
         {
             'title': 'Cash Counter',
+            'group_break_after': True,
             'items': _filter_items(request_or_user, [
                 _nav_item("Today's Cash Counter", 'homeApp:cash_counter', 'calendar check', (
                     'home.can_manage_cash_counter',
@@ -880,6 +883,7 @@ def build_sidebar_sections(request_or_user):
         },
         {
             'title': 'Reports',
+            'group_break_after': True,
             'items': _filter_items(request_or_user, [
                 _nav_item('Daily Summary', 'homeApp:report_daily_summary', 'sun', (
                     'home.can_manage_staff',

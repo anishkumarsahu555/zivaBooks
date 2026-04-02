@@ -1,11 +1,10 @@
 {% if sidebar_sections %}
     {% for section in sidebar_sections %}
         {% if section.items %}
-            <div class="nav-section item{% if section.collapsed_by_default %} is-collapsed{% endif %}">
+            <div class="nav-section item{% if section.collapsed_by_default %} is-collapsed{% endif %}{% if section.tone == 'muted' %} nav-section-muted{% endif %}{% if section.group_break_after %} nav-section-group-break{% endif %}">
                 <button class="nav-section-header" type="button" aria-expanded="{% if section.collapsed_by_default %}false{% else %}true{% endif %}">
                     <span class="nav-section-title-wrap">
                         <span class="nav-section-title">{{ section.title }}</span>
-                        <span class="nav-section-count">{{ section.items|length }}</span>
                     </span>
                     <span class="nav-section-chevron"><i class="chevron down icon"></i></span>
                 </button>
