@@ -573,6 +573,7 @@ class Sales(TenantOwnedModel):
 
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sales')
     partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL)
+    salesID = models.CharField(max_length=40, blank=True, null=True, db_index=True)
     paymentID = models.CharField(max_length=200, blank=True, null=True)
     invoiceSeries = models.ForeignKey('InvoiceSeries', blank=True, null=True, on_delete=models.SET_NULL, related_name='sales')
     invoiceSequenceNumber = models.PositiveIntegerField(blank=True, null=True)
@@ -607,6 +608,7 @@ class Sales(TenantOwnedModel):
         indexes = [
             models.Index(fields=['tenant', 'isDeleted', 'buildDate'], name='sales_tenant_del_build_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'createdBy'], name='sales_tenant_del_staff_idx'),
+            models.Index(fields=['tenant', 'salesID'], name='sales_tenant_salesid_idx'),
             models.Index(fields=['tenant', 'paymentID'], name='sales_tenant_payid_idx'),
         ]
         permissions = [
@@ -917,6 +919,7 @@ class PurchaseInvoice(TenantOwnedModel):
 
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='purchase_invoices')
     partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_invoices')
+    purchaseID = models.CharField(max_length=40, blank=True, null=True, db_index=True)
     invoiceNumber = models.CharField(max_length=200)
     buildDate = models.DateField(blank=True, null=True)
     gstTreatment = models.CharField(max_length=30, choices=GstTreatment.choices, default=GstTreatment.GST)
@@ -937,6 +940,7 @@ class PurchaseInvoice(TenantOwnedModel):
         indexes = [
             models.Index(fields=['tenant', 'isDeleted', 'buildDate'], name='purchase_tenant_del_build_idx'),
             models.Index(fields=['tenant', 'partyID'], name='purchase_tenant_party_idx'),
+            models.Index(fields=['tenant', 'purchaseID'], name='purchase_tenant_pid_idx'),
             models.Index(fields=['tenant', 'invoiceNumber'], name='purchase_tenant_inv_idx'),
         ]
 
@@ -1286,6 +1290,40 @@ class CollectionCashCounter(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'datetime'], name='ccollection_tenant_dt_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'collectedBy'], name='ccollection_tenant_staff_idx'),
             models.Index(fields=['tenant', 'paymentID'], name='ccollection_tenant_payid_idx'),
+        ]
+
+
+class TenantSequence(TenantAwareModel):
+    class Scope(models.TextChoices):
+        COLLECTION_PAYMENT = 'collection_payment', 'Collection Payment'
+        SALES = 'sales', 'Sales'
+        SALES_PAYMENT = 'sales_payment', 'Sales Payment'
+        ORDER = 'order', 'Order'
+        PURCHASE = 'purchase', 'Purchase'
+        CASH_COUNTER = 'cash_counter', 'Cash Counter'
+        CASH_COUNTER_COLLECTION = 'cash_counter_collection', 'Cash Counter Collection'
+        INVENTORY_OPENING = 'inventory_opening', 'Inventory Opening'
+        INVENTORY_ADJUSTMENT = 'inventory_adjustment', 'Inventory Adjustment'
+        INVENTORY_TRANSFER = 'inventory_transfer', 'Inventory Transfer'
+        PURCHASE_RETURN = 'purchase_return', 'Purchase Return'
+        SALES_RETURN = 'sales_return', 'Sales Return'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sequences')
+    scope = models.CharField(max_length=40, choices=Scope.choices)
+    prefix = models.CharField(max_length=20)
+    paddingLength = models.PositiveIntegerField(default=6)
+    nextNumber = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f'{self.tenant} - {self.prefix}'
+
+    class Meta:
+        verbose_name_plural = 'Tenant Sequences'
+        constraints = [
+            models.UniqueConstraint(fields=['tenant', 'scope'], name='unique_tenant_sequence_scope'),
+        ]
+        indexes = [
+            models.Index(fields=['tenant', 'scope'], name='tenantseq_tenant_scope_idx'),
         ]
 
 

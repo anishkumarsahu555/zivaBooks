@@ -471,9 +471,10 @@
                     <div class="invoice-sheet-top">
                         <div>
                             <div class="invoice-sheet-kicker">Purchase Invoice</div>
-                            <h2 class="invoice-sheet-title">{{ purchase.invoiceNumber }}</h2>
+                            <h2 class="invoice-sheet-title">{{ purchase.purchaseID|default:"-" }}</h2>
                             <p class="invoice-sheet-subtitle">
-                                {% if purchase.partyID %}{{ purchase.partyID.name }}{% else %}No supplier selected{% endif %}
+                                {% if purchase.invoiceNumber %}Supplier Invoice: {{ purchase.invoiceNumber }}{% else %}No supplier invoice number{% endif %}
+                                {% if purchase.partyID %} | {{ purchase.partyID.name }}{% else %} | No supplier selected{% endif %}
                                 {% if purchase.buildDate %} | {{ purchase.buildDate|date:"d/m/Y" }}{% endif %}
                             </p>
                         </div>
@@ -505,6 +506,10 @@
                             <h4>Invoice Details</h4>
                         </div>
                         <div class="invoice-detail-grid">
+                            <div class="invoice-detail-item">
+                                <span class="invoice-detail-label">Purchase ID</span>
+                                <span class="invoice-detail-value">{{ purchase.purchaseID|default:"-" }}</span>
+                            </div>
                             <div class="invoice-detail-item">
                                 <span class="invoice-detail-label">Invoice Number</span>
                                 <span class="invoice-detail-value">{{ purchase.invoiceNumber }}</span>

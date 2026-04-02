@@ -59,6 +59,20 @@ INVOICE_MODULE_MODEL_MAP = {
     InvoiceSeries.Module.SALES: Sales,
     InvoiceSeries.Module.CASH_COUNTER: CashCounter,
 }
+TENANT_SEQUENCE_DEFAULTS = {
+    TenantSequence.Scope.COLLECTION_PAYMENT: {'prefix': 'COL', 'padding': 6},
+    TenantSequence.Scope.SALES: {'prefix': 'SAL', 'padding': 6},
+    TenantSequence.Scope.SALES_PAYMENT: {'prefix': 'SPY', 'padding': 6},
+    TenantSequence.Scope.ORDER: {'prefix': 'ORD', 'padding': 6},
+    TenantSequence.Scope.PURCHASE: {'prefix': 'PUR', 'padding': 6},
+    TenantSequence.Scope.CASH_COUNTER: {'prefix': 'CC', 'padding': 6},
+    TenantSequence.Scope.CASH_COUNTER_COLLECTION: {'prefix': 'CCP', 'padding': 6},
+    TenantSequence.Scope.INVENTORY_OPENING: {'prefix': 'OPN', 'padding': 6},
+    TenantSequence.Scope.INVENTORY_ADJUSTMENT: {'prefix': 'ADJ', 'padding': 6},
+    TenantSequence.Scope.INVENTORY_TRANSFER: {'prefix': 'TRF', 'padding': 6},
+    TenantSequence.Scope.PURCHASE_RETURN: {'prefix': 'PRN', 'padding': 6},
+    TenantSequence.Scope.SALES_RETURN: {'prefix': 'SRN', 'padding': 6},
+}
 DEFAULT_GROUP_PERMISSION_MAP = {
     'Owner': '__all__',
     'Admin': '__all__',
@@ -536,6 +550,34 @@ def _invoice_series_payload_obj(series):
         'LockInvoiceNature': bool(getattr(series, 'lockInvoiceNature', False)),
         'RangeLabel': f'{str(series.startNumber).zfill(series.paddingLength)} - {str(series.endNumber).zfill(series.paddingLength)}',
     }
+def _tenant_sequence_queryset(request_or_user, scope):
+    tenant = get_current_tenant(request_or_user)
+    return TenantSequence.objects.filter(tenant=tenant, scope=scope)
+def _next_tenant_sequence_value(request_or_user, scope):
+    defaults = TENANT_SEQUENCE_DEFAULTS[scope]
+    with transaction.atomic():
+        sequence = _tenant_sequence_queryset(request_or_user, scope).select_for_update().first()
+        if sequence is None:
+            sequence = TenantSequence(
+                tenant=get_current_tenant(request_or_user),
+                scope=scope,
+                prefix=defaults['prefix'],
+                paddingLength=defaults['padding'],
+                nextNumber=1,
+            )
+            sequence.save()
+        number = sequence.nextNumber
+        sequence.nextNumber = number + 1
+        sequence.save(update_fields=['nextNumber', 'lastUpdatedOn'])
+    return f"{sequence.prefix}{str(number).zfill(sequence.paddingLength)}"
+def _sales_public_id(obj):
+    return getattr(obj, 'salesID', None) or getattr(obj, 'paymentID', None) or f'SAL{str(getattr(obj, "pk", 0)).zfill(6)}'
+def _purchase_public_id(obj):
+    return getattr(obj, 'purchaseID', None) or f'PUR{str(getattr(obj, "pk", 0)).zfill(6)}'
+def _order_public_id(obj):
+    return getattr(obj, 'orderNumber', None) or f'ORD{str(getattr(obj, "pk", 0)).zfill(6)}'
+def _cash_counter_public_id(obj):
+    return getattr(obj, 'counterID', None) or f'CC{str(getattr(obj, "pk", 0)).zfill(6)}'
 def _normalize_bool(raw):
     return str(raw).strip().lower() in {'1', 'true', 'yes', 'on'}
 def _validate_invoice_series_form(request, *, instance=None):
@@ -2283,7 +2325,7 @@ def add_collection_by_staff_api(request):
             except:
                 pass
             obj.save()
-            obj.paymentID = str(obj.pk).zfill(8)
+            obj.paymentID = _next_tenant_sequence_value(request, TenantSequence.Scope.COLLECTION_PAYMENT)
             if collect_date_obj:
                 try:
                     base_dt = obj.datetime or timezone.now()
@@ -2408,7 +2450,7 @@ def add_collection_by_admin_api(request):
                 obj.otpVerifiedOn = timezone.now()
             obj.collectionAddress = "From Shop."
             obj.save()
-            obj.paymentID = str(obj.pk).zfill(8)
+            obj.paymentID = _next_tenant_sequence_value(request, TenantSequence.Scope.COLLECTION_PAYMENT)
             # If user selected a date-only value, keep the entry time (not 12:00 AM).
             if collect_date_obj:
                 try:
@@ -5242,7 +5284,7 @@ def add_order_api(request):
         obj.status = Order.Status.SUBMITTED if (order_text or '').strip() else Order.Status.DRAFT
         obj.save()
         # Auto-generate order number like Sales.paymentID.
-        obj.orderNumber = _format_order_number(obj.pk)
+        obj.orderNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.ORDER)
         obj.save(update_fields=['orderNumber', 'lastUpdatedOn'])
         for f in request.FILES.getlist('images'):
             att = OrderAttachment(order=obj)
@@ -5429,7 +5471,7 @@ class OrdersByAdminListJson(BaseDatatableView):
             status_label = _order_status_label(item.status)
             att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
             json_data.append([
-                escape(item.orderNumber or str(item.pk)),
+                escape(_order_public_id(item)),
                 escape(party),
                 escape(item.buildDate.strftime('%d-%m-%Y') if item.buildDate else '-'),
                 status_label,
@@ -5498,7 +5540,7 @@ class OrdersByStaffListJson(BaseDatatableView):
             status_label = _order_status_label(item.status)
             att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
             json_data.append([
-                escape(item.orderNumber or str(item.pk)),
+                escape(_order_public_id(item)),
                 escape(party),
                 escape(item.buildDate.strftime('%d-%m-%Y') if item.buildDate else '-'),
                 status_label,
@@ -6136,7 +6178,7 @@ def add_inventory_opening_stock_api(request):
         voucher.remark = request.POST.get('remark')
         voucher.createdBy = _staff_for_request(request)
         voucher.save()
-        voucher.voucherNumber = 'OS' + str(voucher.pk).zfill(6)
+        voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.INVENTORY_OPENING)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
         item_ids = []
@@ -6243,7 +6285,7 @@ def add_inventory_adjustment_voucher_api(request):
         voucher.remark = request.POST.get('remark')
         voucher.createdBy = _staff_for_request(request)
         voucher.save()
-        voucher.voucherNumber = 'ADJ' + str(voucher.pk).zfill(6)
+        voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.INVENTORY_ADJUSTMENT)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
         rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
@@ -6390,7 +6432,7 @@ def add_inventory_transfer_voucher_api(request):
         voucher.remark = request.POST.get('remark')
         voucher.createdBy = _staff_for_request(request)
         voucher.save()
-        voucher.voucherNumber = 'TRN' + str(voucher.pk).zfill(6)
+        voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.INVENTORY_TRANSFER)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
         for row in rows:
@@ -6532,7 +6574,7 @@ def add_purchase_return_voucher_api(request):
         voucher.remark = request.POST.get('remark')
         voucher.createdBy = _staff_for_request(request)
         voucher.save()
-        voucher.voucherNumber = 'PRN' + str(voucher.pk).zfill(6)
+        voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.PURCHASE_RETURN)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
         rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
@@ -6691,7 +6733,7 @@ def add_sales_return_voucher_api(request):
         voucher.remark = request.POST.get('remark')
         voucher.createdBy = _staff_for_request(request)
         voucher.save()
-        voucher.voucherNumber = 'SRN' + str(voucher.pk).zfill(6)
+        voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES_RETURN)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
         rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice')
@@ -6839,6 +6881,7 @@ def list_purchase_invoices_api(request):
     for purchase in rows:
         payload.append({
             'ID': purchase.pk,
+            'PurchaseID': _purchase_public_id(purchase),
             'InvoiceNumber': purchase.invoiceNumber,
             'InvoiceDate': purchase.buildDate.strftime('%d/%m/%Y') if purchase.buildDate else '',
             'Party': purchase.partyID.name if purchase.partyID_id else '-',
@@ -6881,6 +6924,7 @@ def get_purchase_invoice_detail_api(request):
         } for revision in purchase.revisions.filter(isDeleted=False).select_related('changedBy').order_by('-datetime')]
         return JsonResponse({'message': 'success', 'data': {
             'ID': purchase.pk,
+            'PurchaseID': _purchase_public_id(purchase),
             'PartyID': purchase.partyID_id,
             'InvoiceNumber': purchase.invoiceNumber,
             'InvoiceDate': purchase.buildDate.strftime('%d/%m/%Y') if purchase.buildDate else '',
@@ -6920,6 +6964,8 @@ def add_purchase_invoice_api(request):
         purchase.createdBy = _staff_for_request(request)
         purchase.subtotalAmount, purchase.gstAmount, purchase.totalAmount = _purchase_totals_from_lines(lines_payload)
         purchase.save()
+        purchase.purchaseID = _next_tenant_sequence_value(request, TenantSequence.Scope.PURCHASE)
+        purchase.save(update_fields=['purchaseID', 'lastUpdatedOn'])
         _sync_purchase_lines(request, purchase, lines_payload)
         return JsonResponse({'message': 'success', 'purchaseId': purchase.pk}, safe=False)
     except Exception as exc:
@@ -7966,7 +8012,7 @@ def _sync_cash_counter_return_voucher(request, counter: CashCounter):
         voucher.save(update_fields=['sales', 'cashCounter', 'entryDate', 'partyID', 'remark', 'createdBy', 'totalAmount', 'isDeleted', 'lastUpdatedOn'])
     else:
         voucher.save()
-        voucher.voucherNumber = 'SRN' + str(voucher.pk).zfill(6)
+        voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES_RETURN)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
 
     voucher.lines.filter(isDeleted=False).update(isDeleted=True)
@@ -8163,8 +8209,9 @@ def add_sales_by_admin_api(request):
             user = _staff_for_request(request)
             obj.createdBy_id = user.pk
             obj.save()
-            obj.paymentID = 'S' + str(obj.pk).zfill(8)
-            obj.save(update_fields=['paymentID', 'lastUpdatedOn'])
+            obj.salesID = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES)
+            obj.paymentID = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES_PAYMENT)
+            obj.save(update_fields=['salesID', 'paymentID', 'lastUpdatedOn'])
             if inventory_enabled:
                 _sync_sales_lines(request, obj)
             sync_book_transactions(obj)
@@ -8207,7 +8254,7 @@ class SalesByAdminListJson(BaseDatatableView):
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
-                Q(paymentID__icontains=search) | Q(partyID__name__icontains=search) | Q(
+                Q(paymentID__icontains=search) | Q(salesID__icontains=search) | Q(partyID__name__icontains=search) | Q(
                     amount__icontains=search) | Q(
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search) | Q(modeOfPayment__icontains=search) | Q(bankID__name__icontains=search)
@@ -8256,7 +8303,7 @@ class SalesByAdminListJson(BaseDatatableView):
                              No
                            </div>'''
             json_data.append([
-                escape(item.paymentID),
+                escape(_sales_public_id(item)),
                 escape(item.partyID.name),
                 escape(item.invoiceNumber),
                 escape(payment_mode),
@@ -8301,7 +8348,7 @@ class SalesByStaffListJson(BaseDatatableView):
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
-                Q(paymentID__icontains=search) | Q(partyID__name__icontains=search) | Q(
+                Q(paymentID__icontains=search) | Q(salesID__icontains=search) | Q(partyID__name__icontains=search) | Q(
                     amount__icontains=search) | Q(
                     invoiceNumber__icontains=search) | Q(createdBy__name__icontains=search) | Q(
                     remark__icontains=search) | Q(modeOfPayment__icontains=search) | Q(bankID__name__icontains=search)
@@ -8340,7 +8387,7 @@ class SalesByStaffListJson(BaseDatatableView):
             else:
                 payment_detail = 'Cash sale'
             json_data.append([
-                escape(item.paymentID),
+                escape(_sales_public_id(item)),
                 escape(item.partyID.name),
                 escape(item.invoiceNumber),
                 escape(payment_mode),
@@ -8909,8 +8956,8 @@ def add_cash_counter_entry_api(request):
             obj.createdBy_id = user.pk
             _apply_cash_counter_invoice_payload(request, obj, party_obj)
             obj.save()
-            obj.counterID = 'CC' + str(obj.pk).zfill(8)
-            obj.save()
+            obj.counterID = _next_tenant_sequence_value(request, TenantSequence.Scope.CASH_COUNTER)
+            obj.save(update_fields=['counterID', 'lastUpdatedOn'])
             if inventory_enabled:
                 _sync_cash_counter_lines(request, obj)
                 _sync_cash_counter_return_voucher(request, obj)
@@ -8963,7 +9010,7 @@ class CashCounterByStaffListJson(BaseDatatableView):
             except:
                 createdBy = '-'
             json_data.append([
-                escape(item.counterID),
+                escape(_cash_counter_public_id(item)),
                 escape(item.invoiceNumber),
                 formatINR(format(item.amount, '.0f')),
                 createdBy,
@@ -9021,7 +9068,7 @@ class CardCounterByStaffListJson(BaseDatatableView):
             except:
                 remark = escape(item.remark)
             json_data.append([
-                escape(item.counterID),
+                escape(_cash_counter_public_id(item)),
                 escape(item.invoiceNumber),
                 formatINR(format(item.amount, '.0f')),
                 createdBy,
@@ -9074,7 +9121,7 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
             except:
                 createdBy = '-'
             json_data.append([
-                escape(item.counterID),
+                escape(_cash_counter_public_id(item)),
                 escape(item.invoiceNumber),
                 formatINR(format(item.amount, '.0f')),
                 createdBy,
@@ -9132,7 +9179,7 @@ class CreditCounterByStaffListJson(BaseDatatableView):
             except:
                 party = 'N/A'
             json_data.append([
-                escape(item.counterID),
+                escape(_cash_counter_public_id(item)),
                 escape(party),
                 escape(item.invoiceNumber),
                 formatINR(format(item.amount, '.0f')),
@@ -9193,7 +9240,7 @@ class MixCounterByStaffListJson(BaseDatatableView):
             except:
                 remark = escape(item.remark)
             json_data.append([
-                escape(item.counterID),
+                escape(_cash_counter_public_id(item)),
                 escape(item.invoiceNumber),
                 formatINR(format(item.mixCashAmount, '.0f')),
                 formatINR(format(item.mixCardAmount, '.0f')),
@@ -9262,7 +9309,7 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
             except:
                 party = 'N/A'
             json_data.append([
-                escape(item.counterID),
+                escape(_cash_counter_public_id(item)),
                 escape(party),
                 formatINR(format(item.amount, '.0f')),
                 createdBy,
@@ -9330,7 +9377,7 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
             except:
                 party = 'N/A'
             json_data.append([
-                escape(item.counterID),
+                escape(_cash_counter_public_id(item)),
                 escape(party),
                 formatINR(format(item.amount, '.0f')),
                 createdBy,
@@ -9393,7 +9440,7 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
             except:
                 createdBy = '-'
             json_data.append([
-                escape(item.counterID),
+                escape(_cash_counter_public_id(item)),
                 escape(item.expenseType) + ' - ' + escape(item.remark),
                 formatINR(format(item.amount, '.0f')),
                 createdBy,
@@ -9923,7 +9970,7 @@ def add_collection_from_cash_counter_api(request):
             except:
                 pass
             obj.save()
-            obj.paymentID = 'CCC' + str(obj.pk).zfill(8)
+            obj.paymentID = _next_tenant_sequence_value(request, TenantSequence.Scope.CASH_COUNTER_COLLECTION)
             obj.collectionDateTime = obj.datetime
             obj.save()
             sync_book_transactions(obj)
