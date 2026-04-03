@@ -170,7 +170,7 @@ class MessageThread(threading.Thread):
     def run(self):
         while (self._is_running):
             msg = tenant_qs(get_current_tenant(None), WhatsappMessage).filter(isDeleted__exact=False).last()
-            if msg.used < msg.balance:
+            if msg and msg.used < msg.balance:
                 try:
                     # r = requests.get(
                     #     msg.name + "send?number=91" + self.number + "&type=text&message=" + self.message + "&instance_id=" + msg.instanceID + "&access_token=" + msg.apiKey,
@@ -1344,7 +1344,7 @@ def deduct_location_balance(lat, lng):
     return _reverse_geocode_openstreetmap(lat, lng)
 def send_whatsapp_message(number, message):
     msg = tenant_qs(get_current_tenant(None), WhatsappMessage).filter(isDeleted__exact=False).last()
-    if msg.used < msg.balance:
+    if msg and msg.used < msg.balance:
         # r = requests.get(
         #     msg.name + "send?number=91" + number + "&type=text&message=" + message + "&instance_id=" + msg.instanceID + "&access_token=" + msg.apiKey,
         #     verify=False)
@@ -1375,6 +1375,7 @@ def add_staff_group_api(request):
             _sync_staff_group_permissions(obj, permission_ids)
             return JsonResponse({'message': 'success', 'group_id': obj.pk}, safe=False)
         except Exception as exc:
+            transaction.set_rollback(True)
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 class StaffGroupListJson(BaseDatatableView):
     order_columns = ['name', 'description', 'name', 'datetime', 'name']
@@ -1484,6 +1485,7 @@ def edit_staff_group_api(request):
                 _sync_staff_user_group_membership(staff)
             return JsonResponse({'message': 'success', 'group_id': obj.pk}, safe=False)
         except Exception as exc:
+            transaction.set_rollback(True)
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 @transaction.atomic
 def delete_staff_group_api(request):
@@ -8442,59 +8444,59 @@ def _apply_sales_mode_payload(request, obj: Sales) -> None:
         obj.bankID_id = bank_id
 
 
-@transaction.atomic
 def add_sales_by_admin_api(request):
     if request.method == 'POST':
         try:
-            invoiceSeriesId = request.POST.get("invoiceSeriesId")
-            requestedInvoiceNumber = request.POST.get("requestedInvoiceNumber")
-            colDate = request.POST.get("colDate")
-            party = request.POST.get("party")
-            remark = request.POST.get("remark")
-            cus = _parse_sales_party(request, party)
-            inventory_enabled = _inventory_feature_enabled(request)
-            line_items = _request_line_items_payload(request) if (inventory_enabled and _request_line_items_present(request)) else []
-            obj = Sales()
-            assign_tenant(obj, request)
-            obj.partyID_id = cus.pk
-            series, sequence_number, invoice_number = _reserve_invoice_number(
-                request,
-                InvoiceSeries.Module.SALES,
-                invoiceSeriesId,
-                preferred_number=requestedInvoiceNumber or None,
-            )
-            obj.invoiceSeries = series
-            obj.invoiceSequenceNumber = sequence_number
-            obj.invoiceNumber = invoice_number
-            _apply_sales_mode_payload(request, obj)
-            obj.remark = remark
-            obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y').date()
-            _apply_sales_invoice_payload(request, obj, cus, line_items=line_items)
-            user = _staff_for_request(request)
-            obj.createdBy_id = user.pk
-            obj.save()
-            obj.salesID = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES)
-            obj.paymentID = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES_PAYMENT)
-            obj.save(update_fields=['salesID', 'paymentID', 'lastUpdatedOn'])
-            if inventory_enabled:
-                _sync_sales_lines(request, obj)
-            source_order_id = request.POST.get('sourceOrderId')
-            if source_order_id:
-                try:
-                    source_order = tenant_qs(request, Order).get(pk=int(source_order_id), isDeleted=False)
-                    if str(getattr(source_order, 'status', '') or '') in {
-                        Order.Status.APPROVED,
-                        Order.Status.PACKED,
-                        Order.Status.OUT_FOR_DELIVERY,
-                        Order.Status.DELIVERED,
-                        Order.Status.RETURNED,
-                        Order.Status.FULFILLED,
-                    }:
-                        _link_sale_to_order(request, source_order, obj, note='Sale created from order')
-                except Exception:
-                    pass
-            sync_book_transactions(obj)
-            sync_party_ledger_entries_for_object(obj)
+            with transaction.atomic():
+                invoiceSeriesId = request.POST.get("invoiceSeriesId")
+                requestedInvoiceNumber = request.POST.get("requestedInvoiceNumber")
+                colDate = request.POST.get("colDate")
+                party = request.POST.get("party")
+                remark = request.POST.get("remark")
+                cus = _parse_sales_party(request, party)
+                inventory_enabled = _inventory_feature_enabled(request)
+                line_items = _request_line_items_payload(request) if (inventory_enabled and _request_line_items_present(request)) else []
+                obj = Sales()
+                assign_tenant(obj, request)
+                obj.partyID_id = cus.pk
+                series, sequence_number, invoice_number = _reserve_invoice_number(
+                    request,
+                    InvoiceSeries.Module.SALES,
+                    invoiceSeriesId,
+                    preferred_number=requestedInvoiceNumber or None,
+                )
+                obj.invoiceSeries = series
+                obj.invoiceSequenceNumber = sequence_number
+                obj.invoiceNumber = invoice_number
+                _apply_sales_mode_payload(request, obj)
+                obj.remark = remark
+                obj.buildDate = datetime.strptime(colDate, '%d/%m/%Y').date()
+                _apply_sales_invoice_payload(request, obj, cus, line_items=line_items)
+                user = _staff_for_request(request)
+                obj.createdBy_id = user.pk
+                obj.save()
+                obj.salesID = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES)
+                obj.paymentID = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES_PAYMENT)
+                obj.save(update_fields=['salesID', 'paymentID', 'lastUpdatedOn'])
+                if inventory_enabled:
+                    _sync_sales_lines(request, obj)
+                source_order_id = request.POST.get('sourceOrderId')
+                if source_order_id:
+                    try:
+                        source_order = tenant_qs(request, Order).get(pk=int(source_order_id), isDeleted=False)
+                        if str(getattr(source_order, 'status', '') or '') in {
+                            Order.Status.APPROVED,
+                            Order.Status.PACKED,
+                            Order.Status.OUT_FOR_DELIVERY,
+                            Order.Status.DELIVERED,
+                            Order.Status.RETURNED,
+                            Order.Status.FULFILLED,
+                        }:
+                            _link_sale_to_order(request, source_order, obj, note='Sale created from order')
+                    except Exception:
+                        pass
+                sync_book_transactions(obj)
+                sync_party_ledger_entries_for_object(obj)
             # try:
             #     msg = "Your order has been dispatched Ag. Bill No. {} Dt. {} Amt. Rs. {}, Please confirm received the material. If you have any queries about your order, Please feel free contact on this no 7005607770. Thanks, BSS".format(obj.invoiceNumber, obj.buildDate.strftime('%d-%m-%Y'), obj.amount)
             #     try:
@@ -9187,7 +9189,7 @@ def re_send_message_sales(request):
             obj = tenant_qs(request, WhatsappMessageStatus).select_related().get(pk=int(id))
             try:
                 msg = tenant_qs(request, WhatsappMessage).filter(isDeleted__exact=False).last()
-                if msg.used < msg.balance:
+                if msg and msg.used < msg.balance:
                     try:
                         # r = requests.get(
                         #     msg.name + "send?number=91" + obj.phone + "&type=text&message=" + obj.message + "&instance_id=" + msg.instanceID + "&access_token=" + msg.apiKey,
@@ -9227,71 +9229,71 @@ def enable_tally_post_api(request):
         except:
             return JsonResponse({'message': 'error'}, safe=False)
 # cash counter api
-@transaction.atomic
 def add_cash_counter_entry_api(request):
     if request.method == 'POST':
         try:
-            invoiceSeriesId = request.POST.get("invoiceSeriesId")
-            requestedInvoiceNumber = request.POST.get("requestedInvoiceNumber")
-            party = request.POST.get("party")
-            amount = request.POST.get("amount")
-            remark = request.POST.get("remark")
-            amountMixCash = request.POST.get("amountMixCash")
-            amountMixCard = request.POST.get("amountMixCard")
-            expenseType = request.POST.get("expenseType")
-            bank = request.POST.get("bank")
-            mode = request.POST.get("mode")
-            inventory_enabled = _inventory_feature_enabled(request)
-            line_items_total = _line_items_total(request) if (inventory_enabled and _request_line_items_present(request)) else 0.0
-            party_obj = None
-            obj = CashCounter()
-            assign_tenant(obj, request)
-            if mode in {"Cash", "Credit", "Card", "Collection", "Advance", "Mix", "Return"}:
-                c = str(party).split('@')
-                party_obj = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
-                obj.partyID_id = party_obj.pk
-            else:
-                obj.partyID = None
-            if mode == "Cash" or mode == "Mix" or mode == "Card" or mode == "Credit" or mode == "Return":
-                series, sequence_number, invoice_number = _reserve_invoice_number(
-                    request,
-                    InvoiceSeries.Module.CASH_COUNTER,
-                    invoiceSeriesId,
-                    preferred_number=requestedInvoiceNumber or None,
-                )
-                obj.invoiceSeries = series
-                obj.invoiceSequenceNumber = sequence_number
-                obj.invoiceNumber = invoice_number
-            if mode == "Mix":
-                obj.mixCashAmount = float(amountMixCash)
-                obj.mixCardAmount = float(amountMixCard)
-                obj.amount = 0.0
-            else:
-                obj.amount = float(amount or line_items_total or 0.0)
-                obj.mixCashAmount = 0.0
-                obj.mixCardAmount = 0.0
-            if mode == "Expense":
-                obj.expenseType = expenseType
-            else:
-                obj.expenseType = ''
-            if mode == "Card" or mode == "Mix":
-                obj.bankID_id = int(bank)
-            else:
-                obj.bankID = None
-            obj.mode = mode
-            obj.remark = remark
-            obj.entryDate = datetime.now()
-            user = _staff_for_request(request)
-            obj.createdBy_id = user.pk
-            _apply_cash_counter_invoice_payload(request, obj, party_obj)
-            obj.save()
-            obj.counterID = _next_tenant_sequence_value(request, TenantSequence.Scope.CASH_COUNTER)
-            obj.save(update_fields=['counterID', 'lastUpdatedOn'])
-            if inventory_enabled:
-                _sync_cash_counter_lines(request, obj)
-                _sync_cash_counter_return_voucher(request, obj)
-            sync_book_transactions(obj)
-            sync_party_ledger_entries_for_object(obj)
+            with transaction.atomic():
+                invoiceSeriesId = request.POST.get("invoiceSeriesId")
+                requestedInvoiceNumber = request.POST.get("requestedInvoiceNumber")
+                party = request.POST.get("party")
+                amount = request.POST.get("amount")
+                remark = request.POST.get("remark")
+                amountMixCash = request.POST.get("amountMixCash")
+                amountMixCard = request.POST.get("amountMixCard")
+                expenseType = request.POST.get("expenseType")
+                bank = request.POST.get("bank")
+                mode = request.POST.get("mode")
+                inventory_enabled = _inventory_feature_enabled(request)
+                line_items_total = _line_items_total(request) if (inventory_enabled and _request_line_items_present(request)) else 0.0
+                party_obj = None
+                obj = CashCounter()
+                assign_tenant(obj, request)
+                if mode in {"Cash", "Credit", "Card", "Collection", "Advance", "Mix", "Return"}:
+                    c = str(party).split('@')
+                    party_obj = tenant_qs(request, Party).select_related().get(pk=int(c[1]))
+                    obj.partyID_id = party_obj.pk
+                else:
+                    obj.partyID = None
+                if mode == "Cash" or mode == "Mix" or mode == "Card" or mode == "Credit" or mode == "Return":
+                    series, sequence_number, invoice_number = _reserve_invoice_number(
+                        request,
+                        InvoiceSeries.Module.CASH_COUNTER,
+                        invoiceSeriesId,
+                        preferred_number=requestedInvoiceNumber or None,
+                    )
+                    obj.invoiceSeries = series
+                    obj.invoiceSequenceNumber = sequence_number
+                    obj.invoiceNumber = invoice_number
+                if mode == "Mix":
+                    obj.mixCashAmount = float(amountMixCash)
+                    obj.mixCardAmount = float(amountMixCard)
+                    obj.amount = 0.0
+                else:
+                    obj.amount = float(amount or line_items_total or 0.0)
+                    obj.mixCashAmount = 0.0
+                    obj.mixCardAmount = 0.0
+                if mode == "Expense":
+                    obj.expenseType = expenseType
+                else:
+                    obj.expenseType = ''
+                if mode == "Card" or mode == "Mix":
+                    obj.bankID_id = int(bank)
+                else:
+                    obj.bankID = None
+                obj.mode = mode
+                obj.remark = remark
+                obj.entryDate = datetime.now()
+                user = _staff_for_request(request)
+                obj.createdBy_id = user.pk
+                _apply_cash_counter_invoice_payload(request, obj, party_obj)
+                obj.save()
+                obj.counterID = _next_tenant_sequence_value(request, TenantSequence.Scope.CASH_COUNTER)
+                obj.save(update_fields=['counterID', 'lastUpdatedOn'])
+                if inventory_enabled:
+                    _sync_cash_counter_lines(request, obj)
+                    _sync_cash_counter_return_voucher(request, obj)
+                sync_book_transactions(obj)
+                sync_party_ledger_entries_for_object(obj)
             return JsonResponse({'message': 'success', 'invoiceNumber': obj.invoiceNumber}, safe=False)
         except Exception as exc:
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)

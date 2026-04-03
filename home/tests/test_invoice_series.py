@@ -1,3 +1,5 @@
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
@@ -155,6 +157,25 @@ class InvoiceSeriesTests(TestCase):
         self.assertEqual(sale.invoiceSequenceNumber, 2)
         self.assertEqual(sale.invoiceNumber, "BCS0002")
         self.assertFalse(BookTransaction.objects.filter(source_object_id=sale.pk, isDeleted=False).exists())
+
+    def test_add_sales_failure_does_not_consume_invoice_number(self):
+        with mock.patch("home.apiView.sync_book_transactions", side_effect=RuntimeError("boom")):
+            response = self.client.post(
+                reverse("homeApp:add_sales_by_admin_api"),
+                data={
+                    "invoiceSeriesId": str(self.sales_series.pk),
+                    "colDate": "21/03/2026",
+                    "party": f"{self.party.name} @ {self.party.pk}",
+                    "amount": "250",
+                    "remark": "should rollback",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "error")
+        self.sales_series.refresh_from_db()
+        self.assertEqual(self.sales_series.nextNumber, 1)
+        self.assertFalse(Sales.objects.filter(invoiceSeries=self.sales_series, invoiceSequenceNumber=1).exists())
 
     def test_add_sales_can_use_selected_unused_invoice_number(self):
         Sales.objects.create(
@@ -475,6 +496,29 @@ class InvoiceSeriesTests(TestCase):
         )
         self.assertEqual(entry.invoiceSequenceNumber, 1)
         self.assertEqual(entry.invoiceNumber, "CCS0001")
+
+    def test_add_cash_counter_failure_does_not_consume_invoice_number(self):
+        with mock.patch("home.apiView.sync_book_transactions", side_effect=RuntimeError("boom")):
+            response = self.client.post(
+                reverse("homeApp:add_cash_counter_entry_api"),
+                data={
+                    "invoiceSeriesId": str(self.cash_series.pk),
+                    "party": f"{self.party.name} @ {self.party.pk}",
+                    "amount": "500",
+                    "remark": "should rollback",
+                    "amountMixCash": "",
+                    "amountMixCard": "",
+                    "expenseType": "",
+                    "bank": "",
+                    "mode": "Cash",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "error")
+        self.cash_series.refresh_from_db()
+        self.assertEqual(self.cash_series.nextNumber, 1)
+        self.assertFalse(CashCounter.objects.filter(invoiceSeries=self.cash_series, invoiceSequenceNumber=1).exists())
 
     def test_add_cash_counter_can_use_selected_unused_invoice_number(self):
         entry = self._create_cash_counter(

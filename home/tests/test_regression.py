@@ -8,8 +8,8 @@ from django.test import Client, TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from home.apiView import _sync_staff_user_group_membership
-from home.models import AuditLog, Collection, Party, Sales, StaffGroup, StaffUser, Tenant, TenantMembership
+from home.apiView import _sync_staff_user_group_membership, send_whatsapp_message
+from home.models import AuditLog, Collection, Party, Sales, StaffGroup, StaffUser, Tenant, TenantMembership, WhatsappMessageStatus
 from home.otp import get_collection_otp_payload
 
 
@@ -526,3 +526,43 @@ class CollectionOtpEndToEndTests(TestCase):
         collection = Collection.objects.filter(tenant=tenant, partyID=party, collectedBy=staff_profile).order_by("-id").first()
         self.assertIsNotNone(collection)
         self.assertTrue(collection.otpVerified)
+
+
+class WhatsappMessageSafetyTests(TestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(name="WhatsApp Tenant", slug="whatsapp-tenant")
+        self.user = User.objects.create_user(username="wa-user", password="secret123")
+        TenantMembership.objects.create(
+            tenant=self.tenant,
+            user=self.user,
+            role=TenantMembership.Role.STAFF,
+            isDefault=True,
+        )
+        StaffUser.objects.create(
+            tenant=self.tenant,
+            user_ID=self.user,
+            name="WA Staff",
+            phone="9999999999",
+            isActive="Active",
+        )
+        self.client.force_login(self.user)
+
+    def test_send_whatsapp_message_without_package_does_not_raise(self):
+        send_whatsapp_message("9876543210", "hello")
+
+    def test_resend_message_sales_without_package_does_not_crash(self):
+        status = WhatsappMessageStatus.objects.create(
+            tenant=self.tenant,
+            phone="9876543210",
+            message="hello",
+            messageTo="Customer",
+            status="Fail",
+        )
+
+        response = self.client.post(
+            reverse("homeApp:re_send_message_sales"),
+            data={"userID": str(status.pk)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "success")
