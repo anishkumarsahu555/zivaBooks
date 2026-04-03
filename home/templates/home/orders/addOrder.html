@@ -6,6 +6,39 @@
 {% endblock %}
 
 {% block body %}
+    <style>
+        .order-file-input {
+            display: block;
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px dashed rgba(34, 36, 38, 0.18);
+            border-radius: 12px;
+            background: #fbfdff;
+        }
+
+        .order-file-preview {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .order-file-chip {
+            margin: 0 !important;
+        }
+
+        html[data-theme="dark"] .order-file-input {
+            background: rgba(15, 23, 42, 0.88);
+            border-color: rgba(56, 189, 248, 0.18);
+            color: #dce8f7;
+        }
+
+        html[data-theme="dark"] .order-file-chip.ui.tiny.label {
+            background: rgba(15, 23, 42, 0.82) !important;
+            border: 1px solid rgba(56, 189, 248, 0.14) !important;
+            color: #dce8f7 !important;
+        }
+    </style>
     <div class="ui aligned basic grid">
         <div class="sixteen wide column">
             <div class="ui pointing secondary menu">
@@ -53,8 +86,8 @@
                             <div class="one fields">
                                 <div class="sixteen wide field">
                                     <label>Images (optional)</label>
-                                    <input type="file" id="images" multiple accept="image/*">
-                                    <div id="imagePreview" style="margin-top:10px;"></div>
+                                    <input type="file" id="images" class="order-file-input" multiple accept="image/*">
+                                    <div id="imagePreview" class="order-file-preview"></div>
                                 </div>
                             </div>
                             <input type="hidden" id="lat" value="0.0">
@@ -121,7 +154,7 @@
             preview.html('');
             var files = this.files || [];
             for (var i = 0; i < files.length; i++) {
-                preview.append('<div class="ui tiny label" style="margin:2px;">' + files[i].name + '</div>');
+                preview.append('<div class="ui tiny label order-file-chip">' + files[i].name + '</div>');
             }
         });
 

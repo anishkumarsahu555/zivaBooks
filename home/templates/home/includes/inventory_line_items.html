@@ -116,6 +116,50 @@
             flex-wrap: wrap;
         }
 
+        html[data-theme="dark"] .inventory-line-item-box.ui.segment {
+            background: rgba(15, 23, 42, 0.84) !important;
+            border-color: rgba(56, 189, 248, 0.12) !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] .inventory-line-item-box .ui.tiny.header,
+        html[data-theme="dark"] .inventory-line-item-box .inventory-help-text,
+        html[data-theme="dark"] .inventory-line-item-box .inventory-grid .field > label,
+        html[data-theme="dark"] .inventory-line-item-box .inventory-stock-hint {
+            color: #93a4bd !important;
+        }
+
+        html[data-theme="dark"] .inventory-line-item-box .inventory-line-card {
+            background: rgba(15, 23, 42, 0.92) !important;
+            border-color: rgba(56, 189, 248, 0.16) !important;
+        }
+
+        html[data-theme="dark"] .inventory-line-item-box .inventory-unit-badge {
+            background: rgba(22, 120, 194, 0.18) !important;
+            border-color: rgba(56, 189, 248, 0.26) !important;
+            color: #bfefff !important;
+        }
+
+        html[data-theme="dark"] .inventory-line-item-box .inventory-summary-pill,
+        html[data-theme="dark"] .inventory-line-item-box .inventory-footer-totals .ui.tiny.label {
+            background: rgba(15, 23, 42, 0.82) !important;
+            border: 1px solid rgba(56, 189, 248, 0.14) !important;
+            color: #dce8f7 !important;
+        }
+
+        html[data-theme="dark"] .inventory-line-item-box .inventory-footer-totals .ui.tiny.teal.label {
+            background: linear-gradient(135deg, #0f766e, rgba(45, 212, 191, 0.28)) !important;
+            border-color: rgba(45, 212, 191, 0.36) !important;
+            color: #effffc !important;
+        }
+
+        html[data-theme="dark"] .inventory-line-item-box .inventory-add-row.ui.teal.basic.small.button {
+            background: rgba(15, 23, 42, 0.86) !important;
+            border-color: rgba(45, 212, 191, 0.26) !important;
+            color: #8fe5dc !important;
+            box-shadow: none !important;
+        }
+
         @media only screen and (max-width: 767px) {
             .inventory-line-item-box .inventory-grid {
                 grid-template-columns: 1fr;

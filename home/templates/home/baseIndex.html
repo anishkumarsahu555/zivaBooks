@@ -15,6 +15,22 @@
     <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
     <link rel="stylesheet" href="{% static 'css/app-loader.css' %}">
+    <script>
+        (function () {
+            var theme = 'light';
+            try {
+                theme = localStorage.getItem('ziva-theme') || '';
+            } catch (e) {}
+            if (!theme) {
+                try {
+                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                } catch (e) {
+                    theme = 'light';
+                }
+            }
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
     <link rel="stylesheet" type="text/css"
@@ -28,11 +44,45 @@
 
     {% endblock %}
     <style>
+        :root {
+            --app-bg: #f3f7fb;
+            --app-text: #0f172a;
+            --app-muted: #64748b;
+            --app-line: rgba(15, 23, 42, 0.10);
+            --app-surface: #ffffff;
+            --app-surface-soft: #f8fbff;
+            --app-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
+            --app-topbar-bg: linear-gradient(180deg, #0b2235 0%, #102b41 52%, #0e2539 100%);
+            --app-topbar-text: #f8fafc;
+            --app-sidebar-bg:
+                radial-gradient(circle at top left, rgba(45, 212, 191, 0.09), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.12), transparent 34%),
+                linear-gradient(180deg, #0b2235 0%, #102b41 52%, #0e2539 100%);
+        }
+
+        html[data-theme="dark"] {
+            --app-bg: #0b1220;
+            --app-text: #e5edf7;
+            --app-muted: #8fa2bb;
+            --app-line: rgba(148, 163, 184, 0.18);
+            --app-surface: #111b2e;
+            --app-surface-soft: #162338;
+            --app-shadow: 0 20px 48px rgba(2, 6, 23, 0.38);
+            --app-topbar-bg: linear-gradient(180deg, #07111d 0%, #0a1625 52%, #0a1320 100%);
+            --app-topbar-text: #e5edf7;
+            --app-sidebar-bg:
+                radial-gradient(circle at top left, rgba(45, 212, 191, 0.08), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.10), transparent 34%),
+                linear-gradient(180deg, #07111d 0%, #0a1625 52%, #0a1320 100%);
+        }
+
         html {
             scroll-behavior: smooth;
         }
 
         body {
+            background: var(--app-bg);
+            color: var(--app-text);
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
@@ -138,10 +188,7 @@
             padding: 12px 10px 16px;
             overflow-y: auto;
             overflow-x: hidden;
-            background:
-                radial-gradient(circle at top left, rgba(45, 212, 191, 0.09), transparent 28%),
-                radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.12), transparent 34%),
-                linear-gradient(180deg, #0b2235 0%, #102b41 52%, #0e2539 100%);
+            background: var(--app-sidebar-bg);
         }
 
         .sidebar-workspace {
@@ -520,6 +567,24 @@
             line-height: 1.45;
         }
 
+        .theme-toggle.item {
+            gap: 0;
+            font-weight: 700 !important;
+            min-width: 40px;
+            width: 40px;
+            justify-content: center;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+
+        .theme-toggle .theme-toggle-label {
+            display: none;
+        }
+
+        .theme-toggle .icon {
+            margin: 0 !important;
+        }
+
         .main-content {
             margin-top: 40px;
         }
@@ -587,7 +652,15 @@
         }
 
         .bgColor {
-            background-color: #0e2d46 !important;
+            background: var(--app-topbar-bg) !important;
+            color: var(--app-topbar-text) !important;
+        }
+
+        html[data-theme="dark"] .bgColor,
+        html[data-theme="dark"] .ui.inverted.bgColor.menu,
+        html[data-theme="dark"] .ui.inverted.bgColor.vertical.menu {
+            background: var(--app-topbar-bg) !important;
+            color: var(--app-topbar-text) !important;
         }
 
         .logoImg {
@@ -601,6 +674,258 @@
         .ui.inverted.menu .active.item {
             background: #3d3e3f;
             color: #4cebb8 !important;
+        }
+
+        html[data-theme="dark"] body,
+        html[data-theme="dark"] .pusher,
+        html[data-theme="dark"] .main-content {
+            background: var(--app-bg);
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .ui.segment,
+        html[data-theme="dark"] .ui.stacked.segment,
+        html[data-theme="dark"] .ui.attached.segment,
+        html[data-theme="dark"] .ui.raised.segment,
+        html[data-theme="dark"] .ui.modal,
+        html[data-theme="dark"] .ui.modal > .header,
+        html[data-theme="dark"] .ui.modal > .content,
+        html[data-theme="dark"] .ui.modal > .actions,
+        html[data-theme="dark"] .ui.card,
+        html[data-theme="dark"] .ui.cards > .card {
+            background: var(--app-surface) !important;
+            color: var(--app-text) !important;
+            border-color: var(--app-line) !important;
+            box-shadow: var(--app-shadow) !important;
+        }
+
+        html[data-theme="dark"] .ui.form input:not([type]),
+        html[data-theme="dark"] .ui.form input[type="text"],
+        html[data-theme="dark"] .ui.form input[type="number"],
+        html[data-theme="dark"] .ui.form input[type="email"],
+        html[data-theme="dark"] .ui.form input[type="password"],
+        html[data-theme="dark"] .ui.form textarea,
+        html[data-theme="dark"] .ui.selection.dropdown,
+        html[data-theme="dark"] .ui.input > input {
+            background: var(--app-surface-soft) !important;
+            color: var(--app-text) !important;
+            border-color: var(--app-line) !important;
+        }
+
+        html[data-theme="dark"] .ui.table,
+        html[data-theme="dark"] .ui.table thead th,
+        html[data-theme="dark"] .ui.table tbody td,
+        html[data-theme="dark"] .ui.table tfoot th {
+            background: var(--app-surface) !important;
+            color: var(--app-text) !important;
+            border-color: var(--app-line) !important;
+        }
+
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_length,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_filter,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_info,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_paginate,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_length label,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_filter label {
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_filter input,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_length select,
+        html[data-theme="dark"] .dt-button,
+        html[data-theme="dark"] a.dt-button,
+        html[data-theme="dark"] button.dt-button,
+        html[data-theme="dark"] div.dt-button,
+        html[data-theme="dark"] .ui.pagination.menu,
+        html[data-theme="dark"] .ui.pagination.menu .item {
+            background: var(--app-surface-soft) !important;
+            color: var(--app-text) !important;
+            border-color: var(--app-line) !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover,
+        html[data-theme="dark"] .ui.pagination.menu .active.item {
+            background: #1d3653 !important;
+            color: #dbeafe !important;
+            border-color: rgba(56, 189, 248, 0.28) !important;
+        }
+
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_processing,
+        html[data-theme="dark"] .dataTables_wrapper div.dataTables_processing,
+        html[data-theme="dark"] table.dataTable + .dataTables_processing,
+        html[data-theme="dark"] [id$="_processing"] {
+            background: rgba(11, 18, 32, 0.96) !important;
+            color: var(--app-text) !important;
+            border: 1px solid var(--app-line) !important;
+            box-shadow: 0 16px 34px rgba(2, 6, 23, 0.36) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_processing *,
+        html[data-theme="dark"] .dataTables_wrapper div.dataTables_processing *,
+        html[data-theme="dark"] table.dataTable + .dataTables_processing *,
+        html[data-theme="dark"] [id$="_processing"] * {
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .dtfc-fixed-start,
+        html[data-theme="dark"] .dtfc-fixed-end,
+        html[data-theme="dark"] .DTFC_LeftWrapper table,
+        html[data-theme="dark"] .DTFC_RightWrapper table {
+            background: var(--app-surface) !important;
+        }
+
+        html[data-theme="dark"] .ui.message,
+        html[data-theme="dark"] .ui.menu,
+        html[data-theme="dark"] .ui.dropdown .menu {
+            background: var(--app-surface) !important;
+            color: var(--app-text) !important;
+            border-color: var(--app-line) !important;
+        }
+
+        html[data-theme="dark"] .ui.menu .item:before {
+            background: rgba(148, 163, 184, 0.08) !important;
+        }
+
+        html[data-theme="dark"] .ui.menu:not(.inverted) .item,
+        html[data-theme="dark"] .ui.dropdown .menu > .item,
+        html[data-theme="dark"] .ui.message,
+        html[data-theme="dark"] .ui.label {
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .ui.basic.segment,
+        html[data-theme="dark"] .ui.celled.table,
+        html[data-theme="dark"] .ui.celled.table tr td,
+        html[data-theme="dark"] .ui.celled.table tr th,
+        html[data-theme="dark"] .ui.divided.items > .item,
+        html[data-theme="dark"] .ui.list > .item,
+        html[data-theme="dark"] .ui.cards > .card > .content,
+        html[data-theme="dark"] .ui.card > .content,
+        html[data-theme="dark"] .ui.statistic > .value,
+        html[data-theme="dark"] .ui.statistic > .label {
+            border-color: var(--app-line) !important;
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .ui.selection.dropdown .menu > .item,
+        html[data-theme="dark"] .ui.search.selection.dropdown > input.search,
+        html[data-theme="dark"] .ui.clearable.selection.dropdown > .delete.icon,
+        html[data-theme="dark"] .ui.search.dropdown > .delete.icon,
+        html[data-theme="dark"] .ui.search.selection.dropdown > .dropdown.icon,
+        html[data-theme="dark"] .ui.dropdown .menu .header,
+        html[data-theme="dark"] .ui.form ::placeholder {
+            color: var(--app-muted) !important;
+        }
+
+        html[data-theme="dark"] .ui.search.selection.dropdown > input.search {
+            background: transparent !important;
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .ui.clearable.selection.dropdown > .delete.icon,
+        html[data-theme="dark"] .ui.search.dropdown > .delete.icon,
+        html[data-theme="dark"] .ui.search.selection.dropdown > .dropdown.icon {
+            color: var(--app-muted) !important;
+        }
+
+        html[data-theme="dark"] .ui.clearable.selection.dropdown:hover > .delete.icon,
+        html[data-theme="dark"] .ui.search.dropdown:hover > .delete.icon,
+        html[data-theme="dark"] .ui.search.selection.dropdown:hover > .dropdown.icon {
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .ui.checkbox label,
+        html[data-theme="dark"] .ui.radio.checkbox label,
+        html[data-theme="dark"] .ui.form .field > label,
+        html[data-theme="dark"] .ui.form .inline.fields > label,
+        html[data-theme="dark"] .ui.breadcrumb .section,
+        html[data-theme="dark"] .ui.breadcrumb .divider,
+        html[data-theme="dark"] .ui.small.header,
+        html[data-theme="dark"] .meta,
+        html[data-theme="dark"] .description {
+            color: var(--app-muted) !important;
+        }
+
+        html[data-theme="dark"] .ui.basic.button,
+        html[data-theme="dark"] .ui.button:not(.primary):not(.positive):not(.negative):not(.teal):not(.blue):not(.green):not(.red):not(.orange):not(.violet):not(.purple):not(.black) {
+            background: var(--app-surface-soft) !important;
+            color: var(--app-text) !important;
+            box-shadow: inset 0 0 0 1px var(--app-line) !important;
+        }
+
+        html[data-theme="dark"] .ui.basic.button:hover,
+        html[data-theme="dark"] .ui.button:not(.primary):not(.positive):not(.negative):not(.teal):not(.blue):not(.green):not(.red):not(.orange):not(.violet):not(.purple):not(.black):hover {
+            background: #1b2a42 !important;
+        }
+
+        html[data-theme="dark"] .ui.top.attached.menu,
+        html[data-theme="dark"] .ui.attached.menu,
+        html[data-theme="dark"] .ui.tabular.menu {
+            background: transparent !important;
+            border-color: var(--app-line) !important;
+        }
+
+        html[data-theme="dark"] .ui.top.attached.menu .item,
+        html[data-theme="dark"] .ui.tabular.menu .item {
+            color: var(--app-muted) !important;
+        }
+
+        html[data-theme="dark"] .ui.top.attached.menu .active.item,
+        html[data-theme="dark"] .ui.tabular.menu .active.item {
+            background: var(--app-surface) !important;
+            color: var(--app-text) !important;
+            border-color: var(--app-line) !important;
+        }
+
+        html[data-theme="dark"] .ui.ignored.message,
+        html[data-theme="dark"] .ui.info.message,
+        html[data-theme="dark"] .ui.warning.message,
+        html[data-theme="dark"] .ui.positive.message,
+        html[data-theme="dark"] .ui.negative.message {
+            background: var(--app-surface-soft) !important;
+            color: var(--app-text) !important;
+            border-color: var(--app-line) !important;
+        }
+
+        html[data-theme="dark"] .ui.dimmer,
+        html[data-theme="dark"] .ui.page.modals.dimmer {
+            background-color: rgba(2, 6, 23, 0.72) !important;
+        }
+
+        html[data-theme="dark"] .ui.secondary.pointing.menu,
+        html[data-theme="dark"] .ui.pointing.secondary.menu {
+            border-color: var(--app-line) !important;
+        }
+
+        html[data-theme="dark"] .ui.secondary.pointing.menu .item,
+        html[data-theme="dark"] .ui.pointing.secondary.menu .item {
+            color: var(--app-muted) !important;
+        }
+
+        html[data-theme="dark"] .ui.secondary.pointing.menu .active.item,
+        html[data-theme="dark"] .ui.pointing.secondary.menu .active.item {
+            color: #7dd3fc !important;
+            border-color: #38bdf8 !important;
+        }
+
+        html[data-theme="dark"] .ui.header,
+        html[data-theme="dark"] h1,
+        html[data-theme="dark"] h2,
+        html[data-theme="dark"] h3,
+        html[data-theme="dark"] h4,
+        html[data-theme="dark"] h5,
+        html[data-theme="dark"] h6,
+        html[data-theme="dark"] p,
+        html[data-theme="dark"] span,
+        html[data-theme="dark"] label,
+        html[data-theme="dark"] .ui.menu .item,
+        html[data-theme="dark"] .ui.dropdown .menu > .item {
+            color: var(--app-text);
         }
 
         .dataTables_scroll {
@@ -789,6 +1114,97 @@
         .dashboard-stat-link:hover {
             color: #ffffff;
             opacity: 0.92;
+        }
+
+        html[data-theme="dark"] .dashboard-license-banner {
+            background: rgba(120, 53, 15, 0.28) !important;
+            color: #f8e3b3 !important;
+            border-color: rgba(245, 158, 11, 0.25) !important;
+        }
+
+        html[data-theme="dark"] .dashboard-license-banner .header,
+        html[data-theme="dark"] .dashboard-license-banner p,
+        html[data-theme="dark"] .dashboard-license-banner .icon {
+            color: #fde68a !important;
+        }
+
+        html[data-theme="dark"] .dashboard-hero {
+            background:
+                radial-gradient(circle at top right, rgba(148, 163, 184, 0.10), transparent 26%),
+                radial-gradient(circle at left center, rgba(56, 189, 248, 0.16), transparent 28%),
+                linear-gradient(135deg, #07111d, #0c1d32 52%, #0c4a46);
+            box-shadow: 0 24px 48px rgba(2, 6, 23, 0.28);
+        }
+
+        html[data-theme="dark"] .dashboard-hero-kicker {
+            color: rgba(191, 219, 254, 0.76);
+        }
+
+        html[data-theme="dark"] .dashboard-hero-title {
+            color: #eff6ff;
+        }
+
+        html[data-theme="dark"] .dashboard-hero-subtitle {
+            color: rgba(226, 232, 240, 0.84);
+        }
+
+        html[data-theme="dark"] .dashboard-hero-tag {
+            background: rgba(148, 163, 184, 0.10);
+            border-color: rgba(148, 163, 184, 0.18);
+            color: #dbeafe;
+        }
+
+        html[data-theme="dark"] .dashboard-hero-tag.is-tenant {
+            background: rgba(45, 212, 191, 0.14);
+            border-color: rgba(45, 212, 191, 0.24);
+            color: #ccfbf1;
+        }
+
+        html[data-theme="dark"] .dashboard-metric-group,
+        html[data-theme="dark"] .dashboard-actions-shell {
+            background: var(--app-surface);
+            border-color: var(--app-line);
+            box-shadow: var(--app-shadow);
+        }
+
+        html[data-theme="dark"] .dashboard-group-header {
+            background: linear-gradient(180deg, #162338, #111b2e);
+            border-bottom-color: var(--app-line);
+        }
+
+        html[data-theme="dark"] .dashboard-group-title {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .dashboard-group-subtitle {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .dashboard-stat-card {
+            background:
+                radial-gradient(circle at top right, rgba(148, 163, 184, 0.10), rgba(255, 255, 255, 0) 36%),
+                linear-gradient(180deg, #162338, #111b2e);
+            border-color: var(--app-line);
+            box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
+        }
+
+        html[data-theme="dark"] .dashboard-stat-icon {
+            color: #5eead4;
+        }
+
+        html[data-theme="dark"] .dashboard-stat-value,
+        html[data-theme="dark"] .dashboard-stat-label {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .dashboard-stat-split,
+        html[data-theme="dark"] .dashboard-stat-description {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .dashboard-stat-link {
+            background: #1d3653;
+            color: #eff6ff;
         }
 
         .dashboard-action-grid {
@@ -1157,6 +1573,10 @@
     </div>
 
     <div class="right menu">
+        <a href="#" class="item theme-toggle" id="themeToggleBtn" title="Toggle theme">
+            <i class="moon outline icon" id="themeToggleIcon"></i>
+            <span class="theme-toggle-label" id="themeToggleLabel">Dark</span>
+        </a>
         <div class="ui dropdown item">
             <i class="user cirlce icon"></i>
             <div class="menu">
@@ -1206,6 +1626,51 @@
 <script src="{% static 'js/app-loader.js' %}"></script>
 
 <script>
+    function getPreferredTheme() {
+        var theme = 'light';
+        try {
+            theme = localStorage.getItem('ziva-theme') || '';
+        } catch (e) {}
+        if (!theme) {
+            try {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            } catch (e) {
+                theme = 'light';
+            }
+        }
+        return theme === 'dark' ? 'dark' : 'light';
+    }
+
+    function applyThemeUi(theme, persist) {
+        var normalized = theme === 'dark' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', normalized);
+        if (persist !== false) {
+            try {
+                localStorage.setItem('ziva-theme', normalized);
+            } catch (e) {}
+        }
+        var toggleIcon = document.getElementById('themeToggleIcon');
+        var toggleLabel = document.getElementById('themeToggleLabel');
+        var toggleButton = document.getElementById('themeToggleBtn');
+        if (toggleIcon) {
+            toggleIcon.className = (normalized === 'dark' ? 'sun icon' : 'moon outline icon');
+        }
+        if (toggleLabel) {
+            toggleLabel.textContent = normalized === 'dark' ? 'Light' : 'Dark';
+        }
+        if (toggleButton) {
+            toggleButton.setAttribute('data-theme', normalized);
+            toggleButton.setAttribute('aria-label', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+            toggleButton.setAttribute('title', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+        }
+    }
+
+    function toggleTheme(event) {
+        if (event) event.preventDefault();
+        var nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        applyThemeUi(nextTheme, true);
+    }
+
     function getCookie(name) {
         var cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -1247,6 +1712,27 @@
     }
 
         $(function () {
+            applyThemeUi(getPreferredTheme(), false);
+            $('#themeToggleBtn').on('click', toggleTheme);
+
+            if (window.matchMedia) {
+                var darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                var handleThemePreferenceChange = function (event) {
+                    var storedTheme = '';
+                    try {
+                        storedTheme = localStorage.getItem('ziva-theme') || '';
+                    } catch (e) {}
+                    if (!storedTheme) {
+                        applyThemeUi(event.matches ? 'dark' : 'light', false);
+                    }
+                };
+                if (typeof darkModeQuery.addEventListener === 'function') {
+                    darkModeQuery.addEventListener('change', handleThemePreferenceChange);
+                } else if (typeof darkModeQuery.addListener === 'function') {
+                    darkModeQuery.addListener(handleThemePreferenceChange);
+                }
+            }
+
             var current = location.pathname;
             $('.sidebar  a').each(function () {
                 var $this = $(this);

@@ -47,6 +47,15 @@
         input[type=search] {
             width: 100px !important;
         }
+
+        html[data-theme="dark"] #deleteUser .content,
+        html[data-theme="dark"] #imgModal .content,
+        html[data-theme="dark"] #TallyModal .content,
+        html[data-theme="dark"] #deleteUser .header,
+        html[data-theme="dark"] #imgModal .header,
+        html[data-theme="dark"] #TallyModal .header {
+            color: var(--app-text) !important;
+        }
     </style>
 
     <div class="ui {% if not collection_capabilities.can_filter_staff %}right aligned{% endif %} basic grid">

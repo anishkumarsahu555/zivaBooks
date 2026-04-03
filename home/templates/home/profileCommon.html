@@ -18,6 +18,17 @@
             --profile-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
         }
 
+        html[data-theme="dark"] {
+            --profile-ink: #f8fafc;
+            --profile-slate: #94a3b8;
+            --profile-line: rgba(71, 85, 105, 0.42);
+            --profile-surface: rgba(15, 23, 42, 0.92);
+            --profile-accent: #5eead4;
+            --profile-accent-soft: rgba(20, 184, 166, 0.14);
+            --profile-warm: #fdba74;
+            --profile-shadow: 0 24px 60px rgba(2, 6, 23, 0.28);
+        }
+
         .profile-shell {
             padding: 14px;
         }
@@ -152,6 +163,16 @@
             pointer-events: none;
         }
 
+        html[data-theme="dark"] .identity-panel {
+            background:
+                radial-gradient(circle at top center, rgba(20, 184, 166, 0.18), transparent 32%),
+                linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(17, 24, 39, 1));
+        }
+
+        html[data-theme="dark"] .identity-panel::before {
+            border-bottom-color: rgba(71, 85, 105, 0.28);
+        }
+
         .identity-panel > * {
             position: relative;
             z-index: 1;
@@ -174,6 +195,12 @@
             background: #e2e8f0;
         }
 
+        html[data-theme="dark"] .identity-avatar {
+            border-color: rgba(255, 255, 255, 0.12);
+            background: #0b1220;
+            box-shadow: 0 20px 32px rgba(2, 6, 23, 0.28);
+        }
+
         .identity-copy {
             min-width: 0;
             flex: 1 1 auto;
@@ -192,6 +219,10 @@
             letter-spacing: 0.08em;
             text-transform: uppercase;
             margin-bottom: 12px;
+        }
+
+        html[data-theme="dark"] .identity-overline {
+            background: rgba(148, 163, 184, 0.12);
         }
 
         .identity-name {
@@ -225,6 +256,10 @@
             font-weight: 800;
             background: rgba(15, 23, 42, 0.05);
             color: var(--profile-ink);
+        }
+
+        html[data-theme="dark"] .profile-chip {
+            background: rgba(148, 163, 184, 0.12);
         }
 
         .profile-chip.is-accent {
@@ -284,6 +319,10 @@
             padding: 16px;
         }
 
+        html[data-theme="dark"] .meta-card {
+            background: rgba(17, 24, 39, 0.94);
+        }
+
         .meta-label {
             color: var(--profile-slate);
             font-size: 0.75rem;
@@ -328,6 +367,10 @@
             justify-content: center;
         }
 
+        html[data-theme="dark"] .doc-frame {
+            background: #0b1220;
+        }
+
         .doc-frame img {
             width: 100%;
             max-height: 150px;
@@ -355,6 +398,10 @@
             color: var(--profile-slate);
             font-weight: 700;
             padding: 30px;
+        }
+
+        html[data-theme="dark"] .modal-note {
+            color: #94a3b8;
         }
 
         .modal-note {

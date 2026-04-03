@@ -139,6 +139,45 @@
             }
         }
 
+        html[data-theme="dark"] .avatar-upload .avatar-edit input + label {
+            background: var(--app-surface-soft);
+            border-color: var(--app-line);
+            box-shadow: 0 6px 18px rgba(2, 6, 23, 0.18);
+        }
+
+        html[data-theme="dark"] .avatar-upload .avatar-edit input + label:hover {
+            background: #1b2a42;
+            border-color: rgba(56, 189, 248, 0.18);
+        }
+
+        html[data-theme="dark"] .avatar-upload .avatar-edit input + label:after {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .avatar-upload .avatar-preview {
+            border-color: #162338;
+            box-shadow: 0 10px 24px rgba(2, 6, 23, 0.24);
+        }
+
+        html[data-theme="dark"] .collection-otp-box {
+            background: linear-gradient(180deg, #162338 0%, #111b2e 100%);
+            border-color: rgba(56, 189, 248, 0.18);
+        }
+
+        html[data-theme="dark"] .collection-otp-title {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .collection-otp-copy {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .ui.row.teal.stacked.segment.padded {
+            background: var(--app-surface) !important;
+            border-color: var(--app-line) !important;
+            box-shadow: var(--app-shadow) !important;
+        }
+
     </style>
 {% endblock %}
 {% block body %}

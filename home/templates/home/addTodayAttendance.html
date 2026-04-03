@@ -263,6 +263,21 @@
             gap: 0.65rem;
         }
 
+        .attendance-camera-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: fit-content;
+            border-radius: 12px;
+            padding: 0.6rem 0.85rem;
+            border: 1px solid rgba(20, 184, 166, 0.3);
+            background: rgba(240, 253, 250, 0.92);
+            color: #0f766e;
+            font-size: 0.92rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+
         .attendance-photo-panel {
             border: 1px solid rgba(15, 23, 42, 0.08);
             border-radius: 16px;
@@ -334,6 +349,73 @@
 
         .attendance-location-pill .detail {
             color: inherit;
+        }
+
+        html[data-theme="dark"] .attendance-card {
+            border-color: rgba(59, 130, 246, 0.16);
+            background:
+                radial-gradient(circle at top right, rgba(45, 212, 191, 0.12), transparent 35%),
+                linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(17, 24, 39, 0.98));
+            box-shadow: 0 14px 32px rgba(2, 6, 23, 0.28);
+        }
+
+        html[data-theme="dark"] .attendance-card-title,
+        html[data-theme="dark"] .attendance-meta-value,
+        html[data-theme="dark"] .attendance-map-title,
+        html[data-theme="dark"] .attendance-location-address,
+        html[data-theme="dark"] .attendance-photo-label {
+            color: #f8fafc;
+        }
+
+        html[data-theme="dark"] .attendance-card-copy,
+        html[data-theme="dark"] .attendance-meta-value.is-muted,
+        html[data-theme="dark"] .attendance-camera-hint {
+            color: rgba(226, 232, 240, 0.72);
+        }
+
+        html[data-theme="dark"] .attendance-meta-card,
+        html[data-theme="dark"] .attendance-map-block,
+        html[data-theme="dark"] .attendance-photo-panel {
+            background: rgba(15, 23, 42, 0.88);
+            border-color: rgba(71, 85, 105, 0.38);
+        }
+
+        html[data-theme="dark"] .attendance-meta-label {
+            color: rgba(148, 163, 184, 0.76);
+        }
+
+        html[data-theme="dark"] .attendance-location-coords {
+            background: rgba(20, 184, 166, 0.16);
+            color: #99f6e4;
+        }
+
+        html[data-theme="dark"] .attendance-photo-thumb,
+        html[data-theme="dark"] .attendance-map-frame,
+        html[data-theme="dark"] .attendance-camera-stage,
+        html[data-theme="dark"] .attendance-camera-preview {
+            background: #0b1220;
+            border-color: rgba(71, 85, 105, 0.4);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+        }
+
+        html[data-theme="dark"] .attendance-capture-box {
+            border-color: rgba(71, 85, 105, 0.38);
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(17, 24, 39, 0.98));
+        }
+
+        html[data-theme="dark"] .attendance-camera-status {
+            color: #5eead4;
+        }
+
+        html[data-theme="dark"] .attendance-map-link {
+            color: #7dd3fc;
+        }
+
+        html[data-theme="dark"] .attendance-camera-badge {
+            background: rgba(20, 184, 166, 0.12);
+            border-color: rgba(45, 212, 191, 0.4);
+            color: #99f6e4;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
         }
 
         @media (max-width: 767px) {
@@ -668,7 +750,7 @@
                         </div>
                         <div class="attendance-camera-meta">
                             <div>
-                                <div class="ui teal basic label">
+                                <div class="attendance-camera-badge">
                                     <i class="camera icon"></i>
                                     200 x 200 photo
                                 </div>

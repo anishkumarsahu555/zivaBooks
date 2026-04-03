@@ -11,6 +11,22 @@
     <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
     <title>Customer Ledger</title>
+    <script>
+        (function () {
+            var theme = 'light';
+            try {
+                theme = localStorage.getItem('ziva-theme') || '';
+            } catch (e) {}
+            if (!theme) {
+                try {
+                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                } catch (e) {
+                    theme = 'light';
+                }
+            }
+            document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
+        })();
+    </script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
     <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.css">
@@ -39,11 +55,24 @@
             --shadow: 0 18px 44px rgba(15, 23, 42, 0.10);
         }
 
+        html[data-theme="dark"] {
+            --bg-a: #07111d;
+            --bg-b: #0b1524;
+            --bg-c: #0a1422;
+            --surface: rgba(17, 27, 46, 0.94);
+            --surface-strong: #111b2e;
+            --line: rgba(148, 163, 184, 0.18);
+            --text: rgba(226, 232, 240, 0.94);
+            --muted: rgba(148, 163, 184, 0.82);
+            --brand-a: #06101b;
+            --brand-b: #0b1828;
+            --brand-c: #0d3c38;
+            --accent: #38bdf8;
+            --shadow: 0 20px 48px rgba(2, 6, 23, 0.42);
+        }
+
         body {
-            background:
-                radial-gradient(900px 340px at -10% -10%, #dbeafe 0%, transparent 60%),
-                radial-gradient(800px 320px at 110% 0%, #fff1df 0%, transparent 58%),
-                linear-gradient(180deg, var(--bg-a) 0%, var(--bg-b) 48%, var(--bg-c) 100%);
+            background: var(--bg-b);
             color: var(--text);
             overscroll-behavior-y: contain;
         }
@@ -107,6 +136,24 @@
             font-weight: 800 !important;
         }
 
+        .cust-theme-toggle.item {
+            gap: 0;
+            font-weight: 800 !important;
+            min-width: 40px;
+            width: 40px;
+            justify-content: center;
+            padding-left: 0 !important;
+            padding-right: 0 !important;
+        }
+
+        .cust-theme-toggle .icon {
+            margin: 0 !important;
+        }
+
+        #custThemeToggleLabel {
+            display: none;
+        }
+
         .cust-brand {
             display: inline-flex;
             align-items: center;
@@ -142,6 +189,10 @@
         /* Layout */
         .cust-shell {
             padding: 70px 10px 28px;
+            background:
+                radial-gradient(900px 340px at -10% -10%, #dbeafe 0%, transparent 60%),
+                radial-gradient(800px 320px at 110% 0%, #fff1df 0%, transparent 58%),
+                linear-gradient(180deg, var(--bg-a) 0%, var(--bg-b) 48%, var(--bg-c) 100%);
         }
 
         .pusher {
@@ -152,6 +203,14 @@
 
         .cust-shell {
             flex: 1 0 auto;
+        }
+
+        html[data-theme="dark"] .cust-shell {
+            background:
+                radial-gradient(900px 340px at -10% -10%, rgba(30, 64, 175, 0.22) 0%, transparent 60%),
+                radial-gradient(800px 320px at 110% 0%, rgba(15, 118, 110, 0.16) 0%, transparent 58%),
+                radial-gradient(700px 260px at 50% 18%, rgba(15, 23, 42, 0.42) 0%, transparent 72%),
+                linear-gradient(180deg, var(--bg-a) 0%, var(--bg-b) 48%, var(--bg-c) 100%);
         }
 
         .cust-footer {
@@ -166,6 +225,18 @@
 
         .cust-footer .cust-footer-strong { font-weight: 900; color: rgba(15, 23, 42, 0.88); }
         .cust-footer a { color: rgba(15, 23, 42, 0.86); font-weight: 900; }
+
+        html[data-theme="dark"] .cust-footer {
+            color: var(--muted);
+            border-top-color: var(--line);
+            background:
+                linear-gradient(180deg, rgba(11, 18, 32, 0.96), rgba(8, 17, 29, 0.98));
+        }
+
+        html[data-theme="dark"] .cust-footer .cust-footer-strong,
+        html[data-theme="dark"] .cust-footer a {
+            color: var(--text);
+        }
 
         .cust-inner {
             max-width: 980px;
@@ -292,6 +363,209 @@
             box-shadow: var(--shadow);
             overflow: visible;
             padding: 14px 14px 12px !important;
+        }
+
+        html[data-theme="dark"] .cust-hero.ui.segment,
+        html[data-theme="dark"] .cust-kpi,
+        html[data-theme="dark"] .cust-statement.ui.segment,
+        html[data-theme="dark"] .ui.modal,
+        html[data-theme="dark"] .ui.modal > .header,
+        html[data-theme="dark"] .ui.modal > .content,
+        html[data-theme="dark"] .ui.modal > .actions {
+            background: var(--surface) !important;
+            color: var(--text) !important;
+            border-color: var(--line) !important;
+            box-shadow: var(--shadow) !important;
+        }
+
+        html[data-theme="dark"] .cust-phone-pill,
+        html[data-theme="dark"] .cust-otp-timer,
+        html[data-theme="dark"] .cust-otp-chip,
+        html[data-theme="dark"] .cust-date-input,
+        html[data-theme="dark"] .ui.input > input,
+        html[data-theme="dark"] .ui.form input,
+        html[data-theme="dark"] .ui.selection.dropdown {
+            background: rgba(22, 35, 56, 0.94) !important;
+            color: var(--text) !important;
+            border-color: var(--line) !important;
+        }
+
+        html[data-theme="dark"] .cust-hero-form label,
+        html[data-theme="dark"] .cust-kpi-label,
+        html[data-theme="dark"] .cust-otp-sub,
+        html[data-theme="dark"] .ui.small.header,
+        html[data-theme="dark"] .ui.header,
+        html[data-theme="dark"] .ui.menu .item,
+        html[data-theme="dark"] .ui.dropdown .menu > .item,
+        html[data-theme="dark"] .ui.table,
+        html[data-theme="dark"] .ui.table th,
+        html[data-theme="dark"] .ui.table td {
+            color: var(--text) !important;
+            border-color: var(--line) !important;
+        }
+
+        html[data-theme="dark"] .cust-otp-banner {
+            border-color: rgba(56, 189, 248, 0.22);
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.06), rgba(255,255,255,0) 56%),
+                linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(45, 212, 191, 0.12));
+            color: #bfdbfe;
+        }
+
+        html[data-theme="dark"] .cust-otp-banner.is-received {
+            border-color: rgba(16, 185, 129, 0.28);
+            background:
+                radial-gradient(circle at top right, rgba(255,255,255,0.06), rgba(255,255,255,0) 56%),
+                linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(59, 130, 246, 0.10));
+        }
+
+        html[data-theme="dark"] .cust-nav .ui.dropdown .menu {
+            background: #111b2e !important;
+            border: 1px solid rgba(71, 85, 105, 0.42) !important;
+            box-shadow: 0 16px 34px rgba(2, 6, 23, 0.36) !important;
+        }
+
+        html[data-theme="dark"] .cust-nav .ui.dropdown .menu > .item {
+            color: var(--text) !important;
+        }
+
+        html[data-theme="dark"] .cust-nav .ui.dropdown .menu > .item:hover {
+            background: rgba(37, 99, 235, 0.14) !important;
+            color: #e0f2fe !important;
+        }
+
+        html[data-theme="dark"] .cust-otp-title,
+        html[data-theme="dark"] .cust-otp-banner.is-received .cust-otp-title,
+        html[data-theme="dark"] .cust-otp-code,
+        html[data-theme="dark"] .cust-kpi-open .cust-kpi-icon,
+        html[data-theme="dark"] .cust-kpi-debit .cust-kpi-icon,
+        html[data-theme="dark"] .cust-kpi-credit .cust-kpi-icon,
+        html[data-theme="dark"] .cust-kpi-close .cust-kpi-icon {
+            color: var(--text);
+        }
+
+        html[data-theme="dark"] .cust-kpi-open .cust-kpi-icon { background: rgba(100, 116, 139, 0.22); }
+        html[data-theme="dark"] .cust-kpi-debit .cust-kpi-icon { background: rgba(59, 130, 246, 0.20); }
+        html[data-theme="dark"] .cust-kpi-credit .cust-kpi-icon { background: rgba(16, 185, 129, 0.18); }
+        html[data-theme="dark"] .cust-kpi-close .cust-kpi-icon { background: rgba(245, 158, 11, 0.18); }
+
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_length,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_filter,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_info,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_paginate,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_length label,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_filter label,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button,
+        html[data-theme="dark"] .ui.pagination.menu .item {
+            color: var(--text) !important;
+            border-color: var(--line) !important;
+        }
+
+        html[data-theme="dark"] .cust-row-card {
+            background: rgba(17, 27, 46, 0.98);
+            border-color: rgba(71, 85, 105, 0.42);
+            box-shadow: 0 10px 18px rgba(2, 6, 23, 0.22);
+        }
+
+        html[data-theme="dark"] #LedgerTable,
+        html[data-theme="dark"] #LedgerTable_wrapper,
+        html[data-theme="dark"] #LedgerTable tbody,
+        html[data-theme="dark"] #LedgerTable tbody tr,
+        html[data-theme="dark"] #LedgerTable tbody td {
+            background: transparent !important;
+        }
+
+        html[data-theme="dark"] #LedgerTable tbody tr.odd,
+        html[data-theme="dark"] #LedgerTable tbody tr.even,
+        html[data-theme="dark"] #LedgerTable tbody tr.odd td,
+        html[data-theme="dark"] #LedgerTable tbody tr.even td,
+        html[data-theme="dark"] #LedgerTable tbody td.dataTables_empty {
+            background: rgba(17, 27, 46, 0.98) !important;
+            color: var(--text) !important;
+            border-color: rgba(71, 85, 105, 0.42) !important;
+        }
+
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_processing,
+        html[data-theme="dark"] .dataTables_wrapper div.dataTables_processing,
+        html[data-theme="dark"] #LedgerTable_processing {
+            background: rgba(11, 18, 32, 0.96) !important;
+            color: var(--text) !important;
+            border: 1px solid rgba(71, 85, 105, 0.42) !important;
+            box-shadow: 0 16px 34px rgba(2, 6, 23, 0.36) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_processing *,
+        html[data-theme="dark"] .dataTables_wrapper div.dataTables_processing *,
+        html[data-theme="dark"] #LedgerTable_processing * {
+            color: var(--text) !important;
+        }
+
+        html[data-theme="dark"] .dataTables_wrapper.processing,
+        html[data-theme="dark"] .dataTables_wrapper.processing #LedgerTable_wrapper,
+        html[data-theme="dark"] .dataTables_wrapper.processing #LedgerTable {
+            background: transparent !important;
+        }
+
+        html[data-theme="dark"] {
+            background: #08111d;
+        }
+
+        html[data-theme="dark"] .ui.calendar .ui.popup,
+        html[data-theme="dark"] .ui.calendar .ui.popup .ui.grid,
+        html[data-theme="dark"] .ui.calendar .ui.table {
+            background: #111b2e !important;
+            color: var(--text) !important;
+            border-color: rgba(71, 85, 105, 0.42) !important;
+            box-shadow: 0 16px 34px rgba(2, 6, 23, 0.36) !important;
+        }
+
+        html[data-theme="dark"] .ui.calendar .ui.table thead th,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody tr td.link {
+            background: transparent !important;
+            color: var(--text) !important;
+            border-color: rgba(71, 85, 105, 0.28) !important;
+        }
+
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.link:hover,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.link.active,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.link.today {
+            background: rgba(37, 99, 235, 0.18) !important;
+            color: #e0f2fe !important;
+        }
+
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.disabled,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.disabled.link {
+            color: rgba(148, 163, 184, 0.42) !important;
+        }
+
+        html[data-theme="dark"] .pl-date,
+        html[data-theme="dark"] .pl-ref-val,
+        html[data-theme="dark"] .pl-amt,
+        html[data-theme="dark"] .cust-row-bal {
+            color: var(--text);
+        }
+
+        html[data-theme="dark"] .pl-time,
+        html[data-theme="dark"] .pl-part {
+            color: var(--muted);
+        }
+
+        html[data-theme="dark"] .pl-ref-chip {
+            background: rgba(37, 99, 235, 0.14);
+            border-color: rgba(96, 165, 250, 0.22);
+            color: #bfdbfe;
+        }
+
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_filter input,
+        html[data-theme="dark"] .dataTables_wrapper .dataTables_length select,
+        html[data-theme="dark"] .ui.pagination.menu,
+        html[data-theme="dark"] .ui.message {
+            background: rgba(22, 35, 56, 0.94) !important;
+            color: var(--text) !important;
+            border-color: var(--line) !important;
         }
 
         /* Calendar popup can be clipped by overflow contexts; keep it above menus/dimmers. */
@@ -561,6 +835,33 @@
                 flex: 1 1 0;
                 text-align: center;
             }
+        }
+
+        html[data-theme="dark"] #pwdModal .actions.cust-modal-actions {
+            border-top: 1px solid rgba(71, 85, 105, 0.32) !important;
+            background: rgba(11, 18, 32, 0.92) !important;
+        }
+
+        html[data-theme="dark"] #pwdMsg.ui.message {
+            background: rgba(30, 41, 59, 0.92) !important;
+            border-color: rgba(71, 85, 105, 0.42) !important;
+            color: #e2e8f0 !important;
+        }
+
+        html[data-theme="dark"] #pwdMsg.ui.positive.message {
+            background: rgba(6, 78, 59, 0.28) !important;
+            border-color: rgba(16, 185, 129, 0.3) !important;
+            color: #a7f3d0 !important;
+        }
+
+        html[data-theme="dark"] #pwdMsg.ui.negative.message {
+            background: rgba(127, 29, 29, 0.26) !important;
+            border-color: rgba(244, 63, 94, 0.28) !important;
+            color: #fecdd3 !important;
+        }
+
+        html[data-theme="dark"] #pwdModal .ui.form .field > label {
+            color: var(--text) !important;
         }
 
         /* KPI cards */
@@ -836,6 +1137,10 @@
             </div>
         </div>
         <div class="right menu">
+            <a class="item cust-theme-toggle" href="#" id="custThemeToggleBtn" title="Toggle theme">
+                <i class="moon outline icon" id="custThemeToggleIcon"></i>
+                <span id="custThemeToggleLabel">Dark</span>
+            </a>
             <div class="ui dropdown item">
                 <i class="user circle icon"></i>
                 {{ party.name|default:"N/A" }}
@@ -1505,6 +1810,63 @@
                 // Network hiccup: back off a bit.
                 otpBackoffMs = Math.min(otpBackoffMs * 2, otpBackoffMaxMs);
                 scheduleOtpPoll(otpBackoffMs);
+            }
+        }
+
+        function getPreferredTheme() {
+            var theme = 'light';
+            try {
+                theme = localStorage.getItem('ziva-theme') || '';
+            } catch (e) {}
+            if (!theme) {
+                try {
+                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                } catch (e) {
+                    theme = 'light';
+                }
+            }
+            return theme === 'dark' ? 'dark' : 'light';
+        }
+
+        function applyCustomerTheme(theme, persist) {
+            var normalized = theme === 'dark' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', normalized);
+            if (persist !== false) {
+                try {
+                    localStorage.setItem('ziva-theme', normalized);
+                } catch (e) {}
+            }
+            $('#custThemeToggleIcon')
+                .attr('class', normalized === 'dark' ? 'sun icon' : 'moon outline icon');
+            $('#custThemeToggleLabel').text(normalized === 'dark' ? 'Light' : 'Dark');
+            $('#custThemeToggleBtn')
+                .attr('title', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode')
+                .attr('aria-label', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+        }
+
+        $('#custThemeToggleBtn').on('click', function (event) {
+            event.preventDefault();
+            var nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            applyCustomerTheme(nextTheme, true);
+        });
+
+        applyCustomerTheme(getPreferredTheme(), false);
+
+        if (window.matchMedia) {
+            var customerThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            var handleCustomerThemeChange = function (event) {
+                var storedTheme = '';
+                try {
+                    storedTheme = localStorage.getItem('ziva-theme') || '';
+                } catch (e) {}
+                if (!storedTheme) {
+                    applyCustomerTheme(event.matches ? 'dark' : 'light', false);
+                }
+            };
+            if (typeof customerThemeQuery.addEventListener === 'function') {
+                customerThemeQuery.addEventListener('change', handleCustomerThemeChange);
+            } else if (typeof customerThemeQuery.addListener === 'function') {
+                customerThemeQuery.addListener(handleCustomerThemeChange);
             }
         }
 

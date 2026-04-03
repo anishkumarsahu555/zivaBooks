@@ -537,6 +537,106 @@
                 justify-content: center;
             }
         }
+
+        html[data-theme="dark"] .order-hero {
+            background:
+                radial-gradient(circle at top right, rgba(45, 212, 191, 0.10), transparent 34%),
+                linear-gradient(165deg, rgba(15, 23, 42, 0.98) 0%, rgba(17, 27, 46, 0.96) 54%, rgba(16, 27, 49, 0.96) 100%);
+            border-color: rgba(56, 189, 248, 0.14);
+            box-shadow: 0 20px 44px rgba(2, 6, 23, 0.34);
+        }
+
+        html[data-theme="dark"] .order-kicker {
+            color: #7dd3fc;
+        }
+
+        html[data-theme="dark"] .order-number,
+        html[data-theme="dark"] .order-status-copy strong,
+        html[data-theme="dark"] .order-summary-value,
+        html[data-theme="dark"] .order-card-title h3,
+        html[data-theme="dark"] .timeline-title,
+        html[data-theme="dark"] .sale-link-id,
+        html[data-theme="dark"] .order-otp-title,
+        html[data-theme="dark"] .attachment-card span {
+            color: #f8fbff;
+        }
+
+        html[data-theme="dark"] .order-party,
+        html[data-theme="dark"] .order-status-copy,
+        html[data-theme="dark"] .order-summary-label,
+        html[data-theme="dark"] .order-fact-label,
+        html[data-theme="dark"] .timeline-time,
+        html[data-theme="dark"] .timeline-meta,
+        html[data-theme="dark"] .sale-link-helper,
+        html[data-theme="dark"] .order-otp-copy {
+            color: #93a4bd !important;
+        }
+
+        html[data-theme="dark"] .order-status-panel,
+        html[data-theme="dark"] .order-summary-card,
+        html[data-theme="dark"] .order-card,
+        html[data-theme="dark"] .order-fact,
+        html[data-theme="dark"] .attachment-card,
+        html[data-theme="dark"] .sale-link-card,
+        html[data-theme="dark"] .order-otp-box {
+            background: rgba(15, 23, 42, 0.88) !important;
+            border-color: rgba(56, 189, 248, 0.12) !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] .order-card-copy {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.88) 0%, rgba(17, 27, 46, 0.96) 100%);
+            border-color: rgba(56, 189, 248, 0.12);
+            color: #dce8f7;
+        }
+
+        html[data-theme="dark"] .empty-chip,
+        html[data-theme="dark"] .sale-link-meta-chip {
+            background: rgba(22, 120, 194, 0.16) !important;
+            color: #dce8f7 !important;
+        }
+
+        html[data-theme="dark"] .order-chip-row .ui.basic.label,
+        html[data-theme="dark"] .order-status-top .ui.basic.label {
+            background: rgba(15, 23, 42, 0.82) !important;
+            border-color: rgba(56, 189, 248, 0.14) !important;
+            color: #dce8f7 !important;
+        }
+
+        html[data-theme="dark"] .timeline::before {
+            background: linear-gradient(180deg, rgba(56, 189, 248, 0.28), rgba(236, 72, 153, 0.14));
+        }
+
+        html[data-theme="dark"] .timeline-dot {
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.10);
+        }
+
+        html[data-theme="dark"] .sale-link-search {
+            background: #101b31;
+        }
+
+        html[data-theme="dark"] #downloadOrderPdfModal > .header,
+        html[data-theme="dark"] #downloadOrderPdfModal > .content,
+        html[data-theme="dark"] #downloadOrderPdfModal > .actions,
+        html[data-theme="dark"] #orderTransitionModal > .header,
+        html[data-theme="dark"] #orderTransitionModal > .content,
+        html[data-theme="dark"] #orderTransitionModal > .actions,
+        html[data-theme="dark"] #linkSaleModal > .header,
+        html[data-theme="dark"] #linkSaleModal > .content,
+        html[data-theme="dark"] #linkSaleModal > .actions,
+        html[data-theme="dark"] #attachmentModal > .header,
+        html[data-theme="dark"] #attachmentModal > .content,
+        html[data-theme="dark"] #attachmentModal > .actions {
+            background: #101b31 !important;
+            color: #e6eef8 !important;
+            border-color: rgba(56, 189, 248, 0.12) !important;
+        }
+
+        html[data-theme="dark"] .order-otp-status.ui.message {
+            background: rgba(22, 120, 194, 0.14) !important;
+            border-color: rgba(56, 189, 248, 0.2) !important;
+            color: #d7e9fb !important;
+        }
     </style>
 
     <div class="order-page">
