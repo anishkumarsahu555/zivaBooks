@@ -24,7 +24,7 @@ from .books import ensure_books_for_tenant
 from .credential_links import credential_share_token_status, consume_credential_share_token
 from .navigation import build_sidebar_sections, _has_any_perm as _has_tenant_any_perm
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_qs
-from .otp import get_collection_otp_payload, get_collection_status_payload, OTP_TTL_SECONDS
+from .otp import get_collection_otp_payload, get_collection_status_payload, get_order_delivery_otp_payload, get_order_delivery_status_payload, OTP_TTL_SECONDS
 # def login_or_logout(request, type):
 #     try:
 #         data = LoginAndLogoutStatus()
@@ -55,6 +55,34 @@ def _has_any_permission(user, perm_names):
     return any(user.has_perm(perm_name) for perm_name in perm_names)
 def _tenant_has_perm(request_or_user, perm_name):
     return _has_tenant_any_perm(request_or_user, [perm_name])
+def _order_tracking_status_text(status):
+    mapping = {
+        Order.Status.DRAFT: 'Draft',
+        Order.Status.SUBMITTED: 'Submitted',
+        Order.Status.APPROVED: 'Confirmed',
+        Order.Status.PACKED: 'Packed',
+        Order.Status.OUT_FOR_DELIVERY: 'Out for Delivery',
+        Order.Status.DELIVERED: 'Delivered',
+        Order.Status.CANCELLED: 'Cancelled',
+        Order.Status.RETURNED: 'Returned',
+        Order.Status.FULFILLED: 'Delivered',
+    }
+    return mapping.get(str(status or ''), str(status or '').replace('_', ' ').title())
+def _order_allowed_next_statuses_view(order_obj):
+    current = str(getattr(order_obj, 'status', '') or '')
+    if current == Order.Status.FULFILLED:
+        current = Order.Status.DELIVERED
+    return {
+        Order.Status.DRAFT: [Order.Status.SUBMITTED, Order.Status.CANCELLED],
+        Order.Status.SUBMITTED: [Order.Status.APPROVED, Order.Status.CANCELLED],
+        Order.Status.APPROVED: [Order.Status.PACKED, Order.Status.CANCELLED],
+        Order.Status.PACKED: [Order.Status.OUT_FOR_DELIVERY, Order.Status.CANCELLED],
+        Order.Status.OUT_FOR_DELIVERY: [Order.Status.DELIVERED, Order.Status.RETURNED],
+        Order.Status.DELIVERED: [Order.Status.RETURNED],
+        Order.Status.CANCELLED: [],
+        Order.Status.RETURNED: [],
+        Order.Status.FULFILLED: [Order.Status.RETURNED],
+    }.get(current, [])
 def _user_has_portal_access(user):
     if not getattr(user, 'is_authenticated', False):
         return False
@@ -1500,6 +1528,7 @@ def _customer_visible_party_ledger_qs(request, qs):
     """
     Customer portal should show only:
     - Approved Sales
+    - Customer-facing Cash Counter ledger entries
     - Approved Payments (Collection / Counter Collection)
     """
     approved_collection_ids = tenant_qs(request, Collection).filter(
@@ -1512,6 +1541,7 @@ def _customer_visible_party_ledger_qs(request, qs):
     ).values('id')
     return qs.filter(
         Q(source=PartyLedgerEntry.Source.SALES) |
+        Q(source=PartyLedgerEntry.Source.CASH_COUNTER) |
         (Q(source=PartyLedgerEntry.Source.COLLECTION) & Q(source_object_id__in=approved_collection_ids)) |
         (Q(source=PartyLedgerEntry.Source.COUNTER_COLLECTION) & Q(source_object_id__in=approved_counter_collection_ids))
     )
@@ -1699,6 +1729,105 @@ def customer_active_collection_otp(request):
         'amountPaid': meta.get('amountPaid', ''),
         'collectDate': meta.get('collectDate', ''),
     }, safe=False)
+
+
+@permission_required_any('home.view_party')
+def customer_active_delivery_otp(request):
+    if request.method != 'GET':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    party_id = request.session.get('cust_party_id')
+    tenant_id = request.session.get('cust_tenant_id')
+    if party_id:
+        try:
+            party_id = int(party_id)
+        except Exception:
+            party_id = None
+    if tenant_id is not None:
+        try:
+            tenant_id = int(tenant_id)
+        except Exception:
+            tenant_id = None
+    if not party_id:
+        party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only('id', 'tenant_id').order_by('-id').first()
+        if not party:
+            return JsonResponse({'message': 'error', 'error': 'Permission denied.'}, status=403)
+        party_id = int(party.pk)
+        tenant_id = int(party.tenant_id) if party.tenant_id is not None else None
+        try:
+            request.session['cust_party_id'] = party_id
+            request.session['cust_tenant_id'] = tenant_id
+        except Exception:
+            pass
+    def _format_local_delivery_dt(raw_value):
+        if not raw_value:
+            return ''
+        dt_value = raw_value
+        if isinstance(raw_value, str):
+            try:
+                dt_value = datetime.fromisoformat(raw_value)
+            except Exception:
+                return ''
+        if timezone.is_naive(dt_value):
+            dt_value = timezone.make_aware(dt_value)
+        return timezone.localtime(dt_value).strftime('%d %b %Y, %I:%M %p')
+    def _normalize_delivery_dt(raw_value):
+        if not raw_value:
+            return None
+        dt_value = raw_value
+        if isinstance(raw_value, str):
+            try:
+                dt_value = datetime.fromisoformat(raw_value)
+            except Exception:
+                return None
+        if timezone.is_naive(dt_value):
+            dt_value = timezone.make_aware(dt_value)
+        return dt_value
+    status_payload = get_order_delivery_status_payload(tenant_id, party_id)
+    if status_payload:
+        status = str(status_payload.get('status') or '').strip()
+        created_ts = status_payload.get('created_ts')
+        ttl = int(status_payload.get('ttl') or 0)
+        meta = status_payload.get('meta') if isinstance(status_payload.get('meta'), dict) else {}
+        try:
+            created_ts = int(created_ts)
+        except Exception:
+            created_ts = None
+        if status and created_ts is not None and ttl > 0:
+            now_ts = int(timezone.now().timestamp())
+            expires_in = max(0, (created_ts + ttl) - now_ts)
+            if expires_in > 0:
+                return JsonResponse({
+                    'message': 'success',
+                    'active': False,
+                    'status': status,
+                    'status_expires_in': expires_in,
+                    'orderID': meta.get('orderID', ''),
+                    'orderNumber': meta.get('orderNumber', ''),
+                    'verifiedOn': _format_local_delivery_dt(meta.get('verifiedOn')),
+                }, safe=False)
+    payload = get_order_delivery_otp_payload(tenant_id, party_id)
+    if payload:
+        otp = str(payload.get('otp') or '').strip()
+        created_ts = payload.get('created_ts')
+        ttl = int(payload.get('ttl') or OTP_TTL_SECONDS)
+        meta = payload.get('meta') if isinstance(payload.get('meta'), dict) else {}
+        try:
+            created_ts = int(created_ts)
+        except Exception:
+            created_ts = None
+        if otp and created_ts is not None:
+            now_ts = int(timezone.now().timestamp())
+            expires_in = max(0, (created_ts + ttl) - now_ts)
+            if expires_in > 0:
+                return JsonResponse({
+                    'message': 'success',
+                    'active': True,
+                    'otp': otp,
+                    'expires_in': expires_in,
+                    'orderID': meta.get('orderID', ''),
+                    'orderNumber': meta.get('orderNumber', ''),
+                }, safe=False)
+    return JsonResponse({'message': 'success', 'active': False}, safe=False)
 @permission_required_any('home.add_collection', 'home.can_approve_collection')
 def add_collection(request):
     capabilities = _collection_capabilities(request.user)
@@ -1846,12 +1975,29 @@ def attendance_report_admin(request):
 @permission_required_any('home.add_sales')
 def add_sales(request):
     tenant = get_current_tenant(request)
+    source_order = None
+    source_order_id = request.GET.get('order_id')
+    if source_order_id:
+        try:
+            candidate = tenant_qs(request, Order).select_related('partyID').get(pk=int(source_order_id), isDeleted=False)
+            if str(getattr(candidate, 'status', '') or '') in {
+                Order.Status.APPROVED,
+                Order.Status.PACKED,
+                Order.Status.OUT_FOR_DELIVERY,
+                Order.Status.DELIVERED,
+                Order.Status.RETURNED,
+                Order.Status.FULFILLED,
+            }:
+                source_order = candidate
+        except Exception:
+            source_order = None
     return render(request, 'home/sales/addSales.html', {
         'banks': tenant_qs(request, Bank).filter(isDeleted=False).order_by('name'),
         'inventory_enabled': bool(getattr(tenant, 'inventoryEnabled', True)),
         'advanced_invoicing_enabled': bool(getattr(tenant, 'advancedInvoicingEnabled', True)),
         'non_gst_shadow_enabled': bool(getattr(tenant, 'nonGstShadowEnabled', False)),
         'seller_gst_number': getattr(tenant, 'gstNumber', '') or '',
+        'sales_source_order': source_order,
     })
 @is_activated()
 @permission_required_any('home.view_sales', 'home.add_sales', 'home.change_sales', 'home.can_manage_sales')
@@ -1911,6 +2057,7 @@ def purchase_list(request):
 def add_order(request):
     return render(request, 'home/orders/addOrder.html', {
         'order_capabilities': _order_capabilities(request.user),
+        'staffs': tenant_qs(request, StaffUser).filter(isDeleted=False).order_by('name'),
     })
 @is_activated()
 @permission_required_any('home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders')
@@ -1937,27 +2084,46 @@ def edit_order(request, id=None):
     context = {
         'obj': obj,
         'attachments': attachments,
+        'staffs': tenant_qs(request, StaffUser).filter(isDeleted=False).order_by('name'),
         'order_capabilities': capabilities,
-        'order_edit_readonly': bool(str(obj.status) == Order.Status.APPROVED and not admin_like),
+        'order_edit_readonly': bool(str(obj.status) not in {Order.Status.DRAFT, Order.Status.SUBMITTED} and not admin_like),
         'order_return_url': reverse('homeApp:orders_list'),
     }
     return render(request, 'home/orders/editOrder.html', context)
 @permission_required_any('home.view_order', 'home.add_order', 'home.change_order', 'home.can_manage_orders')
 def order_detail(request, id=None):
-    obj = get_object_or_404(tenant_qs(request, Order).select_related('partyID', 'createdBy', 'approvedBy'), pk=id)
+    obj = get_object_or_404(
+        tenant_qs(request, Order).select_related('partyID', 'createdBy', 'approvedBy', 'assignedTo', 'linkedSales'),
+        pk=id,
+    )
     capabilities = _order_capabilities(request.user)
     admin_like = capabilities['can_filter_staff'] or request.user.has_perm('home.can_view_party_credentials') or request.user.has_perm('home.can_approve_orders') or request.user.has_perm('home.can_manage_orders')
     if not admin_like:
         if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
             return redirect('homeApp:orders_list')
     attachments = tenant_qs(request, OrderAttachment).filter(isDeleted=False, order=obj).order_by('-id')
+    status_events = tenant_qs(request, OrderStatusEvent).filter(isDeleted=False, order=obj).select_related('actor').order_by('-datetime')
+    next_statuses = _order_allowed_next_statuses_view(obj)
+    next_status_actions = [(status, _order_tracking_status_text(status)) for status in next_statuses]
+    can_start_fulfillment = str(getattr(obj, 'status', '') or '') in {
+        Order.Status.APPROVED,
+        Order.Status.PACKED,
+        Order.Status.OUT_FOR_DELIVERY,
+        Order.Status.DELIVERED,
+        Order.Status.RETURNED,
+        Order.Status.FULFILLED,
+    }
     context = {
         'obj': obj,
         'attachments': attachments,
+        'status_events': status_events,
         'order_capabilities': capabilities,
         'is_admin_like': admin_like,
         'can_approve_order': capabilities.get('can_approve', False) and str(obj.status) != Order.Status.APPROVED,
-        'can_edit_order': capabilities.get('can_edit', False) and (admin_like or str(obj.status) != Order.Status.APPROVED),
+        'can_edit_order': capabilities.get('can_edit', False) and str(obj.status) in {Order.Status.DRAFT, Order.Status.SUBMITTED},
+        'can_transition_order': capabilities.get('can_approve', False) or capabilities.get('can_edit', False),
+        'next_status_actions': next_status_actions,
+        'can_link_sale': bool((capabilities.get('can_approve', False) or capabilities.get('can_edit', False)) and can_start_fulfillment),
         'order_return_url': reverse('homeApp:orders_list'),
     }
     return render(request, 'home/orders/orderDetail.html', context)

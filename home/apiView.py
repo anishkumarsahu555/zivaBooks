@@ -42,8 +42,14 @@ from home.otp import (
     OTP_TTL_SECONDS,
     clear_collection_otp,
     clear_collection_status,
+    clear_order_delivery_status,
     get_collection_otp_payload,
+    get_order_delivery_status_payload,
+    get_order_delivery_otp_payload,
+    clear_order_delivery_otp,
+    set_order_delivery_status,
     set_collection_otp,
+    set_order_delivery_otp,
     set_collection_status,
 )
 from home.party_ledger import sync_party_ledger_entries_for_object
@@ -342,6 +348,78 @@ def clear_collection_otp_api(request):
             return JsonResponse({'message': 'error', 'error': 'Party not found.'}, status=404)
         clear_collection_otp(party_obj.tenant_id, party_id)
         clear_collection_status(party_obj.tenant_id, party_id)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
+
+def request_order_delivery_otp_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        order_id = int(request.POST.get('orderID') or 0)
+        obj = tenant_qs(request, Order).select_related('partyID').filter(pk=order_id, isDeleted=False).first()
+        if not obj:
+            return JsonResponse({'message': 'error', 'error': 'Order not found.'}, status=404)
+        if not (_can_approve_orders(request.user) or _can_edit_order_record(request.user, obj)):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+        if not obj.partyID_id:
+            return JsonResponse({'message': 'error', 'error': 'Party is required for delivery OTP.'}, status=400)
+        otp = get_random_string(length=6, allowed_chars='0123456789')
+        meta = {'orderID': obj.pk, 'status': Order.Status.DELIVERED, 'orderNumber': obj.orderNumber or str(obj.pk)}
+        clear_order_delivery_status(obj.partyID.tenant_id, obj.partyID_id)
+        set_order_delivery_otp(obj.partyID.tenant_id, obj.partyID_id, otp, ttl=OTP_TTL_SECONDS, meta=meta)
+        return JsonResponse({'message': 'success', 'expires_in': OTP_TTL_SECONDS}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
+
+def verify_order_delivery_otp_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        order_id = int(request.POST.get('orderID') or 0)
+        otp_code = (request.POST.get('otp') or '').strip()
+        if not (otp_code.isdigit() and len(otp_code) == 6):
+            return JsonResponse({'message': 'otp_invalid'}, safe=False)
+        obj = tenant_qs(request, Order).select_related('partyID').filter(pk=order_id, isDeleted=False).first()
+        if not obj:
+            return JsonResponse({'message': 'error', 'error': 'Order not found.'}, status=404)
+        if not (_can_approve_orders(request.user) or _can_edit_order_record(request.user, obj)):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+        if not obj.partyID_id:
+            return JsonResponse({'message': 'error', 'error': 'Party is required for delivery OTP.'}, status=400)
+        payload = get_order_delivery_otp_payload(obj.partyID.tenant_id, obj.partyID_id) or {}
+        if not payload or str(payload.get('otp')) != otp_code:
+            return JsonResponse({'message': 'otp_invalid'}, safe=False)
+        meta = payload.get('meta') or {}
+        if str(meta.get('orderID') or '') not in {'', str(obj.pk)}:
+            return JsonResponse({'message': 'otp_invalid'}, safe=False)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
+
+def clear_order_delivery_otp_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        order_id = int(request.POST.get('orderID') or 0)
+        obj = tenant_qs(request, Order).select_related('partyID').filter(pk=order_id, isDeleted=False).first()
+        if not obj:
+            return JsonResponse({'message': 'error', 'error': 'Order not found.'}, status=404)
+        if not (_can_approve_orders(request.user) or _can_edit_order_record(request.user, obj)):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+        if not obj.partyID_id:
+            return JsonResponse({'message': 'error', 'error': 'Party is required for delivery OTP.'}, status=400)
+        clear_order_delivery_otp(obj.partyID.tenant_id, obj.partyID_id)
+        clear_order_delivery_status(obj.partyID.tenant_id, obj.partyID_id)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
@@ -1002,19 +1080,105 @@ def _credential_share_payload(request, raw_token, token_obj):
     }
 def _format_order_number(pk):
     return 'O' + str(int(pk)).zfill(8)
+def _order_status_text(status):
+    status = str(status or '')
+    status_map = {
+        Order.Status.DRAFT: 'Draft',
+        Order.Status.SUBMITTED: 'Submitted',
+        Order.Status.APPROVED: 'Confirmed',
+        Order.Status.PACKED: 'Packed',
+        Order.Status.OUT_FOR_DELIVERY: 'Out for Delivery',
+        Order.Status.DELIVERED: 'Delivered',
+        Order.Status.CANCELLED: 'Cancelled',
+        Order.Status.RETURNED: 'Returned',
+        Order.Status.FULFILLED: 'Delivered',
+    }
+    return status_map.get(status, status.replace('_', ' ').title() or 'Unknown')
 def _order_status_label(status):
     status = str(status or '')
     if status == Order.Status.APPROVED:
-        return '<div class="ui tiny green label">Approved</div>'
+        return '<div class="ui tiny teal label">Confirmed</div>'
     if status == Order.Status.SUBMITTED:
         return '<div class="ui tiny orange label">Submitted</div>'
     if status == Order.Status.DRAFT:
         return '<div class="ui tiny grey label">Draft</div>'
+    if status == Order.Status.PACKED:
+        return '<div class="ui tiny violet label">Packed</div>'
+    if status == Order.Status.OUT_FOR_DELIVERY:
+        return '<div class="ui tiny blue label">Out for Delivery</div>'
+    if status == Order.Status.DELIVERED:
+        return '<div class="ui tiny green label">Delivered</div>'
     if status == Order.Status.CANCELLED:
         return '<div class="ui tiny red label">Cancelled</div>'
+    if status == Order.Status.RETURNED:
+        return '<div class="ui tiny pink label">Returned</div>'
     if status == Order.Status.FULFILLED:
-        return '<div class="ui tiny blue label">Fulfilled</div>'
-    return '<div class="ui tiny label">{}</div>'.format(escape(status.title() or 'Unknown'))
+        return '<div class="ui tiny green label">Delivered</div>'
+    return '<div class="ui tiny label">{}</div>'.format(escape(_order_status_text(status)))
+def _order_status_transition_map():
+    return {
+        Order.Status.DRAFT: [Order.Status.SUBMITTED, Order.Status.CANCELLED],
+        Order.Status.SUBMITTED: [Order.Status.APPROVED, Order.Status.CANCELLED],
+        Order.Status.APPROVED: [Order.Status.PACKED, Order.Status.CANCELLED],
+        Order.Status.PACKED: [Order.Status.OUT_FOR_DELIVERY, Order.Status.CANCELLED],
+        Order.Status.OUT_FOR_DELIVERY: [Order.Status.DELIVERED, Order.Status.RETURNED],
+        Order.Status.DELIVERED: [Order.Status.RETURNED],
+        Order.Status.CANCELLED: [],
+        Order.Status.RETURNED: [],
+        Order.Status.FULFILLED: [Order.Status.RETURNED],
+    }
+def _normalize_order_status(status):
+    if str(status) == Order.Status.FULFILLED:
+        return Order.Status.DELIVERED
+    return str(status or '')
+def _set_order_tracking_timestamps(order_obj, new_status, actor_staff=None):
+    now_value = timezone.now()
+    new_status = _normalize_order_status(new_status)
+    order_obj.status = new_status
+    if new_status == Order.Status.APPROVED:
+        order_obj.approvedOn = order_obj.approvedOn or now_value
+        if actor_staff and not order_obj.approvedBy_id:
+            order_obj.approvedBy = actor_staff
+    elif new_status == Order.Status.PACKED:
+        order_obj.packedOn = order_obj.packedOn or now_value
+    elif new_status == Order.Status.OUT_FOR_DELIVERY:
+        order_obj.outForDeliveryOn = order_obj.outForDeliveryOn or now_value
+    elif new_status == Order.Status.DELIVERED:
+        order_obj.deliveredOn = order_obj.deliveredOn or now_value
+    elif new_status == Order.Status.CANCELLED:
+        order_obj.cancelledOn = order_obj.cancelledOn or now_value
+    elif new_status == Order.Status.RETURNED:
+        order_obj.returnedOn = order_obj.returnedOn or now_value
+def _create_order_status_event(request, order_obj, from_status, to_status, note=''):
+    event = OrderStatusEvent(order=order_obj)
+    assign_tenant(event, request)
+    event.fromStatus = _normalize_order_status(from_status) or None
+    event.toStatus = _normalize_order_status(to_status)
+    event.note = note or ''
+    staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk, isDeleted=False).only('id').first()
+    if staff:
+        event.actor_id = staff.pk
+    event.save()
+def _order_allowed_next_statuses(order_obj):
+    current = _normalize_order_status(getattr(order_obj, 'status', None))
+    return _order_status_transition_map().get(current, [])
+def _link_sale_to_order(request, order_obj, sale_obj, *, note=''):
+    if not order_obj or not sale_obj:
+        return
+    previous_sale_id = order_obj.linkedSales_id
+    order_obj.linkedSales = sale_obj
+    update_fields = ['linkedSales', 'lastUpdatedOn']
+    if _normalize_order_status(order_obj.status) in {Order.Status.DRAFT, Order.Status.SUBMITTED}:
+        actor_staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk, isDeleted=False).only('id').first()
+        previous_status = _normalize_order_status(order_obj.status)
+        _set_order_tracking_timestamps(order_obj, Order.Status.APPROVED, actor_staff)
+        update_fields.extend(['status', 'approvedOn', 'approvedBy'])
+        order_obj.save(update_fields=update_fields)
+        _create_order_status_event(request, order_obj, previous_status, order_obj.status, note or f'Sale {sale_obj.invoiceNumber or sale_obj.salesID or sale_obj.pk} linked')
+    else:
+        order_obj.save(update_fields=update_fields)
+        if previous_sale_id != sale_obj.pk:
+            _create_order_status_event(request, order_obj, order_obj.status, order_obj.status, note or f'Sale {sale_obj.invoiceNumber or sale_obj.salesID or sale_obj.pk} linked')
 def _collection_verified_label(is_verified):
     if is_verified:
         return '<div class="ui tiny green label">Yes</div>'
@@ -1025,7 +1189,7 @@ def _can_edit_order_record(user, order_obj):
     if not _can_edit_order(user):
         return False
     admin_like = _can_filter_all_orders(user)
-    if str(order_obj.status) == Order.Status.APPROVED and not admin_like:
+    if str(order_obj.status) not in {Order.Status.DRAFT, Order.Status.SUBMITTED} and not admin_like:
         return False
     if admin_like:
         return True
@@ -1039,7 +1203,7 @@ def _can_delete_order_record(user, order_obj):
     if not _can_delete_order(user):
         return False
     admin_like = _can_filter_all_orders(user)
-    if str(order_obj.status) == Order.Status.APPROVED and not admin_like:
+    if str(order_obj.status) not in {Order.Status.DRAFT, Order.Status.SUBMITTED} and not admin_like:
         return False
     if admin_like:
         return True
@@ -4100,6 +4264,7 @@ def _customer_visible_party_ledger_qs_for_request(request, qs):
     ).values('id')
     return qs.filter(
         Q(source=PartyLedgerEntry.Source.SALES) |
+        Q(source=PartyLedgerEntry.Source.CASH_COUNTER) |
         (Q(source=PartyLedgerEntry.Source.COLLECTION) & Q(source_object_id__in=approved_collection_ids)) |
         (Q(source=PartyLedgerEntry.Source.COUNTER_COLLECTION) & Q(source_object_id__in=approved_counter_collection_ids))
     )
@@ -4239,6 +4404,28 @@ class PartyLedgerListJson(BaseDatatableView):
             user=self.request.user,
             role=TenantMembership.Role.PARTY,
         ).exists()
+        sales_id_map = {}
+        collection_id_map = {}
+        counter_collection_id_map = {}
+        if is_customer_view:
+            sales_source_ids = [item.source_object_id for item in qs if item.source == PartyLedgerEntry.Source.SALES and item.source_object_id]
+            collection_source_ids = [item.source_object_id for item in qs if item.source == PartyLedgerEntry.Source.COLLECTION and item.source_object_id]
+            counter_collection_source_ids = [item.source_object_id for item in qs if item.source == PartyLedgerEntry.Source.COUNTER_COLLECTION and item.source_object_id]
+            if sales_source_ids:
+                sales_id_map = {
+                    row['id']: (row.get('salesID') or row.get('invoiceNumber') or '')
+                    for row in tenant_qs(self.request, Sales).filter(id__in=sales_source_ids).values('id', 'salesID', 'invoiceNumber')
+                }
+            if collection_source_ids:
+                collection_id_map = {
+                    row['id']: (row.get('paymentID') or '')
+                    for row in tenant_qs(self.request, Collection).filter(id__in=collection_source_ids).values('id', 'paymentID')
+                }
+            if counter_collection_source_ids:
+                counter_collection_id_map = {
+                    row['id']: (row.get('paymentID') or '')
+                    for row in tenant_qs(self.request, CollectionCashCounter).filter(id__in=counter_collection_source_ids).values('id', 'paymentID')
+                }
         for item in qs:
             running = float(item.running_total or 0.0)
             balance = opening + running
@@ -4282,18 +4469,16 @@ class PartyLedgerListJson(BaseDatatableView):
                 ref_label = ''
                 ref_value = ''
                 if item.source == PartyLedgerEntry.Source.SALES:
-                    # Use actual Sales record id (not invoice no.)
                     if getattr(item, 'source_object_id', None):
                         ref_label = 'Sale ID'
-                        try:
-                            ref_value = 'S' + str(int(item.source_object_id)).zfill(8)
-                        except Exception:
-                            ref_value = 'S' + str(item.source_object_id)
+                        ref_value = sales_id_map.get(item.source_object_id) or ref
                 elif item.source in (PartyLedgerEntry.Source.COLLECTION, PartyLedgerEntry.Source.COUNTER_COLLECTION):
-                    # Show payment id (generated paymentID) when available.
-                    if ref:
+                    if item.source == PartyLedgerEntry.Source.COLLECTION:
+                        ref_value = collection_id_map.get(item.source_object_id) or ref
+                    else:
+                        ref_value = counter_collection_id_map.get(item.source_object_id) or ref
+                    if ref_value:
                         ref_label = 'Payment ID'
-                        ref_value = ref
                 if ref_label and ref_value:
                     ref_html = '<div class="pl-ref"><span class="pl-ref-chip">{}</span><span class="pl-ref-val">{}</span></div>'.format(
                         escape(ref_label),
@@ -5258,6 +5443,7 @@ def add_order_api(request):
         party_id = request.POST.get('party')
         order_text = request.POST.get('orderText')
         remark = request.POST.get('remark')
+        assigned_to = request.POST.get('assignedTo')
         lat = request.POST.get('lat')
         lng = request.POST.get('lng')
         loc = request.POST.get('loc')
@@ -5280,12 +5466,16 @@ def add_order_api(request):
         staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk, isDeleted=False).only('id').first()
         if staff:
             obj.createdBy_id = staff.pk
+            obj.assignedTo_id = staff.pk
+        if assigned_to:
+            obj.assignedTo_id = int(assigned_to)
         # If staff enters text, consider it submitted; otherwise draft.
         obj.status = Order.Status.SUBMITTED if (order_text or '').strip() else Order.Status.DRAFT
         obj.save()
         # Auto-generate order number like Sales.paymentID.
         obj.orderNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.ORDER)
         obj.save(update_fields=['orderNumber', 'lastUpdatedOn'])
+        _create_order_status_event(request, obj, None, obj.status, 'Order created')
         for f in request.FILES.getlist('images'):
             att = OrderAttachment(order=obj)
             assign_tenant(att, request)
@@ -5310,9 +5500,11 @@ def update_order_api(request):
         order_text = request.POST.get('orderText')
         remark = request.POST.get('remark')
         status = request.POST.get('status')
+        previous_status = _normalize_order_status(obj.status)
         lat = request.POST.get('lat')
         lng = request.POST.get('lng')
         loc = request.POST.get('loc')
+        assigned_to = request.POST.get('assignedTo')
         if order_text is not None:
             obj.orderText = order_text
         if remark is not None:
@@ -5321,8 +5513,16 @@ def update_order_api(request):
             obj.buildDate = datetime.strptime(build_date, '%d/%m/%Y').date()
         if party_id:
             obj.partyID_id = int(party_id)
+        if assigned_to:
+            obj.assignedTo_id = int(assigned_to)
+        elif assigned_to == '':
+            obj.assignedTo = None
         if status in dict(Order.Status.choices):
-            obj.status = status
+            _set_order_tracking_timestamps(
+                obj,
+                status,
+                tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk, isDeleted=False).only('id').first(),
+            )
         if lat:
             obj.latitude = lat
         if lng:
@@ -5330,6 +5530,8 @@ def update_order_api(request):
         if loc is not None and loc != 'N/A':
             obj.location = loc
         obj.save()
+        if _normalize_order_status(obj.status) != previous_status:
+            _create_order_status_event(request, obj, previous_status, obj.status, request.POST.get('statusNote', ''))
         for f in request.FILES.getlist('images'):
             att = OrderAttachment(order=obj)
             assign_tenant(att, request)
@@ -5366,23 +5568,83 @@ def approve_order(request):
         order_id = request.POST.get('userID')
         obj = tenant_qs(request, Order).get(pk=int(order_id))
         staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk, isDeleted=False).only('id').first()
-        obj.status = Order.Status.APPROVED
-        obj.approvedOn = datetime.now()
-        if staff:
-            obj.approvedBy_id = staff.pk
+        previous_status = _normalize_order_status(obj.status)
+        _set_order_tracking_timestamps(obj, Order.Status.APPROVED, staff)
         obj.save(update_fields=['status', 'approvedOn', 'approvedBy', 'lastUpdatedOn'])
+        _create_order_status_event(request, obj, previous_status, obj.status, 'Order confirmed')
         log_audit_event(
             obj,
             AuditLog.Action.APPROVE,
             actor=request.user,
             changes={
-                'status': {'from': 'submitted', 'to': Order.Status.APPROVED},
+                'status': {'from': previous_status, 'to': Order.Status.APPROVED},
                 'approvedBy_id': {'from': None, 'to': getattr(staff, 'pk', None)},
                 'approvedOn': {'from': None, 'to': obj.approvedOn.isoformat() if obj.approvedOn else None},
             },
             snapshot=snapshot_instance(obj),
         )
         return JsonResponse({'message': 'success'}, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error'}, safe=False)
+@transaction.atomic
+def transition_order_status_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        order_id = request.POST.get('orderID')
+        target_status = _normalize_order_status(request.POST.get('status'))
+        note = request.POST.get('note', '')
+        obj = tenant_qs(request, Order).get(pk=int(order_id), isDeleted=False)
+        if not (_can_approve_orders(request.user) or _can_edit_order_record(request.user, obj)):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+        current_status = _normalize_order_status(obj.status)
+        if target_status not in _order_allowed_next_statuses(obj):
+            return JsonResponse({'message': 'invalid_transition'}, status=400, safe=False)
+        if target_status == Order.Status.DELIVERED and obj.partyID_id:
+            otp_code = (request.POST.get('otpCode') or '').strip()
+            if not (otp_code.isdigit() and len(otp_code) == 6):
+                return JsonResponse({'message': 'otp_required'}, status=400, safe=False)
+            payload = get_order_delivery_otp_payload(obj.partyID.tenant_id, obj.partyID_id) or {}
+            if not payload or str(payload.get('otp')) != otp_code:
+                return JsonResponse({'message': 'otp_invalid'}, status=400, safe=False)
+        staff = tenant_qs(request, StaffUser).filter(user_ID_id=request.user.pk, isDeleted=False).only('id').first()
+        _set_order_tracking_timestamps(obj, target_status, staff)
+        update_fields = ['status', 'lastUpdatedOn']
+        if target_status == Order.Status.APPROVED:
+            update_fields.extend(['approvedOn', 'approvedBy'])
+        elif target_status == Order.Status.PACKED:
+            update_fields.append('packedOn')
+        elif target_status == Order.Status.OUT_FOR_DELIVERY:
+            update_fields.append('outForDeliveryOn')
+        elif target_status == Order.Status.DELIVERED:
+            obj.deliveryOtpVerified = bool(obj.partyID_id)
+            obj.deliveryOtpVerifiedOn = timezone.now() if obj.partyID_id else None
+            obj.deliveryOtpVerifiedBy = staff
+            update_fields.extend(['deliveredOn', 'deliveryOtpVerified', 'deliveryOtpVerifiedOn', 'deliveryOtpVerifiedBy'])
+        elif target_status == Order.Status.CANCELLED:
+            update_fields.append('cancelledOn')
+        elif target_status == Order.Status.RETURNED:
+            update_fields.append('returnedOn')
+        obj.save(update_fields=update_fields)
+        if target_status == Order.Status.DELIVERED and obj.partyID_id:
+            try:
+                clear_order_delivery_otp(obj.partyID.tenant_id, obj.partyID_id)
+                set_order_delivery_status(
+                    obj.partyID.tenant_id,
+                    obj.partyID_id,
+                    'delivered',
+                    meta={
+                        'orderID': obj.pk,
+                        'orderNumber': obj.orderNumber or str(obj.pk),
+                        'verifiedOn': timezone.now().isoformat(),
+                    },
+                )
+            except Exception:
+                pass
+        _create_order_status_event(request, obj, current_status, target_status, note)
+        return JsonResponse({'message': 'success', 'statusLabel': _order_status_label(obj.status)}, safe=False)
     except Exception:
         return JsonResponse({'message': 'error'}, safe=False)
 @transaction.atomic
@@ -5441,18 +5703,20 @@ class OrdersByAdminListJson(BaseDatatableView):
         can_approve = _can_approve_orders(self.request.user)
         can_edit = _can_edit_order(self.request.user)
         for item in qs:
-            approved = str(item.status) == Order.Status.APPROVED
+            normalized_status = _normalize_order_status(getattr(item, 'status', None))
+            can_confirm = normalized_status == Order.Status.SUBMITTED
+            editable_statuses = {Order.Status.DRAFT, Order.Status.SUBMITTED}
             action_parts = []
-            if can_approve and not approved:
+            if can_approve and can_confirm:
                 action_parts.append(
-                    '''<button data-inverted="" data-tooltip="Approve" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showApproveOrderModal('{}')" class="ui circular purple icon button"><i class="check circle icon"></i></button>'''.format(item.pk)
+                    '''<button data-inverted="" data-tooltip="Confirm" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showApproveOrderModal('{}')" class="ui circular purple icon button"><i class="check circle icon"></i></button>'''.format(item.pk)
                 )
             # Always provide a detail page.
             action_parts.append(
                 '''<a href="/order_detail/{}/" data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular teal icon button"><i class="eye icon"></i></a>'''.format(item.pk)
             )
             # Allow editing for users with edit capability.
-            if can_edit:
+            if can_edit and normalized_status in editable_statuses:
                 action_parts.append(
                     '''<a href="/edit_order/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular green icon button"><i class="pen icon"></i></a>'''.format(item.pk)
                 )
@@ -5518,13 +5782,13 @@ class OrdersByStaffListJson(BaseDatatableView):
         json_data = []
         can_edit = _can_edit_order(self.request.user)
         for item in qs:
-            approved = str(item.status) == Order.Status.APPROVED
+            normalized_status = _normalize_order_status(getattr(item, 'status', None))
             action_parts = []
             action_parts.append(
                 '''<a href="/order_detail/{}/" data-inverted="" data-tooltip="View Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular teal icon button"><i class="eye icon"></i></a>'''.format(item.pk)
             )
             # Staff can edit only before approval; the edit page locks after approval anyway.
-            if can_edit and not approved:
+            if can_edit and normalized_status in {Order.Status.DRAFT, Order.Status.SUBMITTED}:
                 action_parts.append(
                     '''<a href="/edit_order/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular green icon button"><i class="pen icon"></i></a>'''.format(item.pk)
                 )
@@ -8214,6 +8478,21 @@ def add_sales_by_admin_api(request):
             obj.save(update_fields=['salesID', 'paymentID', 'lastUpdatedOn'])
             if inventory_enabled:
                 _sync_sales_lines(request, obj)
+            source_order_id = request.POST.get('sourceOrderId')
+            if source_order_id:
+                try:
+                    source_order = tenant_qs(request, Order).get(pk=int(source_order_id), isDeleted=False)
+                    if str(getattr(source_order, 'status', '') or '') in {
+                        Order.Status.APPROVED,
+                        Order.Status.PACKED,
+                        Order.Status.OUT_FOR_DELIVERY,
+                        Order.Status.DELIVERED,
+                        Order.Status.RETURNED,
+                        Order.Status.FULFILLED,
+                    }:
+                        _link_sale_to_order(request, source_order, obj, note='Sale created from order')
+                except Exception:
+                    pass
             sync_book_transactions(obj)
             sync_party_ledger_entries_for_object(obj)
             # try:
@@ -8229,6 +8508,56 @@ def add_sales_by_admin_api(request):
             return JsonResponse({'message': 'success', 'invoiceNumber': obj.invoiceNumber}, safe=False)
         except Exception as exc:
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+def list_order_sale_link_candidates_api(request):
+    if request.method != 'GET':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        order_id = int(request.GET.get('orderID'))
+        order_obj = tenant_qs(request, Order).select_related('partyID').get(pk=order_id, isDeleted=False)
+        qs = tenant_qs(request, Sales).filter(isDeleted=False).select_related('partyID', 'createdBy').order_by('-buildDate', '-id')
+        linked_elsewhere_ids = set(
+            tenant_qs(request, Order)
+            .filter(isDeleted=False, linkedSales__isnull=False)
+            .exclude(pk=order_obj.pk)
+            .values_list('linkedSales_id', flat=True)
+        )
+        if order_obj.partyID_id:
+            qs = qs.filter(partyID_id=order_obj.partyID_id)
+        rows = []
+        for sale in qs[:40]:
+            rows.append({
+                'ID': sale.pk,
+                'SalesID': _sales_public_id(sale),
+                'InvoiceNumber': sale.invoiceNumber or '-',
+                'Party': sale.partyID.name if sale.partyID_id else '-',
+                'Amount': float(sale.amount or 0.0),
+                'BuildDate': sale.buildDate.strftime('%d/%m/%Y') if sale.buildDate else '',
+                'CreatedBy': sale.createdBy.name if getattr(sale, 'createdBy', None) else '-',
+                'IsLinkedToThisOrder': bool(order_obj.linkedSales_id == sale.pk),
+                'IsLinkedElsewhere': bool(sale.pk in linked_elsewhere_ids),
+            })
+        return JsonResponse({'message': 'success', 'data': rows}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+def link_order_to_sale_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        order_id = int(request.POST.get('orderID'))
+        sale_id = int(request.POST.get('saleID'))
+        order_obj = tenant_qs(request, Order).get(pk=order_id, isDeleted=False)
+        sale_obj = tenant_qs(request, Sales).get(pk=sale_id, isDeleted=False)
+        existing_order = tenant_qs(request, Order).filter(isDeleted=False, linkedSales=sale_obj).exclude(pk=order_obj.pk).first()
+        if existing_order:
+            return JsonResponse({'message': 'already_linked', 'error': f'Sale already linked to {existing_order.orderNumber or existing_order.pk}.'}, status=400, safe=False)
+        _link_sale_to_order(request, order_obj, sale_obj, note='Existing sale linked to order')
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
 class SalesByAdminListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID__name', 'invoiceNumber', 'modeOfPayment', 'bankID__name', 'amount', 'id', 'buildDate', 'createdBy__name',
                      'isApproved', 'approvedBy__name', 'approvedOn',

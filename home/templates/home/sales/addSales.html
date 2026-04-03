@@ -396,6 +396,7 @@
                                 </div>
                                 <input type="hidden" id="salesMode" value="Cash">
                                 <input type="hidden" id="advancedInvoicingEnabled" value="{% if advanced_invoicing_enabled %}1{% else %}0{% endif %}">
+                                <input type="hidden" id="sourceOrderId" value="{% if sales_source_order %}{{ sales_source_order.id }}{% endif %}">
 
                                 <div class="sales-section-card">
                                     <h4 class="ui horizontal left aligned divider header">
@@ -597,6 +598,12 @@
         var selectedInvoiceSeriesMeta = null;
         var invoiceSeriesCatalog = {};
         var advancedInvoiceExpanded = false;
+        var salesSourceOrder = {
+            id: "{% if sales_source_order %}{{ sales_source_order.id }}{% endif %}",
+            partyId: "{% if sales_source_order and sales_source_order.partyID_id %}{{ sales_source_order.partyID_id }}{% endif %}",
+            buildDate: "{% if sales_source_order and sales_source_order.buildDate %}{{ sales_source_order.buildDate|date:'j/n/Y' }}{% endif %}",
+            remark: "{% if sales_source_order %}Order {{ sales_source_order.orderNumber|default:sales_source_order.pk }}{% if sales_source_order.remark %} | {{ sales_source_order.remark|escapejs }}{% endif %}{% endif %}"
+        };
 
         var today = new Date();
         $('#cDate')
@@ -928,6 +935,7 @@
                 data.append('buyerBillingAddress', buyerBillingAddress);
                 data.append('placeOfSupply', placeOfSupply);
                 data.append('lineItems', JSON.stringify(lineItems || []));
+                data.append('sourceOrderId', $('#sourceOrderId').val());
 
                 $.ajax({
                     type: 'post',
@@ -1180,6 +1188,7 @@
                     $('#party').off('change.salesParty').on('change.salesParty', function () {
                         syncPartyInvoiceFields($(this).val());
                     });
+                    applySalesSourceOrderPrefill();
 
                 },
 
@@ -1194,6 +1203,22 @@
             });
 
 
+        }
+
+        function applySalesSourceOrderPrefill() {
+            if (!salesSourceOrder.id) {
+                return;
+            }
+            if (salesSourceOrder.partyId) {
+                $('#party').dropdown('set selected', String(salesSourceOrder.partyId));
+                syncPartyInvoiceFields(String(salesSourceOrder.partyId));
+            }
+            if (salesSourceOrder.buildDate) {
+                $('#colDate').val(salesSourceOrder.buildDate);
+            }
+            if (!$('#remark').val() && salesSourceOrder.remark) {
+                $('#remark').val(salesSourceOrder.remark);
+            }
         }
 
         const toIndianCurrency = () => {

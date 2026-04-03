@@ -494,9 +494,13 @@ class Order(TenantOwnedModel):
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
         SUBMITTED = "submitted", "Submitted"
-        APPROVED = "approved", "Approved"
+        APPROVED = "approved", "Confirmed"
+        PACKED = "packed", "Packed"
+        OUT_FOR_DELIVERY = "out_for_delivery", "Out for Delivery"
+        DELIVERED = "delivered", "Delivered"
         CANCELLED = "cancelled", "Cancelled"
-        FULFILLED = "fulfilled", "Fulfilled"
+        RETURNED = "returned", "Returned"
+        FULFILLED = "fulfilled", "Delivered (Legacy)"
 
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='orders')
     orderNumber = models.CharField(max_length=40, blank=True, null=True, db_index=True)
@@ -516,10 +520,26 @@ class Order(TenantOwnedModel):
     createdBy = models.ForeignKey(
         StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_created'
     )
+    assignedTo = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_assigned'
+    )
+    linkedSales = models.ForeignKey(
+        'Sales', blank=True, null=True, on_delete=models.SET_NULL, related_name='source_orders'
+    )
     approvedOn = models.DateTimeField(blank=True, null=True)
     approvedBy = models.ForeignKey(
         StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_approved'
     )
+    packedOn = models.DateTimeField(blank=True, null=True)
+    outForDeliveryOn = models.DateTimeField(blank=True, null=True)
+    deliveredOn = models.DateTimeField(blank=True, null=True)
+    deliveryOtpVerified = models.BooleanField(default=False)
+    deliveryOtpVerifiedOn = models.DateTimeField(blank=True, null=True)
+    deliveryOtpVerifiedBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_delivery_otp_verified'
+    )
+    cancelledOn = models.DateTimeField(blank=True, null=True)
+    returnedOn = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.orderNumber or f'Order#{self.pk}'
@@ -531,6 +551,7 @@ class Order(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'status'], name='order_tenant_del_status_idx'),
             models.Index(fields=['tenant', 'partyID'], name='order_tenant_party_idx'),
             models.Index(fields=['tenant', 'createdBy'], name='order_tenant_staff_idx'),
+            models.Index(fields=['tenant', 'assignedTo'], name='order_tenant_assigned_idx'),
         ]
         permissions = [
             ('can_approve_orders', 'Can approve orders'),
@@ -557,6 +578,23 @@ class OrderAttachment(TenantOwnedModel):
         verbose_name_plural = 'Order Attachments'
         indexes = [
             models.Index(fields=['tenant', 'isDeleted', 'order'], name='orderatt_tenant_order_idx'),
+        ]
+
+
+class OrderStatusEvent(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='order_status_events')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='statusEvents')
+    fromStatus = models.CharField(max_length=30, choices=Order.Status.choices, blank=True, null=True)
+    toStatus = models.CharField(max_length=30, choices=Order.Status.choices)
+    note = models.CharField(max_length=500, blank=True, null=True)
+    actor = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='order_status_events'
+    )
+
+    class Meta:
+        verbose_name_plural = 'Order Status Events'
+        indexes = [
+            models.Index(fields=['tenant', 'order', 'datetime'], name='ordstat_t_ord_dt_idx'),
         ]
 
 

@@ -15,15 +15,15 @@
                 <div class="ui row teal stacked segment padded">
                     <div class="content">
                         <form class="ui small form" id="addForm" enctype="multipart/form-data">{% csrf_token %}
-                            <div class="two fields">
-                                <div class="eight wide field required">
+                            <div class="two stackable fields">
+                                <div class="twelve wide field required">
                                     <label>Party</label>
                                     <select class="ui clearable search dropdown" id="party">
                                         <option value="">Search By Party Name</option>
                                     </select>
                                 </div>
                                 {% if order_capabilities.can_set_order_date %}
-                                    <div class="eight wide field required">
+                                    <div class="four wide field required">
                                         <label>Order Date</label>
                                         <div class="ui calendar" id="cDate">
                                             <div class="ui input">
@@ -32,7 +32,7 @@
                                         </div>
                                     </div>
                                 {% else %}
-                                    <div class="eight wide field">
+                                    <div class="four wide field">
                                         <label>Order Date</label>
                                         <input type="text" id="buildDate" disabled>
                                     </div>

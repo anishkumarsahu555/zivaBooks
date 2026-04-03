@@ -69,6 +69,75 @@
             background-repeat: no-repeat;
             background-position: center;
         }
+        .collection-otp-box {
+            display: none;
+            margin-top: 10px;
+            padding: 12px;
+            border-radius: 16px;
+            background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+            border: 1px solid rgba(22, 120, 194, 0.12);
+        }
+        .collection-otp-status {
+            display: none;
+            margin: 0 0 10px !important;
+        }
+        .collection-otp-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .collection-otp-title {
+            margin: 0;
+            font-size: .94rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+        .collection-otp-copy {
+            margin-top: 4px;
+            color: rgba(15, 23, 42, 0.62);
+            font-size: .82rem;
+            line-height: 1.45;
+        }
+        .collection-otp-actions {
+            display: grid;
+            grid-template-columns: 1fr 1.25fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+        .collection-otp-actions .ui.button {
+            min-height: 38px;
+            border-radius: 10px;
+            font-weight: 800;
+        }
+        .collection-otp-actions .ui.input > input {
+            min-height: 38px;
+            border-radius: 10px !important;
+            font-weight: 800;
+            letter-spacing: .12em;
+            text-align: center;
+        }
+        .collection-otp-footer {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        @media only screen and (max-width: 767px) {
+            .collection-otp-box {
+                padding: 10px;
+            }
+            .collection-otp-actions {
+                grid-template-columns: 1fr;
+            }
+            .collection-otp-footer {
+                align-items: stretch;
+            }
+        }
 
     </style>
 {% endblock %}
@@ -231,28 +300,30 @@
                                         <input type="checkbox" id="otpRequired" onchange="toggleOtp()">
                                         <label>OTP confirmation (optional)</label>
                                     </div>
-                                    <div id="otpBox" style="display:none; margin-top: 10px;">
-                                        <div class="ui mini message" id="otpStatus" style="display:none;"></div>
-                                        <div class="ui equal width stackable grid" style="margin: 0;">
-                                            <div class="row" style="padding: 0;">
-                                                <div class="column" style="padding: 0 6px 0 0;">
-                                                    <button type="button" class="ui tiny button" id="sendOtpBtn" onclick="sendOtp()">
-                                                        <i class="key icon"></i> Generate OTP
-                                                    </button>
-                                                </div>
-                                                <div class="column" style="padding: 0 6px;">
-                                                    <div class="ui tiny input" style="width: 100%;">
-                                                        <input type="text" id="otpCode" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Enter OTP" onkeyup="autoVerifyOtp()">
-                                                    </div>
-                                                </div>
-                                                <div class="column" style="padding: 0 0 0 6px;">
-                                                    <button type="button" class="ui tiny teal button" id="verifyOtpBtn" onclick="verifyOtp()">
-                                                        <i class="check icon"></i> Verify
-                                                    </button>
-                                                </div>
+                                    <div id="otpBox" class="collection-otp-box">
+                                        <div class="ui mini message collection-otp-status" id="otpStatus"></div>
+                                        <div class="collection-otp-head">
+                                            <div>
+                                                <div class="collection-otp-title">Collection OTP</div>
+                                                <div class="collection-otp-copy">Generate the code, ask the customer to read it from their ledger screen, then verify it here.</div>
+                                            </div>
+                                            <div class="ui tiny basic teal label" id="otpExpiryBadge" style="display:none;">
+                                                <i class="clock outline icon"></i>
+                                                Expires in <span id="otpExpiryText">0:00</span>
                                             </div>
                                         </div>
-                                        <div style="margin-top: 8px;">
+                                        <div class="collection-otp-actions">
+                                            <button type="button" class="ui tiny button" id="sendOtpBtn" onclick="sendOtp()">
+                                                <i class="key icon"></i> Generate OTP
+                                            </button>
+                                            <div class="ui tiny input fluid">
+                                                <input type="text" id="otpCode" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Enter OTP" onkeyup="autoVerifyOtp()">
+                                            </div>
+                                            <button type="button" class="ui tiny teal button" id="verifyOtpBtn" onclick="verifyOtp()">
+                                                <i class="check icon"></i> Verify
+                                            </button>
+                                        </div>
+                                        <div class="collection-otp-footer">
                                             <button type="button" class="ui tiny basic button" id="editOtpBtn" style="display:none;" onclick="editOtpDetails()">
                                                 <i class="edit icon"></i> Edit details
                                             </button>
@@ -348,6 +419,9 @@
                 }
             });
 
+        var collectionOtpExpiresIn = 0;
+        var collectionOtpExpiryTimer = null;
+
         function getSelectedPartyValue() {
             {% if collection_admin_mode %}
                 return $('#party').val();
@@ -363,6 +437,10 @@
         function toggleOtp() {
             var enabled = $('#otpRequired').is(':checked');
             if (!enabled) {
+                stopCollectionOtpTimer();
+                collectionOtpExpiresIn = 0;
+                $('#otpExpiryBadge').hide();
+                $('#otpExpiryText').text('0:00');
                 $('#otpBox').hide();
                 $('#otpStatus').hide();
                 $('#otpCode').val('').prop('disabled', false);
@@ -375,6 +453,43 @@
             }
             $('#otpBox').show();
             $('#otpCode').focus();
+        }
+
+        function formatCollectionOtpTime(seconds) {
+            seconds = Math.max(0, Number(seconds || 0));
+            var m = Math.floor(seconds / 60);
+            var s = seconds % 60;
+            return m + ':' + String(s).padStart(2, '0');
+        }
+
+        function stopCollectionOtpTimer() {
+            if (collectionOtpExpiryTimer) {
+                clearInterval(collectionOtpExpiryTimer);
+                collectionOtpExpiryTimer = null;
+            }
+        }
+
+        function tickCollectionOtpTimer() {
+            if (collectionOtpExpiresIn <= 0) {
+                stopCollectionOtpTimer();
+                $('#otpExpiryBadge').hide();
+                $('#otpExpiryText').text('0:00');
+                return;
+            }
+            $('#otpExpiryBadge').show();
+            $('#otpExpiryText').text(formatCollectionOtpTime(collectionOtpExpiresIn));
+            collectionOtpExpiresIn -= 1;
+        }
+
+        function startCollectionOtpTimer(seconds) {
+            collectionOtpExpiresIn = Number(seconds || 0);
+            stopCollectionOtpTimer();
+            if (collectionOtpExpiresIn > 0) {
+                tickCollectionOtpTimer();
+                collectionOtpExpiryTimer = setInterval(tickCollectionOtpTimer, 1000);
+            } else {
+                $('#otpExpiryBadge').hide();
+            }
         }
 
         function setOtpStatus(type, message) {
@@ -462,6 +577,10 @@
                 dataType: 'json',
                 data: { party: party },
                 complete: function () {
+                    stopCollectionOtpTimer();
+                    collectionOtpExpiresIn = 0;
+                    $('#otpExpiryBadge').hide();
+                    $('#otpExpiryText').text('0:00');
                     $('#otpCode').val('').prop('disabled', false);
                     $('#otpVerified').val('0');
                     $('#otpRequested').val('0');
@@ -499,7 +618,8 @@
                 data: { party: party, paymentMode: paymentMode, amountPaid: amountPaid, collectDate: collectDate },
                 success: function (response) {
                     if (response.message === 'success') {
-                        setOtpStatus('info', 'OTP generated. Ask customer to check OTP on their Ledger screen (valid 5 minutes).');
+                        startCollectionOtpTimer(response.expires_in || 0);
+                        setOtpStatus('info', 'OTP generated. Ask customer to check OTP on their ledger screen and share it before the timer ends.');
                         $('#otpCode').focus();
                         $('#otpRequested').val('1');
                         lockFormAfterOtp();
@@ -539,6 +659,8 @@
                 data: { party: party, otp: otp },
                 success: function (response) {
                     if (response.message === 'success') {
+                        stopCollectionOtpTimer();
+                        $('#otpExpiryBadge').hide();
                         $('#otpVerified').val('1');
                         $('#verifyOtpBtn').removeClass('teal').addClass('green').addClass('disabled');
                         $('#sendOtpBtn').addClass('disabled');

@@ -911,6 +911,20 @@
                             </div>
                         </div>
                     </div>
+                    <div id="custDeliveryOtpPill" class="cust-otp-banner" style="display:none; margin-top: 12px;">
+                        <div class="cust-otp-left">
+                            <div class="cust-otp-title"><i class="key icon" id="custDeliveryOtpIcon"></i> <span id="custDeliveryOtpTitle">Delivery OTP</span></div>
+                            <div class="cust-otp-code" id="custDeliveryOtpCode">------</div>
+                            <div class="cust-otp-sub" id="custDeliveryOtpSub" style="display:none;"></div>
+                        </div>
+                        <div class="cust-otp-right">
+                            <div class="cust-otp-timer" id="custDeliveryOtpTimer">0:00</div>
+                            <div class="cust-otp-details" id="custDeliveryOtpDetails">
+                                <span class="cust-otp-chip" id="custDeliveryOtpOrder" style="display:none;"><i class="file alternate outline icon"></i><span></span></span>
+                                <span class="cust-otp-chip" id="custDeliveryOtpVerifiedOn" style="display:none;"><i class="calendar alternate outline icon"></i><span></span></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1258,6 +1272,153 @@
             $('#custOtpTimer').show();
         }
 
+        var deliveryOtpExpiresIn = 0;
+        var deliveryOtpInterval = null;
+
+        function formatDeliveryOtpTime(seconds) {
+            seconds = Math.max(0, Number(seconds || 0));
+            var m = Math.floor(seconds / 60);
+            var s = seconds % 60;
+            return m + ':' + String(s).padStart(2, '0');
+        }
+
+        function tickDeliveryOtp() {
+            if (deliveryOtpExpiresIn <= 0) {
+                $('#custDeliveryOtpPill').hide();
+                if (deliveryOtpInterval) {
+                    clearInterval(deliveryOtpInterval);
+                    deliveryOtpInterval = null;
+                }
+                return;
+            }
+            $('#custDeliveryOtpTimer').text(formatDeliveryOtpTime(deliveryOtpExpiresIn));
+            deliveryOtpExpiresIn -= 1;
+        }
+
+        function showDeliveryOtpConfirmed(payload) {
+            deliveryOtpExpiresIn = 0;
+            if (deliveryOtpInterval) {
+                clearInterval(deliveryOtpInterval);
+                deliveryOtpInterval = null;
+            }
+            if (deliveryOtpFadeTimer) {
+                clearTimeout(deliveryOtpFadeTimer);
+                deliveryOtpFadeTimer = null;
+            }
+            $('#custDeliveryOtpPill').addClass('is-received').show();
+            $('#custDeliveryOtpTitle').text('Order Delivered');
+            $('#custDeliveryOtpIcon').removeClass('key').addClass('check circle');
+            $('#custDeliveryOtpCode').text(payload.orderNumber ? ('Ref ' + payload.orderNumber) : 'Delivered');
+            $('#custDeliveryOtpSub').text('OTP verified').show();
+            $('#custDeliveryOtpTimer').hide();
+            if (payload.orderNumber) {
+                $('#custDeliveryOtpOrder').show().find('span').last().text(String(payload.orderNumber));
+            } else {
+                $('#custDeliveryOtpOrder').hide();
+            }
+            if (payload.verifiedOn) {
+                $('#custDeliveryOtpVerifiedOn').show().find('span').last().text(String(payload.verifiedOn));
+            } else {
+                $('#custDeliveryOtpVerifiedOn').hide();
+            }
+        }
+
+        function showDeliveryOtpActive() {
+            if (deliveryOtpFadeTimer) {
+                clearTimeout(deliveryOtpFadeTimer);
+                deliveryOtpFadeTimer = null;
+            }
+            $('#custDeliveryOtpPill').removeClass('is-received').show();
+            $('#custDeliveryOtpTitle').text('Delivery OTP');
+            $('#custDeliveryOtpIcon').removeClass('check circle').addClass('key');
+            $('#custDeliveryOtpSub').hide();
+            $('#custDeliveryOtpTimer').show();
+            $('#custDeliveryOtpVerifiedOn').hide();
+            $('#custDeliveryOtpOrder').hide();
+        }
+
+        function fillDeliveryOtpActiveDetails(payload) {
+            $('#custDeliveryOtpCode').text(payload.otp || '');
+            $('#custDeliveryOtpVerifiedOn').hide();
+            if (payload.orderNumber) {
+                $('#custDeliveryOtpOrder').show().find('span').last().text(String(payload.orderNumber));
+            } else {
+                $('#custDeliveryOtpOrder').hide();
+            }
+        }
+
+        var deliveryOtpPollTimer = null;
+        var deliveryOtpBackoffMs = 15000;
+        var deliveryOtpBackoffMaxMs = 120000;
+        var deliveryOtpMuteUntil = 0;
+        var deliveryOtpFadeTimer = null;
+
+        function scheduleDeliveryOtpPoll(delayMs) {
+            if (deliveryOtpPollTimer) clearTimeout(deliveryOtpPollTimer);
+            deliveryOtpPollTimer = setTimeout(function () { pollDeliveryOtp(); }, delayMs);
+        }
+
+        function muteDeliveryOtpPolling(ms) {
+            deliveryOtpMuteUntil = Date.now() + ms;
+            if (deliveryOtpPollTimer) clearTimeout(deliveryOtpPollTimer);
+            deliveryOtpPollTimer = setTimeout(function () {
+                deliveryOtpMuteUntil = 0;
+                deliveryOtpBackoffMs = 15000;
+                pollDeliveryOtp();
+            }, ms);
+        }
+
+        async function pollDeliveryOtp() {
+            if (deliveryOtpMuteUntil && Date.now() < deliveryOtpMuteUntil) {
+                scheduleDeliveryOtpPoll(Math.min(deliveryOtpMuteUntil - Date.now(), 60000));
+                return;
+            }
+            if (document.visibilityState && document.visibilityState !== 'visible') {
+                scheduleDeliveryOtpPoll(30000);
+                return;
+            }
+            try {
+                var res = await fetch("{% url 'homeApp:customer_active_delivery_otp' %}", {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                });
+                var payload = await res.json();
+                if (!res.ok || !payload || payload.message !== 'success' || !payload.active) {
+                    if (payload && payload.status === 'delivered') {
+                        showDeliveryOtpConfirmed(payload);
+                        var ttl = Number(payload.status_expires_in || 10);
+                        deliveryOtpFadeTimer = setTimeout(function () {
+                            $('#custDeliveryOtpPill').fadeOut(200);
+                            deliveryOtpFadeTimer = null;
+                        }, Math.min(20000, ttl * 1000));
+                        muteDeliveryOtpPolling(180000);
+                        return;
+                    }
+                    deliveryOtpExpiresIn = 0;
+                    tickDeliveryOtp();
+                    deliveryOtpBackoffMs = Math.min(deliveryOtpBackoffMs * 2, deliveryOtpBackoffMaxMs);
+                    scheduleDeliveryOtpPoll(deliveryOtpBackoffMs);
+                    return;
+                }
+                deliveryOtpBackoffMs = 12000;
+                showDeliveryOtpActive();
+                fillDeliveryOtpActiveDetails(payload);
+                deliveryOtpExpiresIn = Number(payload.expires_in || 0);
+                if (deliveryOtpExpiresIn > 0) {
+                    tickDeliveryOtp();
+                    if (!deliveryOtpInterval) deliveryOtpInterval = setInterval(tickDeliveryOtp, 1000);
+                    scheduleDeliveryOtpPoll(deliveryOtpBackoffMs);
+                } else {
+                    deliveryOtpBackoffMs = Math.min(deliveryOtpBackoffMs * 2, deliveryOtpBackoffMaxMs);
+                    scheduleDeliveryOtpPoll(deliveryOtpBackoffMs);
+                }
+            } catch (e) {
+                deliveryOtpBackoffMs = Math.min(deliveryOtpBackoffMs * 2, deliveryOtpBackoffMaxMs);
+                scheduleDeliveryOtpPoll(deliveryOtpBackoffMs);
+            }
+        }
+
         // OTP polling: low-frequency when inactive, faster when active, pause when tab hidden.
         var otpPollTimer = null;
         var otpBackoffMs = 15000;
@@ -1354,11 +1515,15 @@
                     otpBackoffMs = 15000;
                     scheduleOtpPoll(400);
                 }
+                deliveryOtpMuteUntil = 0;
+                deliveryOtpBackoffMs = 15000;
+                scheduleDeliveryOtpPoll(400);
             }
         });
 
         // Initial poll.
         scheduleOtpPoll(400);
+        scheduleDeliveryOtpPoll(600);
     });
 </script>
 <script src="{% static 'js/app-loader.js' %}"></script>
