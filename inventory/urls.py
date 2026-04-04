@@ -52,6 +52,9 @@ from inventory.api import (
     update_sales_return_voucher_api,
 )
 from inventory.views import (
+    inventory_analysis_item_report_api,
+    inventory_analysis_page,
+    inventory_analysis_trend_api,
     inventory_items_page,
     inventory_list,
     inventory_masters_page,
@@ -66,6 +69,9 @@ from inventory.views import (
 urlpatterns = [
     path('inventory/', inventory_list, name='inventory_list'),
     path('inventory/items/', inventory_items_page, name='inventory_items_page'),
+    path('inventory/analysis/', inventory_analysis_page, name='inventory_analysis_page'),
+    path('api/inventory_analysis_trend_api/', inventory_analysis_trend_api, name='inventory_analysis_trend_api'),
+    path('api/inventory_analysis_item_report_api/', inventory_analysis_item_report_api, name='inventory_analysis_item_report_api'),
     path('inventory/masters/', inventory_masters_page, name='inventory_masters_page'),
     path('inventory/stock/', inventory_stock_page, name='inventory_stock_page'),
     path('inventory/vouchers/', inventory_vouchers_page, name='inventory_vouchers_page'),

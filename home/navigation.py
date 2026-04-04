@@ -216,6 +216,12 @@ def _admin_sections(user):
                     'home.can_manage_inventory',
                     'home.can_view_party_credentials',
                 ))] if _tenant_feature_enabled(user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Analysis', 'homeApp:inventory_analysis_page', 'chart bar', (
+                    'home.can_view_inventory_reports',
+                    'home.view_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(user, 'inventoryEnabled', True) else []),
                 *([_nav_item('Masters', 'homeApp:inventory_masters_page', 'tags', (
                     'home.view_inventoryitem',
                     'home.add_inventoryitem',
@@ -719,6 +725,12 @@ def build_sidebar_sections(request_or_user):
                     'home.view_inventoryitem',
                     'home.add_inventoryitem',
                     'home.change_inventoryitem',
+                    'home.can_manage_inventory',
+                    'home.can_view_party_credentials',
+                ))] if _tenant_feature_enabled(request_or_user, 'inventoryEnabled', True) else []),
+                *([_nav_item('Analysis', 'homeApp:inventory_analysis_page', 'chart bar', (
+                    'home.can_view_inventory_reports',
+                    'home.view_inventoryitem',
                     'home.can_manage_inventory',
                     'home.can_view_party_credentials',
                 ))] if _tenant_feature_enabled(request_or_user, 'inventoryEnabled', True) else []),

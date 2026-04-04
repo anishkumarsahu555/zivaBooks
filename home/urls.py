@@ -55,6 +55,9 @@ from inventory.api import (
     update_sales_return_voucher_api as inventory_update_sales_return_voucher_api,
 )
 from inventory.views import (
+    inventory_analysis_item_report_api as inventory_analysis_item_report_api_view,
+    inventory_analysis_page as inventory_analysis_page_view,
+    inventory_analysis_trend_api as inventory_analysis_trend_api_view,
     inventory_items_page as inventory_items_page_view,
     inventory_list as inventory_inventory_list_view,
     inventory_masters_page as inventory_masters_page_view,
@@ -101,6 +104,9 @@ urlpatterns = [
     path('invoice_series_list/', invoice_series_list, name='invoice_series_list'),
     path('inventory/', inventory_inventory_list_view, name='inventory_list'),
     path('inventory/items/', inventory_items_page_view, name='inventory_items_page'),
+    path('inventory/analysis/', inventory_analysis_page_view, name='inventory_analysis_page'),
+    path('api/inventory_analysis_trend_api/', inventory_analysis_trend_api_view, name='inventory_analysis_trend_api'),
+    path('api/inventory_analysis_item_report_api/', inventory_analysis_item_report_api_view, name='inventory_analysis_item_report_api'),
     path('inventory/masters/', inventory_masters_page_view, name='inventory_masters_page'),
     path('inventory/non-gst-control/', inventory_non_gst_shadow_page_view, name='non_gst_shadow_page'),
     path('inventory/stock/', inventory_stock_page_view, name='inventory_stock_page'),

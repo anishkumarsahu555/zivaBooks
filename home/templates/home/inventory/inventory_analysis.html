@@ -1,0 +1,828 @@
+{% extends 'home/baseIndex.html' %}
+{% load static %}
+{% load formatting %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.semanticui.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block body %}
+<style>
+    .inv-analysis-shell { padding: .5rem; }
+    .inv-analysis-hero {
+        border-radius: 20px !important;
+        border: 1px solid rgba(148, 163, 184, 0.18) !important;
+        background:
+            radial-gradient(circle at top right, rgba(186, 230, 253, 0.18), transparent 32%),
+            linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(18, 50, 74, 0.96) 56%, rgba(15, 118, 110, 0.9)) !important;
+        color: #f8fafc !important;
+        box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+        margin-bottom: 1rem !important;
+    }
+    .inv-eyebrow { font-size: .74rem; text-transform: uppercase; letter-spacing: .12em; font-weight: 800; color: rgba(186, 230, 253, .86); }
+    .inv-title { font-size: 1.8rem; font-weight: 900; margin: .28rem 0 .24rem; }
+    .inv-subtitle { color: rgba(226, 232, 240, .9); margin-bottom: .9rem; }
+    .inv-filter-form .field > label { color: rgba(226, 232, 240, .86) !important; font-weight: 800 !important; }
+    .inv-filter-form .ui.input > input,
+    .inv-filter-form .ui.selection.dropdown {
+        background: rgba(255, 255, 255, .12) !important;
+        color: #fff !important;
+        border-color: rgba(226, 232, 240, .16) !important;
+    }
+    .inv-filter-form .ui.selection.dropdown .text,
+    .inv-filter-form .ui.selection.dropdown > .dropdown.icon { color: #fff !important; }
+    .inv-filter-actions { display: flex; gap: .6rem; flex-wrap: wrap; align-items: end; }
+    .inv-filter-badges { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .8rem; }
+    .inv-filter-badge {
+        display: inline-flex; align-items: center; padding: .48rem .72rem; border-radius: 999px;
+        background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12); color: #e2e8f0; font-weight: 800; font-size: .8rem;
+    }
+    .inv-kpi-grid, .inv-bucket-grid, .inv-mini-grid { display: grid; gap: 12px; }
+    .inv-kpi-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 1rem; }
+    .inv-bucket-grid { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-bottom: 1rem; }
+    .inv-mini-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .inv-overview-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr); gap: 12px; margin-bottom: 1rem; }
+    .inv-card, .inv-kpi-card, .inv-bucket-card {
+        border-radius: 18px; border: 1px solid rgba(148,163,184,.18); background: linear-gradient(180deg, #fff, #f8fbff);
+        box-shadow: 0 14px 28px rgba(15,23,42,.06); padding: 14px;
+    }
+    .inv-kpi-label, .inv-list-label { color: #64748b; text-transform: uppercase; font-size: .72rem; font-weight: 800; letter-spacing: .08em; }
+    .inv-kpi-value { font-size: 1.5rem; font-weight: 900; color: #0f172a; margin-top: .45rem; }
+    .inv-kpi-sub { color: #64748b; font-size: .78rem; margin-top: .45rem; }
+    .inv-bucket-card { background: linear-gradient(180deg, #fbfdff, #f5f9fc); }
+    .inv-bucket-head { display: flex; justify-content: space-between; gap: .8rem; align-items: center; }
+    .inv-bucket-name { font-size: 1rem; font-weight: 900; color: #0f172a; }
+    .inv-chip {
+        display: inline-flex; align-items: center; gap: .35rem; border-radius: 999px; padding: .22rem .5rem;
+        background: #eff6ff; color: #1d4ed8; font-size: .72rem; font-weight: 800;
+    }
+    .inv-pane-segment { border-radius: 18px !important; padding: 14px !important; }
+    .inv-chart-shell { position: relative; height: 320px; }
+    .inv-chart-toolbar { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap; align-items: center; margin-bottom: .8rem; }
+    .inv-chart-toggle { display: inline-flex; gap: .4rem; flex-wrap: wrap; }
+    .inv-chart-chip {
+        border: 1px solid rgba(148,163,184,.22); background: #f8fafc; color: #334155; border-radius: 999px;
+        padding: .42rem .72rem; font-weight: 800; cursor: pointer;
+    }
+    .inv-chart-chip.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+    .inv-list { display: grid; gap: 10px; margin-top: .7rem; }
+    .inv-list-item {
+        display: flex; justify-content: space-between; gap: .8rem; align-items: start;
+        border-radius: 14px; border: 1px solid rgba(148,163,184,.16); background: linear-gradient(180deg, #fbfdff, #f8fafc); padding: 10px 11px;
+    }
+    .inv-list-title { font-weight: 800; color: #0f172a; line-height: 1.3; }
+    .inv-list-meta { color: #64748b; font-size: .78rem; margin-top: .2rem; }
+    .inv-list-value { text-align: right; font-weight: 900; color: #0f172a; white-space: nowrap; }
+    .inv-age-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+    .inv-age-card {
+        border-radius: 16px; border: 1px solid rgba(148,163,184,.16); padding: 12px; background: linear-gradient(180deg, #fcfdff, #f8fafc);
+    }
+    .inv-tabs.ui.pointing.secondary.menu {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+    .inv-tabs.ui.pointing.secondary.menu::-webkit-scrollbar {
+        height: 6px;
+    }
+    .inv-tabs.ui.pointing.secondary.menu .item {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+    .inv-age-label { font-weight: 800; color: #475569; font-size: .8rem; text-transform: uppercase; }
+    .inv-age-value { font-size: 1.2rem; font-weight: 900; color: #0f172a; margin-top: .35rem; }
+    .inv-table-shell {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+    }
+    .inv-table.ui.table { min-width: 1480px; border-radius: 16px !important; }
+    #inventoryAnalysisTable_wrapper {
+        position: relative;
+    }
+    #inventoryAnalysisTable_wrapper .dt-topbar {
+        display: flex;
+        justify-content: flex-end;
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    #inventoryAnalysisTable_filter {
+        position: static !important;
+        float: none !important;
+        margin: 0 !important;
+        margin-left: auto !important;
+    }
+    #inventoryAnalysisTable_length label,
+    #inventoryAnalysisTable_filter label {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 !important;
+        white-space: nowrap;
+    }
+    #inventoryAnalysisTable_filter input[type=search] { width: 140px !important; }
+    #inventoryAnalysisTable_wrapper .dataTables_info,
+    #inventoryAnalysisTable_wrapper .dataTables_paginate {
+        margin-top: .75rem !important;
+    }
+    .inv-status {
+        display: inline-flex; align-items: center; border-radius: 999px; padding: .26rem .55rem; font-size: .72rem; font-weight: 800;
+        border: 1px solid transparent;
+    }
+    .inv-status.negative { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
+    .inv-status.low { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    .inv-status.out { background: #f8fafc; color: #475569; border-color: #cbd5e1; }
+    .inv-status.idle { background: #f5f3ff; color: #6d28d9; border-color: #ddd6fe; }
+    .inv-status.dead { background: #fff7ed; color: #c2410c; border-color: #fdba74; }
+    .inv-status.healthy { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
+    .inv-empty { color: #64748b; font-weight: 700; }
+    .inv-loading-cell { color: #64748b; font-weight: 700; padding: 1.2rem 0 !important; }
+    .inv-link-card, .inv-link-chip { text-decoration: none !important; }
+    .inv-link-card:hover .inv-list-title,
+    .inv-link-card:hover .inv-list-value { color: #0369a1; }
+    .inv-insight-list { display: grid; gap: 8px; margin-top: .7rem; }
+    .inv-insight-item {
+        border-radius: 14px; border: 1px solid rgba(148,163,184,.16); background: linear-gradient(180deg, #fbfdff, #f8fafc);
+        padding: 10px 11px; color: #334155; font-weight: 700; line-height: 1.5;
+    }
+    html[data-theme="dark"] .inv-card,
+    html[data-theme="dark"] .inv-kpi-card,
+    html[data-theme="dark"] .inv-bucket-card,
+    html[data-theme="dark"] .inv-pane-segment,
+    html[data-theme="dark"] .inv-list-item,
+    html[data-theme="dark"] .inv-age-card,
+    html[data-theme="dark"] .inv-table.ui.table,
+    html[data-theme="dark"] .inv-table.ui.table thead th,
+    html[data-theme="dark"] .inv-table.ui.table tbody td {
+        background: rgba(17, 27, 46, 0.96) !important;
+        color: rgba(226, 232, 240, 0.94) !important;
+        border-color: rgba(148, 163, 184, 0.18) !important;
+    }
+    html[data-theme="dark"] .inv-kpi-value,
+    html[data-theme="dark"] .inv-bucket-name,
+    html[data-theme="dark"] .inv-list-title,
+    html[data-theme="dark"] .inv-list-value,
+    html[data-theme="dark"] .inv-age-value { color: rgba(248, 250, 252, 0.96); }
+    html[data-theme="dark"] .inv-kpi-label,
+    html[data-theme="dark"] .inv-list-label,
+    html[data-theme="dark"] .inv-list-meta,
+    html[data-theme="dark"] .inv-kpi-sub,
+    html[data-theme="dark"] .inv-empty,
+    html[data-theme="dark"] .inv-age-label { color: rgba(148, 163, 184, 0.86); }
+    html[data-theme="dark"] .inv-chip { background: rgba(37, 99, 235, .18); color: #bfdbfe; }
+    html[data-theme="dark"] .inv-chart-chip { background: rgba(22, 35, 56, .96); color: rgba(226, 232, 240, .92); border-color: rgba(148,163,184,.18); }
+    html[data-theme="dark"] .inv-chart-chip.active { background: #1678c2; color: #fff; border-color: rgba(56,189,248,.34); }
+    html[data-theme="dark"] .inv-insight-item { background: rgba(17, 27, 46, 0.96); color: rgba(226, 232, 240, .92); border-color: rgba(148,163,184,.18); }
+    @media (max-width: 768px) {
+        .inv-analysis-shell { padding: .2rem; }
+        .inv-analysis-hero { border-radius: 16px !important; }
+        .inv-title { font-size: 1.25rem; }
+        .inv-kpi-grid, .inv-bucket-grid, .inv-mini-grid, .inv-age-grid, .inv-overview-grid { gap: 8px; }
+        .inv-overview-grid { grid-template-columns: 1fr; }
+        .inv-card, .inv-kpi-card, .inv-bucket-card, .inv-pane-segment { border-radius: 14px !important; padding: 10px !important; }
+        .inv-kpi-value { font-size: 1.18rem; }
+        .inv-list-item { padding: 9px 10px; }
+        .inv-filter-actions { width: 100%; }
+        .inv-filter-form .fields {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 8px !important;
+        }
+        .inv-tabs.ui.pointing.secondary.menu {
+            margin-bottom: .8rem;
+            padding-bottom: 4px;
+        }
+        .inv-filter-form .fields .field {
+            width: auto !important;
+            margin: 0 !important;
+        }
+        .inv-filter-form > .field {
+            margin-bottom: 0 !important;
+        }
+        .inv-table-shell {
+            margin: 0 -2px;
+            padding-bottom: 4px;
+        }
+        .inv-table.ui.table {
+            min-width: 1480px;
+        }
+        .inv-chart-shell { height: 240px; }
+        #inventoryAnalysisTable_wrapper .dt-topbar {
+            justify-content: stretch;
+        }
+        #inventoryAnalysisTable_filter {
+            width: 100% !important;
+        }
+        #inventoryAnalysisTable_filter label {
+            width: 100%;
+            white-space: normal;
+        }
+        #inventoryAnalysisTable_filter input[type=search] {
+            width: 100% !important;
+        }
+    }
+</style>
+
+<div class="ui pointing secondary menu">
+    <div class="active item" data-tab="inventory-analysis">Inventory Analysis</div>
+</div>
+
+<div class="ui active tab" data-tab="inventory-analysis">
+    <div class="inv-analysis-shell" data-requested-tab="{{ filters.tab|default:'' }}">
+        <div class="ui segment inv-analysis-hero">
+            <div class="inv-eyebrow">Inventory Intelligence</div>
+            <div class="inv-title">{{ page_title }}</div>
+            <div class="inv-subtitle">{{ page_subtitle }}</div>
+
+            <form method="get" class="ui small stackable form inv-filter-form">
+                <input type="hidden" name="tab" id="inventoryAnalysisTabInput" value="{{ filters.tab|default:'inv-overview' }}">
+                <div class="two fields">
+                    <div class="field">
+                        <label>Start Date</label>
+                        <div class="ui calendar" id="inventoryAnalysisStartCalendar">
+                            <div class="ui right icon input">
+                                <input type="text" name="start" id="inventoryAnalysisStart" value="{% if filters.start %}{{ filters.start|date:'j/n/Y' }}{% endif %}" placeholder="dd/mm/yyyy" autocomplete="off">
+                                <i class="calendar alternate outline icon"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>End Date</label>
+                        <div class="ui calendar" id="inventoryAnalysisEndCalendar">
+                            <div class="ui right icon input">
+                                <input type="text" name="end" id="inventoryAnalysisEnd" value="{% if filters.end %}{{ filters.end|date:'j/n/Y' }}{% endif %}" placeholder="dd/mm/yyyy" autocomplete="off">
+                                <i class="calendar alternate outline icon"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="three fields">
+                    <div class="field">
+                        <label>Category</label>
+                        <select class="ui search dropdown" name="category">
+                            <option value="">All categories</option>
+                            {% for category in category_options %}
+                                <option value="{{ category.id }}"{% if filters.category_id == category.id %} selected{% endif %}>{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Item</label>
+                        <select class="ui search dropdown" name="item">
+                            <option value="">All items</option>
+                            {% for item in item_options %}
+                                <option value="{{ item.id }}"{% if filters.item_id == item.id %} selected{% endif %}>{{ item.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Bucket</label>
+                        <select class="ui search dropdown" name="bucket">
+                            <option value="">All buckets</option>
+                            {% for value, label in bucket_choices %}
+                                <option value="{{ value }}"{% if filters.bucket == value %} selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="inv-filter-actions">
+                        <button class="ui teal button" type="submit"><i class="filter icon"></i> Apply Filters</button>
+                        <a class="ui basic inverted button" href="{% url 'homeApp:inventory_analysis_page' %}">Reset</a>
+                    </div>
+                </div>
+            </form>
+
+            {% if filter_badges %}
+                <div class="inv-filter-badges">
+                    {% for badge in filter_badges %}
+                        <span class="inv-filter-badge">{{ badge }}</span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="inv-kpi-grid">
+            <div class="inv-kpi-card">
+                <div class="inv-kpi-label">Current On Hand</div>
+                <div class="inv-kpi-value">{{ summary.current_qty|floatformat:2 }}</div>
+                <div class="inv-kpi-sub">Across filtered inventory items</div>
+            </div>
+            <div class="inv-kpi-card">
+                <div class="inv-kpi-label">Current Stock Value</div>
+                <div class="inv-kpi-value">₹ {{ summary.current_value|money }}</div>
+                <div class="inv-kpi-sub">Using default purchase price as stock valuation</div>
+            </div>
+            <div class="inv-kpi-card">
+                <div class="inv-kpi-label">Range Inward</div>
+                <div class="inv-kpi-value">{{ summary.inward_qty|floatformat:2 }}</div>
+                <div class="inv-kpi-sub">₹ {{ summary.inward_value|money }} moved inward</div>
+            </div>
+            <div class="inv-kpi-card">
+                <div class="inv-kpi-label">Range Outward</div>
+                <div class="inv-kpi-value">{{ summary.outward_qty|floatformat:2 }}</div>
+                <div class="inv-kpi-sub">₹ {{ summary.outward_value|money }} moved outward</div>
+            </div>
+            <a class="inv-kpi-card inv-link-card" href="{% url 'homeApp:inventory_analysis_page' %}{{ drilldowns.negative }}">
+                <div class="inv-kpi-label">Exception Count</div>
+                <div class="inv-kpi-value">{{ summary.negative_count|add:summary.low_stock_count|add:summary.missing_master_count }}</div>
+                <div class="inv-kpi-sub">{{ summary.low_stock_count }} low, {{ summary.negative_count }} negative, {{ summary.missing_master_count }} master gaps</div>
+            </a>
+        </div>
+
+        <div class="inv-bucket-grid">
+            {% for bucket in bucket_rows %}
+                <a class="inv-bucket-card inv-link-card" href="{% url 'homeApp:inventory_analysis_page' %}{{ bucket.drilldown_url }}">
+                    <div class="inv-bucket-head">
+                        <div>
+                            <div class="inv-list-label">Bucket</div>
+                            <div class="inv-bucket-name">{{ bucket.label }}</div>
+                        </div>
+                        <span class="inv-chip">{{ bucket.items }} items</span>
+                    </div>
+                    <div class="inv-kpi-value" style="font-size:1.2rem; margin-top:.8rem;">{{ bucket.qty|floatformat:2 }}</div>
+                    <div class="inv-kpi-sub">₹ {{ bucket.value|money }} current value</div>
+                </a>
+            {% endfor %}
+        </div>
+
+        <div class="ui pointing secondary menu inv-tabs">
+            <a class="active item" data-tab="inv-overview">Overview</a>
+            <a class="item" data-tab="inv-performance">Performance</a>
+            <a class="item" data-tab="inv-aging">Aging</a>
+            <a class="item" data-tab="inv-exceptions">Exceptions</a>
+            <a class="item" data-tab="inv-detail">Item Report</a>
+        </div>
+
+        <div class="ui active tab" data-tab="inv-overview">
+            <div class="inv-overview-grid">
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-chart-toolbar">
+                        <div class="inv-list-label">Inward vs Outward Trend</div>
+                        <div class="inv-chart-toggle">
+                            <button type="button" class="inv-chart-chip active" data-grain="day">Day</button>
+                            <button type="button" class="inv-chart-chip" data-grain="week">Week</button>
+                            <button type="button" class="inv-chart-chip" data-grain="month">Month</button>
+                        </div>
+                    </div>
+                    <div class="inv-chart-shell">
+                        <canvas id="inventoryTrendChart"></canvas>
+                    </div>
+                </div>
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-list-label">Inventory Health Today</div>
+                    <div class="inv-insight-list">
+                        {% for line in insight_lines %}
+                            <div class="inv-insight-item">{{ line }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="inv-mini-grid">
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-list-label">Top Categories By Stock Value</div>
+                    <div class="inv-list">
+                        {% for row in category_rows %}
+                            <a class="inv-list-item inv-link-card" href="{% url 'homeApp:inventory_analysis_page' %}{{ row.drilldown_url }}">
+                                <div>
+                                    <div class="inv-list-title">{{ row.name }}</div>
+                                    <div class="inv-list-meta">{{ row.items }} items · {{ row.qty|floatformat:2 }} on hand</div>
+                                </div>
+                                <div class="inv-list-value">₹ {{ row.value|money }}</div>
+                            </a>
+                        {% empty %}
+                            <div class="inv-empty">No category data available for the selected filters.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-list-label">Movement Snapshot</div>
+                    <div class="inv-list">
+                        <div class="inv-list-item">
+                            <div><div class="inv-list-title">Low Stock Items</div><div class="inv-list-meta">Below reorder or minimum level</div></div>
+                            <a class="inv-list-value" href="{% url 'homeApp:inventory_analysis_page' %}{{ drilldowns.low }}">{{ summary.low_stock_count }}</a>
+                        </div>
+                        <div class="inv-list-item">
+                            <div><div class="inv-list-title">Zero Stock Items</div><div class="inv-list-meta">Currently out of stock</div></div>
+                            <div class="inv-list-value">{{ summary.zero_stock_count }}</div>
+                        </div>
+                        <div class="inv-list-item">
+                            <div><div class="inv-list-title">Negative Stock Items</div><div class="inv-list-meta">Need correction or stock adjustment</div></div>
+                            <a class="inv-list-value" href="{% url 'homeApp:inventory_analysis_page' %}{{ drilldowns.negative }}">{{ summary.negative_count }}</a>
+                        </div>
+                        <div class="inv-list-item">
+                            <div><div class="inv-list-title">Dead Stock Items</div><div class="inv-list-meta">No outward movement for 90+ days</div></div>
+                            <a class="inv-list-value" href="{% url 'homeApp:inventory_analysis_page' %}{{ drilldowns.dead }}">{{ summary.dead_stock_count }}</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ui tab" data-tab="inv-performance">
+            <div class="inv-mini-grid">
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-list-label">Best Selling Items</div>
+                    <div class="inv-list">
+                        {% for row in best_sellers %}
+                            <div class="inv-list-item">
+                                <div>
+                                    <div class="inv-list-title">{{ row.item.name }}</div>
+                                    <div class="inv-list-meta">{{ row.bucket_label }} · Avg sale ₹ {{ row.avg_sale_rate|floatformat:2 }}</div>
+                                </div>
+                                <div class="inv-list-value">{{ row.sold_qty|floatformat:2 }}</div>
+                            </div>
+                        {% empty %}
+                            <div class="inv-empty">No outward sales movement for the selected filters.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-list-label">Slow Movers</div>
+                    <div class="inv-list">
+                        {% for row in slow_movers %}
+                            <div class="inv-list-item">
+                                <div>
+                                    <div class="inv-list-title">{{ row.item.name }}</div>
+                                    <div class="inv-list-meta">On hand {{ row.current_qty|floatformat:2 }} · {{ row.status }}</div>
+                                </div>
+                                <div class="inv-list-value">{{ row.sold_qty|floatformat:2 }}</div>
+                            </div>
+                        {% empty %}
+                            <div class="inv-empty">No slow-mover list available for the selected range.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-list-label">High Return Ratio</div>
+                    <div class="inv-list">
+                        {% for row in high_return_rows %}
+                            <div class="inv-list-item">
+                                <div>
+                                    <div class="inv-list-title">{{ row.item.name }}</div>
+                                    <div class="inv-list-meta">{{ row.sales_return_qty|floatformat:2 }} returned against {{ row.sold_qty|floatformat:2 }} sold</div>
+                                </div>
+                                <div class="inv-list-value">{{ row.return_ratio|floatformat:2 }}%</div>
+                            </div>
+                        {% empty %}
+                            <div class="inv-empty">No return-heavy items in this filter range.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ui tab" data-tab="inv-aging">
+            <div class="ui segment inv-pane-segment">
+                <div class="inv-age-grid">
+                    {% for bucket in aging_buckets %}
+                        <div class="inv-age-card">
+                            <div class="inv-age-label">{{ bucket.label }}</div>
+                            <div class="inv-age-value">{{ bucket.count }}</div>
+                            <div class="inv-kpi-sub">{{ bucket.qty|floatformat:2 }} qty · ₹ {{ bucket.value|money }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="ui segment inv-pane-segment" style="margin-top:1rem;">
+                <div class="inv-list-label">Oldest Stock Risk</div>
+                <div class="inv-list">
+                    {% for row in dead_stock_rows %}
+                        <div class="inv-list-item">
+                            <div>
+                                <div class="inv-list-title">{{ row.item.name }}</div>
+                                <div class="inv-list-meta">Age {{ row.age_days|default:'90+' }} days · On hand {{ row.current_qty|floatformat:2 }}</div>
+                            </div>
+                            <div class="inv-list-value">₹ {{ row.current_value|money }}</div>
+                        </div>
+                    {% empty %}
+                        <div class="inv-empty">No dead stock risk in the selected filters.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="ui tab" data-tab="inv-exceptions">
+            <div class="inv-mini-grid">
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-list-label">Negative Stock</div>
+                    <div class="inv-list">
+                        {% for row in negative_rows %}
+                            <div class="inv-list-item">
+                                <div>
+                                    <div class="inv-list-title">{{ row.item.name }}</div>
+                                    <div class="inv-list-meta">{{ row.bucket_label }}</div>
+                                </div>
+                                <div class="inv-list-value">{{ row.current_qty|floatformat:2 }}</div>
+                            </div>
+                        {% empty %}
+                            <div class="inv-empty">No negative stock items.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-list-label">Low Stock</div>
+                    <div class="inv-list">
+                        {% for row in low_stock_rows %}
+                            <div class="inv-list-item">
+                                <div>
+                                    <div class="inv-list-title">{{ row.item.name }}</div>
+                                    <div class="inv-list-meta">Reorder {{ row.item.reorderLevel|floatformat:2 }} · On hand {{ row.current_qty|floatformat:2 }}</div>
+                                </div>
+                                <div class="inv-list-value">{{ row.status }}</div>
+                            </div>
+                        {% empty %}
+                            <div class="inv-empty">No low stock items.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="ui segment inv-pane-segment">
+                    <div class="inv-list-label">Missing Master Data</div>
+                    <div class="inv-list">
+                        {% for row in missing_master_rows %}
+                            <div class="inv-list-item">
+                                <div>
+                                    <div class="inv-list-title">{{ row.item.name }}</div>
+                                    <div class="inv-list-meta">
+                                        {% if not row.item.category_id %}No category{% endif %}
+                                        {% if not row.item.unit_id %}{% if not row.item.category_id %} · {% endif %}No unit{% endif %}
+                                        {% if row.item.defaultStockBucket == 'gst' and not row.item.taxProfile_id %}{% if not row.item.category_id or not row.item.unit_id %} · {% endif %}No tax profile{% endif %}
+                                    </div>
+                                </div>
+                                <div class="inv-list-value">Fix</div>
+                            </div>
+                        {% empty %}
+                            <div class="inv-empty">Master data looks complete for the current selection.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ui tab" data-tab="inv-detail">
+            <div class="ui segment inv-pane-segment">
+                <div class="inv-list-label" style="margin-bottom:.8rem;">Item Wise Report</div>
+                <div class="inv-table-shell">
+                    <table class="ui unstackable tiny sortable celled very nowrap very compact table inv-table" id="inventoryAnalysisTable">
+                        <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Category</th>
+                            <th>Bucket</th>
+                            <th>On Hand</th>
+                            <th>Stock Value</th>
+                            <th>Purchased</th>
+                            <th>Sold</th>
+                            <th>Sales Return</th>
+                            <th>Purchase Return</th>
+                            <th>Avg Purchase</th>
+                            <th>Avg Sale</th>
+                            <th>Margin %</th>
+                            <th>Last Bill</th>
+                            <th>Last Qty</th>
+                            <th>Last Rate</th>
+                            <th>Last Date</th>
+                            <th>Age</th>
+                            <th>Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="18" class="center aligned inv-loading-cell">Loading item report...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+    $(function () {
+        var trendApiUrl = "{% url 'homeApp:inventory_analysis_trend_api' %}";
+        var itemReportApiUrl = "{% url 'homeApp:inventory_analysis_item_report_api' %}";
+        var pageUrl = "{% url 'homeApp:inventory_analysis_page' %}";
+        var inventoryAnalysisState = {
+            itemReportLoaded: false,
+            trendLoaded: false,
+            inventoryTable: null,
+            trendChart: null,
+            currentQuery: window.location.search || ''
+        };
+
+        function formatCalendarDate(date) {
+            if (!date) return '';
+            return date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
+        }
+
+        function destroyTrendChart() {
+            if (inventoryAnalysisState.trendChart) {
+                inventoryAnalysisState.trendChart.destroy();
+                inventoryAnalysisState.trendChart = null;
+            }
+        }
+
+        function destroyItemReportTable() {
+            if (inventoryAnalysisState.inventoryTable) {
+                inventoryAnalysisState.inventoryTable.clear().destroy();
+                inventoryAnalysisState.inventoryTable = null;
+            }
+        }
+
+        function initItemReportTable() {
+            destroyItemReportTable();
+            if ($.fn.DataTable && $('#inventoryAnalysisTable').length) {
+                inventoryAnalysisState.inventoryTable = $('#inventoryAnalysisTable').DataTable({
+                    dom: "<'dt-topbar' f>rtip",
+                    pageLength: 25,
+                    order: [[0, 'asc']],
+                    autoWidth: false,
+                    scrollX: true,
+                    lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']]
+                });
+            }
+        }
+
+        function renderTrendChart(grain) {
+            var trendPayload = window.inventoryTrendPayload || {};
+            var payload = trendPayload[grain] || {labels: [], inward: [], outward: []};
+            destroyTrendChart();
+            inventoryAnalysisState.trendChart = new Chart(document.getElementById('inventoryTrendChart'), {
+                type: 'bar',
+                data: {
+                    labels: payload.labels,
+                    datasets: [
+                        {
+                            label: 'Inward',
+                            data: payload.inward,
+                            borderRadius: 10,
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Outward',
+                            data: payload.outward,
+                            borderRadius: 10,
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { ticks: { color: '#64748b' }, grid: { display: false } },
+                        y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(148,163,184,0.16)' }, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#64748b', boxWidth: 12, usePointStyle: true, pointStyle: 'circle' } }
+                    }
+                }
+            });
+        }
+
+        function loadTrendData() {
+            if (inventoryAnalysisState.trendLoaded) {
+                return;
+            }
+            inventoryAnalysisState.trendLoaded = true;
+            $.getJSON(trendApiUrl + inventoryAnalysisState.currentQuery)
+                .done(function (response) {
+                    if (response && response.message === 'success') {
+                        window.inventoryTrendPayload = response.trend || {};
+                        var activeGrain = $('.inv-chart-chip.active').data('grain') || 'day';
+                        renderTrendChart(activeGrain);
+                    }
+                })
+                .fail(function () {
+                    inventoryAnalysisState.trendLoaded = false;
+                });
+        }
+
+        function loadItemReport() {
+            if (inventoryAnalysisState.itemReportLoaded) {
+                return;
+            }
+            inventoryAnalysisState.itemReportLoaded = true;
+            $.getJSON(itemReportApiUrl + inventoryAnalysisState.currentQuery)
+                .done(function (response) {
+                    if (!response || response.message !== 'success') {
+                        inventoryAnalysisState.itemReportLoaded = false;
+                        return;
+                    }
+                    $('#inventoryAnalysisTable tbody').html(response.rows_html || '<tr><td colspan="18" class="center aligned">No inventory items match the selected filters.</td></tr>');
+                    initItemReportTable();
+                })
+                .fail(function () {
+                    inventoryAnalysisState.itemReportLoaded = false;
+                    $('#inventoryAnalysisTable tbody').html('<tr><td colspan="18" class="center aligned inv-loading-cell">Unable to load item report right now.</td></tr>');
+                });
+        }
+
+        function bindAnalysisEvents() {
+            $('.inv-chart-chip').off('click.inventoryAnalysis').on('click.inventoryAnalysis', function () {
+                var grain = $(this).data('grain');
+                $('.inv-chart-chip').removeClass('active');
+                $(this).addClass('active');
+                if (inventoryAnalysisState.trendLoaded) {
+                    renderTrendChart(grain);
+                } else {
+                    loadTrendData();
+                }
+            });
+
+            $('.inv-tabs .item').off('click.inventoryAnalysis').on('click.inventoryAnalysis', function () {
+                $('#inventoryAnalysisTabInput').val($(this).data('tab') || 'inv-overview');
+                if ($(this).data('tab') === 'inv-detail') {
+                    loadItemReport();
+                }
+            });
+
+            $('.inv-filter-form').off('submit.inventoryAnalysis').on('submit.inventoryAnalysis', function (e) {
+                e.preventDefault();
+                var queryString = $(this).serialize();
+                inventoryAnalysisState.currentQuery = queryString ? ('?' + queryString) : '';
+                refreshAnalysisShell(inventoryAnalysisState.currentQuery, true);
+            });
+        }
+
+        function initAnalysisShell() {
+            inventoryAnalysisState.itemReportLoaded = false;
+            inventoryAnalysisState.trendLoaded = false;
+            destroyTrendChart();
+            destroyItemReportTable();
+
+            $('.inv-filter-form .ui.dropdown').dropdown();
+            $('.menu .item').tab();
+            $('#inventoryAnalysisStartCalendar, #inventoryAnalysisEndCalendar').calendar({
+                monthFirst: false,
+                type: 'date',
+                formatter: { date: formatCalendarDate }
+            });
+
+            bindAnalysisEvents();
+
+            var requestedTab = $('.inv-analysis-shell').data('requested-tab') || '';
+            if (requestedTab) {
+                $('.inv-tabs .item[data-tab="' + requestedTab + '"]').tab('change tab', requestedTab);
+                $('#inventoryAnalysisTabInput').val(requestedTab);
+            } else {
+                $('#inventoryAnalysisTabInput').val('inv-overview');
+            }
+
+            loadTrendData();
+            if (requestedTab === 'inv-detail') {
+                loadItemReport();
+            }
+        }
+
+        function refreshAnalysisShell(query, pushHistory) {
+            destroyTrendChart();
+            destroyItemReportTable();
+            var fetchUrl = pageUrl + (query || '');
+            $('.inv-analysis-shell').addClass('loading');
+            $.get(fetchUrl)
+                .done(function (html) {
+                    var $nextShell = $('<div>').html(html).find('.inv-analysis-shell').first();
+                    if (!$nextShell.length) {
+                        $('.inv-analysis-shell').removeClass('loading');
+                        return;
+                    }
+                    $('.inv-analysis-shell').replaceWith($nextShell);
+                    if (pushHistory) {
+                        window.history.replaceState({}, '', fetchUrl);
+                    }
+                    initAnalysisShell();
+                })
+                .fail(function () {
+                    $('.inv-analysis-shell').removeClass('loading');
+                });
+        }
+
+        initAnalysisShell();
+    });
+</script>
+{{ block.super }}
+{% endblock %}
