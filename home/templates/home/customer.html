@@ -252,10 +252,34 @@
 
         .cust-sidebar .item {
             color: rgba(226, 232, 240, 0.92) !important;
-            border-radius: 12px !important;
-            margin: 2px 8px;
+            border-radius: 10px !important;
+            margin: 1px 6px;
+            padding: 9px 10px !important;
+            min-height: 38px;
             font-weight: 800 !important;
             transition: background 0.14s ease-out, transform 0.14s ease-out;
+        }
+
+        .cust-sidebar .item > .icon,
+        .cust-sidenav .ui.vertical.menu .item > .icon {
+            margin-right: 0.65em !important;
+        }
+
+        .cust-nav-brand {
+            padding: 10px 10px 7px !important;
+        }
+
+        .cust-nav-section {
+            padding: 3px 10px !important;
+            min-height: auto !important;
+        }
+
+        .cust-nav-section-label {
+            color: rgba(226, 232, 240, 0.66);
+            font-size: 0.67rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
         }
 
         .cust-sidebar .item.active,
@@ -274,9 +298,9 @@
             content: "";
             position: absolute;
             left: 0;
-            top: 10px;
-            bottom: 10px;
-            width: 3px;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
             border-radius: 999px;
             background: linear-gradient(180deg, rgba(45, 212, 191, 0.95), rgba(56, 189, 248, 0.95));
         }
@@ -292,7 +316,7 @@
         @media (min-width: 768px) {
             .cust-shell {
                 padding-left: 16rem;
-                padding-right: 16px;
+                padding-right: 12px;
             }
 
             .cust-mobile-toggle {
@@ -306,7 +330,7 @@
                 left: 0;
                 width: 15rem;
                 height: calc(100vh - 56px);
-                padding: 12px 10px 14px;
+                padding: 8px 8px 10px;
                 overflow: auto;
                 background:
                     radial-gradient(circle at top right, rgba(248, 250, 252, 0.10), transparent 32%),
@@ -323,8 +347,10 @@
 
             .cust-sidenav .ui.vertical.menu .item {
                 color: rgba(226, 232, 240, 0.92) !important;
-                border-radius: 14px !important;
-                margin: 3px 0;
+                border-radius: 10px !important;
+                margin: 1px 0;
+                padding: 9px 10px !important;
+                min-height: 38px;
                 font-weight: 800 !important;
                 transition: background 0.14s ease-out, transform 0.14s ease-out;
             }
@@ -344,9 +370,9 @@
                 content: "";
                 position: absolute;
                 left: 0;
-                top: 10px;
-                bottom: 10px;
-                width: 3px;
+                top: 8px;
+                bottom: 8px;
+                width: 2px;
                 border-radius: 999px;
                 background: linear-gradient(180deg, rgba(45, 212, 191, 0.95), rgba(56, 189, 248, 0.95));
             }
@@ -1081,7 +1107,7 @@
 </div>
 
 <div class="ui left vertical inverted sidebar menu cust-sidebar" id="custSidebar">
-    <div class="item" style="padding: 14px 14px 10px;">
+    <div class="item cust-nav-brand">
         <div class="cust-brand">
             <img class="cust-logo" alt="Logo" src="{% static 'sw/images/icon-192.png' %}">
             <div>
@@ -1090,8 +1116,8 @@
             </div>
         </div>
     </div>
-    <div class="item" style="padding-top: 6px; padding-bottom: 6px;">
-        <div style="color: rgba(226,232,240,0.7); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;">
+    <div class="item cust-nav-section">
+        <div class="cust-nav-section-label">
             Menu
         </div>
     </div>
@@ -1102,7 +1128,7 @@
 
 <div class="cust-sidenav">
     <div class="ui vertical inverted menu">
-        <div class="item" style="padding: 14px 14px 10px;">
+        <div class="item cust-nav-brand">
             <div class="cust-brand">
                 <img class="cust-logo" alt="Logo" src="{% static 'sw/images/icon-192.png' %}">
                 <div>
@@ -1111,8 +1137,8 @@
                 </div>
             </div>
         </div>
-        <div class="item" style="padding-top: 6px; padding-bottom: 6px;">
-            <div style="color: rgba(226,232,240,0.7); font-size: 0.72rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;">
+        <div class="item cust-nav-section">
+            <div class="cust-nav-section-label">
                 Menu
             </div>
         </div>
