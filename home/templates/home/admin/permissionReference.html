@@ -82,6 +82,37 @@
             padding: 4px 8px;
         }
 
+        html[data-theme="dark"] .permission-ref-card {
+            background: var(--app-surface);
+            border-color: var(--app-line);
+            box-shadow: var(--app-shadow);
+        }
+
+        html[data-theme="dark"] .permission-ref-header {
+            background: linear-gradient(180deg, #162338, #111b2e);
+            border-bottom-color: var(--app-line);
+        }
+
+        html[data-theme="dark"] .permission-ref-title,
+        html[data-theme="dark"] .preset-name {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .preset-card {
+            background: var(--app-surface-soft);
+            border-color: var(--app-line);
+        }
+
+        html[data-theme="dark"] .preset-description {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .permission-chip {
+            background: rgba(37, 99, 235, 0.18);
+            border-color: rgba(56, 189, 248, 0.18);
+            color: #93c5fd;
+        }
+
         @media (max-width: 640px) {
             .permission-ref-shell {
                 padding: 6px;

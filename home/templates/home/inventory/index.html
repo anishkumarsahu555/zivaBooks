@@ -1,0 +1,1994 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/4.1.0/css/fixedColumns.dataTables.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.1.0/js/dataTables.fixedColumns.min.js"></script>
+{% endblock %}
+
+{% block title %}<title>{{ inventory_page_title|default:"Inventory" }}</title>{% endblock %}
+
+{% block body %}
+<style>
+    #inventoryItemTable_length,
+    #inventoryCategoryTable_length,
+    #inventoryUnitTable_length,
+    #inventoryTaxTable_length,
+    #inventoryWarehouseTable_length,
+    #inventoryLedgerTable_length,
+    #inventoryAdjustmentTable_length,
+    #inventoryTransferTable_length,
+    #purchaseReturnTable_length,
+    #salesReturnTable_length {
+        left: 20px;
+        position: absolute;
+    }
+
+    #inventoryItemTable_filter,
+    #inventoryCategoryTable_filter,
+    #inventoryUnitTable_filter,
+    #inventoryTaxTable_filter,
+    #inventoryWarehouseTable_filter,
+    #inventoryLedgerTable_filter,
+    #inventoryAdjustmentTable_filter,
+    #inventoryTransferTable_filter,
+    #purchaseReturnTable_filter,
+    #salesReturnTable_filter {
+        float: right;
+    }
+
+    .dt-buttons {
+        position: absolute;
+        left: 174px;
+    }
+
+    input[type=search] {
+        width: 100px !important;
+    }
+
+    .inventory-cell-title {
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .inventory-cell-meta {
+        margin-top: 3px;
+        font-size: 12px;
+        color: #64748b;
+    }
+
+    .inventory-stock-badge {
+        display: inline-block;
+        margin: 0 6px 6px 0;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    .inventory-stock-badge.gst {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .inventory-stock-badge.non-gst {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .inventory-modal .content {
+        padding-top: 0.75rem !important;
+        overflow: visible !important;
+    }
+
+    .inventory-action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 3px;
+    }
+
+    .inventory-ledger-reference {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .inventory-ledger-reference-text {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .inventory-ledger-reference-action {
+        flex: 0 0 auto;
+    }
+
+    .inventory-voucher-menu {
+        position: relative;
+        z-index: 20;
+    }
+
+    .inventory-voucher-menu-panel {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        min-width: 230px;
+        background: #fff;
+        border: 1px solid rgba(34, 36, 38, 0.12);
+        border-radius: 10px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+        padding: 8px 0;
+        display: none;
+        z-index: 30;
+    }
+
+    .inventory-voucher-menu.open .inventory-voucher-menu-panel {
+        display: block;
+    }
+
+    .inventory-voucher-menu-header {
+        padding: 6px 14px;
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6b7280;
+    }
+
+    .inventory-voucher-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 14px;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        font-size: 0.9rem;
+        color: #111827;
+        cursor: pointer;
+    }
+
+    .inventory-voucher-menu-item:hover {
+        background: #f8fafc;
+    }
+
+    .inventory-voucher-menu-divider {
+        height: 1px;
+        margin: 6px 0;
+        background: rgba(34, 36, 38, 0.08);
+    }
+
+    .inventory-line-item-box {
+        width: 100%;
+        overflow: hidden;
+    }
+
+    .inventory-line-item-box .inventory-table-wrap {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+        position: relative;
+    }
+
+    .inventory-line-item-box .inventory-line-item-table {
+        width: 100%;
+        min-width: 980px;
+        table-layout: fixed;
+    }
+
+    .inventory-line-item-box .inventory-line-item-table th,
+    .inventory-line-item-box .inventory-line-item-table td {
+        white-space: nowrap;
+        vertical-align: middle;
+        overflow: visible;
+    }
+
+    .inventory-line-item-box .inventory-line-item-table td .field {
+        margin-bottom: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    .inventory-line-item-box .inventory-stock-hint {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #5f6b7a;
+        line-height: 1.3;
+        white-space: normal;
+    }
+
+    .inventory-line-item-box .inventory-line-item-table td .ui.dropdown.active,
+    .inventory-line-item-box .inventory-line-item-table td .ui.dropdown.visible {
+        z-index: 30;
+    }
+
+    .inventory-line-item-box .inventory-line-item-table td .ui.dropdown .menu {
+        z-index: 35;
+    }
+
+    .inventory-line-item-box .inventory-line-item-table .field,
+    .inventory-line-item-box .inventory-line-item-table .ui.dropdown,
+    .inventory-line-item-box .inventory-line-item-table input,
+    .inventory-line-item-box .inventory-line-item-table select,
+    .inventory-line-item-box .inventory-line-item-table button {
+        width: 100%;
+    }
+
+    .inventory-line-item-box .inventory-line-item-table .inventory-remove {
+        min-width: auto;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        margin: 0 auto;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .inventory-line-item-box .inventory-line-item-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+
+    .inventory-line-item-box .inventory-total-label {
+        margin-left: auto;
+    }
+
+    .opening-stock-shell .ui.message {
+        margin-top: 0;
+    }
+
+    .opening-stock-shell .opening-stock-section {
+        margin-top: 14px;
+    }
+
+    .opening-stock-shell .opening-stock-section:first-child {
+        margin-top: 0;
+    }
+
+    .opening-stock-shell .opening-stock-history {
+        max-height: 180px;
+        overflow-y: auto;
+    }
+
+    .opening-stock-shell .opening-stock-history .item:first-child {
+        padding-top: 0;
+    }
+
+    .inventory-item-modal {
+        width: 820px !important;
+        max-width: 92vw !important;
+    }
+
+    .inventory-item-shell {
+        display: grid;
+        gap: 16px;
+    }
+
+    .inventory-item-section {
+        border: 1px solid rgba(34, 36, 38, 0.08);
+        border-radius: 12px;
+        padding: 16px;
+        background: #fff;
+    }
+
+    .inventory-item-section .ui.small.header {
+        margin-bottom: 4px;
+    }
+
+    .inventory-item-caption {
+        margin: 0 0 14px 0;
+        color: #667085;
+        font-size: 13px;
+    }
+
+    .inventory-item-note {
+        margin: 0;
+    }
+
+    .inventory-item-metric-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .inventory-item-toggle-field {
+        display: flex;
+        align-items: flex-end;
+    }
+
+    .inventory-section-divider {
+        margin: 18px 0 12px !important;
+    }
+
+    .inventory-section-divider:first-of-type {
+        margin-top: 8px !important;
+    }
+
+    @media (max-width: 900px) {
+        .inventory-item-metric-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    .opening-stock-shell #openingStockLineItemBox {
+        margin-bottom: 14px;
+    }
+
+    .opening-stock-shell #openingStockLineItemBox .inventory-table-wrap {
+        overflow-x: visible;
+    }
+
+    .opening-stock-shell #openingStockLineItemBox .inventory-line-item-table {
+        min-width: 100%;
+    }
+
+    .opening-stock-shell #openingStockLineItemBox .inventory-line-item-footer {
+        border-top: 1px solid rgba(34, 36, 38, 0.08);
+        padding-top: 12px !important;
+    }
+
+    .opening-stock-shell #openingStockLineItemBox .ui.dropdown .menu {
+        min-width: 100%;
+        max-width: 100%;
+        white-space: normal;
+    }
+
+    .opening-stock-shell #openingStockLineItemBox .ui.dropdown .menu > .item {
+        white-space: normal;
+        line-height: 1.3;
+    }
+
+    html[data-theme="dark"] .inventory-cell-title {
+        color: #f8fbff;
+    }
+
+    html[data-theme="dark"] .inventory-cell-meta,
+    html[data-theme="dark"] .inventory-item-caption {
+        color: #93a4bd;
+    }
+
+    html[data-theme="dark"] .inventory-stock-badge.gst {
+        background: rgba(34, 197, 94, 0.18);
+        color: #86efac;
+    }
+
+    html[data-theme="dark"] .inventory-stock-badge.non-gst {
+        background: rgba(239, 68, 68, 0.16);
+        color: #fca5a5;
+    }
+
+    html[data-theme="dark"] .inventory-voucher-menu-panel {
+        background: #101b31;
+        border-color: rgba(56, 189, 248, 0.18);
+        box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+    }
+
+    html[data-theme="dark"] .inventory-voucher-menu-header {
+        color: #95a8c5;
+    }
+
+    html[data-theme="dark"] .inventory-voucher-menu-item {
+        color: #e2ebf7;
+    }
+
+    html[data-theme="dark"] .inventory-voucher-menu-item:hover {
+        background: rgba(22, 120, 194, 0.16);
+    }
+
+    html[data-theme="dark"] .inventory-voucher-menu-divider {
+        background: rgba(56, 189, 248, 0.12);
+    }
+
+    html[data-theme="dark"] .inventory-line-item-box .inventory-stock-hint {
+        color: #93a4bd;
+    }
+
+    html[data-theme="dark"] .inventory-item-section {
+        background: rgba(15, 23, 42, 0.86);
+        border-color: rgba(56, 189, 248, 0.12);
+    }
+
+    html[data-theme="dark"] .inventory-item-section .ui.small.header,
+    html[data-theme="dark"] .inventory-item-note {
+        color: #e6eef8;
+    }
+
+    html[data-theme="dark"] .inventory-item-note.ui.info.message {
+        background: rgba(22, 120, 194, 0.14) !important;
+        border-color: rgba(56, 189, 248, 0.2) !important;
+        color: #d7e9fb !important;
+    }
+
+    html[data-theme="dark"] .inventory-ledger-reference-text > div:first-child {
+        color: #eaf2fc;
+    }
+
+    html[data-theme="dark"] .opening-stock-shell .ui.tiny.info.message,
+    html[data-theme="dark"] .opening-stock-shell .ui.segment.opening-stock-section {
+        background: rgba(15, 23, 42, 0.86) !important;
+        border-color: rgba(56, 189, 248, 0.12) !important;
+        color: #e6eef8 !important;
+    }
+
+    html[data-theme="dark"] .opening-stock-shell .ui.tiny.header,
+    html[data-theme="dark"] .opening-stock-shell .opening-stock-history .item {
+        color: #e6eef8 !important;
+    }
+
+    html[data-theme="dark"] .opening-stock-shell .opening-stock-history .description,
+    html[data-theme="dark"] .opening-stock-shell .opening-stock-history .content,
+    html[data-theme="dark"] .opening-stock-shell .opening-stock-history .header {
+        color: inherit !important;
+    }
+
+    html[data-theme="dark"] .inventory-modal > .header,
+    html[data-theme="dark"] .inventory-modal > .content,
+    html[data-theme="dark"] .inventory-modal > .actions {
+        background: #101b31 !important;
+        color: #e6eef8 !important;
+        border-color: rgba(56, 189, 248, 0.12) !important;
+    }
+
+    html[data-theme="dark"] .inventory-modal .ui.tiny.form label,
+    html[data-theme="dark"] .inventory-modal .ui.tiny.form .field > label {
+        color: #cdd9e8 !important;
+    }
+
+    html[data-theme="dark"] #inventoryDeleteModal .ui.icon.header,
+    html[data-theme="dark"] #inventoryDeleteModal .content,
+    html[data-theme="dark"] #inventoryDeleteModal .actions {
+        background: #101b31 !important;
+        color: #e6eef8 !important;
+    }
+
+    html[data-theme="dark"] .opening-stock-shell #openingStockLineItemBox .inventory-line-item-footer {
+        border-top-color: rgba(56, 189, 248, 0.12);
+    }
+
+</style>
+
+<div class="ui left aligned basic grid">
+    <div class="sixteen wide column">
+        <div class="ui pointing secondary menu" style="overflow: visible;">
+            <div style="cursor: pointer;" class="item active">{{ inventory_page_title|default:"Inventory" }}</div>
+            <div style="position: absolute; right: 1.5rem; top: 18px; display:flex; gap:8px; flex-wrap:wrap;">
+            {% if inventory_page == 'items' %}
+            <button class="ui green mini button" onclick="showItemModal()"><i class="plus square outline icon"></i>Add Item</button>
+            {% elif inventory_page == 'masters' %}
+            <div class="inventory-voucher-menu" id="masterActionDropdown">
+                <button type="button" class="ui olive mini labeled icon button" onclick="toggleMasterActionMenu(event)">
+                    <i class="plus icon"></i>New Master
+                </button>
+                <div class="inventory-voucher-menu-panel">
+                    <div class="inventory-voucher-menu-header">Catalog Setup</div>
+                    <button type="button" class="inventory-voucher-menu-item" onclick="showCategoryModal(); closeMasterActionMenu();">
+                        <i class="tags icon"></i>
+                        <span>Add Category</span>
+                    </button>
+                    <button type="button" class="inventory-voucher-menu-item" onclick="showUnitModal(); closeMasterActionMenu();">
+                        <i class="balance scale icon"></i>
+                        <span>Add Unit</span>
+                    </button>
+                    <button type="button" class="inventory-voucher-menu-item" onclick="showTaxModal(); closeMasterActionMenu();">
+                        <i class="percent icon"></i>
+                        <span>Add HSN / Tax</span>
+                    </button>
+                </div>
+            </div>
+            {% elif inventory_page == 'stock' %}
+            <div class="inventory-voucher-menu" id="stockActionDropdown">
+                <button type="button" class="ui blue mini labeled icon button" onclick="toggleStockActionMenu(event)">
+                    <i class="plus icon"></i>New Stock Entry
+                </button>
+                <div class="inventory-voucher-menu-panel">
+                    <div class="inventory-voucher-menu-header">Stock Setup</div>
+                    <button type="button" class="inventory-voucher-menu-item" onclick="showWarehouseModal(); closeStockActionMenu();">
+                        <i class="warehouse icon"></i>
+                        <span>Add Warehouse</span>
+                    </button>
+                    <button type="button" class="inventory-voucher-menu-item" onclick="showOpeningStockModal(); closeStockActionMenu();">
+                        <i class="boxes icon"></i>
+                        <span>Opening Stock</span>
+                    </button>
+                </div>
+            </div>
+            {% elif inventory_page == 'vouchers' %}
+            <div class="inventory-voucher-menu" id="voucherActionDropdown">
+                <button type="button" class="ui violet mini labeled icon button" onclick="toggleVoucherActionMenu(event)">
+                    <i class="plus icon"></i>New Voucher
+                </button>
+                <div class="inventory-voucher-menu-panel">
+                    <div class="inventory-voucher-menu-header">Stock Corrections</div>
+                    <button type="button" class="inventory-voucher-menu-item" onclick="showAdjustmentModal(); closeVoucherActionMenu();">
+                        <i class="sliders horizontal icon"></i>
+                        <span>Adjustment</span>
+                    </button>
+                    <button type="button" class="inventory-voucher-menu-item" onclick="showTransferModal(); closeVoucherActionMenu();">
+                        <i class="exchange icon"></i>
+                        <span>Transfer</span>
+                    </button>
+                    <div class="inventory-voucher-menu-divider"></div>
+                    <div class="inventory-voucher-menu-header">Returns</div>
+                    <button type="button" class="inventory-voucher-menu-item" onclick="showPurchaseReturnModal(); closeVoucherActionMenu();">
+                        <i class="undo icon"></i>
+                        <span>Purchase Return</span>
+                    </button>
+                    <button type="button" class="inventory-voucher-menu-item" onclick="showSalesReturnModal(); closeVoucherActionMenu();">
+                        <i class="reply icon"></i>
+                        <span>Sales Return</span>
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+            </div>
+        </div>
+
+        {% if inventory_page == 'items' %}
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    Items
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="inventoryItemTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Item</th><th>Category / Tax</th><th>Pricing</th><th>Stock</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if inventory_page == 'masters' %}
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    Categories
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="inventoryCategoryTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Name</th><th>Code</th><th>Description</th><th>Items</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    Units
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="inventoryUnitTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Name</th><th>Symbol</th><th>Decimals</th><th>Items</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    HSN / Tax Profiles
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="inventoryTaxTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Name</th><th>HSN</th><th>GST %</th><th>Cess %</th><th>Items</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if inventory_page == 'stock' %}
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    Warehouses
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="inventoryWarehouseTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Name</th><th>Code</th><th>Address</th><th>Default</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    Stock Ledger
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="inventoryLedgerTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Date</th><th>Item / Source</th><th>Warehouse</th><th>Qty</th><th>Reference</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if inventory_page == 'vouchers' %}
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    Adjustments
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="inventoryAdjustmentTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Voucher</th><th>Date</th><th>Remark</th><th>Lines</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    Transfers
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="inventoryTransferTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Voucher</th><th>Date</th><th>From / To</th><th>Lines</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    Purchase Returns
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="purchaseReturnTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Voucher</th><th>Date</th><th>Party / Purchase</th><th>Amount</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="left align icon"></i>
+                    Sales Returns
+                </h4>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="salesReturnTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Voucher</th><th>Date</th><th>Party / Sales</th><th>Amount</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="ui tiny modal inventory-modal" id="warehouseModal">
+    <i class="close icon"></i>
+    <div class="header">Warehouse / Godown</div>
+    <div class="content">
+        <form class="ui tiny form" id="warehouseForm">{% csrf_token %}
+            <input type="hidden" id="warehouseId">
+            <div class="two fields">
+                <div class="field required">
+                    <label>Name</label>
+                    <input type="text" id="warehouseName" placeholder="Main Store">
+                </div>
+                <div class="field">
+                    <label>Code</label>
+                    <input type="text" id="warehouseCode" placeholder="MAIN">
+                </div>
+            </div>
+            <div class="field">
+                <label>Address</label>
+                <input type="text" id="warehouseAddress" placeholder="Warehouse address">
+            </div>
+            <div class="field">
+                <div class="ui checkbox">
+                    <input type="checkbox" id="warehouseDefault" checked>
+                    <label>Mark as default warehouse</label>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui green right labeled icon button" onclick="saveWarehouse()"><span id="warehouseActionLabel">Save</span><i class="checkmark icon"></i></button>
+    </div>
+</div>
+
+<div class="ui large modal inventory-modal inventory-item-modal" id="itemModal">
+    <i class="close icon"></i>
+    <div class="header">Inventory Item</div>
+    <div class="content">
+        <form class="ui tiny form" id="inventoryItemForm">{% csrf_token %}
+            <input type="hidden" id="itemId">
+            <div class="inventory-item-shell">
+                <div class="ui tiny info message inventory-item-note">
+                    Create the product master here, then use opening stock, purchases, sales, and cash counter entries to move inventory for this tenant.
+                </div>
+
+                <div class="inventory-item-section">
+                    <div class="ui small header">Identity</div>
+                    <p class="inventory-item-caption">Core product information used across purchase, sales, and stock screens.</p>
+                    <div class="field required">
+                        <label>Item Name</label>
+                        <input type="text" id="itemName" placeholder="Item name">
+                    </div>
+                    <div class="two fields">
+                        <div class="field">
+                            <label>SKU</label>
+                            <input type="text" id="itemSku" placeholder="SKU">
+                        </div>
+                        <div class="field">
+                            <label>Barcode</label>
+                            <input type="text" id="itemBarcode" placeholder="Barcode">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Description</label>
+                        <input type="text" id="itemDescription" placeholder="Product description">
+                    </div>
+                </div>
+
+                <div class="inventory-item-section">
+                    <div class="ui small header">Classification</div>
+                    <p class="inventory-item-caption">Map this item to category, tax profile, unit, brand, HSN, and default stock bucket.</p>
+                    <div class="three fields">
+                        <div class="field">
+                            <label>Category</label>
+                            <select class="ui fluid search dropdown" id="itemCategoryId"></select>
+                        </div>
+                        <div class="field">
+                            <label>Tax Profile</label>
+                            <select class="ui fluid search dropdown" id="itemTaxProfileId"></select>
+                        </div>
+                        <div class="field">
+                            <label>Brand</label>
+                            <input type="text" id="itemBrand" placeholder="Brand">
+                        </div>
+                    </div>
+                    <div class="three fields">
+                        <div class="field">
+                            <label>Unit</label>
+                            <select class="ui fluid search dropdown" id="itemUnitId"></select>
+                        </div>
+                        <div class="field">
+                            <label>HSN Code</label>
+                            <input type="text" id="itemHsn" placeholder="HSN">
+                        </div>
+                        <div class="field required">
+                            <label>Default Bucket</label>
+                            <select class="ui fluid dropdown" id="itemBucket">
+                                <option value="gst">GST</option>
+                                {% if non_gst_shadow_enabled %}
+                                <option value="non_gst">Non GST</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="inventory-item-section">
+                    <div class="ui small header">Pricing and Controls</div>
+                    <p class="inventory-item-caption">Set rates, thresholds, and sale restrictions for this item.</p>
+                    <div class="inventory-item-metric-grid">
+                        <div class="field">
+                            <label>GST %</label>
+                            <input type="number" id="itemGstRate" value="0" step="0.01" min="0">
+                        </div>
+                        <div class="field">
+                            <label>Purchase Price</label>
+                            <input type="number" id="itemPurchasePrice" value="0" step="0.01" min="0">
+                        </div>
+                        <div class="field">
+                            <label>Sales Price</label>
+                            <input type="number" id="itemPrice" value="0" step="0.01" min="0">
+                        </div>
+                        <div class="field">
+                            <label>MRP</label>
+                            <input type="number" id="itemMrp" value="0" step="0.01" min="0">
+                        </div>
+                        <div class="field">
+                            <label>Minimum Stock</label>
+                            <input type="number" id="itemMinimumStock" value="0" step="0.01" min="0">
+                        </div>
+                        <div class="field">
+                            <label>Reorder Level</label>
+                            <input type="number" id="itemReorderLevel" value="0" step="0.01" min="0">
+                        </div>
+                        <div class="field inventory-item-toggle-field">
+                            <div class="ui checkbox" style="margin-top: 24px;">
+                                <input type="checkbox" id="itemSaleBlocked">
+                                <label>Block sale for this item</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui green right labeled icon button" onclick="saveInventoryItem()"><span id="itemActionLabel">Save</span><i class="checkmark icon"></i></button>
+    </div>
+</div>
+
+<div class="ui tiny modal inventory-modal" id="categoryModal">
+    <i class="close icon"></i>
+    <div class="header">Inventory Category</div>
+    <div class="content">
+        <form class="ui tiny form" id="categoryForm">{% csrf_token %}
+            <input type="hidden" id="categoryId">
+            <div class="two fields">
+                <div class="field required">
+                    <label>Name</label>
+                    <input type="text" id="categoryName" placeholder="Category name">
+                </div>
+                <div class="field">
+                    <label>Code</label>
+                    <input type="text" id="categoryCode" placeholder="CAT001">
+                </div>
+            </div>
+            <div class="field">
+                <label>Description</label>
+                <input type="text" id="categoryDescription" placeholder="Category description">
+            </div>
+        </form>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui olive right labeled icon button" onclick="saveCategory()"><span id="categoryActionLabel">Save</span><i class="checkmark icon"></i></button>
+    </div>
+</div>
+
+<div class="ui tiny modal inventory-modal" id="unitModal">
+    <i class="close icon"></i>
+    <div class="header">Inventory Unit</div>
+    <div class="content">
+        <form class="ui tiny form" id="unitForm">{% csrf_token %}
+            <input type="hidden" id="unitId">
+            <div class="two fields">
+                <div class="field required">
+                    <label>Name</label>
+                    <input type="text" id="unitName" placeholder="Pieces">
+                </div>
+                <div class="field required">
+                    <label>Symbol</label>
+                    <input type="text" id="unitSymbol" placeholder="pcs">
+                </div>
+            </div>
+            <div class="field">
+                <label>Description</label>
+                <input type="text" id="unitDescription" placeholder="Stock base unit">
+            </div>
+            <div class="field">
+                <div class="ui checkbox">
+                    <input type="checkbox" id="unitAllowsDecimal">
+                    <label>Allow decimal quantities</label>
+                </div>
+            </div>
+        </form>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui yellow right labeled icon button" onclick="saveUnit()"><span id="unitActionLabel">Save</span><i class="checkmark icon"></i></button>
+    </div>
+</div>
+
+<div class="ui tiny modal inventory-modal" id="taxModal">
+    <i class="close icon"></i>
+    <div class="header">HSN / Tax Profile</div>
+    <div class="content">
+        <form class="ui tiny form" id="taxForm">{% csrf_token %}
+            <input type="hidden" id="taxProfileId">
+            <div class="two fields">
+                <div class="field required">
+                    <label>Name</label>
+                    <input type="text" id="taxProfileName" placeholder="PVC 18%">
+                </div>
+                <div class="field required">
+                    <label>HSN Code</label>
+                    <input type="text" id="taxProfileHSNCode" placeholder="3917">
+                </div>
+            </div>
+            <div class="two fields">
+                <div class="field">
+                    <label>GST %</label>
+                    <input type="number" id="taxProfileGSTRate" value="0" step="0.01" min="0">
+                </div>
+                <div class="field">
+                    <label>Cess %</label>
+                    <input type="number" id="taxProfileCessRate" value="0" step="0.01" min="0">
+                </div>
+            </div>
+            <div class="field">
+                <label>Description</label>
+                <input type="text" id="taxProfileDescription" placeholder="Tax profile description">
+            </div>
+        </form>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui teal right labeled icon button" onclick="saveTaxProfile()"><span id="taxActionLabel">Save</span><i class="checkmark icon"></i></button>
+    </div>
+</div>
+
+<div class="ui modal inventory-modal" id="openingStockModal">
+    <i class="close icon"></i>
+    <div class="header">Add Opening Stock</div>
+    <div class="content">
+        <div class="opening-stock-shell">
+            <div class="ui tiny info message">
+                Use this voucher only for initial stock loading. Purchases, sales, and returns will continue to move stock after this point.
+            </div>
+
+            <div class="ui segment opening-stock-section">
+                <div class="ui tiny header">Voucher Details</div>
+                <form class="ui tiny form" id="openingStockForm">{% csrf_token %}
+                    <div class="two fields">
+                        <div class="field required">
+                            <label>Entry Date</label>
+                            <div class="ui calendar" id="openingStockDateCalendar">
+                                <div class="ui input"><input type="text" id="openingStockDate" placeholder="dd/mm/yyyy"></div>
+                            </div>
+                        </div>
+                        <div class="field required">
+                            <label>Warehouse</label>
+                            <select class="ui fluid dropdown" id="openingStockWarehouse"></select>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Remark</label>
+                        <input type="text" id="openingStockRemark" placeholder="Opening stock note">
+                    </div>
+                </form>
+            </div>
+
+            <div class="opening-stock-section">
+                {% include 'home/includes/inventory_line_items.html' with section_id='openingStockLineItemBox' hidden_input_id='openingStockLineItems' title='Opening Stock Items' show_toggle=False help_text='Add the item rows to be loaded into the selected warehouse. Use GST or Non GST bucket as applicable.' add_button_label='Add Opening Row' allow_non_gst=non_gst_shadow_enabled %}
+            </div>
+
+            <div class="ui segment opening-stock-section">
+                <div class="ui tiny header">Recent Opening Vouchers</div>
+                <div class="ui relaxed divided list opening-stock-history" id="openingVoucherList"></div>
+            </div>
+        </div>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui blue right labeled icon button" onclick="saveOpeningStock()"><i class="checkmark icon"></i>Save</button>
+    </div>
+</div>
+
+<div class="ui modal inventory-modal" id="adjustmentModal">
+    <i class="close icon"></i>
+    <div class="header">Inventory Adjustment</div>
+    <div class="content">
+        <form class="ui tiny form" id="adjustmentForm">{% csrf_token %}
+            <input type="hidden" id="adjustmentVoucherId">
+            <div class="three fields">
+                <div class="field required">
+                    <label>Entry Date</label>
+                    <div class="ui calendar" id="adjustmentDateCalendar">
+                        <div class="ui input"><input type="text" id="adjustmentDate" placeholder="dd/mm/yyyy"></div>
+                    </div>
+                </div>
+                <div class="field required">
+                    <label>Warehouse</label>
+                    <select class="ui fluid dropdown" id="adjustmentWarehouse"></select>
+                </div>
+                <div class="field required">
+                    <label>Direction</label>
+                    <select class="ui fluid dropdown" id="adjustmentDirection">
+                        <option value="increase">Increase</option>
+                        <option value="decrease">Decrease</option>
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label>Remark</label>
+                <input type="text" id="adjustmentRemark" placeholder="Stock count correction">
+            </div>
+        </form>
+        <div style="margin-top:12px;">
+            {% include 'home/includes/inventory_line_items.html' with section_id='adjustmentLineItemBox' hidden_input_id='adjustmentLineItems' title='Add inventory adjustment lines' enabled=True allow_non_gst=non_gst_shadow_enabled %}
+        </div>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui violet right labeled icon button" onclick="saveAdjustmentVoucher()"><i class="checkmark icon"></i><span id="adjustmentActionLabel">Save</span></button>
+    </div>
+</div>
+
+<div class="ui modal inventory-modal" id="transferModal">
+    <i class="close icon"></i>
+    <div class="header">Warehouse Transfer</div>
+    <div class="content">
+        <form class="ui tiny form" id="transferForm">{% csrf_token %}
+            <input type="hidden" id="transferVoucherId">
+            <div class="three fields">
+                <div class="field required">
+                    <label>Entry Date</label>
+                    <div class="ui calendar" id="transferDateCalendar">
+                        <div class="ui input"><input type="text" id="transferDate" placeholder="dd/mm/yyyy"></div>
+                    </div>
+                </div>
+                <div class="field required">
+                    <label>From Warehouse</label>
+                    <select class="ui fluid dropdown" id="transferFromWarehouse"></select>
+                </div>
+                <div class="field required">
+                    <label>To Warehouse</label>
+                    <select class="ui fluid dropdown" id="transferToWarehouse"></select>
+                </div>
+            </div>
+            <div class="field">
+                <label>Remark</label>
+                <input type="text" id="transferRemark" placeholder="Move stock between godowns">
+            </div>
+        </form>
+        <div style="margin-top:12px;">
+            {% include 'home/includes/inventory_line_items.html' with section_id='transferLineItemBox' hidden_input_id='transferLineItems' title='Add transfer item rows' enabled=True allow_non_gst=non_gst_shadow_enabled %}
+        </div>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui brown right labeled icon button" onclick="saveTransferVoucher()"><i class="checkmark icon"></i><span id="transferActionLabel">Save</span></button>
+    </div>
+</div>
+
+<div class="ui modal inventory-modal" id="purchaseReturnModal">
+    <i class="close icon"></i>
+    <div class="header">Purchase Return</div>
+    <div class="content">
+        <form class="ui tiny form" id="purchaseReturnForm">{% csrf_token %}
+            <input type="hidden" id="purchaseReturnVoucherId">
+            <div class="three fields">
+                <div class="field required">
+                    <label>Entry Date</label>
+                    <div class="ui calendar" id="purchaseReturnDateCalendar">
+                        <div class="ui input"><input type="text" id="purchaseReturnDate" placeholder="dd/mm/yyyy"></div>
+                    </div>
+                </div>
+                <div class="field required">
+                    <label>Warehouse</label>
+                    <select class="ui fluid dropdown" id="purchaseReturnWarehouse"></select>
+                </div>
+                <div class="field">
+                    <label>Purchase Invoice ID</label>
+                    <input type="text" id="purchaseReturnPurchaseInvoiceId" placeholder="Optional purchase invoice id">
+                </div>
+            </div>
+            <div class="two fields">
+                <div class="field">
+                    <label>Party ID</label>
+                    <input type="text" id="purchaseReturnParty" placeholder="Optional party id">
+                </div>
+                <div class="field">
+                    <label>Remark</label>
+                    <input type="text" id="purchaseReturnRemark" placeholder="Return to supplier">
+                </div>
+            </div>
+        </form>
+        <div style="margin-top:12px;">
+            {% include 'home/includes/inventory_line_items.html' with section_id='purchaseReturnLineItemBox' hidden_input_id='purchaseReturnLineItems' title='Add purchase return lines' enabled=True allow_non_gst=non_gst_shadow_enabled %}
+        </div>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui red right labeled icon button" onclick="savePurchaseReturnVoucher()"><i class="checkmark icon"></i><span id="purchaseReturnActionLabel">Save</span></button>
+    </div>
+</div>
+
+<div class="ui modal inventory-modal" id="salesReturnModal">
+    <i class="close icon"></i>
+    <div class="header">Sales Return</div>
+    <div class="content">
+        <form class="ui tiny form" id="salesReturnForm">{% csrf_token %}
+            <input type="hidden" id="salesReturnVoucherId">
+            <div class="three fields">
+                <div class="field required">
+                    <label>Entry Date</label>
+                    <div class="ui calendar" id="salesReturnDateCalendar">
+                        <div class="ui input"><input type="text" id="salesReturnDate" placeholder="dd/mm/yyyy"></div>
+                    </div>
+                </div>
+                <div class="field required">
+                    <label>Warehouse</label>
+                    <select class="ui fluid dropdown" id="salesReturnWarehouse"></select>
+                </div>
+                <div class="field">
+                    <label>Sales ID</label>
+                    <input type="text" id="salesReturnSalesId" placeholder="Optional sales id">
+                </div>
+            </div>
+            <div class="two fields">
+                <div class="field">
+                    <label>Party ID</label>
+                    <input type="text" id="salesReturnParty" placeholder="Optional party id">
+                </div>
+                <div class="field">
+                    <label>Remark</label>
+                    <input type="text" id="salesReturnRemark" placeholder="Goods received back">
+                </div>
+            </div>
+        </form>
+        <div style="margin-top:12px;">
+            {% include 'home/includes/inventory_line_items.html' with section_id='salesReturnLineItemBox' hidden_input_id='salesReturnLineItems' title='Add sales return lines' enabled=True allow_non_gst=non_gst_shadow_enabled %}
+        </div>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Cancel</div>
+        <button class="ui pink right labeled icon button" onclick="saveSalesReturnVoucher()"><i class="checkmark icon"></i><span id="salesReturnActionLabel">Save</span></button>
+    </div>
+</div>
+
+<div class="ui basic modal custom" id="inventoryDeleteModal">
+    <div class="ui icon header">
+        <i class="archive icon"></i>
+        Record Will Be Deleted
+    </div>
+    <div class="content">
+        <p style="text-align: center" id="inventoryDeleteMessage">This record will be deleted. Are you sure?</p>
+    </div>
+    <div class="actions">
+        <div class="ui red basic cancel inverted button">
+            <i class="remove icon"></i>
+            No
+        </div>
+        <div class="ui green ok inverted button" onclick="runInventoryDeleteAction()">
+            <i class="checkmark icon"></i>
+            Yes
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script src="{% static 'js/inventory-line-items.js' %}"></script>
+<script>
+    var inventoryItemTable = null;
+    var inventoryCategoryTable = null;
+    var inventoryUnitTable = null;
+    var inventoryTaxTable = null;
+    var inventoryWarehouseTable = null;
+    var inventoryLedgerTable = null;
+    var inventoryAdjustmentTable = null;
+    var inventoryTransferTable = null;
+    var purchaseReturnTable = null;
+    var salesReturnTable = null;
+    var openingStockWidget = null;
+    var adjustmentWidget = null;
+    var transferWidget = null;
+    var purchaseReturnWidget = null;
+    var salesReturnWidget = null;
+    var pendingInventoryDeleteAction = null;
+    var inventoryState = {
+        items: [],
+        categories: [],
+        units: [],
+        taxProfiles: [],
+        warehouses: [],
+        ledgerRows: [],
+        adjustments: [],
+        transfers: [],
+        purchaseReturns: [],
+        salesReturns: []
+    };
+    const nonGstShadowEnabled = {{ non_gst_shadow_enabled|yesno:"true,false" }};
+
+    function toastMessage(type, message) { $('body').toast({class: type, message: message}); }
+
+    function todayString() {
+        var date = new Date();
+        return date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
+    }
+
+    function initCalendar(selector) {
+        if (!$.fn.calendar) return;
+        $(selector).calendar({
+            monthFirst: false,
+            type: 'date',
+            formatter: {date: function (date) { return date ? date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear() : ''; }}
+        });
+    }
+
+    function initInventoryUi() {
+        if ($.fn.dropdown) {
+            $('.ui.selection.dropdown, .ui.search.dropdown, .ui.clearable.dropdown').dropdown({fullTextSearch: true});
+            $('.ui.dropdown').not('.selection').not('.search').not('.clearable').dropdown();
+        }
+        if ($.fn.checkbox) $('.ui.checkbox').checkbox();
+        $('.ui.modal').modal({autofocus: false, allowMultiple: true, detachable: false});
+        ['#openingStockDateCalendar', '#adjustmentDateCalendar', '#transferDateCalendar', '#purchaseReturnDateCalendar', '#salesReturnDateCalendar'].forEach(initCalendar);
+    }
+
+    function toggleVoucherActionMenu(event) {
+        if (event) event.stopPropagation();
+        $('#voucherActionDropdown').toggleClass('open');
+    }
+
+    function closeVoucherActionMenu() {
+        $('#voucherActionDropdown').removeClass('open');
+    }
+
+    function toggleMasterActionMenu(event) {
+        if (event) event.stopPropagation();
+        $('#masterActionDropdown').toggleClass('open');
+    }
+
+    function closeMasterActionMenu() {
+        $('#masterActionDropdown').removeClass('open');
+    }
+
+    function toggleStockActionMenu(event) {
+        if (event) event.stopPropagation();
+        $('#stockActionDropdown').toggleClass('open');
+    }
+
+    function closeStockActionMenu() {
+        $('#stockActionDropdown').removeClass('open');
+    }
+
+    function initTables() {
+        function dataTableConfig(columns, sortOrder, exportColumns) {
+            return {
+                data: [],
+                dom: 'Blfrtip',
+                scrollY: '350px',
+                scrollX: true,
+                stateSave: true,
+                fixedColumns: {left: 1},
+                buttons: [{extend: 'excel', exportOptions: {columns: exportColumns}}],
+                autoWidth: false,
+                aaSorting: sortOrder,
+                columns: columns
+            };
+        }
+
+        if ($('#inventoryItemTable').length) {
+            var itemTableConfig = dataTableConfig([{data: 'itemHtml'}, {data: 'categoryTaxHtml'}, {data: 'priceHtml'}, {data: 'stockHtml'}, {data: 'statusHtml'}, {data: 'actionHtml'}], [[0, 'asc']], [0,1,2,3,4]);
+            delete itemTableConfig.scrollY;
+            itemTableConfig.fixedColumns = {left: 0, right: 1};
+            inventoryItemTable = $('#inventoryItemTable').DataTable(itemTableConfig);
+        }
+        if ($('#inventoryCategoryTable').length) {
+            var categoryTableConfig = dataTableConfig([{data: 'name'}, {data: 'code'}, {data: 'description'}, {data: 'itemCount'}, {data: 'actionHtml'}], [[0, 'asc']], [0,1,2,3]);
+            categoryTableConfig.fixedColumns = {left: 0, right: 1};
+            inventoryCategoryTable = $('#inventoryCategoryTable').DataTable(categoryTableConfig);
+        }
+        if ($('#inventoryUnitTable').length) {
+            var unitTableConfig = dataTableConfig([{data: 'name'}, {data: 'symbol'}, {data: 'allowsDecimal'}, {data: 'itemCount'}, {data: 'actionHtml'}], [[0, 'asc']], [0,1,2,3]);
+            unitTableConfig.fixedColumns = {left: 0, right: 1};
+            inventoryUnitTable = $('#inventoryUnitTable').DataTable(unitTableConfig);
+        }
+        if ($('#inventoryTaxTable').length) {
+            var taxTableConfig = dataTableConfig([{data: 'name'}, {data: 'hsn'}, {data: 'gst'}, {data: 'cess'}, {data: 'itemCount'}, {data: 'actionHtml'}], [[0, 'asc']], [0,1,2,3,4]);
+            taxTableConfig.fixedColumns = {left: 0, right: 1};
+            inventoryTaxTable = $('#inventoryTaxTable').DataTable(taxTableConfig);
+        }
+        if ($('#inventoryWarehouseTable').length) {
+            var warehouseTableConfig = dataTableConfig([{data: 'nameHtml'}, {data: 'code'}, {data: 'address'}, {data: 'defaultHtml'}, {data: 'actionHtml'}], [[0, 'asc']], [0,1,2,3]);
+            warehouseTableConfig.fixedColumns = {left: 0, right: 1};
+            inventoryWarehouseTable = $('#inventoryWarehouseTable').DataTable(warehouseTableConfig);
+        }
+        if ($('#inventoryAdjustmentTable').length) {
+            var adjustmentTableConfig = dataTableConfig([{data: 'voucher'}, {data: 'date'}, {data: 'remark'}, {data: 'lineCount'}, {data: 'actionHtml'}], [[1, 'desc']], [0,1,2,3]);
+            adjustmentTableConfig.fixedColumns = {left: 0, right: 1};
+            inventoryAdjustmentTable = $('#inventoryAdjustmentTable').DataTable(adjustmentTableConfig);
+        }
+        if ($('#inventoryTransferTable').length) {
+            var transferTableConfig = dataTableConfig([{data: 'voucher'}, {data: 'date'}, {data: 'route'}, {data: 'lineCount'}, {data: 'actionHtml'}], [[1, 'desc']], [0,1,2,3]);
+            transferTableConfig.fixedColumns = {left: 0, right: 1};
+            inventoryTransferTable = $('#inventoryTransferTable').DataTable(transferTableConfig);
+        }
+        if ($('#purchaseReturnTable').length) {
+            var purchaseReturnTableConfig = dataTableConfig([{data: 'voucher'}, {data: 'date'}, {data: 'party'}, {data: 'amount'}, {data: 'actionHtml'}], [[1, 'desc']], [0,1,2,3]);
+            purchaseReturnTableConfig.fixedColumns = {left: 0, right: 1};
+            purchaseReturnTable = $('#purchaseReturnTable').DataTable(purchaseReturnTableConfig);
+        }
+        if ($('#salesReturnTable').length) {
+            var salesReturnTableConfig = dataTableConfig([{data: 'voucher'}, {data: 'date'}, {data: 'party'}, {data: 'amount'}, {data: 'actionHtml'}], [[1, 'desc']], [0,1,2,3]);
+            salesReturnTableConfig.fixedColumns = {left: 0, right: 1};
+            salesReturnTable = $('#salesReturnTable').DataTable(salesReturnTableConfig);
+        }
+        if ($('#inventoryLedgerTable').length) {
+            var ledgerTableConfig = dataTableConfig([
+                {data: 'date', render: function (data, type) { return type === 'sort' ? ((data && data.sort) || '') : ((data && data.display) || '-'); }},
+                {data: 'itemSourceHtml'},
+                {data: 'warehouse'},
+                {data: 'qtyHtml'},
+                {data: 'referenceHtml'}
+            ], [[0, 'desc']], [0,1,2,3,4]);
+            ledgerTableConfig.fixedColumns = {left: 0};
+            inventoryLedgerTable = $('#inventoryLedgerTable').DataTable(ledgerTableConfig);
+        }
+    }
+
+    function itemRow(item) {
+        var totalStock = nonGstShadowEnabled ? ((item.GSTStock || 0) + (item.NonGSTStock || 0)) : (item.GSTStock || 0);
+        var stockHtml = '<span class="inventory-stock-badge gst">GST ' + (item.GSTStock || 0) + '</span>';
+        if (nonGstShadowEnabled) {
+            stockHtml += '<span class="inventory-stock-badge non-gst">Non GST ' + (item.NonGSTStock || 0) + '</span>';
+        }
+        stockHtml += '<div class="inventory-cell-meta">Total: ' + totalStock + '</div>';
+        return {
+            itemHtml: '<div class="inventory-cell-title">' + item.Name + '</div><div class="inventory-cell-meta">SKU: ' + (item.SKU || '-') + ' | Barcode: ' + (item.Barcode || '-') + '</div><div class="inventory-cell-meta">Brand: ' + (item.BrandName || '-') + ' | Unit: ' + (item.UnitName || 'pcs') + '</div>',
+            categoryTaxHtml: '<div>Category: <strong>' + (item.CategoryName || '-') + '</strong></div><div class="inventory-cell-meta">HSN: ' + (item.HSN || '-') + ' | GST: ' + (item.GSTRate || 0) + '%</div>',
+            priceHtml: '<div>Purchase: ' + (item.DefaultPurchasePrice || 0) + '</div><div class="inventory-cell-meta">Sales: ' + (item.DefaultSalesPrice || 0) + ' | MRP: ' + (item.MRP || 0) + '</div>',
+            stockHtml: stockHtml,
+            statusHtml: (item.IsLowStock ? '<div class="ui tiny red label">Low Stock</div>' : '<div class="ui tiny green label">OK</div>') + '<div style="margin-top:6px;">' + (item.IsSaleBlocked ? '<div class="ui tiny red basic label">Sale Blocked</div>' : '<div class="ui tiny basic teal label">Sale Allowed</div>') + '</div>',
+            actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editItem(' + item.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteItem(' + item.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'
+        };
+    }
+
+    function categoryRow(row) { return {name: row.Name, code: row.Code || '-', description: row.Description || '-', itemCount: row.ItemCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editCategory(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteCategory(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function unitRow(row) { return {name: row.Name, symbol: row.Symbol, allowsDecimal: row.AllowsDecimal ? 'Yes' : 'No', itemCount: row.ItemCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editUnit(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteUnit(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function taxRow(row) { return {name: row.Name, hsn: row.HSNCode, gst: row.GSTRate, cess: row.CessRate, itemCount: row.ItemCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editTaxProfile(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteTaxProfile(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function warehouseRow(row) { return {nameHtml: '<div class="inventory-cell-title">' + row.Name + '</div>', code: row.Code || '-', address: row.Address || '-', defaultHtml: row.IsDefault ? '<div class="ui tiny teal label">Default</div>' : '-', actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editWarehouse(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteWarehouse(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function adjustmentRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, remark: row.Remark || '-', lineCount: row.LineCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editAdjustmentVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteAdjustmentVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function transferRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, route: '<div>' + (row.FromWarehouse || '-') + '</div><div class="inventory-cell-meta">to ' + (row.ToWarehouse || '-') + '</div>', lineCount: row.LineCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editTransferVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteTransferVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function purchaseReturnRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, party: '<div>' + (row.Party || '-') + '</div><div class="inventory-cell-meta">Purchase: ' + (row.PurchaseInvoice || '-') + ' | Lines: ' + (row.LineCount || 0) + '</div>', amount: row.TotalAmount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editPurchaseReturnVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deletePurchaseReturnVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function salesReturnRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, party: '<div>' + (row.Party || '-') + '</div><div class="inventory-cell-meta">Sales: ' + (row.SalesInvoice || '-') + ' | Lines: ' + (row.LineCount || 0) + '</div>', amount: row.TotalAmount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editSalesReturnVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteSalesReturnVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+
+    function inventoryLedgerDetailAction(action, id) {
+        if (!action || !id) return;
+        if (action === 'adjustment') return editAdjustmentVoucher(id);
+        if (action === 'transfer') return editTransferVoucher(id);
+        if (action === 'purchase_return') return editPurchaseReturnVoucher(id);
+        if (action === 'sales_return') return editSalesReturnVoucher(id);
+    }
+
+    function ledgerRow(row) {
+        var positive = row.QuantityDelta >= 0;
+        var detailHtml = '';
+        if (row.DetailUrl) {
+            detailHtml = '<div class="inventory-ledger-reference-action"><a href="' + row.DetailUrl + '" data-inverted="" data-tooltip="' + (row.DetailLabel || 'View Detail') + '" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular teal icon button"><i class="eye icon"></i></a></div>';
+        } else if (row.DetailAction && row.DetailId) {
+            detailHtml = '<div class="inventory-ledger-reference-action"><button type="button" data-inverted="" data-tooltip="' + (row.DetailLabel || 'View Detail') + '" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="inventoryLedgerDetailAction(\'' + row.DetailAction + '\', ' + row.DetailId + ')" class="ui circular teal icon button"><i class="eye icon"></i></button></div>';
+        }
+        return {
+            date: {
+                display: row.EntryDate || '-',
+                sort: row.EntryDateSort || ''
+            },
+            itemSourceHtml: '<div class="inventory-cell-title">' + row.ItemName + '</div><div class="inventory-cell-meta">' + row.SourceType + ' | ' + row.StockBucket + ' | Rate ' + row.UnitRate + '</div>',
+            warehouse: row.WarehouseName || '-',
+            qtyHtml: '<span style="font-weight:700; color:' + (positive ? '#166534' : '#b91c1c') + ';">' + (positive ? '+' : '') + row.QuantityDelta + '</span>',
+            referenceHtml: '<div class="inventory-ledger-reference">' + detailHtml + '<div class="inventory-ledger-reference-text"><div>' + (row.ReferenceNumber || '-') + '</div><div class="inventory-cell-meta">' + (row.Remark || '-') + '</div></div></div>'
+        };
+    }
+
+    function updateMetrics() {}
+
+    function refreshDropdown($element) {
+        if ($.fn.dropdown) $element.dropdown('refresh');
+    }
+
+    function populateMasterDropdowns() {
+        var warehouseSelectors = ['#openingStockWarehouse', '#adjustmentWarehouse', '#transferFromWarehouse', '#transferToWarehouse', '#purchaseReturnWarehouse', '#salesReturnWarehouse'];
+        $('#itemCategoryId').html('<option value="">Select category</option>');
+        $('#itemUnitId').html('<option value="">Select unit</option>');
+        $('#itemTaxProfileId').html('<option value="">Select tax profile</option>');
+        warehouseSelectors.forEach(function (selector) { $(selector).html('<option value="">Select warehouse</option>'); });
+        inventoryState.categories.forEach(function (row) { $('#itemCategoryId').append('<option value="' + row.ID + '">' + row.Name + '</option>'); });
+        inventoryState.units.forEach(function (row) { $('#itemUnitId').append('<option value="' + row.ID + '">' + row.Name + ' (' + row.Symbol + ')</option>'); });
+        inventoryState.taxProfiles.forEach(function (row) { $('#itemTaxProfileId').append('<option value="' + row.ID + '">' + row.Name + ' (' + row.HSNCode + ' / ' + row.GSTRate + '%)</option>'); });
+        inventoryState.warehouses.forEach(function (row) {
+            var option = '<option value="' + row.ID + '">' + row.Name + (row.IsDefault ? ' [Default]' : '') + '</option>';
+            warehouseSelectors.forEach(function (selector) { $(selector).append(option); });
+        });
+        refreshDropdown($('#itemCategoryId'));
+        refreshDropdown($('#itemUnitId'));
+        refreshDropdown($('#itemTaxProfileId'));
+        warehouseSelectors.forEach(function (selector) { refreshDropdown($(selector)); });
+    }
+
+    function renderOpeningVouchers(rows) {
+        var $list = $('#openingVoucherList');
+        $list.html('');
+        if (!rows.length) { $list.html('<div class="item">No opening stock vouchers yet.</div>'); return; }
+        rows.forEach(function (row) { $list.append('<div class="item"><div class="content"><div class="header">' + row.VoucherNumber + '</div><div class="description">' + row.EntryDate + ' | lines: ' + row.LineCount + ' | ' + (row.Remark || '-') + '</div></div></div>'); });
+    }
+
+    function setDataTableData(table, rows) {
+        if (table && typeof table.clear === 'function') {
+            table.clear().rows.add(rows || []).draw();
+        }
+    }
+
+    function loadAllMasters() {
+        $.get('{% url "homeApp:list_inventory_warehouses_api" %}', function (response) {
+            inventoryState.warehouses = response.data || [];
+            setDataTableData(inventoryWarehouseTable, inventoryState.warehouses.map(warehouseRow));
+            populateMasterDropdowns();
+            updateMetrics();
+        });
+        $.get('{% url "homeApp:list_inventory_categories_api" %}', function (response) {
+            inventoryState.categories = response.data || [];
+            setDataTableData(inventoryCategoryTable, inventoryState.categories.map(categoryRow));
+            populateMasterDropdowns();
+            updateMetrics();
+        });
+        $.get('{% url "homeApp:list_inventory_units_api" %}', function (response) {
+            inventoryState.units = response.data || [];
+            setDataTableData(inventoryUnitTable, inventoryState.units.map(unitRow));
+            populateMasterDropdowns();
+            updateMetrics();
+        });
+        $.get('{% url "homeApp:list_inventory_tax_profiles_api" %}', function (response) {
+            inventoryState.taxProfiles = response.data || [];
+            setDataTableData(inventoryTaxTable, inventoryState.taxProfiles.map(taxRow));
+            populateMasterDropdowns();
+            updateMetrics();
+        });
+        $.get('{% url "homeApp:list_inventory_items_api" %}', function (response) {
+            inventoryState.items = response.data || [];
+            setDataTableData(inventoryItemTable, inventoryState.items.map(itemRow));
+            updateMetrics();
+        });
+        $.get('{% url "homeApp:list_inventory_adjustment_vouchers_api" %}', function (response) {
+            inventoryState.adjustments = response.data || [];
+            setDataTableData(inventoryAdjustmentTable, inventoryState.adjustments.map(adjustmentRow));
+        });
+        $.get('{% url "homeApp:list_inventory_transfer_vouchers_api" %}', function (response) {
+            inventoryState.transfers = response.data || [];
+            setDataTableData(inventoryTransferTable, inventoryState.transfers.map(transferRow));
+        });
+        $.get('{% url "homeApp:list_purchase_return_vouchers_api" %}', function (response) {
+            inventoryState.purchaseReturns = response.data || [];
+            setDataTableData(purchaseReturnTable, inventoryState.purchaseReturns.map(purchaseReturnRow));
+        });
+        $.get('{% url "homeApp:list_sales_return_vouchers_api" %}', function (response) {
+            inventoryState.salesReturns = response.data || [];
+            setDataTableData(salesReturnTable, inventoryState.salesReturns.map(salesReturnRow));
+        });
+        $.get('{% url "homeApp:list_inventory_ledger_entries_api" %}', function (response) {
+            inventoryState.ledgerRows = response.data || [];
+            setDataTableData(inventoryLedgerTable, inventoryState.ledgerRows.map(ledgerRow));
+            updateMetrics();
+        });
+        $.get('{% url "homeApp:list_inventory_opening_vouchers_api" %}', function (response) { renderOpeningVouchers(response.data || []); });
+    }
+
+    function validateRequired(value, message) {
+        if (!String(value || '').trim()) { toastMessage('orange', message); return false; }
+        return true;
+    }
+
+    function collectLineItemsFromBox(boxSelector, hiddenSelector) {
+        var rows = [];
+        var total = 0;
+        $(boxSelector).find('tbody .inventory-row').each(function () {
+            var $row = $(this);
+            var itemId = '';
+            var bucket = 'gst';
+            if ($row.find('.inventory-item').dropdown && typeof $row.find('.inventory-item').dropdown === 'function') {
+                itemId = $row.find('.inventory-item').dropdown('get value') || $row.find('.inventory-item').val() || '';
+            } else {
+                itemId = $row.find('.inventory-item').val() || '';
+            }
+            if ($row.find('.inventory-bucket').dropdown && typeof $row.find('.inventory-bucket').dropdown === 'function') {
+                bucket = $row.find('.inventory-bucket').dropdown('get value') || $row.find('.inventory-bucket').val() || 'gst';
+            } else {
+                bucket = $row.find('.inventory-bucket').val() || 'gst';
+            }
+            var quantity = parseFloat($row.find('.inventory-qty').val() || '0');
+            var unitRate = parseFloat($row.find('.inventory-rate').val() || '0');
+            var lineTotal = parseFloat($row.find('.inventory-total').val() || '0');
+            if (!lineTotal && quantity > 0 && unitRate >= 0) {
+                lineTotal = quantity * unitRate;
+                $row.find('.inventory-total').val(lineTotal.toFixed(2));
+            }
+            if (!itemId || !(quantity > 0)) {
+                return;
+            }
+            rows.push({
+                itemId: itemId,
+                stockBucket: bucket,
+                quantity: quantity,
+                unitPrice: unitRate,
+                unitCost: unitRate,
+                taxableAmount: lineTotal,
+                gstRate: 0,
+                gstAmount: 0,
+                lineTotal: lineTotal,
+                remark: $row.find('.inventory-remark').val() || ''
+            });
+            total += lineTotal;
+        });
+        $(boxSelector).find('.inventory-total-display').text(total.toFixed(2));
+        var raw = JSON.stringify(rows);
+        $(hiddenSelector).val(raw);
+        return raw;
+    }
+
+    function getLineItemsPayload(widgetApi, selector, boxSelector) {
+        var raw = boxSelector ? collectLineItemsFromBox(boxSelector, selector) : '[]';
+        if (raw !== '[]') {
+            return raw;
+        }
+        if (widgetApi && typeof widgetApi.collect === 'function') {
+            raw = widgetApi.collect() || '[]';
+        } else {
+            raw = $(selector).val() || '[]';
+        }
+        $(selector).val(raw);
+        return raw;
+    }
+
+    function validateLineItems(widgetApi, selector, boxSelector, message) {
+        var raw = getLineItemsPayload(widgetApi, selector, boxSelector);
+        try {
+            if ((JSON.parse(raw) || []).length) return true;
+        } catch (error) {}
+        toastMessage('orange', message);
+        return false;
+    }
+
+    function postFormData(url, data, successMessage, modalSelector) {
+        $.ajax({
+            type: 'post',
+            url: url,
+            data: data,
+            contentType: false,
+            processData: false,
+            success: function (response) {
+                if (response.message === 'success') {
+                    if (modalSelector) $(modalSelector).modal('hide');
+                    toastMessage('success', successMessage + (response.voucherNumber ? ': ' + response.voucherNumber : ''));
+                    loadAllMasters();
+                } else {
+                    toastMessage('error', response.error || 'Unable to save record.');
+                }
+            },
+            error: function (xhr) {
+                toastMessage('error', (xhr.responseJSON && xhr.responseJSON.error) || 'Unable to save record.');
+            }
+        });
+    }
+
+    function resetWarehouseForm() {
+        $('#warehouseId,#warehouseName,#warehouseCode,#warehouseAddress').val('');
+        $('#warehouseDefault').prop('checked', true);
+        $('#warehouseActionLabel').text('Save');
+    }
+    function resetItemForm() {
+        $('#itemId,#itemName,#itemSku,#itemBarcode,#itemBrand,#itemDescription,#itemHsn').val('');
+        $('#itemPurchasePrice,#itemPrice,#itemMrp,#itemMinimumStock,#itemReorderLevel,#itemGstRate').val('0');
+        $('#itemSaleBlocked').prop('checked', false);
+        $('#itemActionLabel').text('Save');
+        if ($.fn.dropdown) {
+            $('#itemBucket').dropdown('set selected', 'gst');
+            $('#itemCategoryId').dropdown('clear');
+            $('#itemUnitId').dropdown('clear');
+            $('#itemTaxProfileId').dropdown('clear');
+        }
+    }
+    function resetCategoryForm() {
+        $('#categoryId,#categoryName,#categoryCode,#categoryDescription').val('');
+        $('#categoryActionLabel').text('Save');
+    }
+    function resetTaxForm() {
+        $('#taxProfileId,#taxProfileName,#taxProfileHSNCode,#taxProfileDescription').val('');
+        $('#taxProfileGSTRate,#taxProfileCessRate').val('0');
+        $('#taxActionLabel').text('Save');
+    }
+    function resetUnitForm() {
+        $('#unitId,#unitName,#unitSymbol,#unitDescription').val('');
+        $('#unitAllowsDecimal').prop('checked', false);
+        $('#unitActionLabel').text('Save');
+    }
+    function resetOpeningStockForm() {
+        $('#openingStockDate').val(todayString());
+        $('#openingStockRemark').val('');
+        if ($.fn.dropdown) $('#openingStockWarehouse').dropdown('clear');
+    }
+    function resetAdjustmentForm() {
+        $('#adjustmentVoucherId').val('');
+        $('#adjustmentDate').val(todayString());
+        $('#adjustmentRemark').val('');
+        $('#adjustmentActionLabel').text('Save');
+        if ($.fn.dropdown) {
+            $('#adjustmentWarehouse').dropdown('clear');
+            $('#adjustmentDirection').dropdown('set selected', 'increase');
+        }
+        if (adjustmentWidget) adjustmentWidget.setRows([]);
+    }
+    function resetTransferForm() {
+        $('#transferVoucherId').val('');
+        $('#transferDate').val(todayString());
+        $('#transferRemark').val('');
+        $('#transferActionLabel').text('Save');
+        if ($.fn.dropdown) {
+            $('#transferFromWarehouse').dropdown('clear');
+            $('#transferToWarehouse').dropdown('clear');
+        }
+        if (transferWidget) transferWidget.setRows([]);
+    }
+    function resetPurchaseReturnForm() {
+        $('#purchaseReturnVoucherId').val('');
+        $('#purchaseReturnDate').val(todayString());
+        $('#purchaseReturnPurchaseInvoiceId,#purchaseReturnParty,#purchaseReturnRemark').val('');
+        $('#purchaseReturnActionLabel').text('Save');
+        if ($.fn.dropdown) $('#purchaseReturnWarehouse').dropdown('clear');
+        if (purchaseReturnWidget) purchaseReturnWidget.setRows([]);
+    }
+    function resetSalesReturnForm() {
+        $('#salesReturnVoucherId').val('');
+        $('#salesReturnDate').val(todayString());
+        $('#salesReturnSalesId,#salesReturnParty,#salesReturnRemark').val('');
+        $('#salesReturnActionLabel').text('Save');
+        if ($.fn.dropdown) $('#salesReturnWarehouse').dropdown('clear');
+        if (salesReturnWidget) salesReturnWidget.setRows([]);
+    }
+
+    window.showWarehouseModal = function () { resetWarehouseForm(); $('#warehouseModal').modal('show'); };
+    window.showItemModal = function () { resetItemForm(); $('#itemModal').modal('show'); };
+    window.showCategoryModal = function () { resetCategoryForm(); $('#categoryModal').modal('show'); };
+    window.showUnitModal = function () { resetUnitForm(); $('#unitModal').modal('show'); };
+    window.showTaxModal = function () { resetTaxForm(); $('#taxModal').modal('show'); };
+    window.showOpeningStockModal = function () { resetOpeningStockForm(); $('#openingStockModal').modal('show'); };
+    window.showAdjustmentModal = function () { resetAdjustmentForm(); $('#adjustmentModal').modal('show'); };
+    window.showTransferModal = function () { resetTransferForm(); $('#transferModal').modal('show'); };
+    window.showPurchaseReturnModal = function () { resetPurchaseReturnForm(); $('#purchaseReturnModal').modal('show'); };
+    window.showSalesReturnModal = function () { resetSalesReturnForm(); $('#salesReturnModal').modal('show'); };
+
+    window.editWarehouse = function (warehouseId) {
+        var row = inventoryState.warehouses.find(function (item) { return item.ID === warehouseId; });
+        if (!row) return;
+        $('#warehouseId').val(row.ID);
+        $('#warehouseName').val(row.Name);
+        $('#warehouseCode').val(row.Code);
+        $('#warehouseAddress').val(row.Address);
+        $('#warehouseDefault').prop('checked', !!row.IsDefault);
+        $('#warehouseActionLabel').text('Update');
+        $('#warehouseModal').modal('show');
+    };
+
+    window.editItem = function (itemId) {
+        var row = inventoryState.items.find(function (item) { return item.ID === itemId; });
+        if (!row) return;
+        $('#itemId').val(row.ID);
+        $('#itemName').val(row.Name);
+        $('#itemSku').val(row.SKU);
+        $('#itemBarcode').val(row.Barcode);
+        $('#itemBrand').val(row.BrandName);
+        $('#itemHsn').val(row.HSN);
+        $('#itemDescription').val(row.Description);
+        $('#itemPurchasePrice').val(row.DefaultPurchasePrice || 0);
+        $('#itemPrice').val(row.DefaultSalesPrice || 0);
+        $('#itemMrp').val(row.MRP || 0);
+        $('#itemMinimumStock').val(row.MinimumStockLevel || 0);
+        $('#itemReorderLevel').val(row.ReorderLevel || 0);
+        $('#itemGstRate').val(row.GSTRate || 0);
+        $('#itemSaleBlocked').prop('checked', !!row.IsSaleBlocked);
+        $('#itemActionLabel').text('Update');
+        if ($.fn.dropdown) {
+            $('#itemBucket').dropdown('set selected', row.DefaultStockBucket || 'gst');
+            row.CategoryID ? $('#itemCategoryId').dropdown('set selected', String(row.CategoryID)) : $('#itemCategoryId').dropdown('clear');
+            row.UnitID ? $('#itemUnitId').dropdown('set selected', String(row.UnitID)) : $('#itemUnitId').dropdown('clear');
+            row.TaxProfileID ? $('#itemTaxProfileId').dropdown('set selected', String(row.TaxProfileID)) : $('#itemTaxProfileId').dropdown('clear');
+        }
+        $('#itemModal').modal('show');
+    };
+    window.editCategory = function (categoryId) {
+        var row = inventoryState.categories.find(function (item) { return item.ID === categoryId; });
+        if (!row) return;
+        $('#categoryId').val(row.ID);
+        $('#categoryName').val(row.Name);
+        $('#categoryCode').val(row.Code);
+        $('#categoryDescription').val(row.Description);
+        $('#categoryActionLabel').text('Update');
+        $('#categoryModal').modal('show');
+    };
+    window.editTaxProfile = function (taxProfileId) {
+        var row = inventoryState.taxProfiles.find(function (item) { return item.ID === taxProfileId; });
+        if (!row) return;
+        $('#taxProfileId').val(row.ID);
+        $('#taxProfileName').val(row.Name);
+        $('#taxProfileHSNCode').val(row.HSNCode);
+        $('#taxProfileGSTRate').val(row.GSTRate);
+        $('#taxProfileCessRate').val(row.CessRate);
+        $('#taxProfileDescription').val(row.Description);
+        $('#taxActionLabel').text('Update');
+        $('#taxModal').modal('show');
+    };
+    window.editUnit = function (unitId) {
+        var row = inventoryState.units.find(function (item) { return item.ID === unitId; });
+        if (!row) return;
+        $('#unitId').val(row.ID);
+        $('#unitName').val(row.Name);
+        $('#unitSymbol').val(row.Symbol);
+        $('#unitDescription').val(row.Description);
+        $('#unitAllowsDecimal').prop('checked', !!row.AllowsDecimal);
+        $('#unitActionLabel').text('Update');
+        $('#unitModal').modal('show');
+    };
+    window.editAdjustmentVoucher = function (voucherId) {
+        $.get('{% url "homeApp:get_inventory_adjustment_voucher_detail_api" %}', {voucherId: voucherId}, function (response) {
+            if (response.message !== 'success') { toastMessage('error', response.error || 'Unable to load adjustment voucher.'); return; }
+            var row = response.data || {};
+            resetAdjustmentForm();
+            $('#adjustmentVoucherId').val(row.ID);
+            $('#adjustmentDate').val(row.EntryDate || todayString());
+            $('#adjustmentRemark').val(row.Remark || '');
+            $('#adjustmentActionLabel').text('Update');
+            if ($.fn.dropdown) {
+                $('#adjustmentWarehouse').dropdown('set selected', String(row.WarehouseID || ''));
+                $('#adjustmentDirection').dropdown('set selected', row.Direction || 'increase');
+            }
+            if (adjustmentWidget) adjustmentWidget.setRows(row.Lines || []);
+            $('#adjustmentModal').modal('show');
+        });
+    };
+    window.editTransferVoucher = function (voucherId) {
+        $.get('{% url "homeApp:get_inventory_transfer_voucher_detail_api" %}', {voucherId: voucherId}, function (response) {
+            if (response.message !== 'success') { toastMessage('error', response.error || 'Unable to load transfer voucher.'); return; }
+            var row = response.data || {};
+            resetTransferForm();
+            $('#transferVoucherId').val(row.ID);
+            $('#transferDate').val(row.EntryDate || todayString());
+            $('#transferRemark').val(row.Remark || '');
+            $('#transferActionLabel').text('Update');
+            if ($.fn.dropdown) {
+                $('#transferFromWarehouse').dropdown('set selected', String(row.FromWarehouseID || ''));
+                $('#transferToWarehouse').dropdown('set selected', String(row.ToWarehouseID || ''));
+            }
+            if (transferWidget) transferWidget.setRows(row.Lines || []);
+            $('#transferModal').modal('show');
+        });
+    };
+    window.editPurchaseReturnVoucher = function (voucherId) {
+        $.get('{% url "homeApp:get_purchase_return_voucher_detail_api" %}', {voucherId: voucherId}, function (response) {
+            if (response.message !== 'success') { toastMessage('error', response.error || 'Unable to load purchase return.'); return; }
+            var row = response.data || {};
+            resetPurchaseReturnForm();
+            $('#purchaseReturnVoucherId').val(row.ID);
+            $('#purchaseReturnDate').val(row.EntryDate || todayString());
+            $('#purchaseReturnPurchaseInvoiceId').val(row.PurchaseInvoiceID || '');
+            $('#purchaseReturnParty').val(row.PartyID || '');
+            $('#purchaseReturnRemark').val(row.Remark || '');
+            $('#purchaseReturnActionLabel').text('Update');
+            if ($.fn.dropdown) $('#purchaseReturnWarehouse').dropdown('set selected', String(row.WarehouseID || ''));
+            if (purchaseReturnWidget) purchaseReturnWidget.setRows(row.Lines || []);
+            $('#purchaseReturnModal').modal('show');
+        });
+    };
+    window.editSalesReturnVoucher = function (voucherId) {
+        $.get('{% url "homeApp:get_sales_return_voucher_detail_api" %}', {voucherId: voucherId}, function (response) {
+            if (response.message !== 'success') { toastMessage('error', response.error || 'Unable to load sales return.'); return; }
+            var row = response.data || {};
+            resetSalesReturnForm();
+            $('#salesReturnVoucherId').val(row.ID);
+            $('#salesReturnDate').val(row.EntryDate || todayString());
+            $('#salesReturnSalesId').val(row.SalesID || '');
+            $('#salesReturnParty').val(row.PartyID || '');
+            $('#salesReturnRemark').val(row.Remark || '');
+            $('#salesReturnActionLabel').text('Update');
+            if ($.fn.dropdown) $('#salesReturnWarehouse').dropdown('set selected', String(row.WarehouseID || ''));
+            if (salesReturnWidget) salesReturnWidget.setRows(row.Lines || []);
+            $('#salesReturnModal').modal('show');
+        });
+    };
+
+    function postDelete(url, payload, successMessage) {
+        $.post(url, payload, function (response) {
+            if (response.message === 'success') {
+                toastMessage('success', successMessage);
+                loadAllMasters();
+            } else {
+                toastMessage('error', response.error || 'Unable to delete record.');
+            }
+        });
+    }
+
+    function confirmInventoryDelete(message, callback) {
+        pendingInventoryDeleteAction = callback;
+        $('#inventoryDeleteMessage').text(message);
+        $('#inventoryDeleteModal').modal('show');
+    }
+
+    window.runInventoryDeleteAction = function () {
+        if (typeof pendingInventoryDeleteAction === 'function') {
+            pendingInventoryDeleteAction();
+        }
+        pendingInventoryDeleteAction = null;
+        $('#inventoryDeleteModal').modal('hide');
+    };
+
+    window.deleteItem = function (itemId) { confirmInventoryDelete('The inventory item will be deleted. Are you sure?', function () { postDelete('{% url "homeApp:delete_inventory_item_api" %}', {itemId: itemId}, 'Inventory item deleted.'); }); };
+    window.deleteCategory = function (categoryId) { confirmInventoryDelete('The category will be deleted. Are you sure?', function () { postDelete('{% url "homeApp:delete_inventory_category_api" %}', {categoryId: categoryId}, 'Category deleted.'); }); };
+    window.deleteUnit = function (unitId) { confirmInventoryDelete('The unit will be deleted. Are you sure?', function () { postDelete('{% url "homeApp:delete_inventory_unit_api" %}', {unitId: unitId}, 'Unit deleted.'); }); };
+    window.deleteTaxProfile = function (taxProfileId) { confirmInventoryDelete('The tax profile will be deleted. Are you sure?', function () { postDelete('{% url "homeApp:delete_inventory_tax_profile_api" %}', {taxProfileId: taxProfileId}, 'Tax profile deleted.'); }); };
+    window.deleteWarehouse = function (warehouseId) { confirmInventoryDelete('The warehouse will be deleted. Are you sure?', function () { postDelete('{% url "homeApp:delete_inventory_warehouse_api" %}', {warehouseId: warehouseId}, 'Warehouse deleted.'); }); };
+    window.deleteAdjustmentVoucher = function (voucherId) { confirmInventoryDelete('The adjustment voucher will be deleted. Are you sure?', function () { postDelete('{% url "homeApp:delete_inventory_adjustment_voucher_api" %}', {voucherId: voucherId}, 'Adjustment voucher deleted.'); }); };
+    window.deleteTransferVoucher = function (voucherId) { confirmInventoryDelete('The transfer voucher will be deleted. Are you sure?', function () { postDelete('{% url "homeApp:delete_inventory_transfer_voucher_api" %}', {voucherId: voucherId}, 'Transfer voucher deleted.'); }); };
+    window.deletePurchaseReturnVoucher = function (voucherId) { confirmInventoryDelete('The purchase return voucher will be deleted. Are you sure?', function () { postDelete('{% url "homeApp:delete_purchase_return_voucher_api" %}', {voucherId: voucherId}, 'Purchase return deleted.'); }); };
+    window.deleteSalesReturnVoucher = function (voucherId) { confirmInventoryDelete('The sales return voucher will be deleted. Are you sure?', function () { postDelete('{% url "homeApp:delete_sales_return_voucher_api" %}', {voucherId: voucherId}, 'Sales return deleted.'); }); };
+
+    window.saveWarehouse = function () {
+        if (!validateRequired($('#warehouseName').val(), 'Warehouse name is required.')) return;
+        var data = new FormData();
+        if ($('#warehouseId').val()) data.append('warehouseId', $('#warehouseId').val());
+        data.append('name', $('#warehouseName').val().trim());
+        data.append('code', $('#warehouseCode').val().trim());
+        data.append('address', $('#warehouseAddress').val().trim());
+        data.append('isDefault', $('#warehouseDefault').is(':checked') ? '1' : '');
+        postFormData($('#warehouseId').val() ? '{% url "homeApp:update_inventory_warehouse_api" %}' : '{% url "homeApp:add_inventory_warehouse_api" %}', data, 'Warehouse saved', '#warehouseModal');
+    };
+    window.saveCategory = function () {
+        if (!validateRequired($('#categoryName').val(), 'Category name is required.')) return;
+        var data = new FormData();
+        data.append('name', $('#categoryName').val().trim());
+        data.append('code', $('#categoryCode').val().trim());
+        data.append('description', $('#categoryDescription').val().trim());
+        if ($('#categoryId').val()) data.append('categoryId', $('#categoryId').val());
+        postFormData($('#categoryId').val() ? '{% url "homeApp:update_inventory_category_api" %}' : '{% url "homeApp:add_inventory_category_api" %}', data, 'Category saved', '#categoryModal');
+    };
+    window.saveUnit = function () {
+        if (!validateRequired($('#unitName').val(), 'Unit name is required.')) return;
+        if (!validateRequired($('#unitSymbol').val(), 'Unit symbol is required.')) return;
+        var data = new FormData();
+        if ($('#unitId').val()) data.append('unitId', $('#unitId').val());
+        data.append('name', $('#unitName').val().trim());
+        data.append('symbol', $('#unitSymbol').val().trim());
+        data.append('description', $('#unitDescription').val().trim());
+        data.append('allowsDecimal', $('#unitAllowsDecimal').is(':checked') ? '1' : '');
+        postFormData($('#unitId').val() ? '{% url "homeApp:update_inventory_unit_api" %}' : '{% url "homeApp:add_inventory_unit_api" %}', data, 'Unit saved', '#unitModal');
+    };
+    window.saveTaxProfile = function () {
+        if (!validateRequired($('#taxProfileName').val(), 'Tax profile name is required.')) return;
+        if (!validateRequired($('#taxProfileHSNCode').val(), 'HSN code is required.')) return;
+        var data = new FormData();
+        data.append('name', $('#taxProfileName').val().trim());
+        data.append('hsnCode', $('#taxProfileHSNCode').val().trim());
+        data.append('gstRate', $('#taxProfileGSTRate').val());
+        data.append('cessRate', $('#taxProfileCessRate').val());
+        data.append('description', $('#taxProfileDescription').val().trim());
+        if ($('#taxProfileId').val()) data.append('taxProfileId', $('#taxProfileId').val());
+        postFormData($('#taxProfileId').val() ? '{% url "homeApp:update_inventory_tax_profile_api" %}' : '{% url "homeApp:add_inventory_tax_profile_api" %}', data, 'Tax profile saved', '#taxModal');
+    };
+    window.saveInventoryItem = function () {
+        if (!validateRequired($('#itemName').val(), 'Item name is required.')) return;
+        if (!validateRequired($('#itemBucket').val(), 'Default bucket is required.')) return;
+        var data = new FormData();
+        if ($('#itemId').val()) data.append('itemId', $('#itemId').val());
+        data.append('name', $('#itemName').val().trim());
+        data.append('sku', $('#itemSku').val().trim());
+        data.append('barcode', $('#itemBarcode').val().trim());
+        data.append('categoryId', $('#itemCategoryId').val());
+        data.append('unitId', $('#itemUnitId').val());
+        data.append('taxProfileId', $('#itemTaxProfileId').val());
+        data.append('brandName', $('#itemBrand').val().trim());
+        data.append('hsnCode', $('#itemHsn').val().trim());
+        data.append('description', $('#itemDescription').val().trim());
+        data.append('defaultStockBucket', $('#itemBucket').val());
+        data.append('gstRate', $('#itemGstRate').val());
+        data.append('defaultPurchasePrice', $('#itemPurchasePrice').val());
+        data.append('defaultSalesPrice', $('#itemPrice').val());
+        data.append('mrp', $('#itemMrp').val());
+        data.append('minimumStockLevel', $('#itemMinimumStock').val());
+        data.append('reorderLevel', $('#itemReorderLevel').val());
+        data.append('isSaleBlocked', $('#itemSaleBlocked').is(':checked') ? '1' : '');
+        postFormData($('#itemId').val() ? '{% url "homeApp:update_inventory_item_api" %}' : '{% url "homeApp:add_inventory_item_api" %}', data, 'Inventory item saved', '#itemModal');
+    };
+    window.saveOpeningStock = function () {
+        if (!validateRequired($('#openingStockDate').val(), 'Opening stock date is required.')) return;
+        if (!validateRequired($('#openingStockWarehouse').val(), 'Warehouse is required.')) return;
+        if (!validateLineItems(openingStockWidget, '#openingStockLineItems', '#openingStockLineItemBox', 'Add at least one opening stock line.')) return;
+        var data = new FormData();
+        data.append('entryDate', $('#openingStockDate').val().trim());
+        data.append('warehouseId', $('#openingStockWarehouse').val());
+        data.append('remark', $('#openingStockRemark').val().trim());
+        data.append('lineItems', getLineItemsPayload(openingStockWidget, '#openingStockLineItems', '#openingStockLineItemBox'));
+        postFormData('{% url "homeApp:add_inventory_opening_stock_api" %}', data, 'Opening stock saved', '#openingStockModal');
+    };
+    window.saveAdjustmentVoucher = function () {
+        if (!validateRequired($('#adjustmentDate').val(), 'Adjustment date is required.')) return;
+        if (!validateRequired($('#adjustmentWarehouse').val(), 'Warehouse is required.')) return;
+        if (!validateLineItems(adjustmentWidget, '#adjustmentLineItems', '#adjustmentLineItemBox', 'Add at least one adjustment line.')) return;
+        var data = new FormData();
+        if ($('#adjustmentVoucherId').val()) data.append('voucherId', $('#adjustmentVoucherId').val());
+        data.append('entryDate', $('#adjustmentDate').val().trim());
+        data.append('warehouseId', $('#adjustmentWarehouse').val());
+        data.append('direction', $('#adjustmentDirection').val());
+        data.append('remark', $('#adjustmentRemark').val().trim());
+        data.append('lineItems', getLineItemsPayload(adjustmentWidget, '#adjustmentLineItems', '#adjustmentLineItemBox'));
+        postFormData($('#adjustmentVoucherId').val() ? '{% url "homeApp:update_inventory_adjustment_voucher_api" %}' : '{% url "homeApp:add_inventory_adjustment_voucher_api" %}', data, 'Adjustment saved', '#adjustmentModal');
+    };
+    window.saveTransferVoucher = function () {
+        if (!validateRequired($('#transferDate').val(), 'Transfer date is required.')) return;
+        if (!validateRequired($('#transferFromWarehouse').val(), 'From warehouse is required.')) return;
+        if (!validateRequired($('#transferToWarehouse').val(), 'To warehouse is required.')) return;
+        if ($('#transferFromWarehouse').val() === $('#transferToWarehouse').val()) { toastMessage('orange', 'From and To warehouse cannot be same.'); return; }
+        if (!validateLineItems(transferWidget, '#transferLineItems', '#transferLineItemBox', 'Add at least one transfer line.')) return;
+        var data = new FormData();
+        if ($('#transferVoucherId').val()) data.append('voucherId', $('#transferVoucherId').val());
+        data.append('entryDate', $('#transferDate').val().trim());
+        data.append('fromWarehouseId', $('#transferFromWarehouse').val());
+        data.append('toWarehouseId', $('#transferToWarehouse').val());
+        data.append('remark', $('#transferRemark').val().trim());
+        data.append('lineItems', getLineItemsPayload(transferWidget, '#transferLineItems', '#transferLineItemBox'));
+        postFormData($('#transferVoucherId').val() ? '{% url "homeApp:update_inventory_transfer_voucher_api" %}' : '{% url "homeApp:add_inventory_transfer_voucher_api" %}', data, 'Transfer saved', '#transferModal');
+    };
+    window.savePurchaseReturnVoucher = function () {
+        if (!validateRequired($('#purchaseReturnDate').val(), 'Purchase return date is required.')) return;
+        if (!validateRequired($('#purchaseReturnWarehouse').val(), 'Warehouse is required.')) return;
+        if (!validateLineItems(purchaseReturnWidget, '#purchaseReturnLineItems', '#purchaseReturnLineItemBox', 'Add at least one purchase return line.')) return;
+        var data = new FormData();
+        if ($('#purchaseReturnVoucherId').val()) data.append('voucherId', $('#purchaseReturnVoucherId').val());
+        data.append('entryDate', $('#purchaseReturnDate').val().trim());
+        data.append('warehouseId', $('#purchaseReturnWarehouse').val());
+        data.append('purchaseInvoiceId', $('#purchaseReturnPurchaseInvoiceId').val().trim());
+        data.append('party', $('#purchaseReturnParty').val().trim());
+        data.append('remark', $('#purchaseReturnRemark').val().trim());
+        data.append('lineItems', getLineItemsPayload(purchaseReturnWidget, '#purchaseReturnLineItems', '#purchaseReturnLineItemBox'));
+        postFormData($('#purchaseReturnVoucherId').val() ? '{% url "homeApp:update_purchase_return_voucher_api" %}' : '{% url "homeApp:add_purchase_return_voucher_api" %}', data, 'Purchase return saved', '#purchaseReturnModal');
+    };
+    window.saveSalesReturnVoucher = function () {
+        if (!validateRequired($('#salesReturnDate').val(), 'Sales return date is required.')) return;
+        if (!validateRequired($('#salesReturnWarehouse').val(), 'Warehouse is required.')) return;
+        if (!validateLineItems(salesReturnWidget, '#salesReturnLineItems', '#salesReturnLineItemBox', 'Add at least one sales return line.')) return;
+        var data = new FormData();
+        if ($('#salesReturnVoucherId').val()) data.append('voucherId', $('#salesReturnVoucherId').val());
+        data.append('entryDate', $('#salesReturnDate').val().trim());
+        data.append('warehouseId', $('#salesReturnWarehouse').val());
+        data.append('salesId', $('#salesReturnSalesId').val().trim());
+        data.append('party', $('#salesReturnParty').val().trim());
+        data.append('remark', $('#salesReturnRemark').val().trim());
+        data.append('lineItems', getLineItemsPayload(salesReturnWidget, '#salesReturnLineItems', '#salesReturnLineItemBox'));
+        postFormData($('#salesReturnVoucherId').val() ? '{% url "homeApp:update_sales_return_voucher_api" %}' : '{% url "homeApp:add_sales_return_voucher_api" %}', data, 'Sales return saved', '#salesReturnModal');
+    };
+
+    function initLineItemWidget(boxSelector, hiddenSelector, helpText) {
+        if (!window.InventoryLineItems || typeof window.InventoryLineItems.init !== 'function') {
+            toastMessage('error', 'Inventory line item widget did not load.');
+            return null;
+        }
+        var widgetApi = window.InventoryLineItems.init({
+            containerSelector: boxSelector,
+            hiddenInputSelector: hiddenSelector,
+            catalogUrl: '{% url "homeApp:list_inventory_items_api" %}'
+        });
+        $(boxSelector + ' .inventory-enable-toggle').hide();
+        $(boxSelector + ' .inventory-table-wrap').show();
+        $(boxSelector + ' .inventory-help-text').text(helpText);
+        return widgetApi;
+    }
+
+    initInventoryUi();
+    initTables();
+    openingStockWidget = initLineItemWidget('#openingStockLineItemBox', '#openingStockLineItems', 'Add item rows with quantity, rate, and GST bucket.');
+    adjustmentWidget = initLineItemWidget('#adjustmentLineItemBox', '#adjustmentLineItems', 'Use increase or decrease to correct stock counts.');
+    transferWidget = initLineItemWidget('#transferLineItemBox', '#transferLineItems', 'Move stock from one warehouse to another.');
+    purchaseReturnWidget = initLineItemWidget('#purchaseReturnLineItemBox', '#purchaseReturnLineItems', 'Reduce stock for supplier returns.');
+    salesReturnWidget = initLineItemWidget('#salesReturnLineItemBox', '#salesReturnLineItems', 'Increase stock for goods received back from customers.');
+    $(document).on('click', function (event) {
+        if (!$(event.target).closest('#voucherActionDropdown').length) {
+            closeVoucherActionMenu();
+        }
+        if (!$(event.target).closest('#masterActionDropdown').length) {
+            closeMasterActionMenu();
+        }
+        if (!$(event.target).closest('#stockActionDropdown').length) {
+            closeStockActionMenu();
+        }
+    });
+    loadAllMasters();
+</script>
+{% endblock %}

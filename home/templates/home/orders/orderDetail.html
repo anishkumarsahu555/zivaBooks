@@ -7,186 +7,1004 @@
 
 {% block body %}
     <style>
-        .meta-card {
-            border-radius: 14px;
-            border: 1px solid rgba(34,36,38,.10);
-            background: #fff;
-            padding: 12px;
+        .order-page {
+            width: 100%;
+            max-width: none;
+            margin: 0;
+            padding: 0 8px 18px;
         }
-        .meta-k { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: rgba(0,0,0,.55); margin-bottom: 4px; }
-        .meta-v { font-size: 14px; font-weight: 600; color: rgba(0,0,0,.85); }
-        .order-text { white-space: pre-wrap; line-height: 1.4; }
-        .att-img { width: 100%; height: 140px; object-fit: cover; display: block; }
+        .order-menu-actions {
+            position: absolute;
+            right: 1.5rem;
+            top: 18px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .order-menu-actions .ui.button {
+            border-radius: 8px;
+            min-width: 108px;
+            justify-content: center;
+        }
+        .order-hero {
+            border-radius: 24px;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at top right, rgba(45, 212, 191, 0.18), transparent 36%),
+                linear-gradient(165deg, #ffffff 0%, #f5fbff 54%, #f9fbff 100%);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 20px 44px rgba(15, 23, 42, 0.08);
+        }
+        .order-hero-inner {
+            display: grid;
+            grid-template-columns: minmax(0, 1.3fr) minmax(280px, .95fr);
+            gap: 14px;
+            padding: 18px;
+        }
+        .order-hero-main,
+        .order-hero-side {
+            min-width: 0;
+        }
+        .order-hero-main {
+            padding: 2px 2px 0;
+        }
+        .order-kicker {
+            font-size: 11px;
+            letter-spacing: .16em;
+            text-transform: uppercase;
+            color: #1678c2;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .order-number {
+            font-size: 1.85rem;
+            font-weight: 900;
+            line-height: 1.05;
+            color: #0f172a;
+        }
+        .order-party {
+            margin-top: 10px;
+            color: rgba(15, 23, 42, 0.70);
+            font-size: .98rem;
+            line-height: 1.45;
+        }
+        .order-chip-row,
+        .order-action-row,
+        .order-stage-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .order-chip-row {
+            margin-top: 12px;
+        }
+        .order-action-row .ui.button,
+        .order-stage-row .ui.button {
+            min-height: 36px;
+            padding: .72em 1em;
+            border-radius: 12px;
+            font-size: .92rem;
+            font-weight: 700;
+            box-shadow: none !important;
+        }
+        .order-action-row .ui.blue.button {
+            background: #e0eefc;
+            color: #215d9c;
+        }
+        .order-action-row .ui.teal.button {
+            background: #d9f3f0;
+            color: #0f766e;
+        }
+        .order-action-row .ui.basic.teal.button {
+            background: #ffffff;
+            border: 1px solid rgba(15, 118, 110, 0.28);
+            color: #0f766e;
+        }
+        .order-action-row .ui.green.button {
+            background: #e3f6ea;
+            color: #1f7a45;
+        }
+        .order-stage-row .ui.basic.button {
+            background: #f8fafc;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            color: #475569;
+        }
+        .order-action-row .ui.button > .icon,
+        .order-stage-row .ui.button > .icon {
+            opacity: .9;
+        }
+        .order-hero-side {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .order-status-panel {
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+            padding: 14px;
+        }
+        .order-status-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .order-status-copy {
+            color: rgba(15, 23, 42, 0.62);
+            font-size: .9rem;
+            line-height: 1.45;
+        }
+        .order-status-copy strong {
+            display: block;
+            color: #0f172a;
+            font-size: .98rem;
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+        .order-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .order-summary-card {
+            border-radius: 16px;
+            background: rgba(248, 250, 252, 0.94);
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            padding: 12px 13px;
+            min-height: 74px;
+        }
+        .order-summary-label {
+            font-size: 10px;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: rgba(15, 23, 42, 0.46);
+            font-weight: 800;
+            margin-bottom: 7px;
+        }
+        .order-summary-value {
+            font-size: .98rem;
+            font-weight: 800;
+            line-height: 1.38;
+            color: #0f172a;
+            word-break: break-word;
+        }
+        .order-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.5fr) minmax(300px, .95fr);
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .order-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .order-card {
+            border-radius: 22px;
+            background: #ffffff;
+            border: 1px solid rgba(15, 23, 42, 0.07);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+            padding: 18px;
+        }
+        .order-card-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .order-card-title h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+        .order-card-copy {
+            border-radius: 16px;
+            background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+            border: 1px solid rgba(22, 120, 194, 0.10);
+            padding: 15px;
+            color: #243448;
+            white-space: pre-wrap;
+            line-height: 1.58;
+            min-height: 140px;
+        }
+        .order-facts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .order-fact {
+            border-radius: 16px;
+            background: #fbfdff;
+            border: 1px solid rgba(15, 23, 42, 0.06);
+            padding: 13px 14px;
+        }
+        .order-fact-label {
+            font-size: 10px;
+            letter-spacing: .11em;
+            text-transform: uppercase;
+            color: rgba(15, 23, 42, 0.48);
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        .order-fact-value {
+            color: #0f172a;
+            font-weight: 800;
+            line-height: 1.45;
+        }
+        .timeline {
+            position: relative;
+            padding-left: 22px;
+        }
+        .timeline::before {
+            content: "";
+            position: absolute;
+            top: 6px;
+            bottom: 6px;
+            left: 8px;
+            width: 2px;
+            background: linear-gradient(180deg, rgba(22, 120, 194, 0.26), rgba(236, 72, 153, 0.18));
+        }
+        .timeline-item {
+            position: relative;
+            padding: 0 0 16px 18px;
+        }
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+        .timeline-dot {
+            position: absolute;
+            left: -1px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #1678c2, #0ea5e9);
+            box-shadow: 0 0 0 4px rgba(22, 120, 194, 0.12);
+        }
+        .timeline-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .timeline-title {
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.35;
+        }
+        .timeline-time {
+            font-size: .8rem;
+            color: rgba(15, 23, 42, 0.54);
+            white-space: nowrap;
+        }
+        .timeline-meta {
+            margin-top: 5px;
+            color: rgba(15, 23, 42, 0.68);
+            line-height: 1.45;
+            font-size: .9rem;
+        }
+        .milestone-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .attachment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
+            gap: 10px;
+        }
+        .attachment-card {
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #fff;
+            cursor: pointer;
+        }
+        .attachment-card img {
+            width: 100%;
+            height: 132px;
+            object-fit: cover;
+            display: block;
+        }
+        .attachment-card span {
+            display: block;
+            padding: 9px 11px;
+            color: #243448;
+            font-size: .88rem;
+        }
+        .empty-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.12);
+            color: rgba(15, 23, 42, 0.72);
+            font-size: .84rem;
+            font-weight: 700;
+        }
+        .sale-link-search {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #fff;
+            padding-bottom: 12px;
+        }
+        .sale-link-results {
+            max-height: 54vh;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .sale-link-results::-webkit-scrollbar {
+            width: 8px;
+        }
+        .sale-link-results::-webkit-scrollbar-thumb {
+            border-radius: 999px;
+            background: rgba(22, 120, 194, 0.22);
+        }
+        .sale-link-card {
+            border-radius: 16px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: #fbfdff;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+        .sale-link-card:last-child {
+            margin-bottom: 0;
+        }
+        .sale-link-title {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+        .sale-link-id {
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.35;
+        }
+        .sale-link-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 8px 0 10px;
+        }
+        .sale-link-meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 8px;
+            border-radius: 999px;
+            background: rgba(22, 120, 194, 0.08);
+            color: #31506f;
+            font-size: .78rem;
+            font-weight: 700;
+        }
+        .sale-link-helper {
+            color: rgba(15, 23, 42, 0.68);
+            font-size: .86rem;
+            line-height: 1.42;
+            margin-bottom: 10px;
+        }
+        .order-otp-box {
+            display: none;
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 16px;
+            background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+            border: 1px solid rgba(22, 120, 194, 0.12);
+        }
+        .order-otp-status {
+            display: none;
+            margin: 0 0 10px !important;
+        }
+        .order-otp-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+        .order-otp-title-wrap {
+            min-width: 0;
+        }
+        .order-otp-title {
+            margin: 0;
+            font-size: .94rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+        .order-otp-copy {
+            margin-top: 4px;
+            color: rgba(15, 23, 42, 0.62);
+            font-size: .82rem;
+            line-height: 1.45;
+        }
+        .order-otp-actions {
+            display: grid;
+            grid-template-columns: 1fr 1.25fr auto;
+            gap: 8px;
+            align-items: center;
+        }
+        .order-otp-actions .ui.button {
+            min-height: 38px;
+            border-radius: 10px;
+            font-weight: 800;
+        }
+        .order-otp-actions .ui.input > input {
+            min-height: 38px;
+            border-radius: 10px !important;
+            font-weight: 800;
+            letter-spacing: .12em;
+            text-align: center;
+        }
+        .order-otp-footer {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        @media only screen and (max-width: 980px) {
+            .order-hero-inner {
+                grid-template-columns: 1fr;
+            }
+            .order-summary-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            .order-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+        @media only screen and (max-width: 720px) {
+            .order-page {
+                padding: 0 4px 14px;
+            }
+            .order-menu-actions .ui.button {
+                min-width: 96px;
+                justify-content: center;
+            }
+            .order-action-row,
+            .order-stage-row {
+                gap: 6px;
+            }
+            .order-action-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+            }
+            .order-stage-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+            }
+            .order-action-row .ui.button,
+            .order-stage-row .ui.button {
+                width: 100%;
+                min-height: 33px;
+                padding: .62em .8em;
+                font-size: .84rem;
+                border-radius: 10px;
+            }
+            .order-otp-box {
+                padding: 10px;
+            }
+            .order-otp-actions {
+                grid-template-columns: 1fr;
+            }
+            .order-otp-footer {
+                align-items: stretch;
+            }
+            .order-hero-inner {
+                padding: 14px;
+                gap: 12px;
+            }
+            .order-status-panel {
+                padding: 12px;
+            }
+            .order-number {
+                font-size: 1.42rem;
+            }
+            .order-summary-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .order-card {
+                border-radius: 18px;
+                padding: 14px;
+            }
+            .order-facts-grid,
+            .milestone-grid {
+                grid-template-columns: 1fr;
+            }
+            .timeline-head,
+            .sale-link-title {
+                flex-direction: column;
+            }
+            .timeline-time {
+                white-space: normal;
+            }
+            .order-action-row .ui.button,
+            .order-stage-row .ui.button {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        html[data-theme="dark"] .order-hero {
+            background:
+                radial-gradient(circle at top right, rgba(45, 212, 191, 0.10), transparent 34%),
+                linear-gradient(165deg, rgba(15, 23, 42, 0.98) 0%, rgba(17, 27, 46, 0.96) 54%, rgba(16, 27, 49, 0.96) 100%);
+            border-color: rgba(56, 189, 248, 0.14);
+            box-shadow: 0 20px 44px rgba(2, 6, 23, 0.34);
+        }
+
+        html[data-theme="dark"] .order-kicker {
+            color: #7dd3fc;
+        }
+
+        html[data-theme="dark"] .order-number,
+        html[data-theme="dark"] .order-status-copy strong,
+        html[data-theme="dark"] .order-summary-value,
+        html[data-theme="dark"] .order-card-title h3,
+        html[data-theme="dark"] .timeline-title,
+        html[data-theme="dark"] .sale-link-id,
+        html[data-theme="dark"] .order-otp-title,
+        html[data-theme="dark"] .attachment-card span {
+            color: #f8fbff;
+        }
+
+        html[data-theme="dark"] .order-party,
+        html[data-theme="dark"] .order-status-copy,
+        html[data-theme="dark"] .order-summary-label,
+        html[data-theme="dark"] .order-fact-label,
+        html[data-theme="dark"] .timeline-time,
+        html[data-theme="dark"] .timeline-meta,
+        html[data-theme="dark"] .sale-link-helper,
+        html[data-theme="dark"] .order-otp-copy {
+            color: #93a4bd !important;
+        }
+
+        html[data-theme="dark"] .order-status-panel,
+        html[data-theme="dark"] .order-summary-card,
+        html[data-theme="dark"] .order-card,
+        html[data-theme="dark"] .order-fact,
+        html[data-theme="dark"] .attachment-card,
+        html[data-theme="dark"] .sale-link-card,
+        html[data-theme="dark"] .order-otp-box {
+            background: rgba(15, 23, 42, 0.88) !important;
+            border-color: rgba(56, 189, 248, 0.12) !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] .order-card-copy {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.88) 0%, rgba(17, 27, 46, 0.96) 100%);
+            border-color: rgba(56, 189, 248, 0.12);
+            color: #dce8f7;
+        }
+
+        html[data-theme="dark"] .empty-chip,
+        html[data-theme="dark"] .sale-link-meta-chip {
+            background: rgba(22, 120, 194, 0.16) !important;
+            color: #dce8f7 !important;
+        }
+
+        html[data-theme="dark"] .order-chip-row .ui.basic.label,
+        html[data-theme="dark"] .order-status-top .ui.basic.label {
+            background: rgba(15, 23, 42, 0.82) !important;
+            border-color: rgba(56, 189, 248, 0.14) !important;
+            color: #dce8f7 !important;
+        }
+
+        html[data-theme="dark"] .timeline::before {
+            background: linear-gradient(180deg, rgba(56, 189, 248, 0.28), rgba(236, 72, 153, 0.14));
+        }
+
+        html[data-theme="dark"] .timeline-dot {
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.10);
+        }
+
+        html[data-theme="dark"] .sale-link-search {
+            background: #101b31;
+        }
+
+        html[data-theme="dark"] #downloadOrderPdfModal > .header,
+        html[data-theme="dark"] #downloadOrderPdfModal > .content,
+        html[data-theme="dark"] #downloadOrderPdfModal > .actions,
+        html[data-theme="dark"] #orderTransitionModal > .header,
+        html[data-theme="dark"] #orderTransitionModal > .content,
+        html[data-theme="dark"] #orderTransitionModal > .actions,
+        html[data-theme="dark"] #linkSaleModal > .header,
+        html[data-theme="dark"] #linkSaleModal > .content,
+        html[data-theme="dark"] #linkSaleModal > .actions,
+        html[data-theme="dark"] #attachmentModal > .header,
+        html[data-theme="dark"] #attachmentModal > .content,
+        html[data-theme="dark"] #attachmentModal > .actions {
+            background: #101b31 !important;
+            color: #e6eef8 !important;
+            border-color: rgba(56, 189, 248, 0.12) !important;
+        }
+
+        html[data-theme="dark"] .order-otp-status.ui.message {
+            background: rgba(22, 120, 194, 0.14) !important;
+            border-color: rgba(56, 189, 248, 0.2) !important;
+            color: #d7e9fb !important;
+        }
     </style>
 
-    <div class="ui basic grid">
-        <div class="sixteen wide column">
-            <div class="ui pointing secondary menu">
-                <div class="item active">Order {{ obj.orderNumber|default:obj.pk }}</div>
-                <div style="position:absolute;right:1.5rem;top:18px;">
-                    <a class="ui teal mini button" href="{{ order_return_url }}">
-                        <i class="arrow left icon"></i>
-                        Back
-                    </a>
-                </div>
-            </div>
-
-            <div class="ui row teal stacked segment padded">
-                <div class="content">
-                    <div class="ui grid">
-                        <div class="ten wide column">
-                            {% if obj.status == "approved" %}
-                                <div class="ui tiny green label">Approved</div>
-                            {% else %}
-                                <div class="ui tiny orange label">{{ obj.get_status_display }}</div>
-                            {% endif %}
-                            {% if obj.partyID %}
-                                <div class="ui tiny basic label"><i class="user icon"></i> {{ obj.partyID.name }}</div>
-                            {% endif %}
-                        </div>
-                        <div class="six wide column right aligned">
-                            <div class="ui mini buttons">
-                                <button class="ui blue button" type="button" onclick="downloadOrderPdf('{{ obj.id }}')">
-                                    <i class="file pdf outline icon"></i>
-                                    PDF
-                                </button>
-                                {% if can_edit_order %}
-                                    <a class="ui green button" href="{% url 'homeApp:edit_order' obj.id %}">
-                                        <i class="pen icon"></i>
-                                        Edit
-                                    </a>
-                                {% endif %}
-                                {% if can_approve_order %}
-                                    <button class="ui purple button" type="button" onclick="showApproveOrderModal('{{ obj.id }}')">
-                                        <i class="check icon"></i>
-                                        Approve
-                                    </button>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="ui divider"></div>
-
-                    <div class="ui stackable grid">
-                        <div class="four wide column">
-                            <div class="meta-card">
-                                <div class="meta-k">Order Date</div>
-                                <div class="meta-v">{% if obj.buildDate %}{{ obj.buildDate|date:"d-m-Y" }}{% else %}-{% endif %}</div>
-                            </div>
-                        </div>
-                        <div class="four wide column">
-                            <div class="meta-card">
-                                <div class="meta-k">Created</div>
-                                <div class="meta-v">{{ obj.datetime|date:"d-m-Y h:i A" }}</div>
-                            </div>
-                        </div>
-                        <div class="four wide column">
-                            <div class="meta-card">
-                                <div class="meta-k">Updated</div>
-                                <div class="meta-v">{{ obj.lastUpdatedOn|date:"d-m-Y h:i A" }}</div>
-                            </div>
-                        </div>
-                        <div class="four wide column">
-                            <div class="meta-card">
-                                <div class="meta-k">Created By</div>
-                                <div class="meta-v">{{ obj.createdBy.name|default:"-" }}</div>
-                            </div>
-                        </div>
-                        <div class="four wide column">
-                            <div class="meta-card">
-                                <div class="meta-k">Approved By</div>
-                                <div class="meta-v">{{ obj.approvedBy.name|default:"-" }}</div>
-                            </div>
-                        </div>
-                        <div class="four wide column">
-                            <div class="meta-card">
-                                <div class="meta-k">Approved On</div>
-                                <div class="meta-v">{% if obj.approvedOn %}{{ obj.approvedOn|date:"d-m-Y h:i A" }}{% else %}-{% endif %}</div>
-                            </div>
-                        </div>
-                        <div class="four wide column">
-                            <div class="meta-card">
-                                <div class="meta-k">Location</div>
-                                <div class="meta-v">{{ obj.location|default:"-" }}</div>
-                            </div>
-                        </div>
-                        <div class="four wide column">
-                            <div class="meta-card">
-                                <div class="meta-k">Lat/Lng</div>
-                                <div class="meta-v">{{ obj.latitude|default:"0.0" }}, {{ obj.longitude|default:"0.0" }}</div>
-                            </div>
-                        </div>
-                        <div class="eight wide column">
-                            <div class="meta-card">
-                                <div class="meta-k">Remark</div>
-                                <div class="meta-v">{{ obj.remark|default:"-" }}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="ui divider"></div>
-
-                    <div class="ui segment" style="border-radius:14px;">
-                        <div class="ui tiny header">Order Text</div>
-                        <div class="order-text">{{ obj.orderText|default:"" }}</div>
-                    </div>
-
-                    <div class="ui segment" style="border-radius:14px;">
-                        <div class="ui tiny header">Attachments</div>
-                        {% if attachments %}
-                            <div class="ui four stackable cards">
-                                {% for att in attachments %}
-                                    <div class="card" style="cursor:pointer" onclick="showAttachment('{{ att.image.url }}')">
-                                        <div class="image">
-                                            <img class="att-img" src="{{ att.image.thumbnail.url }}" alt="attachment">
-                                        </div>
-                                        <div class="content">
-                                            <div class="description">{{ att.label|default:"Image" }}</div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="ui tiny grey label">No images uploaded.</div>
+    <div class="order-page">
+        <div class="ui right aligned basic grid">
+            <div class="sixteen wide column">
+                <div class="ui pointing secondary menu">
+                    <div class="item active">{{ obj.orderNumber|default:obj.pk }}</div>
+                    <div class="order-menu-actions">
+                        <a class="ui green mini plus button right" href="{{ order_return_url }}">
+                            <i class="arrow left icon"></i>
+                            Back
+                        </a>
+                        {% if can_link_sale and not obj.linkedSales_id %}
+                            <a class="ui teal mini button" href="{% url 'homeApp:add_sales' %}?order_id={{ obj.id }}">
+                                <i class="plus circle icon"></i>
+                                Create Sale
+                            </a>
                         {% endif %}
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="ui mini modal" id="downloadOrderPdfModal">
-                <i class="close icon"></i>
-                <div class="header">Download PDF</div>
-                <div class="content"><p>Download this order as PDF?</p></div>
-                <div class="actions">
-                    <div class="ui cancel button">Cancel</div>
-                    <input type="hidden" id="DownloadOrderID" value="{{ obj.id }}">
-                    <div class="ui blue ok button" onclick="confirmDownloadOrderPdf()">Download</div>
-                </div>
-            </div>
+        <div class="order-hero">
+            <div class="order-hero-inner">
+                <div class="order-hero-main">
+                    <div class="order-kicker">Order Lifecycle</div>
+                    <div class="order-number">{{ obj.orderNumber|default:obj.pk }}</div>
+                    <div class="order-party">
+                        {% if obj.partyID %}{{ obj.partyID.name }}{% else %}Walk-in / Unassigned Party{% endif %}
+                    </div>
 
-            <div class="ui mini modal" id="approveOrderModal">
-                <i class="close icon"></i>
-                <div class="header">Approve Order</div>
-                <div class="content">
-                    <p>Are you sure you want to approve this order?</p>
-                    <div class="ui tiny grey label">After approval, staff edits will be locked.</div>
+                    <div class="order-chip-row">
+                        {% if obj.status == 'approved' %}
+                            <div class="ui tiny teal label">Confirmed</div>
+                        {% elif obj.status == 'submitted' %}
+                            <div class="ui tiny orange label">Submitted</div>
+                        {% elif obj.status == 'draft' %}
+                            <div class="ui tiny grey label">Draft</div>
+                        {% elif obj.status == 'packed' %}
+                            <div class="ui tiny violet label">Packed</div>
+                        {% elif obj.status == 'out_for_delivery' %}
+                            <div class="ui tiny blue label">Out for Delivery</div>
+                        {% elif obj.status == 'delivered' or obj.status == 'fulfilled' %}
+                            <div class="ui tiny green label">Delivered</div>
+                        {% elif obj.status == 'cancelled' %}
+                            <div class="ui tiny red label">Cancelled</div>
+                        {% elif obj.status == 'returned' %}
+                            <div class="ui tiny pink label">Returned</div>
+                        {% else %}
+                            <div class="ui tiny label">{{ obj.get_status_display }}</div>
+                        {% endif %}
+                        <div class="ui tiny basic label"><i class="history icon"></i> {{ status_events|length }} updates</div>
+                    </div>
                 </div>
-                <div class="actions">
-                    <div class="ui red cancel button">No</div>
-                    <input type="hidden" id="ApproveOrderID" value="{{ obj.id }}">
-                    <div class="ui green ok button" onclick="confirmApproveOrder()">
-                        Yes <i class="check icon"></i>
+
+                <div class="order-hero-side">
+                    <div class="order-status-panel">
+                        <div class="order-status-top">
+                            <div class="order-status-copy">
+                                <strong>{{ obj.get_status_display }}</strong>
+                                {% if obj.assignedTo %}Assigned to {{ obj.assignedTo.name }}{% else %}Awaiting assignment{% endif %}
+                            </div>
+                            <div class="ui tiny basic label">
+                                {% if obj.buildDate %}{{ obj.buildDate|date:"d M Y" }}{% else %}-{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="order-action-row">
+                            <button class="ui blue button" type="button" onclick="downloadOrderPdf('{{ obj.id }}')">
+                                <i class="file pdf outline icon"></i>
+                                PDF
+                            </button>
+                            {% if can_link_sale and not obj.linkedSales_id %}
+                                <a class="ui teal button" href="{% url 'homeApp:add_sales' %}?order_id={{ obj.id }}">
+                                    <i class="plus circle icon"></i>
+                                    Create Sale
+                                </a>
+                                <button class="ui basic teal button" type="button" onclick="openLinkSaleModal()">
+                                    <i class="linkify icon"></i>
+                                    Link Sale
+                                </button>
+                            {% endif %}
+                            {% if can_edit_order %}
+                                <a class="ui green button" href="{% url 'homeApp:edit_order' obj.id %}">
+                                    <i class="pen icon"></i>
+                                    Edit
+                                </a>
+                            {% endif %}
+                        </div>
+
+                        {% if can_transition_order and next_status_actions %}
+                            <div class="order-stage-row" style="margin-top:10px;">
+                                {% for status, label in next_status_actions %}
+                                    <button type="button" class="ui tiny basic button" onclick="openTransitionModal('{{ status }}', '{{ label }}')">
+                                        {{ label }}
+                                    </button>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="order-summary-grid">
+                        <div class="order-summary-card">
+                            <div class="order-summary-label">Current Status</div>
+                            <div class="order-summary-value">{{ obj.get_status_display }}</div>
+                        </div>
+                        <div class="order-summary-card">
+                            <div class="order-summary-label">Order Date</div>
+                            <div class="order-summary-value">{% if obj.buildDate %}{{ obj.buildDate|date:"d M Y" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div class="order-summary-card">
+                            <div class="order-summary-label">Assigned To</div>
+                            <div class="order-summary-value">{{ obj.assignedTo.name|default:"-" }}</div>
+                        </div>
+                        <div class="order-summary-card">
+                            <div class="order-summary-label">Linked Sale</div>
+                            <div class="order-summary-value">
+                                {% if obj.linkedSales %}
+                                    {{ obj.linkedSales.salesID|default:obj.linkedSales.paymentID|default:obj.linkedSales.invoiceNumber }}
+                                {% else %}
+                                    Not linked
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="order-summary-card">
+                            <div class="order-summary-label">Delivery OTP</div>
+                            <div class="order-summary-value">
+                                {% if obj.deliveryOtpVerified %}
+                                    Verified
+                                {% elif obj.status == 'delivered' and obj.partyID_id %}
+                                    Missing
+                                {% else %}
+                                    Not required
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="order-summary-card">
+                            <div class="order-summary-label">OTP Verified By</div>
+                            <div class="order-summary-value">{{ obj.deliveryOtpVerifiedBy.name|default:"-" }}</div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="ui modal" id="attachmentModal">
-                <i class="close icon"></i>
-                <div class="header">Attachment</div>
-                <div class="content" style="text-align:center;">
-                    <img id="attachmentModalImg" src="" style="max-width:100%;height:auto;border-radius:12px;">
+        <div class="order-layout">
+            <div class="order-stack">
+                <div class="order-card">
+                    <div class="order-card-title">
+                        <h3>Order Notes</h3>
+                    </div>
+                    <div class="order-card-copy">{{ obj.orderText|default:"No order text captured." }}</div>
+                    <div class="order-facts-grid">
+                        <div class="order-fact">
+                            <div class="order-fact-label">Remark</div>
+                            <div class="order-fact-value">{{ obj.remark|default:"-" }}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Capture Location</div>
+                            <div class="order-fact-value">{{ obj.location|default:"-" }}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Created By</div>
+                            <div class="order-fact-value">{{ obj.createdBy.name|default:"-" }}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Created On</div>
+                            <div class="order-fact-value">{{ obj.datetime|date:"d M Y, h:i A" }}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Updated On</div>
+                            <div class="order-fact-value">{{ obj.lastUpdatedOn|date:"d M Y, h:i A" }}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Coordinates</div>
+                            <div class="order-fact-value">{{ obj.latitude|default:"0.0" }}, {{ obj.longitude|default:"0.0" }}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Delivery OTP Verified</div>
+                            <div class="order-fact-value">
+                                {% if obj.deliveryOtpVerified %}
+                                    Yes{% if obj.deliveryOtpVerifiedOn %} · {{ obj.deliveryOtpVerifiedOn|date:"d M Y, h:i A" }}{% endif %}
+                                {% else %}
+                                    No
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
+                <div class="order-card">
+                    <div class="order-card-title">
+                        <h3>Attachments</h3>
+                    </div>
+                    {% if attachments %}
+                        <div class="attachment-grid">
+                            {% for att in attachments %}
+                                <div class="attachment-card" onclick="showAttachment('{{ att.image.url }}')">
+                                    <img src="{{ att.image.thumbnail.url }}" alt="attachment">
+                                    <span>{{ att.label|default:"Image" }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <span class="empty-chip"><i class="image outline icon"></i> No attachments uploaded</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="order-stack">
+                <div class="order-card">
+                    <div class="order-card-title">
+                        <h3>Tracking Timeline</h3>
+                    </div>
+                    <div class="timeline">
+                        {% if status_events %}
+                            {% for event in status_events %}
+                                <div class="timeline-item">
+                                    <span class="timeline-dot"></span>
+                                    <div class="timeline-head">
+                                        <div class="timeline-title">{{ event.get_toStatus_display }}</div>
+                                        <div class="timeline-time">{{ event.datetime|date:"d M Y, h:i A" }}</div>
+                                    </div>
+                                    <div class="timeline-meta">
+                                        {% if event.actor %}by {{ event.actor.name }}{% else %}by system{% endif %}
+                                        {% if event.fromStatus %}<span> | from {{ event.get_fromStatus_display }}</span>{% endif %}
+                                        {% if event.note %}<div>{{ event.note }}</div>{% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <span class="empty-chip"><i class="clock outline icon"></i> No tracking events yet</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="order-card">
+                    <div class="order-card-title">
+                        <h3>Milestones</h3>
+                    </div>
+                    <div class="milestone-grid">
+                        <div class="order-fact">
+                            <div class="order-fact-label">Confirmed</div>
+                            <div class="order-fact-value">{% if obj.approvedOn %}{{ obj.approvedOn|date:"d M Y, h:i A" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Packed</div>
+                            <div class="order-fact-value">{% if obj.packedOn %}{{ obj.packedOn|date:"d M Y, h:i A" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Out for Delivery</div>
+                            <div class="order-fact-value">{% if obj.outForDeliveryOn %}{{ obj.outForDeliveryOn|date:"d M Y, h:i A" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Delivered</div>
+                            <div class="order-fact-value">{% if obj.deliveredOn %}{{ obj.deliveredOn|date:"d M Y, h:i A" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">OTP Verified On</div>
+                            <div class="order-fact-value">{% if obj.deliveryOtpVerifiedOn %}{{ obj.deliveryOtpVerifiedOn|date:"d M Y, h:i A" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Cancelled</div>
+                            <div class="order-fact-value">{% if obj.cancelledOn %}{{ obj.cancelledOn|date:"d M Y, h:i A" }}{% else %}-{% endif %}</div>
+                        </div>
+                        <div class="order-fact">
+                            <div class="order-fact-label">Returned</div>
+                            <div class="order-fact-value">{% if obj.returnedOn %}{{ obj.returnedOn|date:"d M Y, h:i A" }}{% else %}-{% endif %}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ui mini modal" id="downloadOrderPdfModal">
+            <i class="close icon"></i>
+            <div class="header">Download PDF</div>
+            <div class="content"><p>Download this order as PDF?</p></div>
+            <div class="actions">
+                <div class="ui cancel button">Cancel</div>
+                <input type="hidden" id="DownloadOrderID" value="{{ obj.id }}">
+                <div class="ui blue ok button" onclick="confirmDownloadOrderPdf()">Download</div>
+            </div>
+        </div>
+
+        <div class="ui tiny modal" id="orderTransitionModal">
+            <i class="close icon"></i>
+            <div class="header">Update Order Status</div>
+            <div class="content">
+                <p id="orderTransitionText"></p>
+                <div class="ui small form">
+                    <div class="field">
+                        <label>Tracking Note</label>
+                        <textarea id="orderTransitionNote" rows="3" placeholder="Optional note for this stage"></textarea>
+                    </div>
+                    <div class="order-otp-box" id="orderDeliveryOtpBox">
+                        <div class="ui mini message order-otp-status" id="orderDeliveryOtpStatus"></div>
+                        <div class="order-otp-head">
+                            <div class="order-otp-title-wrap">
+                                <div class="order-otp-title">Delivery OTP</div>
+                                <div class="order-otp-copy">Generate the code, ask the customer to read it from their ledger screen, then verify it here.</div>
+                            </div>
+                            <div class="ui tiny basic teal label" id="orderOtpExpiryBadge" style="display:none;">
+                                <i class="clock outline icon"></i>
+                                Expires in <span id="orderOtpExpiryText">0:00</span>
+                            </div>
+                        </div>
+                        <div class="order-otp-actions">
+                            <button type="button" class="ui tiny button" id="sendOrderOtpBtn" onclick="sendOrderDeliveryOtp()">
+                                <i class="key icon"></i>
+                                Generate OTP
+                            </button>
+                            <div class="ui tiny input fluid">
+                                <input type="text" id="orderDeliveryOtpCode" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Enter OTP" onkeyup="autoVerifyOrderDeliveryOtp()">
+                            </div>
+                            <button type="button" class="ui tiny teal button" id="verifyOrderOtpBtn" onclick="verifyOrderDeliveryOtp()">
+                                <i class="check icon"></i>
+                                Verify
+                            </button>
+                        </div>
+                        <div class="order-otp-footer">
+                            <button type="button" class="ui tiny basic button" id="editOrderOtpBtn" style="display:none;" onclick="editOrderDeliveryOtp()">
+                                <i class="edit icon"></i>
+                                Edit OTP
+                            </button>
+                            <div class="ui tiny green label" id="orderOtpVerifiedBadge" style="display:none; margin-top: 8px;">
+                                <i class="check circle icon"></i>
+                                OTP Verified
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" id="orderTransitionStatus" value="">
+                <input type="hidden" id="orderDeliveryOtpVerified" value="0">
+            </div>
+            <div class="actions">
+                <div class="ui cancel button">Cancel</div>
+                <button class="ui teal button" type="button" onclick="confirmOrderTransition()">Update</button>
+            </div>
+        </div>
+
+        <div class="ui small modal" id="linkSaleModal">
+            <i class="close icon"></i>
+            <div class="header">Link Existing Sale</div>
+            <div class="content">
+                <div class="sale-link-search">
+                    <div class="ui icon input fluid">
+                        <input type="text" id="linkSaleSearch" placeholder="Search by sale ID, invoice number, party, amount, or date">
+                        <i class="search icon"></i>
+                    </div>
+                </div>
+                <div class="sale-link-results" id="linkSaleResults">
+                    <div class="sale-link-card">
+                        <div class="sale-link-helper">Loading sales...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="actions">
+                <div class="ui cancel button">Close</div>
+            </div>
+        </div>
+
+        <div class="ui modal" id="attachmentModal">
+            <i class="close icon"></i>
+            <div class="header">Attachment</div>
+            <div class="content" style="text-align:center;">
+                <img id="attachmentModalImg" src="" style="max-width:100%;height:auto;border-radius:12px;">
             </div>
         </div>
     </div>
@@ -194,6 +1012,13 @@
 
 {% block js %}
     <script>
+        var orderId = "{{ obj.id }}";
+        var orderPartyId = "{{ obj.partyID_id|default:'' }}";
+        var saleLinkRows = [];
+        var orderOtpTypingTimer = null;
+        var orderOtpExpiresIn = 0;
+        var orderOtpExpiryTimer = null;
+
         function downloadOrderPdf(id) {
             $('#DownloadOrderID').val('' + id);
             $('#downloadOrderPdfModal').modal('show');
@@ -201,9 +1026,6 @@
         function confirmDownloadOrderPdf() {
             var id = $('#DownloadOrderID').val();
             $('#downloadOrderPdfModal').modal('hide');
-            startDownloadOrderPdf(id);
-        }
-        function startDownloadOrderPdf(id) {
             var baseUrl = "{% url 'homeApp:generate_order_pdf' %}";
             var a = document.createElement('a');
             a.href = baseUrl + '?id=' + encodeURIComponent(id);
@@ -212,40 +1034,304 @@
             a.click();
             setTimeout(function () { document.body.removeChild(a); }, 1000);
         }
-
-        function showApproveOrderModal(id) {
-            $('#ApproveOrderID').val('' + id);
-            $('#approveOrderModal').modal('show');
+        function openTransitionModal(status, label) {
+            $('#orderTransitionStatus').val(status);
+            $('#orderTransitionNote').val('');
+            $('#orderTransitionText').text('Move this order to "' + label + '"?');
+            resetOrderDeliveryOtp();
+            if (status === 'delivered' && orderPartyId) {
+                $('#orderDeliveryOtpBox').show();
+                setOrderOtpStatus('info', 'Generate OTP and verify it before marking delivery complete.');
+            } else {
+                $('#orderDeliveryOtpBox').hide();
+            }
+            $('#orderTransitionModal').modal('show');
         }
-        function confirmApproveOrder() {
-            showLoading();
-            var id = $('#ApproveOrderID').val();
-            $('#approveOrderModal').modal('hide');
-            var formdata = new FormData();
-            formdata.append('userID', id);
+        function setOrderOtpStatus(type, message) {
+            var box = $('#orderDeliveryOtpStatus');
+            box.removeClass('positive negative info warning');
+            if (type === 'success') box.addClass('positive');
+            else if (type === 'error') box.addClass('negative');
+            else if (type === 'warn') box.addClass('warning');
+            else box.addClass('info');
+            box.html(message).show();
+        }
+        function formatOrderOtpTime(seconds) {
+            seconds = Math.max(0, Number(seconds || 0));
+            var m = Math.floor(seconds / 60);
+            var s = seconds % 60;
+            return m + ':' + String(s).padStart(2, '0');
+        }
+        function stopOrderOtpTimer() {
+            if (orderOtpExpiryTimer) {
+                clearInterval(orderOtpExpiryTimer);
+                orderOtpExpiryTimer = null;
+            }
+        }
+        function tickOrderOtpTimer() {
+            if (orderOtpExpiresIn <= 0) {
+                stopOrderOtpTimer();
+                $('#orderOtpExpiryBadge').hide();
+                $('#orderOtpExpiryText').text('0:00');
+                return;
+            }
+            $('#orderOtpExpiryBadge').show();
+            $('#orderOtpExpiryText').text(formatOrderOtpTime(orderOtpExpiresIn));
+            orderOtpExpiresIn -= 1;
+        }
+        function startOrderOtpTimer(seconds) {
+            orderOtpExpiresIn = Number(seconds || 0);
+            stopOrderOtpTimer();
+            if (orderOtpExpiresIn > 0) {
+                tickOrderOtpTimer();
+                orderOtpExpiryTimer = setInterval(tickOrderOtpTimer, 1000);
+            } else {
+                $('#orderOtpExpiryBadge').hide();
+            }
+        }
+        function resetOrderDeliveryOtp() {
+            stopOrderOtpTimer();
+            orderOtpExpiresIn = 0;
+            $('#orderOtpExpiryBadge').hide();
+            $('#orderOtpExpiryText').text('0:00');
+            $('#orderDeliveryOtpCode').val('').prop('disabled', false);
+            $('#orderDeliveryOtpVerified').val('0');
+            $('#orderOtpVerifiedBadge').hide();
+            $('#editOrderOtpBtn').hide();
+            $('#orderDeliveryOtpStatus').hide();
+            $('#sendOrderOtpBtn').removeClass('disabled loading').prop('disabled', false);
+            $('#verifyOrderOtpBtn').removeClass('green disabled').addClass('teal').prop('disabled', false);
+        }
+        function sendOrderDeliveryOtp() {
+            if (!orderPartyId) {
+                setOrderOtpStatus('warn', 'Party is required for delivery OTP.');
+                return;
+            }
+            $('#sendOrderOtpBtn').addClass('loading disabled');
             $.ajax({
-                url: "{% url 'homeApp:approve_order' %}",
-                type: "post",
-                data: formdata,
+                type: 'post',
+                url: '{% url "homeApp:request_order_delivery_otp_api" %}',
+                dataType: 'json',
+                data: { orderID: orderId },
+                success: function (response) {
+                    if (response.message === 'success') {
+                        startOrderOtpTimer(response.expires_in || 0);
+                        setOrderOtpStatus('info', 'OTP generated. Ask customer to check OTP on their ledger screen and share it before the timer ends.');
+                        $('#orderDeliveryOtpCode').focus();
+                    } else {
+                        setOrderOtpStatus('error', (response && response.error) ? response.error : 'Unable to generate OTP.');
+                    }
+                },
+                error: function (xhr) {
+                    var msg = 'Unable to generate OTP.';
+                    if (xhr && xhr.status) msg += ' (HTTP ' + xhr.status + ')';
+                    setOrderOtpStatus('error', msg);
+                },
+                complete: function () {
+                    $('#sendOrderOtpBtn').removeClass('loading disabled');
+                }
+            });
+        }
+        function verifyOrderDeliveryOtp() {
+            var otp = ($('#orderDeliveryOtpCode').val() || '').trim();
+            if (!orderPartyId) {
+                setOrderOtpStatus('warn', 'Party is required for delivery OTP.');
+                return;
+            }
+            if (!(otp.length === 6 && /^[0-9]{6}$/.test(otp))) {
+                setOrderOtpStatus('warn', 'Enter 6 digit OTP.');
+                return;
+            }
+            $('#verifyOrderOtpBtn').addClass('loading disabled');
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:verify_order_delivery_otp_api" %}',
+                dataType: 'json',
+                data: { orderID: orderId, otp: otp },
+                success: function (response) {
+                    if (response.message === 'success') {
+                        stopOrderOtpTimer();
+                        $('#orderOtpExpiryBadge').hide();
+                        $('#orderDeliveryOtpVerified').val('1');
+                        $('#verifyOrderOtpBtn').removeClass('teal').addClass('green').prop('disabled', true);
+                        $('#sendOrderOtpBtn').addClass('disabled').prop('disabled', true);
+                        $('#orderDeliveryOtpCode').prop('disabled', true);
+                        $('#orderOtpVerifiedBadge').show();
+                        $('#editOrderOtpBtn').show();
+                        setOrderOtpStatus('success', 'OTP verified.');
+                    } else {
+                        $('#orderDeliveryOtpVerified').val('0');
+                        setOrderOtpStatus('error', 'Invalid OTP.');
+                    }
+                },
+                error: function (xhr) {
+                    var msg = 'Unable to verify OTP.';
+                    if (xhr && xhr.status) msg += ' (HTTP ' + xhr.status + ')';
+                    setOrderOtpStatus('error', msg);
+                },
+                complete: function () {
+                    $('#verifyOrderOtpBtn').removeClass('loading disabled');
+                }
+            });
+        }
+        function autoVerifyOrderDeliveryOtp() {
+            clearTimeout(orderOtpTypingTimer);
+            var otp = ($('#orderDeliveryOtpCode').val() || '').trim();
+            if (otp.length !== 6) return;
+            orderOtpTypingTimer = setTimeout(function () { verifyOrderDeliveryOtp(); }, 300);
+        }
+        function editOrderDeliveryOtp() {
+            if (!orderPartyId) return;
+            $('#editOrderOtpBtn').addClass('loading disabled');
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:clear_order_delivery_otp_api" %}',
+                dataType: 'json',
+                data: { orderID: orderId },
+                complete: function () {
+                    resetOrderDeliveryOtp();
+                    setOrderOtpStatus('info', 'OTP cleared. Generate a fresh code.');
+                }
+            });
+        }
+        function confirmOrderTransition() {
+            var data = new FormData();
+            var targetStatus = $('#orderTransitionStatus').val();
+            if (targetStatus === 'delivered' && orderPartyId && $('#orderDeliveryOtpVerified').val() !== '1') {
+                setOrderOtpStatus('warn', 'Please verify OTP before marking delivery complete.');
+                return;
+            }
+            showLoading();
+            data.append('orderID', orderId);
+            data.append('status', targetStatus);
+            data.append('note', $('#orderTransitionNote').val());
+            if (targetStatus === 'delivered' && orderPartyId) {
+                data.append('otpCode', ($('#orderDeliveryOtpCode').val() || '').trim());
+            }
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:transition_order_status_api" %}',
+                data: data,
                 contentType: false,
                 cache: false,
                 processData: false,
                 success: function (response) {
                     if (response.message === 'success') {
-                        $('body').toast({class: 'success', message: 'Order Approved.'});
+                        $('body').toast({class:'success', message:'Order status updated.'});
                         location.reload();
+                    } else if (response.message === 'invalid_transition') {
+                        $('body').toast({class:'warning', message:'That transition is not allowed from the current stage.'});
+                    } else if (response.message === 'otp_required') {
+                        setOrderOtpStatus('warn', 'OTP is required before marking delivery complete.');
+                    } else if (response.message === 'otp_invalid') {
+                        setOrderOtpStatus('error', 'Invalid OTP. Please verify again.');
                     } else {
-                        $('body').toast({class: 'error', message: 'An error occurred !'});
+                        $('body').toast({class:'error', message:'An error occurred !'});
                     }
                     hideLoading();
                 },
                 error: function () {
-                    $('body').toast({class: 'error', message: 'An error occurred !'});
+                    $('body').toast({class:'error', message:'An error occurred !'});
                     hideLoading();
                 }
             });
         }
-
+        function openLinkSaleModal() {
+            saleLinkRows = [];
+            $('#linkSaleSearch').val('');
+            $('#linkSaleResults').html('<div class="sale-link-card"><div class="sale-link-helper">Loading sales...</div></div>');
+            $('#linkSaleModal').modal('show');
+            $.ajax({
+                type: 'get',
+                url: '{% url "homeApp:list_order_sale_link_candidates_api" %}',
+                data: {orderID: orderId},
+                success: function (response) {
+                    if (response.message !== 'success') {
+                        $('#linkSaleResults').html('<div class="sale-link-card"><div class="sale-link-helper">Could not load sales.</div></div>');
+                        return;
+                    }
+                    saleLinkRows = response.data || [];
+                    if (!response.data.length) {
+                        $('#linkSaleResults').html('<div class="sale-link-card"><div class="sale-link-helper">No matching sales found for this party.</div></div>');
+                        return;
+                    }
+                    renderSaleLinkResults(saleLinkRows);
+                },
+                error: function () {
+                    $('#linkSaleResults').html('<div class="sale-link-card"><div class="sale-link-helper">Could not load sales.</div></div>');
+                }
+            });
+        }
+        function renderSaleLinkResults(rows) {
+            if (!rows.length) {
+                $('#linkSaleResults').html('<div class="sale-link-card"><div class="sale-link-helper">No sales match the current search.</div></div>');
+                return;
+            }
+            var html = '';
+            rows.forEach(function (row) {
+                var disabled = row.IsLinkedElsewhere || row.IsLinkedToThisOrder ? 'disabled' : '';
+                var helper = row.IsLinkedElsewhere ? 'Already linked to another order' : (row.IsLinkedToThisOrder ? 'Already linked to this order' : 'Ready to link');
+                html += '<div class="sale-link-card">';
+                html += '<div class="sale-link-title">';
+                html += '<div class="sale-link-id">' + row.SalesID + ' · ' + row.InvoiceNumber + '</div>';
+                html += '<span class="ui tiny basic label">' + helper + '</span>';
+                html += '</div>';
+                html += '<div class="sale-link-meta">';
+                html += '<span class="sale-link-meta-chip"><i class="user outline icon"></i>' + row.Party + '</span>';
+                html += '<span class="sale-link-meta-chip"><i class="calendar alternate outline icon"></i>' + row.BuildDate + '</span>';
+                html += '<span class="sale-link-meta-chip"><i class="rupee sign icon"></i>' + Number(row.Amount || 0).toFixed(2) + '</span>';
+                html += '</div>';
+                html += '<div class="sale-link-helper">Created by ' + row.CreatedBy + '</div>';
+                html += '<button type="button" class="ui tiny teal button" ' + disabled + ' onclick="linkSaleToOrder(' + row.ID + ')">Link This Sale</button>';
+                html += '</div>';
+            });
+            $('#linkSaleResults').html(html);
+        }
+        $('#linkSaleSearch').on('input', function () {
+            var query = String($(this).val() || '').trim().toLowerCase();
+            if (!query) {
+                renderSaleLinkResults(saleLinkRows);
+                return;
+            }
+            var filtered = saleLinkRows.filter(function (row) {
+                return [
+                    row.SalesID,
+                    row.InvoiceNumber,
+                    row.Party,
+                    row.BuildDate,
+                    row.CreatedBy,
+                    String(Number(row.Amount || 0).toFixed(2))
+                ].join(' ').toLowerCase().indexOf(query) !== -1;
+            });
+            renderSaleLinkResults(filtered);
+        });
+        function linkSaleToOrder(saleId) {
+            showLoading();
+            var data = new FormData();
+            data.append('orderID', orderId);
+            data.append('saleID', saleId);
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:link_order_to_sale_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class:'success', message:'Sale linked to order.'});
+                        location.reload();
+                    } else {
+                        $('body').toast({class:'error', message:response.error || 'Could not link sale.'});
+                    }
+                    hideLoading();
+                },
+                error: function (xhr) {
+                    $('body').toast({class:'error', message:(xhr.responseJSON && xhr.responseJSON.error) || 'Could not link sale.'});
+                    hideLoading();
+                }
+            });
+        }
         function showAttachment(url) {
             $('#attachmentModalImg').attr('src', url);
             $('#attachmentModal').modal('show');

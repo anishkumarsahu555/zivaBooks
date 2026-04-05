@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import Group
 from django.db import models
 from django.contrib.contenttypes.fields import GenericRelation
@@ -53,11 +54,41 @@ class TenantOwnedModel(TenantAwareModel, SoftDeleteModel):
 class Tenant(TimeStampedModel, AuditedModel):
     name = models.CharField(max_length=200, unique=True)
     slug = models.SlugField(max_length=200, unique=True)
+    legalName = models.CharField(max_length=255, blank=True, null=True)
+    gstNumber = models.CharField(max_length=20, blank=True, null=True)
+    billingAddress = models.TextField(blank=True, null=True)
+    phone = models.CharField(max_length=30, blank=True, null=True)
     isActive = models.BooleanField(default=True)
+    inventoryEnabled = models.BooleanField(
+        default=True,
+        help_text='Enable inventory masters, purchases, stock control, and stock-backed billing for this tenant.',
+    )
+    advancedInvoicingEnabled = models.BooleanField(
+        default=True,
+        help_text='Enable advanced GST/B2B/B2C invoicing rules, buyer tax details, and invoice-series nature control.',
+    )
+    nonGstShadowEnabled = models.BooleanField(
+        default=False,
+        help_text='When disabled, Non-GST inventory and billing flows stay hidden and blocked for this tenant.',
+    )
+    nonGstShadowCodeHash = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text='Hashed 6-digit admin access code used to enable or disable Non-GST shadow mode.',
+    )
     enableAttendanceLocationMaps = models.BooleanField(
         default=False,
         help_text='Enable reverse geolocation and map display on attendance records for this tenant.',
     )
+
+    def set_non_gst_shadow_code(self, raw_code: str) -> None:
+        self.nonGstShadowCodeHash = make_password(str(raw_code or '').strip())
+
+    def check_non_gst_shadow_code(self, raw_code: str) -> bool:
+        if not self.nonGstShadowCodeHash:
+            return False
+        return check_password(str(raw_code or '').strip(), self.nonGstShadowCodeHash)
 
     def __str__(self):
         return self.name
@@ -286,11 +317,15 @@ class Bank(TenantOwnedModel):
 class Party(TenantOwnedModel):
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='parties')
     name = models.CharField(max_length=200, blank=True, null=True)
+    legalName = models.CharField(max_length=255, blank=True, null=True)
     phone = models.CharField(max_length=200, blank=True, null=True)
+    gstNumber = models.CharField(max_length=20, blank=True, null=True)
+    isB2B = models.BooleanField(default=False)
     address = models.TextField(blank=True, null=True)
+    billingAddress = models.TextField(blank=True, null=True)
     openingBalance = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    username = models.CharField(max_length=15, blank=True, null=True, help_text='Legacy field. Use linked Django auth user for login.')
-    password = models.CharField(max_length=15, blank=True, null=True, help_text='Legacy field retained for compatibility. Use Django auth password hashing instead.')
+    username = models.CharField(max_length=50, blank=True, null=True, help_text='Legacy field. Use linked Django auth user for login.')
+    password = models.CharField(max_length=50, blank=True, null=True, help_text='Legacy field retained for compatibility. Use Django auth password hashing instead.')
     userID = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         blank=True,
@@ -459,9 +494,13 @@ class Order(TenantOwnedModel):
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
         SUBMITTED = "submitted", "Submitted"
-        APPROVED = "approved", "Approved"
+        APPROVED = "approved", "Confirmed"
+        PACKED = "packed", "Packed"
+        OUT_FOR_DELIVERY = "out_for_delivery", "Out for Delivery"
+        DELIVERED = "delivered", "Delivered"
         CANCELLED = "cancelled", "Cancelled"
-        FULFILLED = "fulfilled", "Fulfilled"
+        RETURNED = "returned", "Returned"
+        FULFILLED = "fulfilled", "Delivered (Legacy)"
 
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='orders')
     orderNumber = models.CharField(max_length=40, blank=True, null=True, db_index=True)
@@ -481,10 +520,26 @@ class Order(TenantOwnedModel):
     createdBy = models.ForeignKey(
         StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_created'
     )
+    assignedTo = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_assigned'
+    )
+    linkedSales = models.ForeignKey(
+        'Sales', blank=True, null=True, on_delete=models.SET_NULL, related_name='source_orders'
+    )
     approvedOn = models.DateTimeField(blank=True, null=True)
     approvedBy = models.ForeignKey(
         StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_approved'
     )
+    packedOn = models.DateTimeField(blank=True, null=True)
+    outForDeliveryOn = models.DateTimeField(blank=True, null=True)
+    deliveredOn = models.DateTimeField(blank=True, null=True)
+    deliveryOtpVerified = models.BooleanField(default=False)
+    deliveryOtpVerifiedOn = models.DateTimeField(blank=True, null=True)
+    deliveryOtpVerifiedBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='orders_delivery_otp_verified'
+    )
+    cancelledOn = models.DateTimeField(blank=True, null=True)
+    returnedOn = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.orderNumber or f'Order#{self.pk}'
@@ -496,6 +551,7 @@ class Order(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'status'], name='order_tenant_del_status_idx'),
             models.Index(fields=['tenant', 'partyID'], name='order_tenant_party_idx'),
             models.Index(fields=['tenant', 'createdBy'], name='order_tenant_staff_idx'),
+            models.Index(fields=['tenant', 'assignedTo'], name='order_tenant_assigned_idx'),
         ]
         permissions = [
             ('can_approve_orders', 'Can approve orders'),
@@ -525,7 +581,28 @@ class OrderAttachment(TenantOwnedModel):
         ]
 
 
+class OrderStatusEvent(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='order_status_events')
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='statusEvents')
+    fromStatus = models.CharField(max_length=30, choices=Order.Status.choices, blank=True, null=True)
+    toStatus = models.CharField(max_length=30, choices=Order.Status.choices)
+    note = models.CharField(max_length=500, blank=True, null=True)
+    actor = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='order_status_events'
+    )
+
+    class Meta:
+        verbose_name_plural = 'Order Status Events'
+        indexes = [
+            models.Index(fields=['tenant', 'order', 'datetime'], name='ordstat_t_ord_dt_idx'),
+        ]
+
+
 class Sales(TenantOwnedModel):
+    class InvoiceKind(models.TextChoices):
+        B2C = 'b2c', 'B2C'
+        B2B = 'b2b', 'B2B'
+
     class Mode(models.TextChoices):
         CASH = 'Cash', 'Cash'
         CREDIT = 'Credit', 'Credit'
@@ -534,10 +611,19 @@ class Sales(TenantOwnedModel):
 
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sales')
     partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL)
+    salesID = models.CharField(max_length=40, blank=True, null=True, db_index=True)
     paymentID = models.CharField(max_length=200, blank=True, null=True)
     invoiceSeries = models.ForeignKey('InvoiceSeries', blank=True, null=True, on_delete=models.SET_NULL, related_name='sales')
     invoiceSequenceNumber = models.PositiveIntegerField(blank=True, null=True)
     invoiceNumber = models.CharField(max_length=200, default='Cash')
+    invoiceKind = models.CharField(max_length=10, choices=InvoiceKind.choices, default=InvoiceKind.B2C)
+    buyerLegalName = models.CharField(max_length=255, blank=True, null=True)
+    buyerGstNumber = models.CharField(max_length=20, blank=True, null=True)
+    buyerBillingAddress = models.TextField(blank=True, null=True)
+    placeOfSupply = models.CharField(max_length=120, blank=True, null=True)
+    taxableAmount = models.FloatField(default=0.0)
+    gstAmount = models.FloatField(default=0.0)
+    roundOffAmount = models.FloatField(default=0.0)
     modeOfPayment = models.CharField(max_length=50, choices=Mode.choices, default=Mode.CASH)
     amount = models.FloatField(default=0.0)
     mixCashAmount = models.FloatField(default=0.0)
@@ -560,6 +646,7 @@ class Sales(TenantOwnedModel):
         indexes = [
             models.Index(fields=['tenant', 'isDeleted', 'buildDate'], name='sales_tenant_del_build_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'createdBy'], name='sales_tenant_del_staff_idx'),
+            models.Index(fields=['tenant', 'salesID'], name='sales_tenant_salesid_idx'),
             models.Index(fields=['tenant', 'paymentID'], name='sales_tenant_payid_idx'),
         ]
         permissions = [
@@ -569,19 +656,413 @@ class Sales(TenantOwnedModel):
         ]
 
 
+class InventoryItem(TenantOwnedModel):
+    class StockBucket(models.TextChoices):
+        GST = 'gst', 'GST'
+        NON_GST = 'non_gst', 'Non GST'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_items')
+    name = models.CharField(max_length=200)
+    sku = models.CharField(max_length=80, blank=True, null=True)
+    barcode = models.CharField(max_length=80, blank=True, null=True)
+    category = models.ForeignKey(
+        'InventoryCategory',
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='items',
+    )
+    unit = models.ForeignKey(
+        'InventoryUnit',
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='items',
+    )
+    taxProfile = models.ForeignKey(
+        'InventoryTaxProfile',
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='items',
+    )
+    categoryName = models.CharField(max_length=120, blank=True, null=True)
+    brandName = models.CharField(max_length=120, blank=True, null=True)
+    unitName = models.CharField(max_length=40, blank=True, null=True, default='pcs')
+    hsnCode = models.CharField(max_length=40, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
+    defaultStockBucket = models.CharField(max_length=20, choices=StockBucket.choices, default=StockBucket.GST)
+    gstRate = models.FloatField(default=0.0)
+    defaultPurchasePrice = models.FloatField(default=0.0)
+    defaultSalesPrice = models.FloatField(default=0.0)
+    mrp = models.FloatField(default=0.0)
+    minimumStockLevel = models.FloatField(default=0.0)
+    reorderLevel = models.FloatField(default=0.0)
+    isActive = models.BooleanField(default=True)
+    isSaleBlocked = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name_plural = 'Inventory Items'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'name'], name='invitem_tenant_del_name_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'sku'], name='invitem_tenant_del_sku_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'barcode'], name='invitem_tenant_barcode_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'sku'],
+                condition=Q(isDeleted=False) & ~Q(sku__isnull=True),
+                name='uniq_invsku_tenant',
+            ),
+        ]
+        permissions = [
+            ('can_manage_inventory', 'Can manage inventory'),
+            ('can_view_inventory_reports', 'Can view inventory reports'),
+        ]
+
+
+class InventoryCategory(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_categories')
+    name = models.CharField(max_length=120)
+    code = models.CharField(max_length=40, blank=True, null=True)
+    description = models.CharField(max_length=300, blank=True, null=True)
+    isActive = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name_plural = 'Inventory Categories'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'name'], name='invcat_tenant_name_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'name'],
+                condition=Q(isDeleted=False),
+                name='uniq_invcat_name_tenant',
+            ),
+        ]
+
+
+class InventoryUnit(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_units')
+    name = models.CharField(max_length=120)
+    symbol = models.CharField(max_length=20)
+    allowsDecimal = models.BooleanField(default=False)
+    description = models.CharField(max_length=300, blank=True, null=True)
+    isActive = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.symbol or self.name
+
+    class Meta:
+        verbose_name_plural = 'Inventory Units'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'name'], name='invunit_tenant_name_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'symbol'], name='invunit_tenant_symbol_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'name'],
+                condition=Q(isDeleted=False),
+                name='uniq_invunit_name_tenant',
+            ),
+            models.UniqueConstraint(
+                fields=['tenant', 'symbol'],
+                condition=Q(isDeleted=False),
+                name='uniq_invunit_symbol_tenant',
+            ),
+        ]
+
+
+class InventoryTaxProfile(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_tax_profiles')
+    name = models.CharField(max_length=120)
+    hsnCode = models.CharField(max_length=40)
+    gstRate = models.FloatField(default=0.0)
+    cessRate = models.FloatField(default=0.0)
+    description = models.CharField(max_length=300, blank=True, null=True)
+    isActive = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name_plural = 'Inventory Tax Profiles'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'name'], name='invtax_tenant_name_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'hsnCode'], name='invtax_tenant_hsn_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'name'],
+                condition=Q(isDeleted=False),
+                name='uniq_invtax_name_tenant',
+            ),
+        ]
+
+
+class InventoryOpeningVoucher(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_opening_vouchers')
+    voucherNumber = models.CharField(max_length=40, blank=True, null=True)
+    entryDate = models.DateField(blank=True, null=True)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+    createdBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='inventory_opening_vouchers_created'
+    )
+
+    def __str__(self):
+        return self.voucherNumber or f'Opening#{self.pk}'
+
+    class Meta:
+        verbose_name_plural = 'Inventory Opening Vouchers'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'entryDate'], name='invopen_tenant_date_idx'),
+        ]
+
+
+class InventoryWarehouse(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_warehouses')
+    name = models.CharField(max_length=120)
+    code = models.CharField(max_length=40, blank=True, null=True)
+    address = models.CharField(max_length=300, blank=True, null=True)
+    isDefault = models.BooleanField(default=False)
+    isActive = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name_plural = 'Inventory Warehouses'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'name'], name='invwh_tenant_del_name_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'isDefault'], name='invwh_tenant_default_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'code'],
+                condition=Q(isDeleted=False) & ~Q(code__isnull=True),
+                name='uniq_invwh_code_tenant',
+            ),
+        ]
+
+
+class InventoryOpeningLine(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_opening_lines')
+    voucher = models.ForeignKey(InventoryOpeningVoucher, on_delete=models.CASCADE, related_name='lines')
+    warehouse = models.ForeignKey(
+        InventoryWarehouse,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='opening_lines',
+    )
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='opening_lines')
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantity = models.FloatField(default=0.0)
+    unitCost = models.FloatField(default=0.0)
+    lineTotal = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'Inventory Opening Lines'
+        indexes = [
+            models.Index(fields=['tenant', 'voucher'], name='invopenline_tenant_voucher_idx'),
+            models.Index(fields=['tenant', 'item', 'stockBucket'], name='invopenline_tenant_item_idx'),
+        ]
+
+
+class InventoryStock(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_stocks')
+    item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='stock_rows')
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantityOnHand = models.FloatField(default=0.0)
+
+    def __str__(self):
+        return f'{self.item} [{self.get_stockBucket_display()}] = {self.quantityOnHand}'
+
+    class Meta:
+        verbose_name_plural = 'Inventory Stock'
+        indexes = [
+            models.Index(fields=['tenant', 'item', 'stockBucket'], name='invstock_t_item_bkt_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['tenant', 'item', 'stockBucket'], name='uniq_invstock_bucket'),
+        ]
+
+
+class InventoryLedgerEntry(TenantOwnedModel):
+    class SourceType(models.TextChoices):
+        OPENING = 'opening', 'Opening Stock'
+        PURCHASE = 'purchase', 'Purchase'
+        SALES = 'sales', 'Sales'
+        CASH_COUNTER = 'cash_counter', 'Cash Counter'
+        ADJUSTMENT = 'adjustment', 'Stock Adjustment'
+        TRANSFER_OUT = 'transfer_out', 'Stock Transfer Out'
+        TRANSFER_IN = 'transfer_in', 'Stock Transfer In'
+        PURCHASE_RETURN = 'purchase_return', 'Purchase Return'
+        SALES_RETURN = 'sales_return', 'Sales Return'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_ledger_entries')
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='ledger_entries')
+    warehouse = models.ForeignKey(
+        InventoryWarehouse,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='ledger_entries',
+    )
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    sourceType = models.CharField(max_length=30, choices=SourceType.choices)
+    quantityDelta = models.FloatField(default=0.0)
+    unitRate = models.FloatField(default=0.0)
+    totalValue = models.FloatField(default=0.0)
+    entryDate = models.DateField(blank=True, null=True)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+    referenceNumber = models.CharField(max_length=120, blank=True, null=True)
+    source_content_type = models.ForeignKey(
+        ContentType,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='inventory_ledger_entries',
+    )
+    source_object_id = models.PositiveBigIntegerField(blank=True, null=True)
+    source_object = GenericForeignKey('source_content_type', 'source_object_id')
+
+    class Meta:
+        verbose_name_plural = 'Inventory Ledger Entries'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'entryDate'], name='invled_tenant_date_idx'),
+            models.Index(fields=['tenant', 'item', 'stockBucket'], name='invled_tenant_item_bucket_idx'),
+            models.Index(fields=['tenant', 'warehouse', 'entryDate'], name='invled_tenant_wh_date_idx'),
+            models.Index(fields=['source_content_type', 'source_object_id'], name='invled_source_idx'),
+        ]
+
+
+class PurchaseInvoice(TenantOwnedModel):
+    class GstTreatment(models.TextChoices):
+        GST = 'gst', 'GST Invoice'
+        NON_GST = 'non_gst', 'Non GST Invoice'
+        NON_GST_CLAIMABLE = 'non_gst_claimable', 'Non GST Claimable'
+
+    class ClaimStatus(models.TextChoices):
+        NOT_APPLICABLE = 'not_applicable', 'Not Applicable'
+        PENDING = 'pending', 'Pending'
+        CLAIMED = 'claimed', 'Claimed'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='purchase_invoices')
+    partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_invoices')
+    purchaseID = models.CharField(max_length=40, blank=True, null=True, db_index=True)
+    invoiceNumber = models.CharField(max_length=200)
+    buildDate = models.DateField(blank=True, null=True)
+    gstTreatment = models.CharField(max_length=30, choices=GstTreatment.choices, default=GstTreatment.GST)
+    claimStatus = models.CharField(max_length=20, choices=ClaimStatus.choices, default=ClaimStatus.NOT_APPLICABLE)
+    subtotalAmount = models.FloatField(default=0.0)
+    gstAmount = models.FloatField(default=0.0)
+    totalAmount = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+    createdBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_invoices_created'
+    )
+
+    def __str__(self):
+        return self.invoiceNumber or f'Purchase#{self.pk}'
+
+    class Meta:
+        verbose_name_plural = 'Purchase Invoices'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'buildDate'], name='purchase_tenant_del_build_idx'),
+            models.Index(fields=['tenant', 'partyID'], name='purchase_tenant_party_idx'),
+            models.Index(fields=['tenant', 'purchaseID'], name='purchase_tenant_pid_idx'),
+            models.Index(fields=['tenant', 'invoiceNumber'], name='purchase_tenant_inv_idx'),
+        ]
+
+
+class PurchaseInvoiceRevision(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='purchase_invoice_revisions')
+    purchaseInvoice = models.ForeignKey(PurchaseInvoice, on_delete=models.CASCADE, related_name='revisions')
+    previousGstTreatment = models.CharField(max_length=30, choices=PurchaseInvoice.GstTreatment.choices, blank=True, null=True)
+    newGstTreatment = models.CharField(max_length=30, choices=PurchaseInvoice.GstTreatment.choices)
+    previousClaimStatus = models.CharField(max_length=20, choices=PurchaseInvoice.ClaimStatus.choices, blank=True, null=True)
+    newClaimStatus = models.CharField(max_length=20, choices=PurchaseInvoice.ClaimStatus.choices)
+    reason = models.CharField(max_length=500, blank=True, null=True)
+    snapshot = models.JSONField(default=dict, blank=True)
+    changedBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_invoice_revisions_changed'
+    )
+
+    class Meta:
+        verbose_name_plural = 'Purchase Invoice Revisions'
+        indexes = [
+            models.Index(fields=['tenant', 'purchaseInvoice', 'datetime'], name='pinvrev_tenant_purchase_dt_idx'),
+        ]
+
+
+class PurchaseLine(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='purchase_lines')
+    purchaseInvoice = models.ForeignKey(PurchaseInvoice, on_delete=models.CASCADE, related_name='lines')
+    warehouse = models.ForeignKey(
+        InventoryWarehouse,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='purchase_lines',
+    )
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='purchase_lines')
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantity = models.FloatField(default=0.0)
+    unitCost = models.FloatField(default=0.0)
+    taxableAmount = models.FloatField(default=0.0)
+    gstRate = models.FloatField(default=0.0)
+    gstAmount = models.FloatField(default=0.0)
+    lineTotal = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'Purchase Lines'
+        indexes = [
+            models.Index(fields=['tenant', 'purchaseInvoice'], name='pline_tenant_purchase_idx'),
+            models.Index(fields=['tenant', 'item', 'stockBucket'], name='pline_tenant_item_bucket_idx'),
+        ]
+
+
 class CashCounter(TenantOwnedModel):
+    class InvoiceKind(models.TextChoices):
+        B2C = 'b2c', 'B2C'
+        B2B = 'b2b', 'B2B'
+
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='cash_counters')
     partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL)
     counterID = models.CharField(max_length=200, blank=True, null=True)
     invoiceSeries = models.ForeignKey('InvoiceSeries', blank=True, null=True, on_delete=models.SET_NULL, related_name='cash_counters')
     invoiceSequenceNumber = models.PositiveIntegerField(blank=True, null=True)
     invoiceNumber = models.CharField(max_length=200, blank=True, null=True)
+    invoiceKind = models.CharField(max_length=10, choices=InvoiceKind.choices, default=InvoiceKind.B2C)
+    buyerLegalName = models.CharField(max_length=255, blank=True, null=True)
+    buyerGstNumber = models.CharField(max_length=20, blank=True, null=True)
+    buyerBillingAddress = models.TextField(blank=True, null=True)
+    placeOfSupply = models.CharField(max_length=120, blank=True, null=True)
+    taxableAmount = models.FloatField(default=0.0)
+    gstAmount = models.FloatField(default=0.0)
+    roundOffAmount = models.FloatField(default=0.0)
     mode = models.CharField(max_length=200, blank=True, null=True)
     amount = models.FloatField(default=0.0)
     mixCashAmount = models.FloatField(default=0.0)
     mixCardAmount = models.FloatField(default=0.0)
     expenseType = models.CharField(max_length=500, blank=True, null=True, default='')
     bankID = models.ForeignKey(Bank, blank=True, null=True, on_delete=models.SET_NULL)
+    linkedSalesReturnVoucher = models.ForeignKey(
+        'SalesReturnVoucher',
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='cash_counter_entries',
+    )
     remark = models.CharField(max_length=500, blank=True, null=True)
     createdBy = models.ForeignKey(StaffUser, blank=True, null=True, on_delete=models.SET_NULL,
                                   related_name='createdByStaffCashCounter')
@@ -600,6 +1081,216 @@ class CashCounter(TenantOwnedModel):
         permissions = [
             ('can_manage_cash_counter', 'Can manage cash counter'),
             ('can_view_cash_counter_reports', 'Can view cash counter reports'),
+        ]
+
+
+class SalesLine(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sales_lines')
+    sales = models.ForeignKey(Sales, on_delete=models.CASCADE, related_name='lines')
+    warehouse = models.ForeignKey(
+        InventoryWarehouse,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='sales_lines',
+    )
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='sales_lines')
+    hsnCode = models.CharField(max_length=40, blank=True, null=True)
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantity = models.FloatField(default=0.0)
+    unitPrice = models.FloatField(default=0.0)
+    discountPercent = models.FloatField(default=0.0)
+    taxableAmount = models.FloatField(default=0.0)
+    gstRate = models.FloatField(default=0.0)
+    gstAmount = models.FloatField(default=0.0)
+    lineTotal = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'Sales Lines'
+        indexes = [
+            models.Index(fields=['tenant', 'sales'], name='sline_tenant_sales_idx'),
+            models.Index(fields=['tenant', 'item', 'stockBucket'], name='sline_tenant_item_bucket_idx'),
+        ]
+
+
+class CashCounterLine(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='cash_counter_lines')
+    cashCounter = models.ForeignKey(CashCounter, on_delete=models.CASCADE, related_name='lines')
+    warehouse = models.ForeignKey(
+        InventoryWarehouse,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='cash_counter_lines',
+    )
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='cash_counter_lines')
+    hsnCode = models.CharField(max_length=40, blank=True, null=True)
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantity = models.FloatField(default=0.0)
+    unitPrice = models.FloatField(default=0.0)
+    discountPercent = models.FloatField(default=0.0)
+    taxableAmount = models.FloatField(default=0.0)
+    gstRate = models.FloatField(default=0.0)
+    gstAmount = models.FloatField(default=0.0)
+    lineTotal = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'Cash Counter Lines'
+        indexes = [
+            models.Index(fields=['tenant', 'cashCounter'], name='ccline_tenant_counter_idx'),
+            models.Index(fields=['tenant', 'item', 'stockBucket'], name='ccline_tenant_item_bucket_idx'),
+        ]
+
+
+class InventoryAdjustmentVoucher(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_adjustment_vouchers')
+    voucherNumber = models.CharField(max_length=40, blank=True, null=True)
+    entryDate = models.DateField(blank=True, null=True)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+    createdBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='inventory_adjustment_vouchers_created'
+    )
+
+    class Meta:
+        verbose_name_plural = 'Inventory Adjustment Vouchers'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'entryDate'], name='invadj_tenant_date_idx'),
+        ]
+
+
+class InventoryAdjustmentLine(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_adjustment_lines')
+    voucher = models.ForeignKey(InventoryAdjustmentVoucher, on_delete=models.CASCADE, related_name='lines')
+    warehouse = models.ForeignKey(InventoryWarehouse, blank=True, null=True, on_delete=models.SET_NULL, related_name='adjustment_lines')
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='adjustment_lines')
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantityDelta = models.FloatField(default=0.0)
+    unitCost = models.FloatField(default=0.0)
+    lineTotal = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'Inventory Adjustment Lines'
+        indexes = [
+            models.Index(fields=['tenant', 'voucher'], name='invadjline_tenant_voucher_idx'),
+        ]
+
+
+class InventoryTransferVoucher(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_transfer_vouchers')
+    voucherNumber = models.CharField(max_length=40, blank=True, null=True)
+    entryDate = models.DateField(blank=True, null=True)
+    fromWarehouse = models.ForeignKey(InventoryWarehouse, blank=True, null=True, on_delete=models.SET_NULL, related_name='transfer_vouchers_from')
+    toWarehouse = models.ForeignKey(InventoryWarehouse, blank=True, null=True, on_delete=models.SET_NULL, related_name='transfer_vouchers_to')
+    remark = models.CharField(max_length=500, blank=True, null=True)
+    createdBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='inventory_transfer_vouchers_created'
+    )
+
+    class Meta:
+        verbose_name_plural = 'Inventory Transfer Vouchers'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'entryDate'], name='invtrn_tenant_date_idx'),
+        ]
+
+
+class InventoryTransferLine(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_transfer_lines')
+    voucher = models.ForeignKey(InventoryTransferVoucher, on_delete=models.CASCADE, related_name='lines')
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='transfer_lines')
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantity = models.FloatField(default=0.0)
+    unitCost = models.FloatField(default=0.0)
+    lineTotal = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'Inventory Transfer Lines'
+        indexes = [
+            models.Index(fields=['tenant', 'voucher'], name='invtrnline_tenant_voucher_idx'),
+        ]
+
+
+class PurchaseReturnVoucher(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='purchase_return_vouchers')
+    voucherNumber = models.CharField(max_length=40, blank=True, null=True)
+    entryDate = models.DateField(blank=True, null=True)
+    partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_return_vouchers')
+    purchaseInvoice = models.ForeignKey(PurchaseInvoice, blank=True, null=True, on_delete=models.SET_NULL, related_name='return_vouchers')
+    totalAmount = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+    createdBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_return_vouchers_created'
+    )
+
+    class Meta:
+        verbose_name_plural = 'Purchase Return Vouchers'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'entryDate'], name='prtn_tenant_date_idx'),
+        ]
+
+
+class PurchaseReturnLine(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='purchase_return_lines')
+    voucher = models.ForeignKey(PurchaseReturnVoucher, on_delete=models.CASCADE, related_name='lines')
+    warehouse = models.ForeignKey(InventoryWarehouse, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_return_lines')
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='purchase_return_lines')
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantity = models.FloatField(default=0.0)
+    unitCost = models.FloatField(default=0.0)
+    lineTotal = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'Purchase Return Lines'
+        indexes = [
+            models.Index(fields=['tenant', 'voucher'], name='prtnline_tenant_voucher_idx'),
+        ]
+
+
+class SalesReturnVoucher(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sales_return_vouchers')
+    voucherNumber = models.CharField(max_length=40, blank=True, null=True)
+    entryDate = models.DateField(blank=True, null=True)
+    partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL, related_name='sales_return_vouchers')
+    sales = models.ForeignKey(Sales, blank=True, null=True, on_delete=models.SET_NULL, related_name='return_vouchers')
+    cashCounter = models.ForeignKey(
+        CashCounter,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='return_vouchers',
+    )
+    totalAmount = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+    createdBy = models.ForeignKey(
+        StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='sales_return_vouchers_created'
+    )
+
+    class Meta:
+        verbose_name_plural = 'Sales Return Vouchers'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'entryDate'], name='srtn_tenant_date_idx'),
+        ]
+
+
+class SalesReturnLine(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sales_return_lines')
+    voucher = models.ForeignKey(SalesReturnVoucher, on_delete=models.CASCADE, related_name='lines')
+    warehouse = models.ForeignKey(InventoryWarehouse, blank=True, null=True, on_delete=models.SET_NULL, related_name='sales_return_lines')
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='sales_return_lines')
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantity = models.FloatField(default=0.0)
+    unitPrice = models.FloatField(default=0.0)
+    lineTotal = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'Sales Return Lines'
+        indexes = [
+            models.Index(fields=['tenant', 'voucher'], name='srtnline_tenant_voucher_idx'),
         ]
 
 
@@ -640,10 +1331,49 @@ class CollectionCashCounter(TenantOwnedModel):
         ]
 
 
+class TenantSequence(TenantAwareModel):
+    class Scope(models.TextChoices):
+        COLLECTION_PAYMENT = 'collection_payment', 'Collection Payment'
+        SALES = 'sales', 'Sales'
+        SALES_PAYMENT = 'sales_payment', 'Sales Payment'
+        ORDER = 'order', 'Order'
+        PURCHASE = 'purchase', 'Purchase'
+        CASH_COUNTER = 'cash_counter', 'Cash Counter'
+        CASH_COUNTER_COLLECTION = 'cash_counter_collection', 'Cash Counter Collection'
+        INVENTORY_OPENING = 'inventory_opening', 'Inventory Opening'
+        INVENTORY_ADJUSTMENT = 'inventory_adjustment', 'Inventory Adjustment'
+        INVENTORY_TRANSFER = 'inventory_transfer', 'Inventory Transfer'
+        PURCHASE_RETURN = 'purchase_return', 'Purchase Return'
+        SALES_RETURN = 'sales_return', 'Sales Return'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sequences')
+    scope = models.CharField(max_length=40, choices=Scope.choices)
+    prefix = models.CharField(max_length=20)
+    paddingLength = models.PositiveIntegerField(default=6)
+    nextNumber = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f'{self.tenant} - {self.prefix}'
+
+    class Meta:
+        verbose_name_plural = 'Tenant Sequences'
+        constraints = [
+            models.UniqueConstraint(fields=['tenant', 'scope'], name='unique_tenant_sequence_scope'),
+        ]
+        indexes = [
+            models.Index(fields=['tenant', 'scope'], name='tenantseq_tenant_scope_idx'),
+        ]
+
+
 class InvoiceSeries(TenantOwnedModel):
     class Module(models.TextChoices):
         SALES = 'sales', 'Sales'
         CASH_COUNTER = 'cash_counter', 'Cash Counter'
+
+    class InvoiceNature(models.TextChoices):
+        MIXED = 'mixed', 'Mixed / Manual'
+        B2B = 'b2b', 'B2B'
+        B2C = 'b2c', 'B2C'
 
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='invoice_series')
     module = models.CharField(max_length=40, choices=Module.choices)
@@ -655,6 +1385,8 @@ class InvoiceSeries(TenantOwnedModel):
     paddingLength = models.PositiveIntegerField(default=4)
     isActive = models.BooleanField(default=True)
     isDefault = models.BooleanField(default=False)
+    invoiceNature = models.CharField(max_length=10, choices=InvoiceNature.choices, default=InvoiceNature.MIXED)
+    lockInvoiceNature = models.BooleanField(default=False)
 
     def __str__(self):
         return f'{self.get_module_display()} - {self.seriesCode}'
@@ -900,4 +1632,20 @@ class JournalLine(TenantOwnedModel):
             models.Index(fields=['tenant', 'isDeleted', 'journalEntry', 'lineNo'], name='jrnline_tenant_entry_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'accountType'], name='jrnline_tenant_account_idx'),
             models.Index(fields=['tenant', 'isDeleted', 'party'], name='jrnline_tenant_party_idx'),
+        ]
+
+
+class UserTwoFactorAuth(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='two_factor_auth')
+    secret = models.CharField(max_length=64)
+    isEnabled = models.BooleanField(default=False)
+    confirmedAt = models.DateTimeField(blank=True, null=True)
+    lastUsedStep = models.BigIntegerField(blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'User Two Factor Auth'
+        indexes = [
+            models.Index(fields=['tenant', 'isEnabled'], name='user2fa_tenant_enabled_idx'),
+            models.Index(fields=['user', 'isEnabled'], name='user2fa_user_enabled_idx'),
         ]

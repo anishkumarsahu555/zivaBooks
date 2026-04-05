@@ -277,6 +277,51 @@
             color: #ffffff !important;
         }
 
+        html[data-theme="dark"] .detail-card {
+            background: var(--app-surface);
+            border-color: var(--app-line);
+            box-shadow: var(--app-shadow);
+        }
+
+        html[data-theme="dark"] .detail-card-header {
+            background: linear-gradient(180deg, #162338, #111b2e);
+            border-bottom-color: var(--app-line);
+        }
+
+        html[data-theme="dark"] .detail-card-title,
+        html[data-theme="dark"] .module-title,
+        html[data-theme="dark"] .meta-value,
+        html[data-theme="dark"] .member-cell {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .meta-item,
+        html[data-theme="dark"] .member-table,
+        html[data-theme="dark"] .member-table-row,
+        html[data-theme="dark"] .module-block,
+        html[data-theme="dark"] .empty-state {
+            background: var(--app-surface-soft);
+            border-color: var(--app-line);
+        }
+
+        html[data-theme="dark"] .meta-label,
+        html[data-theme="dark"] .member-table-head,
+        html[data-theme="dark"] .group-topbar-link,
+        html[data-theme="dark"] .empty-state {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .module-count {
+            background: rgba(37, 99, 235, 0.18);
+            color: #93c5fd;
+        }
+
+        html[data-theme="dark"] .permission-chip {
+            background: rgba(22, 35, 56, 0.94);
+            border-color: var(--app-line);
+            color: var(--app-text);
+        }
+
         @media (max-width: 991px) {
             .group-grid {
                 grid-template-columns: 1fr;

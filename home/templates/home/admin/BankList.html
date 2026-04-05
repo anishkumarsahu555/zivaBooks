@@ -257,6 +257,52 @@
                 text-align: right !important;
             }
         }
+
+        html[data-theme="dark"] .bb-segment.ui.segment,
+        html[data-theme="dark"] #myModalUser .content,
+        html[data-theme="dark"] #userModal .content {
+            background: var(--app-surface) !important;
+            border-color: var(--app-line) !important;
+            color: var(--app-text) !important;
+            box-shadow: var(--app-shadow) !important;
+        }
+
+        html[data-theme="dark"] .bb-title,
+        html[data-theme="dark"] #myModalUser .header,
+        html[data-theme="dark"] #userModal .header {
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .bb-sub,
+        html[data-theme="dark"] .bb-acct,
+        html[data-theme="dark"] .bb-acct-inline,
+        html[data-theme="dark"] #BankBalanceTable thead th {
+            color: var(--app-muted) !important;
+        }
+
+        html[data-theme="dark"] .bb-total-chip,
+        html[data-theme="dark"] .bb-balance {
+            background: rgba(16, 185, 129, 0.14);
+            border-color: rgba(16, 185, 129, 0.22);
+            color: #99f6e4;
+        }
+
+        html[data-theme="dark"] #BankBalanceTable tbody tr {
+            border-bottom-color: var(--app-line);
+        }
+
+        html[data-theme="dark"] #BankBalanceTable tbody td {
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] #BankBalanceTable tbody tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        html[data-theme="dark"] #myModalUser .actions,
+        html[data-theme="dark"] #userModal .actions {
+            background: transparent !important;
+        }
     </style>
 
     <div class="ui right aligned basic  grid">
@@ -306,6 +352,10 @@
                 <div class="row" style="padding-left: 5px; padding-right: 5px">
                     <div class="wide">
 
+                        <h4 class="ui horizontal left aligned divider header">
+                            <i class="left align icon"></i>
+                            Bank List
+                        </h4>
                         <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="UserTable"
                                style="margin-top: 5px;width: 100%">
                             <thead>

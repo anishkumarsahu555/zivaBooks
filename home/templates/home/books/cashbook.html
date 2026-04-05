@@ -209,6 +209,114 @@
         input[type=search] {
             width: 100px !important;
         }
+
+        html[data-theme="dark"] .books-header-sub {
+            color: rgba(226, 232, 240, 0.68);
+        }
+
+        html[data-theme="dark"] .books-pill {
+            background: rgba(20, 184, 166, 0.16);
+            border-color: rgba(45, 212, 191, 0.28);
+            color: #99f6e4;
+        }
+
+        html[data-theme="dark"] .books-kpi {
+            background: linear-gradient(135deg, rgba(17, 24, 39, 0.96), rgba(15, 23, 42, 0.96));
+            border-color: rgba(59, 130, 246, 0.16);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        html[data-theme="dark"] .books-kpi::after {
+            background: radial-gradient(circle at center, rgba(56, 189, 248, 0.18), transparent 60%);
+        }
+
+        html[data-theme="dark"] .books-kpi-label {
+            color: rgba(191, 219, 254, 0.72);
+        }
+
+        html[data-theme="dark"] .books-kpi-value {
+            color: #f8fafc;
+        }
+
+        html[data-theme="dark"] .books-kpi-icon {
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+        }
+
+        html[data-theme="dark"] .books-kpi-opening .books-kpi-icon {
+            background: rgba(148, 163, 184, 0.16);
+            color: #cbd5e1;
+        }
+
+        html[data-theme="dark"] .books-kpi-in .books-kpi-icon {
+            background: rgba(34, 197, 94, 0.18);
+            color: #86efac;
+        }
+
+        html[data-theme="dark"] .books-kpi-out .books-kpi-icon {
+            background: rgba(244, 63, 94, 0.18);
+            color: #fda4af;
+        }
+
+        html[data-theme="dark"] .books-kpi-closing .books-kpi-icon {
+            background: rgba(59, 130, 246, 0.18);
+            color: #93c5fd;
+        }
+
+        html[data-theme="dark"] .books-content > .ui.segment,
+        html[data-theme="dark"] #manualModal .content,
+        html[data-theme="dark"] #editModal .content,
+        html[data-theme="dark"] #transferModal .content {
+            background: #0f172a !important;
+        }
+
+        html[data-theme="dark"] #manualModal .header,
+        html[data-theme="dark"] #editModal .header,
+        html[data-theme="dark"] #transferModal .header {
+            background: #111827 !important;
+            color: #f8fafc !important;
+            border-bottom-color: rgba(148, 163, 184, 0.18) !important;
+        }
+
+        html[data-theme="dark"] #manualModal .actions,
+        html[data-theme="dark"] #editModal .actions,
+        html[data-theme="dark"] #transferModal .actions {
+            background: #0b1220 !important;
+            border-top-color: rgba(148, 163, 184, 0.16) !important;
+        }
+
+        html[data-theme="dark"] #transferModal .ui.grey.message {
+            background: rgba(30, 41, 59, 0.95) !important;
+            border-color: rgba(71, 85, 105, 0.4) !important;
+            color: #cbd5e1 !important;
+        }
+
+        html[data-theme="dark"] .books-ledger-table thead th {
+            background: #111827 !important;
+            color: #e2e8f0 !important;
+            border-color: rgba(71, 85, 105, 0.38) !important;
+        }
+
+        html[data-theme="dark"] .books-ledger-table tbody td {
+            border-color: rgba(51, 65, 85, 0.55) !important;
+        }
+
+        html[data-theme="dark"] .books-ledger-table tbody tr:hover td {
+            background: rgba(30, 41, 59, 0.72) !important;
+        }
+
+        html[data-theme="dark"] .books-ledger-table .ui.tiny.label {
+            background: rgba(30, 41, 59, 0.96) !important;
+            border: 1px solid rgba(71, 85, 105, 0.5) !important;
+            color: #cbd5e1 !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] #UserTable_length,
+        html[data-theme="dark"] #UserTable_filter,
+        html[data-theme="dark"] .dt-buttons {
+            color: #cbd5e1;
+        }
     </style>
 {% endblock %}
 
@@ -336,6 +444,10 @@
                         </div>
                     </div>
 
+                    <h4 class="ui horizontal left aligned divider header">
+                        <i class="left align icon"></i>
+                        Cash Book Entries
+                    </h4>
                     <table class="ui unstackable tiny sortable celled very nowrap very compact table books-ledger-table" id="UserTable"
                            style="margin-top: 5px;width: 100%">
                         <thead>

@@ -47,6 +47,116 @@
         input[type=search] {
             width: 100px !important;
         }
+
+        #myModalUser,
+        #userModal {
+            width: min(860px, 94vw);
+        }
+
+        .party-modal-form .ui.segment {
+            border-radius: .75rem;
+            box-shadow: none;
+            border: 1px solid rgba(34, 36, 38, .08);
+        }
+
+        .party-modal-form .ui.segment + .ui.segment {
+            margin-top: 1rem;
+        }
+
+        .party-modal-form .section-help {
+            color: rgba(0, 0, 0, .55);
+            font-size: .9rem;
+            margin: -.4rem 0 1rem;
+        }
+
+        .party-modal-form .inline-toggle-row {
+            display: flex;
+            align-items: end;
+            min-height: 100%;
+            padding-bottom: .45rem;
+        }
+
+        .party-modal-form .inline-toggle-row .ui.checkbox {
+            margin-top: 1.6rem;
+        }
+
+        #myModalUser .content,
+        #userModal .content {
+            max-height: calc(100vh - 8rem);
+            overflow-y: auto;
+        }
+
+        #myModalUser .actions,
+        #userModal .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: .75rem;
+            flex-wrap: wrap;
+        }
+
+        @media only screen and (max-width: 767px) {
+            #UserTable_filter {
+                width: 100%;
+                float: none;
+            }
+
+            .dt-buttons,
+            #UserTable_length {
+                position: static;
+                left: auto;
+            }
+
+            #myModalUser,
+            #userModal {
+                width: 96vw !important;
+                margin: 1rem auto !important;
+            }
+
+            .party-modal-form .ui.segment {
+                padding: 1rem !important;
+            }
+
+            .party-modal-form .inline-toggle-row {
+                align-items: flex-start;
+                padding-bottom: 0;
+            }
+
+            .party-modal-form .inline-toggle-row .ui.checkbox {
+                margin-top: .25rem;
+            }
+        }
+
+        html[data-theme="dark"] .party-modal-form .ui.segment,
+        html[data-theme="dark"] #myModalUser .content,
+        html[data-theme="dark"] #userModal .content,
+        html[data-theme="dark"] #accessLinkModal .content {
+            background: var(--app-surface) !important;
+            border-color: var(--app-line) !important;
+            color: var(--app-text) !important;
+            box-shadow: var(--app-shadow) !important;
+        }
+
+        html[data-theme="dark"] #myModalUser .header,
+        html[data-theme="dark"] #userModal .header,
+        html[data-theme="dark"] #accessLinkModal .header,
+        html[data-theme="dark"] .party-modal-form .ui.segment .header,
+        html[data-theme="dark"] .party-modal-form h4.header,
+        html[data-theme="dark"] .party-modal-form h4.header .icon {
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .party-modal-form .section-help {
+            color: var(--app-muted) !important;
+        }
+
+        html[data-theme="dark"] .party-modal-form .ui.segment {
+            background: var(--app-surface-soft) !important;
+        }
+
+        html[data-theme="dark"] #myModalUser .actions,
+        html[data-theme="dark"] #userModal .actions {
+            background: transparent !important;
+        }
     </style>
 
     <div class="ui right aligned basic  grid">
@@ -69,12 +179,17 @@
                 <div class="row" style="padding-left: 5px; padding-right: 5px">
                     <div class="wide">
 
+                        <h4 class="ui horizontal left aligned divider header">
+                            <i class="left align icon"></i>
+                            Party List
+                        </h4>
                         <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="UserTable"
                                style="margin-top: 5px;width: 100%">
                             <thead>
                             <tr>
                                 <th>Name</th>
                                 <th>PhoneNumber</th>
+                                <th>GST / Type</th>
                                 <th>Opening Balance</th>
                                 <th>Username</th>
                                 <th>Password</th>
@@ -96,67 +211,101 @@
                         </div>
                         <div class="content">
 
-                            <form class="ui tiny form" id="addForm">{% csrf_token %}
-                                <div class="three required fields">
-                                    <div class=" field">
-                                        <label>Party Name</label>
-                                        <input type="text" name="partyName" placeholder="Party Name" id="partyName">
+                            <form class="ui tiny form party-modal-form" id="addForm">{% csrf_token %}
+                                <div class="ui segment">
+                                    <h4 class="ui horizontal left aligned divider header">
+                                        <i class="address card outline icon"></i>
+                                        Basic Details
+                                    </h4>
+                                    <p class="section-help">Capture the party name used in day-to-day operations and the legal name used on invoices.</p>
+                                    <div class="three stackable fields">
+                                        <div class="required field">
+                                            <label>Party Name</label>
+                                            <input type="text" name="partyName" placeholder="Party Name" id="partyName">
+                                        </div>
+                                        <div class="required field">
+                                            <label>Phone Number</label>
+                                            <input type="number" name="phoneNumber" placeholder="Phone Number" id="phoneNumber">
+                                        </div>
+                                        <div class="field">
+                                            <label>Legal / Business Name</label>
+                                            <input type="text" name="legalName" placeholder="Legal name for GST invoice" id="legalName">
+                                        </div>
                                     </div>
-                                    <div class=" field">
-                                        <label>Phone Number</label>
-                                        <input type="number" name="phoneNumber" placeholder="Phone Number"
-                                               id="phoneNumber">
-                                    </div>
-                                    <div class=" field">
-                                        <label>Opening Balance</label>
-                                        <input type="number" step="0.01" name="openingBalance" placeholder="Opening Balance"
-                                               id="openingBalance" value="0">
-                                    </div>
-
-
                                 </div>
 
-                                <div class="two fields">
-                                    {% comment %}<div class="sixteen wide field required">
-                                        <label>Address</label>
-                                        <input type="text" name="address" placeholder="Address"
-                                               id="address">
-                                    </div>{% endcomment %}
-                                    <div class="field required">
-                                        <label>Party Group/Station</label>
-                                        <select class="ui fluid search clearable dropdown" id="partyGroup">
-                                            <option value="" hidden>Party Group/Station/Address</option>
-                                            {% for group in party_groups %}
-                                                <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
-                                            {% endfor %}
-
-                                        </select>
+                                <div class="ui segment">
+                                    <h4 class="ui horizontal left aligned divider header">
+                                        <i class="file alternate outline icon"></i>
+                                        GST And Billing
+                                    </h4>
+                                    <p class="section-help">Use this only when the party needs GST invoices or B2B billing details.</p>
+                                    <div class="three stackable fields">
+                                        <div class="field">
+                                            <label>GST Number</label>
+                                            <input type="text" name="gstNumber" placeholder="Optional GSTIN for B2B" id="gstNumber">
+                                        </div>
+                                        <div class="field">
+                                            <label>Billing Address</label>
+                                            <input type="text" name="billingAddress" placeholder="Billing address for invoice print" id="billingAddress">
+                                        </div>
+                                        <div class="field inline-toggle-row">
+                                            <div class="ui checkbox">
+                                                <input type="checkbox" id="isB2B">
+                                                <label>Use as B2B party</label>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="field required">
-                                        <label>Assign To (Staff)</label>
-                                        <select class="ui fluid search clearable dropdown" id="staffID">
-                                            <option value="" hidden>Assign To</option>
-                                            {% for staff in staffs %}
-                                                <option value="{{ staff.id }}">{{ staff.name|capfirst }}
-                                                    - {{ staff.partyGroupID.name|capfirst }}  </option>
-                                            {% endfor %}
-
-
-                                        </select>
-                                    </div>
-
                                 </div>
 
+                                <div class="ui segment">
+                                    <h4 class="ui horizontal left aligned divider header">
+                                        <i class="settings icon"></i>
+                                        Account Setup
+                                    </h4>
+                                    <p class="section-help">Assign the party to a station and staff member so billing and collections stay mapped correctly.</p>
+                                    <div class="three stackable fields">
+                                        <div class="field">
+                                            <label>Opening Balance</label>
+                                            <input type="number" step="0.01" name="openingBalance" placeholder="Opening Balance" id="openingBalance" value="0">
+                                        </div>
+                                        <div class="field">
+                                            <label>Address</label>
+                                            <input type="text" name="address" placeholder="Primary address" id="address">
+                                        </div>
+                                        <div class="field required">
+                                            <label>Party Group/Station</label>
+                                            <select class="ui fluid search clearable dropdown" id="partyGroup">
+                                                <option value="" hidden>Party Group/Station/Address</option>
+                                                {% for group in party_groups %}
+                                                    <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
 
+                                    <div class="one stackable fields">
+                                        <div class="field required">
+                                            <label>Assign To (Staff)</label>
+                                            <select class="ui fluid search clearable dropdown" id="staffID">
+                                                <option value="" hidden>Assign To</option>
+                                                {% for staff in staffs %}
+                                                    <option value="{{ staff.id }}">{{ staff.name|capfirst }}
+                                                        - {{ staff.partyGroupID.name|capfirst }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
                             </form>
 
                             <div class="actions" style="padding-top: 20px; padding-bottom: 20px ;float: right">
                                 <div class="ui cancel button">Cancel</div>
-                                <button class="ui right labeled icon button green saveBtn" onclick="addUser()">
+                                <button type="button" class="ui right labeled icon button green saveBtn" onclick="addUser()">
                                     Submit
                                     <i class="checkmark icon"></i>
                                 </button>
-                                <button style="display: none" class="ui right labeled icon button green saveBtnLoad" >
+                                <button type="button" style="display: none" class="ui right labeled icon button green saveBtnLoad" >
                                     Saving ...
                                     <i class="checkmark icon"></i>
                                 </button>
@@ -230,77 +379,103 @@
                     </div>
                     <div class="content">
 
-                        <form class="ui tiny form" id="EditForm">{% csrf_token %}
-                            <div class="three required fields">
-                                <div class=" field">
-                                    <label>Party Name</label>
-                                    <input type="text" name="partyNameEdit" placeholder="Party Name" id="partyNameEdit">
+                        <form class="ui tiny form party-modal-form" id="EditForm">{% csrf_token %}
+                            <div class="ui segment">
+                                <h4 class="ui horizontal left aligned divider header">
+                                    <i class="address card outline icon"></i>
+                                    Basic Details
+                                </h4>
+                                <p class="section-help">Review the display name, contact number, and invoice legal name before updating.</p>
+                                <div class="three stackable fields">
+                                    <div class="required field">
+                                        <label>Party Name</label>
+                                        <input type="text" name="partyNameEdit" placeholder="Party Name" id="partyNameEdit">
+                                    </div>
+                                    <div class="required field">
+                                        <label>Phone Number</label>
+                                        <input type="number" name="phoneNumberEdit" placeholder="Phone Number" id="phoneNumberEdit">
+                                    </div>
+                                    <div class="field">
+                                        <label>Legal / Business Name</label>
+                                        <input type="text" name="legalNameEdit" placeholder="Legal name for GST invoice" id="legalNameEdit">
+                                    </div>
                                 </div>
-                                <div class=" field">
-                                    <label>Phone Number</label>
-                                    <input type="number" name="phoneNumberEdit" placeholder="Phone Number"
-                                           id="phoneNumberEdit">
-                                </div>
-                                <div class=" field">
-                                    <label>Opening Balance</label>
-                                    <input type="number" step="0.01" name="openingBalanceEdit" placeholder="Opening Balance" id="openingBalanceEdit" value="0">
-                                </div>
-                                {% comment %}   <div class="field required">
-                                    <label>Party Group</label>
-                                    <select class="ui fluid dropdown" id="partyGroupEdit">
-                                        <option value="" hidden>Party Group</option>
-                                        {% for group in party_groups %}
-                                            <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
-                                        {% endfor %}
-
-
-                                    </select>
-                                </div>{% endcomment %}
-
                             </div>
 
-                            <div class="two fields">
-                                {% comment %}      <div class="sixteen wide field required">
-                                    <label>Address</label>
-                                    <input type="text" name="addressEdit" placeholder="Address"
-                                           id="addressEdit">
-                                </div>{% endcomment %}
-                                <div class="field required">
-                                    <label>Party Group/Station</label>
-                                    <select class="ui fluid search clearable dropdown" id="partyGroupEdit">
-                                        <option value="" hidden>Party Group/Station/Address</option>
-                                        {% for group in party_groups %}
-                                            <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
-                                        {% endfor %}
-
-                                    </select>
+                            <div class="ui segment">
+                                <h4 class="ui horizontal left aligned divider header">
+                                    <i class="file alternate outline icon"></i>
+                                    GST And Billing
+                                </h4>
+                                <p class="section-help">Keep GST details only for parties that require tax invoices or B2B billing.</p>
+                                <div class="three stackable fields">
+                                    <div class="field">
+                                        <label>GST Number</label>
+                                        <input type="text" name="gstNumberEdit" placeholder="Optional GSTIN for B2B" id="gstNumberEdit">
+                                    </div>
+                                    <div class="field">
+                                        <label>Billing Address</label>
+                                        <input type="text" name="billingAddressEdit" placeholder="Billing address for invoice print" id="billingAddressEdit">
+                                    </div>
+                                    <div class="field inline-toggle-row">
+                                        <div class="ui checkbox">
+                                            <input type="checkbox" id="isB2BEdit">
+                                            <label>Use as B2B party</label>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="field required">
-                                    <label>Assign To (Staff)</label>
-                                    <select class="ui fluid search clearable dropdown" id="staffIDEdit">
-                                        <option value="" hidden>Assign To</option>
-                                        {% for staff in staffs %}
-                                            <option value="{{ staff.id }}">{{ staff.name|capfirst }}
-                                                - {{ staff.partyGroupID.name|capfirst }}  </option>
-                                        {% endfor %}
-
-
-                                    </select>
-                                </div>
-
                             </div>
 
+                            <div class="ui segment">
+                                <h4 class="ui horizontal left aligned divider header">
+                                    <i class="settings icon"></i>
+                                    Account Setup
+                                </h4>
+                                <p class="section-help">Update the opening balance, address, party group, and assigned staff from one place.</p>
+                                <div class="three stackable fields">
+                                    <div class="field">
+                                        <label>Opening Balance</label>
+                                        <input type="number" step="0.01" name="openingBalanceEdit" placeholder="Opening Balance" id="openingBalanceEdit" value="0">
+                                    </div>
+                                    <div class="field">
+                                        <label>Address</label>
+                                        <input type="text" name="addressEdit" placeholder="Primary address" id="addressEdit">
+                                    </div>
+                                    <div class="field required">
+                                        <label>Party Group/Station</label>
+                                        <select class="ui fluid search clearable dropdown" id="partyGroupEdit">
+                                            <option value="" hidden>Party Group/Station/Address</option>
+                                            {% for group in party_groups %}
+                                                <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="one stackable fields">
+                                    <div class="field required">
+                                        <label>Assign To (Staff)</label>
+                                        <select class="ui fluid search clearable dropdown" id="staffIDEdit">
+                                            <option value="" hidden>Assign To</option>
+                                            {% for staff in staffs %}
+                                                <option value="{{ staff.id }}">{{ staff.name|capfirst }}
+                                                    - {{ staff.partyGroupID.name|capfirst }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
 
                             <input type="hidden" id="EditId">
                         </form>
 
                         <div class="actions" style="padding-top: 20px; padding-bottom: 20px ;float: right">
                             <div class="ui cancel button">Cancel</div>
-                            <button class="ui right labeled icon button green saveBtn" onclick="editUser()">
+                            <button type="button" class="ui right labeled icon button green saveBtn" onclick="editUser()">
                                 Update
                                 <i class="checkmark icon"></i>
                             </button>
-                            <button style="display: none" class="ui right labeled icon button green saveBtnLoad" >
+                            <button type="button" style="display: none" class="ui right labeled icon button green saveBtnLoad" >
                                     Saving ...
                                     <i class="checkmark icon"></i>
                                 </button>
@@ -318,40 +493,58 @@
     {{ party_capabilities|json_script:"party-capabilities-data" }}
     <script>
         var partyCaps = JSON.parse(document.getElementById('party-capabilities-data').textContent);
+        $('.ui.checkbox').checkbox();
 
         var userTab;
 
+        function resetPartyFormState(modalSelector, formSelector) {
+            $(formSelector).trigger('reset');
+            $(modalSelector + ' .ui.dropdown').dropdown('clear');
+            $(modalSelector + ' .ui.checkbox').checkbox('uncheck');
+            $(modalSelector + ' input, ' + modalSelector + ' select, ' + modalSelector + ' textarea').prop('disabled', false);
+            $(modalSelector + ' .saveBtn').show();
+        }
+
+        function validatePartyForm(values) {
+            if (!values.partyName || !values.phoneNumber || !values.partyGroup || !values.staffID) {
+                $('body').toast({
+                    class: 'orange',
+                    message: 'Party name, phone number, party group, and assigned staff are required.'
+                });
+                return false;
+            }
+            return true;
+        }
 
         function showUserModal() {
             if (!partyCaps.can_add) {
                 $('body').toast({class: 'warning', message: 'You do not have permission to add parties.'});
                 return;
             }
+            resetPartyFormState('#myModalUser', '#addForm');
             $('#myModalUser').modal('show');
-            myOwnReset();
-        }
-
-        function EditUser() {
-            $('')
         }
 
         function addUser() {
             showLoading();
             var partyName = $('#partyName').val();
             var phoneNumber = $('#phoneNumber').val();
+            var legalName = $('#legalName').val();
+            var gstNumber = $('#gstNumber').val();
+            var billingAddress = $('#billingAddress').val();
             var openingBalance = $('#openingBalance').val();
             var partyGroup = $('#partyGroup').val();
             var staffID = $('#staffID').val();
-            {#var address = $('#address').val();#}
+            var address = $('#address').val();
+            var isB2B = $('#isB2B').is(':checked');
 
 
-            if (partyName === '' || phoneNumber === '') {
-                $('body')
-                    .toast({
-                        class: 'orange',
-                        message: '* fields are required.'
-                    })
-                ;
+            if (!validatePartyForm({
+                partyName: partyName,
+                phoneNumber: phoneNumber,
+                partyGroup: partyGroup,
+                staffID: staffID
+            })) {
                 hideLoading();
             } else {
 
@@ -360,10 +553,14 @@
                 data = new FormData();
                 data.append('partyName', partyName);
                 data.append('phoneNumber', phoneNumber);
+                data.append('legalName', legalName);
+                data.append('gstNumber', gstNumber);
+                data.append('billingAddress', billingAddress);
                 data.append('openingBalance', openingBalance);
                 data.append('partyGroup', partyGroup);
                 data.append('staffID', staffID);
-                {#data.append('address', address);#}
+                data.append('address', address);
+                data.append('isB2B', isB2B ? '1' : '0');
 
 
                 data.append('csrfmiddlewaretoken', csrfmiddlewaretoken);
@@ -396,7 +593,7 @@
                             $('body')
                                 .toast({
                                     class: 'error',
-                                    message: 'An error occurred !'
+                                    message: response.error || 'An error occurred !'
                                 })
                             ;
                             hideLoading();
@@ -405,11 +602,11 @@
 
                         return response;
                     },
-                    error: function () {
+                    error: function (xhr) {
                         $('body')
                             .toast({
                                 class: 'error',
-                                message: 'An error occurred !'
+                                message: (xhr.responseJSON && xhr.responseJSON.error) || 'An error occurred !'
                             })
                         ;
                         hideLoading();
@@ -430,13 +627,13 @@
             "scrollX": true,
             {#stateSave: true,#}
             fixedColumns: {
-                left: 1,
+                left: 0,
                 right: 1
             },
             buttons: [{
                 extend: 'excel',
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6, 7]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8]
                 }
             }
                 {% comment %}      , {
@@ -449,13 +646,14 @@
             "columnDefs": [
                 {"name": "name", "targets": 0, "orderable": true},
                 {"name": "phone", "targets": 1, "orderable": true},
-                {"name": "openingBalance", "targets": 2, "orderable": true},
-                {"name": "username", "targets": 3, "orderable": true},
-                {"name": "password", "targets": 4, "orderable": true},
-                {"name": "partyGroupID.name", "targets": 5, "orderable": true},
-                {"name": "assignTo.name", "targets": 6, "orderable": true},
-                {"name": "datetime", "targets": 7, "orderable": true},
-                {"name": "action", "targets": 8, "orderable": false}
+                {"name": "gstNumber", "targets": 2, "orderable": true},
+                {"name": "openingBalance", "targets": 3, "orderable": true},
+                {"name": "username", "targets": 4, "orderable": true},
+                {"name": "password", "targets": 5, "orderable": true},
+                {"name": "partyGroupID.name", "targets": 6, "orderable": true},
+                {"name": "assignTo.name", "targets": 7, "orderable": true},
+                {"name": "datetime", "targets": 8, "orderable": true},
+                {"name": "action", "targets": 9, "orderable": false}
 
             ],
             aaSorting: [[0, 'asc']],
@@ -614,20 +812,23 @@
 
         function GetUserDetails(id, mode) {
             mode = mode || 'edit';
-            myOwnReset();
+            resetPartyFormState('#userModal', '#EditForm');
             $('#userModal').modal('show');
             $.ajax({
                 type: 'get',
                 url: '{% url "homeApp:get_party_detail"%}?id=' + id,
                 success: function (response) {
-                    console.log(response)
                     $('#EditId').val(response.data['ID']);
                     $('#partyNameEdit').val(response.data['Name']);
+                    $('#legalNameEdit').val(response.data['LegalName']);
                     $('#phoneNumberEdit').val(response.data['PhoneNumber']);
+                    $('#gstNumberEdit').val(response.data['GSTNumber']);
                     $('#openingBalanceEdit').val(response.data['OpeningBalance']);
                     $('#addressEdit').val(response.data['Address']);
+                    $('#billingAddressEdit').val(response.data['BillingAddress']);
                     $('#partyGroupEdit').val(response.data['PartyGroup']).change();
                     $('#staffIDEdit').val(response.data['AssignTo']).change();
+                    $('#isB2BEdit').closest('.ui.checkbox').checkbox(response.data['IsB2B'] ? 'check' : 'uncheck');
 
                     var isReadOnly = (mode === 'view') || !partyCaps.can_edit;
                     $('#userModal .header').text(isReadOnly ? 'View Party Details' : 'Edit Party Details');
@@ -635,11 +836,11 @@
                     $('#userModal .saveBtn').toggle(!isReadOnly);
 
                 },
-                error: function () {
+                error: function (xhr) {
                     $('body')
                         .toast({
                             class: 'error',
-                            message: 'An error occurred !'
+                            message: (xhr.responseJSON && xhr.responseJSON.error) || 'An error occurred !'
                         })
                     ;
                 }
@@ -655,19 +856,22 @@
             var EditId = $('#EditId').val();
             var partyName = $('#partyNameEdit').val();
             var phoneNumber = $('#phoneNumberEdit').val();
+            var legalName = $('#legalNameEdit').val();
+            var gstNumber = $('#gstNumberEdit').val();
+            var billingAddress = $('#billingAddressEdit').val();
             var openingBalance = $('#openingBalanceEdit').val();
-            {#var address = $('#addressEdit').val();#}
+            var address = $('#addressEdit').val();
+            var isB2B = $('#isB2BEdit').is(':checked');
             var partyGroup = $('#partyGroupEdit').val();
             var staffID = $('#staffIDEdit').val();
 
 
-            if (partyName === '' || phoneNumber === '') {
-                $('body')
-                    .toast({
-                        class: 'orange',
-                        message: '* fields are required.'
-                    })
-                ;
+            if (!validatePartyForm({
+                partyName: partyName,
+                phoneNumber: phoneNumber,
+                partyGroup: partyGroup,
+                staffID: staffID
+            })) {
                 hideLoading();
             } else {
 
@@ -675,8 +879,12 @@
 
                 data = new FormData();
                 data.append('partyGroup', partyGroup);
-                {#data.append('address', address);#}
+                data.append('address', address);
                 data.append('phoneNumber', phoneNumber);
+                data.append('legalName', legalName);
+                data.append('gstNumber', gstNumber);
+                data.append('billingAddress', billingAddress);
+                data.append('isB2B', isB2B ? '1' : '0');
                 data.append('partyName', partyName);
                 data.append('openingBalance', openingBalance);
                 data.append('staffID', staffID);
@@ -710,7 +918,7 @@
                             $('body')
                                 .toast({
                                     class: 'error',
-                                    message: 'An error occurred !'
+                                    message: response.error || 'An error occurred !'
                                 })
                             ;
                             hideLoading();
@@ -719,11 +927,11 @@
 
                         return response;
                     },
-                    error: function () {
+                    error: function (xhr) {
                         $('body')
                             .toast({
                                 class: 'error',
-                                message: 'An error occurred !'
+                                message: (xhr.responseJSON && xhr.responseJSON.error) || 'An error occurred !'
                             })
                         ;
                         hideLoading();

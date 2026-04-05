@@ -116,6 +116,56 @@
         width: 100px !important;
     }
 
+    html[data-theme="dark"] .audit-compare-wrap {
+        border-color: rgba(71, 85, 105, 0.4);
+        background: #0f172a;
+    }
+
+    html[data-theme="dark"] .audit-compare-table thead th {
+        background: #111827;
+        color: #e2e8f0;
+        border-bottom-color: rgba(71, 85, 105, 0.4);
+    }
+
+    html[data-theme="dark"] .audit-compare-table tbody td {
+        border-bottom-color: rgba(51, 65, 85, 0.55);
+        color: #dbe4f0;
+    }
+
+    html[data-theme="dark"] .audit-compare-key {
+        color: #f8fafc;
+    }
+
+    html[data-theme="dark"] .audit-compare-from {
+        color: #fda4af;
+        background: rgba(159, 18, 57, 0.12);
+    }
+
+    html[data-theme="dark"] .audit-compare-to {
+        color: #99f6e4;
+        background: rgba(13, 148, 136, 0.14);
+    }
+
+    html[data-theme="dark"] .audit-empty-state {
+        color: #94a3b8;
+    }
+
+    html[data-theme="dark"] #AuditTable_length,
+    html[data-theme="dark"] #AuditTable_filter,
+    html[data-theme="dark"] .dt-buttons {
+        color: #cbd5e1;
+    }
+
+    html[data-theme="dark"] #auditDetailModal .header {
+        background: #111827 !important;
+        color: #f8fafc !important;
+        border-bottom-color: rgba(148, 163, 184, 0.18) !important;
+    }
+
+    html[data-theme="dark"] #auditDetailModal .content {
+        background: #0f172a !important;
+    }
+
     @media (max-width: 767px) {
         .audit-json {
             padding: 10px;
@@ -228,6 +278,10 @@
                     </div>
                     <div class="wide">
                         <div class="audit-table-wrap">
+                            <h4 class="ui horizontal left aligned divider header">
+                                <i class="left align icon"></i>
+                                Audit Log
+                            </h4>
                             <table class="ui unstackable tiny sortable celled very compact table" id="AuditTable" style="margin-top: 5px; width: 100%">
                                 <thead>
                                 <tr>

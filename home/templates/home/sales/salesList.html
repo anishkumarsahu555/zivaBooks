@@ -43,6 +43,13 @@
         input[type=search] {
             width: 100px !important;
         }
+
+        html[data-theme="dark"] #deleteUser .content,
+        html[data-theme="dark"] #imgModal .content,
+        html[data-theme="dark"] #deleteUser .header,
+        html[data-theme="dark"] #imgModal .header {
+            color: var(--app-text) !important;
+        }
     </style>
 
     <div class="ui basic grid">
@@ -110,10 +117,14 @@
                             <input type="hidden" id="staffID" value="All">
                         {% endif %}
 
+                        <h4 class="ui horizontal left aligned divider header">
+                            <i class="left align icon"></i>
+                            Sales List
+                        </h4>
                         <table class="ui unstackable sortable celled very nowrap very small compact table" id="UserTable" style="margin-top: 5px; width: 100%">
                             <thead>
                             <tr>
-                                <th>PaymentID</th>
+                                <th>SaleID</th>
                                 <th>Party Name</th>
                                 <th>InvoiceNumber</th>
                                 <th>Mode</th>
@@ -314,6 +325,17 @@
             var endDate = $('#endDateF').val();
             var staffID = $('#staffID').val();
             userTab.ajax.url('{% if sales_capabilities.can_filter_staff %}{% url 'homeApp:SalesByAdminListJson' %}{% else %}{% url 'homeApp:SalesByStaffListJson' %}{% endif %}?startDate=' + startDate + '&endDate=' + endDate + '&staffID=' + staffID).load();
+        }
+
+        function downloadSalesInvoice(id) {
+            var baseUrl = "{% url 'homeApp:generate_sales_invoice_pdf' %}";
+            $('body').toast({class: 'info', message: 'Preparing invoice PDF...'});
+            var a = document.createElement('a');
+            a.href = baseUrl + '?id=' + encodeURIComponent(id);
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { document.body.removeChild(a); }, 1000);
         }
 
         {% if sales_capabilities.can_message %}

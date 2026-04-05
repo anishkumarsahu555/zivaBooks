@@ -1,0 +1,41 @@
+{% load formatting %}
+{% for row in detail_rows %}
+    <tr>
+        <td>
+            <div style="font-weight:800;">{{ row.item.name }}</div>
+            <div style="font-size:.78rem; color:#64748b;">
+                {% if row.item.sku %}{{ row.item.sku }}{% else %}-{% endif %}
+            </div>
+        </td>
+        <td>{% if row.item.category_id %}{{ row.item.category.name }}{% else %}-{% endif %}</td>
+        <td>{{ row.bucket_label }}</td>
+        <td>{{ row.current_qty|floatformat:2 }}</td>
+        <td>₹ {{ row.current_value|money }}</td>
+        <td>{{ row.purchase_qty|floatformat:2 }}</td>
+        <td>{{ row.sold_qty|floatformat:2 }}</td>
+        <td>{{ row.sales_return_qty|floatformat:2 }}</td>
+        <td>{{ row.purchase_return_qty|floatformat:2 }}</td>
+        <td>₹ {{ row.avg_purchase_rate|floatformat:2 }}</td>
+        <td>₹ {{ row.avg_sale_rate|floatformat:2 }}</td>
+        <td>{{ row.margin_pct|floatformat:2 }}%</td>
+        <td>
+            {% if row.latest_sale %}
+                <a href="{{ row.latest_sale.url }}">{{ row.latest_sale.bill_number }}</a>
+                <div style="font-size:.78rem; color:#64748b;">{{ row.latest_sale.source }}</div>
+            {% else %}
+                -
+            {% endif %}
+        </td>
+        <td>{% if row.latest_sale %}{{ row.latest_sale.quantity|floatformat:2 }}{% else %}-{% endif %}</td>
+        <td>{% if row.latest_sale %}₹ {{ row.latest_sale.rate|floatformat:2 }}{% else %}-{% endif %}</td>
+        <td>{% if row.latest_sale and row.latest_sale.date %}{{ row.latest_sale.date|date:"d-m-Y" }}{% else %}-{% endif %}</td>
+        <td>{% if row.age_days is not None %}{{ row.age_days }} days{% else %}-{% endif %}</td>
+        <td>
+            <span class="inv-status {% if row.status == 'Negative' %}negative{% elif row.status == 'Low Stock' %}low{% elif row.status == 'Out of Stock' %}out{% elif row.status == 'Idle' %}idle{% elif row.status == 'Dead Stock' %}dead{% else %}healthy{% endif %}">
+                {{ row.status }}
+            </span>
+        </td>
+    </tr>
+{% empty %}
+    <tr><td colspan="18" class="center aligned">No inventory items match the selected filters.</td></tr>
+{% endfor %}

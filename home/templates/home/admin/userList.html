@@ -283,6 +283,63 @@
         input[type=search] {
             width: 100px !important;
         }
+
+        html[data-theme="dark"] .upload-card,
+        html[data-theme="dark"] .cropper-stage-wrap,
+        html[data-theme="dark"] #myModalUser .content,
+        html[data-theme="dark"] #userModal .content,
+        html[data-theme="dark"] #accessLinkModal .content,
+        html[data-theme="dark"] #imageCropModal .content {
+            background: var(--app-surface) !important;
+            border-color: var(--app-line) !important;
+            box-shadow: var(--app-shadow) !important;
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .upload-title,
+        html[data-theme="dark"] .cropper-slider-label,
+        html[data-theme="dark"] #myModalUser .header,
+        html[data-theme="dark"] #userModal .header,
+        html[data-theme="dark"] #accessLinkModal .header,
+        html[data-theme="dark"] #imageCropModal .header {
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .upload-hint,
+        html[data-theme="dark"] .cropper-meta {
+            color: var(--app-muted) !important;
+        }
+
+        html[data-theme="dark"] .upload-remove {
+            color: #fdba74;
+        }
+
+        html[data-theme="dark"] .avatar-upload .avatar-preview {
+            border-color: #162338;
+            box-shadow: 0 12px 26px rgba(2, 6, 23, 0.24);
+        }
+
+        html[data-theme="dark"] .cropper-stage-wrap {
+            background: linear-gradient(180deg, #162338, #111b2e) !important;
+        }
+
+        html[data-theme="dark"] .cropper-stage {
+            background:
+                linear-gradient(45deg, rgba(148, 163, 184, 0.10) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.10) 75%),
+                linear-gradient(45deg, rgba(148, 163, 184, 0.10) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.10) 75%);
+            background-size: 18px 18px;
+            background-position: 0 0, 9px 9px;
+        }
+
+        html[data-theme="dark"] .ui.tiny.basic.teal.label {
+            background: rgba(15, 118, 110, 0.14) !important;
+            border-color: rgba(45, 212, 191, 0.22) !important;
+            color: #99f6e4 !important;
+        }
+
+        html[data-theme="dark"] .actions[style*=\"float: right\"] {
+            background: transparent !important;
+        }
     </style>
 
     <div class="ui right aligned basic  grid">
@@ -303,6 +360,10 @@
                 <div class="row" style="padding-left: 5px; padding-right: 5px">
                     <div class="wide">
 
+                        <h4 class="ui horizontal left aligned divider header">
+                            <i class="left align icon"></i>
+                            User List
+                        </h4>
                         <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="UserTable"
                                style="margin-top: 5px;width: 100%">
                             <thead>

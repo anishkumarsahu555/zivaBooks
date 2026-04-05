@@ -42,6 +42,15 @@
         input[type=search] {
             width: 100px !important;
         }
+
+        html[data-theme="dark"] #deleteUser .content,
+        html[data-theme="dark"] #approveOrderModal .content,
+        html[data-theme="dark"] #downloadOrderPdfModal .content,
+        html[data-theme="dark"] #deleteUser .header,
+        html[data-theme="dark"] #approveOrderModal .header,
+        html[data-theme="dark"] #downloadOrderPdfModal .header {
+            color: var(--app-text) !important;
+        }
     </style>
 
     <div class="ui basic grid">
@@ -105,6 +114,10 @@
                             </form>
                         </div>
 
+                        <h4 class="ui horizontal left aligned divider header">
+                            <i class="left align icon"></i>
+                            Order List
+                        </h4>
                         <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="UserTable" style="margin-top: 5px;width: 100%">
                             <thead>
                             <tr>

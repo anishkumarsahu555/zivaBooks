@@ -1,0 +1,683 @@
+{% extends 'home/admin/index.html' %}
+
+{% block title %}<title>Purchase Detail</title>{% endblock %}
+
+{% block body %}
+<style>
+    .purchase-detail-page {
+        text-align: left;
+    }
+
+    .purchase-detail-page .sixteen.wide.column {
+        padding-top: 0.5rem !important;
+    }
+
+    .purchase-detail-page .ui.pointing.secondary.menu .item {
+        padding-left: 0 !important;
+    }
+
+    .purchase-detail-shell {
+        display: grid;
+        gap: 12px;
+    }
+
+    .invoice-sheet {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 14px 34px rgba(15, 23, 42, 0.05);
+        overflow: hidden;
+    }
+
+    .invoice-sheet-header {
+        padding: 14px 16px 12px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        background:
+            linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .invoice-sheet-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    .invoice-sheet-kicker {
+        margin-bottom: 6px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #0f766e;
+        font-weight: 700;
+    }
+
+    .invoice-sheet-title {
+        margin: 0;
+        font-size: 1.65rem;
+        line-height: 1.02;
+        color: #111827;
+    }
+
+    .invoice-sheet-subtitle {
+        margin: 6px 0 0;
+        color: #667085;
+        font-size: 0.9rem;
+        line-height: 1.45;
+    }
+
+    .invoice-sheet-status {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+
+    .invoice-sheet-status .ui.label {
+        margin: 0;
+        border-radius: 999px;
+        padding: 0.55em 0.85em;
+    }
+
+    .invoice-sheet-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0;
+        margin-top: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 14px;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .invoice-sheet-summary-item {
+        padding: 10px 12px;
+        border-right: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .invoice-sheet-summary-item:last-child {
+        border-right: 0;
+        background: #f0fdfa;
+    }
+
+    .invoice-sheet-summary-label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #667085;
+    }
+
+    .invoice-sheet-summary-value {
+        display: block;
+        color: #111827;
+        font-size: 1.16rem;
+        line-height: 1.1;
+        font-weight: 800;
+    }
+
+    .invoice-sheet-body {
+        padding: 12px 14px 14px;
+        display: grid;
+        gap: 12px;
+    }
+
+    .invoice-panel {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 14px;
+        background: #fff;
+        overflow: hidden;
+    }
+
+    .invoice-panel-head {
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        background: #f8fafc;
+    }
+
+    .invoice-panel-head h4 {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #111827;
+    }
+
+    .invoice-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0;
+    }
+
+    .invoice-detail-item {
+        padding: 10px 12px;
+        border-right: 1px solid rgba(15, 23, 42, 0.08);
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        min-width: 0;
+    }
+
+    .invoice-detail-item:nth-child(2n) {
+        border-right: 0;
+    }
+
+    .invoice-detail-item:last-child,
+    .invoice-detail-item:nth-last-child(2):nth-child(odd) {
+        border-bottom: 0;
+    }
+
+    .invoice-detail-label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #667085;
+    }
+
+    .invoice-detail-value {
+        display: block;
+        color: #111827;
+        font-size: 0.9rem;
+        line-height: 1.45;
+        font-weight: 700;
+        word-break: break-word;
+    }
+
+    .invoice-remark {
+        padding: 12px;
+        color: #374151;
+        line-height: 1.55;
+        min-height: 0;
+        background: #fcfcfd;
+    }
+
+    .invoice-lines-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        padding: 10px 12px 0;
+    }
+
+    .invoice-lines-note {
+        margin: 0;
+        color: #667085;
+        font-size: 0.83rem;
+    }
+
+    .invoice-lines-table-wrap {
+        padding: 10px 12px 12px;
+    }
+
+    .invoice-lines-scroll {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    .invoice-lines-scroll table.ui.table {
+        min-width: 1080px !important;
+        width: max-content !important;
+        max-width: none !important;
+        margin: 0 !important;
+        border: 0 !important;
+    }
+
+    .invoice-lines-scroll table.ui.table th,
+    .invoice-lines-scroll table.ui.table td {
+        white-space: nowrap !important;
+        word-break: normal !important;
+        overflow-wrap: normal !important;
+    }
+
+    .invoice-lines-scroll table.ui.table thead th {
+        background: #f8fafc;
+        color: #344054;
+    }
+
+    .invoice-lines-scroll::-webkit-scrollbar {
+        height: 8px;
+    }
+
+    .invoice-lines-scroll::-webkit-scrollbar-thumb {
+        background: rgba(15, 23, 42, 0.18);
+        border-radius: 999px;
+    }
+
+    .invoice-lines-mobile {
+        display: none;
+        padding: 0 12px 12px;
+        gap: 10px;
+    }
+
+    .invoice-line-card {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 14px;
+        overflow: hidden;
+        background: #fbfcfe;
+    }
+
+    .invoice-line-card-top {
+        padding: 10px 12px 8px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        background: #fff;
+    }
+
+    .invoice-line-top-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .invoice-line-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        background: #e6fffb;
+        color: #0f766e;
+        font-size: 11px;
+        font-weight: 800;
+        flex: 0 0 auto;
+    }
+
+    .invoice-line-title {
+        margin: 0;
+        color: #111827;
+        font-size: 0.98rem;
+        line-height: 1.45;
+        font-weight: 700;
+    }
+
+    .invoice-line-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px 12px 12px;
+    }
+
+    .invoice-line-field {
+        border: 1px solid rgba(15, 23, 42, 0.06);
+        border-radius: 10px;
+        background: #fff;
+        padding: 9px 10px;
+        min-width: 0;
+    }
+
+    .invoice-line-field.full {
+        grid-column: 1 / -1;
+    }
+
+    .invoice-line-label {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #667085;
+    }
+
+    .invoice-line-value {
+        display: block;
+        color: #111827;
+        font-size: 0.92rem;
+        line-height: 1.4;
+        font-weight: 700;
+        word-break: break-word;
+    }
+
+    .invoice-revision-list {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+    }
+
+    .invoice-revision-item {
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 12px;
+        background: #fbfcfe;
+        padding: 10px 12px;
+    }
+
+    .invoice-revision-title {
+        color: #111827;
+        font-weight: 700;
+        line-height: 1.45;
+    }
+
+    .invoice-revision-meta {
+        margin-top: 4px;
+        color: #667085;
+        font-size: 0.86rem;
+        line-height: 1.5;
+        word-break: break-word;
+    }
+
+    @media only screen and (max-width: 767px) {
+        .purchase-detail-page .sixteen.wide.column {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+
+        .purchase-detail-page .ui.pointing.secondary.menu {
+            margin-bottom: 0.5rem;
+        }
+
+        .invoice-sheet {
+            border-radius: 16px;
+        }
+
+        .invoice-sheet-header {
+            padding: 12px;
+        }
+
+        .invoice-sheet-title {
+            font-size: 1.25rem;
+        }
+
+        .invoice-sheet-subtitle {
+            font-size: 0.82rem;
+            margin-top: 6px;
+        }
+
+        .invoice-sheet-status {
+            width: 100%;
+        }
+
+        .invoice-sheet-summary {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            margin-top: 10px;
+        }
+
+        .invoice-sheet-summary-item {
+            padding: 9px 10px;
+            border-right: 1px solid rgba(15, 23, 42, 0.08);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .invoice-sheet-summary-item:nth-child(2) {
+            border-right: 0;
+        }
+
+        .invoice-sheet-summary-item:last-child {
+            grid-column: 1 / -1;
+            border-bottom: 0;
+        }
+
+        .invoice-sheet-summary-value {
+            font-size: 0.98rem;
+        }
+
+        .invoice-sheet-body {
+            padding: 10px;
+            gap: 10px;
+        }
+
+        .invoice-detail-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .invoice-detail-item {
+            border-right: 0;
+        }
+
+        .invoice-remark {
+            min-height: 0;
+            padding: 10px;
+        }
+
+        .invoice-lines-note {
+            font-size: 0.79rem;
+        }
+
+        .invoice-lines-table-wrap {
+            display: none;
+        }
+
+        .invoice-lines-mobile {
+            display: grid;
+        }
+
+        .invoice-revision-list {
+            padding: 10px;
+        }
+
+        .invoice-revision-item {
+            padding: 9px 10px;
+        }
+    }
+</style>
+
+<div class="ui basic grid purchase-detail-page">
+    <div class="sixteen wide column">
+        <div class="ui pointing secondary menu">
+            <a class="item" href="{% url 'homeApp:purchase_list' %}">
+                <i class="arrow left icon"></i>
+                Purchase List
+            </a>
+            <div class="item active">Purchase Detail</div>
+        </div>
+
+        <div class="purchase-detail-shell">
+            <div class="invoice-sheet">
+                <div class="invoice-sheet-header">
+                    <div class="invoice-sheet-top">
+                        <div>
+                            <div class="invoice-sheet-kicker">Purchase Invoice</div>
+                            <h2 class="invoice-sheet-title">{{ purchase.purchaseID|default:"-" }}</h2>
+                            <p class="invoice-sheet-subtitle">
+                                {% if purchase.invoiceNumber %}Supplier Invoice: {{ purchase.invoiceNumber }}{% else %}No supplier invoice number{% endif %}
+                                {% if purchase.partyID %} | {{ purchase.partyID.name }}{% else %} | No supplier selected{% endif %}
+                                {% if purchase.buildDate %} | {{ purchase.buildDate|date:"d/m/Y" }}{% endif %}
+                            </p>
+                        </div>
+                        <div class="invoice-sheet-status">
+                            <span class="ui tiny teal basic label">{{ purchase.get_gstTreatment_display|default:purchase.gstTreatment }}</span>
+                            <span class="ui tiny basic label">{{ purchase.get_claimStatus_display|default:purchase.claimStatus }}</span>
+                        </div>
+                    </div>
+
+                    <div class="invoice-sheet-summary">
+                        <div class="invoice-sheet-summary-item">
+                            <span class="invoice-sheet-summary-label">Subtotal</span>
+                            <span class="invoice-sheet-summary-value">₹ {{ purchase.subtotalAmount|floatformat:2 }}</span>
+                        </div>
+                        <div class="invoice-sheet-summary-item">
+                            <span class="invoice-sheet-summary-label">GST</span>
+                            <span class="invoice-sheet-summary-value">₹ {{ purchase.gstAmount|floatformat:2 }}</span>
+                        </div>
+                        <div class="invoice-sheet-summary-item">
+                            <span class="invoice-sheet-summary-label">Grand Total</span>
+                            <span class="invoice-sheet-summary-value">₹ {{ purchase.totalAmount|floatformat:2 }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="invoice-sheet-body">
+                    <div class="invoice-panel">
+                        <div class="invoice-panel-head">
+                            <h4>Invoice Details</h4>
+                        </div>
+                        <div class="invoice-detail-grid">
+                            <div class="invoice-detail-item">
+                                <span class="invoice-detail-label">Purchase ID</span>
+                                <span class="invoice-detail-value">{{ purchase.purchaseID|default:"-" }}</span>
+                            </div>
+                            <div class="invoice-detail-item">
+                                <span class="invoice-detail-label">Invoice Number</span>
+                                <span class="invoice-detail-value">{{ purchase.invoiceNumber }}</span>
+                            </div>
+                            <div class="invoice-detail-item">
+                                <span class="invoice-detail-label">Invoice Date</span>
+                                <span class="invoice-detail-value">{% if purchase.buildDate %}{{ purchase.buildDate|date:"d/m/Y" }}{% else %}-{% endif %}</span>
+                            </div>
+                            <div class="invoice-detail-item">
+                                <span class="invoice-detail-label">Supplier / Party</span>
+                                <span class="invoice-detail-value">{% if purchase.partyID %}{{ purchase.partyID.name }}{% else %}-{% endif %}</span>
+                            </div>
+                            {% if purchase.gstTreatment == 'gst' or purchase.gstTreatment == 'non_gst_claimable' %}
+                            <div class="invoice-detail-item">
+                                <span class="invoice-detail-label">Supplier GST Number</span>
+                                <span class="invoice-detail-value">{% if purchase.partyID and purchase.partyID.gstNumber %}{{ purchase.partyID.gstNumber }}{% else %}-{% endif %}</span>
+                            </div>
+                            {% endif %}
+                            <div class="invoice-detail-item">
+                                <span class="invoice-detail-label">Created By</span>
+                                <span class="invoice-detail-value">{% if purchase.createdBy %}{{ purchase.createdBy.name }}{% else %}-{% endif %}</span>
+                            </div>
+                            <div class="invoice-detail-item">
+                                <span class="invoice-detail-label">GST Treatment</span>
+                                <span class="invoice-detail-value">{{ purchase.get_gstTreatment_display|default:purchase.gstTreatment }}</span>
+                            </div>
+                            <div class="invoice-detail-item">
+                                <span class="invoice-detail-label">Claim Status</span>
+                                <span class="invoice-detail-value">{{ purchase.get_claimStatus_display|default:purchase.claimStatus }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="invoice-panel">
+                        <div class="invoice-panel-head">
+                            <h4>Remark</h4>
+                        </div>
+                        <div class="invoice-remark">
+                            {% if purchase.remark %}
+                                {{ purchase.remark }}
+                            {% else %}
+                                No internal remark recorded for this purchase invoice.
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="invoice-panel">
+                        <div class="invoice-lines-meta">
+                            <h4 style="margin:0;color:#111827;">Purchase Lines</h4>
+                            <p class="invoice-lines-note">Desktop uses an invoice table. Mobile uses line cards.</p>
+                        </div>
+
+                        <div class="invoice-lines-table-wrap">
+                            <div class="invoice-lines-scroll">
+                                <table class="ui unstackable tiny celled very compact table">
+                                    <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Bucket</th>
+                                        <th>Qty</th>
+                                        <th>Unit Cost</th>
+                                        <th>Taxable</th>
+                                        <th>GST %</th>
+                                        <th>GST Amt</th>
+                                        <th>Total</th>
+                                        <th>Remark</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for line in purchase_lines %}
+                                        <tr>
+                                            <td>{{ line.item.name }}{% if line.item.sku %} [{{ line.item.sku }}]{% endif %}</td>
+                                            <td>{{ line.get_stockBucket_display|default:line.stockBucket }}</td>
+                                            <td>{{ line.quantity|floatformat:2 }}</td>
+                                            <td>{{ line.unitCost|floatformat:2 }}</td>
+                                            <td>{{ line.taxableAmount|floatformat:2 }}</td>
+                                            <td>{{ line.gstRate|floatformat:2 }}</td>
+                                            <td>{{ line.gstAmount|floatformat:2 }}</td>
+                                            <td>{{ line.lineTotal|floatformat:2 }}</td>
+                                            <td>{{ line.remark|default:'-' }}</td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="9" class="center aligned">No purchase lines found.</td>
+                                        </tr>
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="invoice-lines-mobile">
+                            {% for line in purchase_lines %}
+                                <div class="invoice-line-card">
+                                    <div class="invoice-line-card-top">
+                                        <div class="invoice-line-top-row">
+                                            <span class="invoice-line-index">{{ forloop.counter }}</span>
+                                        </div>
+                                        <h5 class="invoice-line-title">
+                                            {{ line.item.name }}{% if line.item.sku %} [{{ line.item.sku }}]{% endif %}
+                                        </h5>
+                                    </div>
+                                    <div class="invoice-line-grid">
+                                        <div class="invoice-line-field">
+                                            <span class="invoice-line-label">Bucket</span>
+                                            <span class="invoice-line-value">{{ line.get_stockBucket_display|default:line.stockBucket }}</span>
+                                        </div>
+                                        <div class="invoice-line-field">
+                                            <span class="invoice-line-label">Qty</span>
+                                            <span class="invoice-line-value">{{ line.quantity|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="invoice-line-field">
+                                            <span class="invoice-line-label">Unit Cost</span>
+                                            <span class="invoice-line-value">₹ {{ line.unitCost|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="invoice-line-field">
+                                            <span class="invoice-line-label">GST %</span>
+                                            <span class="invoice-line-value">{{ line.gstRate|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="invoice-line-field">
+                                            <span class="invoice-line-label">Taxable</span>
+                                            <span class="invoice-line-value">₹ {{ line.taxableAmount|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="invoice-line-field">
+                                            <span class="invoice-line-label">GST Amt</span>
+                                            <span class="invoice-line-value">₹ {{ line.gstAmount|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="invoice-line-field full">
+                                            <span class="invoice-line-label">Total</span>
+                                            <span class="invoice-line-value">₹ {{ line.lineTotal|floatformat:2 }}</span>
+                                        </div>
+                                        <div class="invoice-line-field full">
+                                            <span class="invoice-line-label">Remark</span>
+                                            <span class="invoice-line-value">{{ line.remark|default:'-' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% empty %}
+                                <div class="ui tiny message">No purchase lines found.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="invoice-panel">
+                        <div class="invoice-panel-head">
+                            <h4>GST / Claim Revisions</h4>
+                        </div>
+                        <div class="invoice-revision-list">
+                            {% for revision in purchase_revisions %}
+                                <div class="invoice-revision-item">
+                                    <div class="invoice-revision-title">
+                                        {{ revision.previousGstTreatment|default:'-' }} -> {{ revision.newGstTreatment }}
+                                        | {{ revision.previousClaimStatus|default:'-' }} -> {{ revision.newClaimStatus }}
+                                    </div>
+                                    <div class="invoice-revision-meta">
+                                        {{ revision.datetime|date:"d/m/Y h:i A" }}
+                                        {% if revision.changedBy %} by {{ revision.changedBy.name }}{% else %} by -{% endif %}
+                                        {% if revision.reason %}<br>{{ revision.reason }}{% endif %}
+                                    </div>
+                                </div>
+                            {% empty %}
+                                <div class="ui tiny message">No GST or claim revisions recorded for this purchase invoice.</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

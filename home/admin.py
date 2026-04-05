@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 
 # Register your models here.
 from .models import *
@@ -322,17 +322,64 @@ class CashCounterAdmin(admin.ModelAdmin):
 
 class TenantAdmin(admin.ModelAdmin):
     form = TenantAdminForm
-    list_display = ['name', 'slug', 'isActive', 'enableAttendanceLocationMaps', 'datetime', 'lastUpdatedOn']
+    list_display = [
+        'name',
+        'slug',
+        'legalName',
+        'gstNumber',
+        'phone',
+        'inventoryEnabled',
+        'advancedInvoicingEnabled',
+        'nonGstShadowEnabled',
+        'isActive',
+        'datetime',
+        'lastUpdatedOn',
+    ]
+    search_fields = ['name', 'slug', 'legalName', 'gstNumber', 'phone']
+    list_filter = [
+        'isActive',
+        'inventoryEnabled',
+        'advancedInvoicingEnabled',
+        'nonGstShadowEnabled',
+        'enableAttendanceLocationMaps',
+    ]
+    readonly_fields = ['datetime', 'lastUpdatedOn', 'membership_summary']
 
     fieldsets = (
         (None, {
-            'fields': ('name', 'slug', 'isActive', 'enableAttendanceLocationMaps'),
+            'fields': ('name', 'slug', 'isActive'),
+        }),
+        ('Business Details', {
+            'fields': ('legalName', 'gstNumber', 'phone', 'billingAddress'),
+        }),
+        ('Tenant Features', {
+            'fields': (
+                'inventoryEnabled',
+                'advancedInvoicingEnabled',
+                'nonGstShadowEnabled',
+                'enableAttendanceLocationMaps',
+            ),
         }),
         ('Tenant Admin Access', {
             'fields': ('tenant_admin_user', 'preset_bundles', 'admin_permissions'),
             'description': 'Assign the tenant admin, choose permission presets, then review the raw tenant admin permissions below.',
         }),
+        ('Membership Snapshot', {
+            'fields': ('membership_summary', 'datetime', 'lastUpdatedOn'),
+        }),
     )
+
+    def membership_summary(self, obj):
+        memberships = obj.memberships.select_related('user').order_by('-isDefault', 'role', 'id')
+        if not memberships.exists():
+            return 'No memberships'
+        rows = []
+        for membership in memberships:
+            default_badge = ' (Default)' if membership.isDefault else ''
+            rows.append(f'{membership.user.username} - {membership.get_role_display()}{default_badge}')
+        return format_html_join('\n', '{}<br>', ((row,) for row in rows))
+
+    membership_summary.short_description = 'Tenant Memberships'
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)

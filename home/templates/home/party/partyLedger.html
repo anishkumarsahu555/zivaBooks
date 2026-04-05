@@ -111,6 +111,42 @@
             width: 100px !important;
         }
 
+        html[data-theme="dark"] .books-kpi {
+            border-color: var(--app-line);
+            background: linear-gradient(135deg, #162338, #111b2e);
+        }
+
+        html[data-theme="dark"] .books-kpi::after {
+            background: radial-gradient(circle at top right, rgba(148, 163, 184, 0.10), rgba(255,255,255,0) 55%);
+        }
+
+        html[data-theme="dark"] .books-kpi-label,
+        html[data-theme="dark"] .pl-time {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .books-kpi-value,
+        html[data-theme="dark"] .pl-part,
+        html[data-theme="dark"] .pl-date,
+        html[data-theme="dark"] .pl-amt {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .books-kpi-opening .books-kpi-icon { background: rgba(100, 116, 139, 0.22); color: #cbd5e1; }
+        html[data-theme="dark"] .books-kpi-in .books-kpi-icon { background: rgba(59, 130, 246, 0.20); color: #93c5fd; }
+        html[data-theme="dark"] .books-kpi-out .books-kpi-icon { background: rgba(16, 185, 129, 0.18); color: #99f6e4; }
+        html[data-theme="dark"] .books-kpi-closing .books-kpi-icon { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+
+        html[data-theme="dark"] .pl-chip-dr {
+            background: rgba(16, 185, 129, 0.16);
+            color: #99f6e4;
+        }
+
+        html[data-theme="dark"] .pl-chip-cr {
+            background: rgba(244, 63, 94, 0.16);
+            color: #fda4af;
+        }
+
     </style>
 {% endblock %}
 
@@ -210,6 +246,10 @@
                     </div>
                 </div>
 
+                <h4 class="ui horizontal left aligned divider header">
+                    <i class="left align icon"></i>
+                    Party Ledger
+                </h4>
                 <table class="ui unstackable tiny sortable celled very compact table party-ledger-table" id="UserTable" style="margin-top: 5px; width: 100%">
                     <thead>
                     <tr>

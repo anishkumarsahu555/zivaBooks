@@ -36,6 +36,7 @@
         margin:0!important;
     }
 }
+html[data-theme="dark"] .panel{background:#0f172a;border-color:rgba(71,85,105,.42);box-shadow:0 14px 32px rgba(2,6,23,.28)}html[data-theme="dark"] .action-card{border-color:rgba(71,85,105,.4);background:linear-gradient(180deg,#111827,#0f172a)}html[data-theme="dark"] .action-card p,html[data-theme="dark"] .tip-list{color:#94a3b8}html[data-theme="dark"] .panel .ui.info.message{background:rgba(8,47,73,.38)!important;border-color:rgba(56,189,248,.24)!important;color:#dbeafe!important}html[data-theme="dark"] .panel .ui.info.message .header,html[data-theme="dark"] .ui.header{color:#f8fafc!important}
 </style>
 {% endblock %}
 {% block body %}
@@ -87,7 +88,10 @@
   <div class="ui two column stackable grid">
     <div class="column">
       <div class="action-card">
-        <h4 class="ui header">Cash Movement</h4>
+        <h4 class="ui horizontal left aligned divider header">
+          <i class="left align icon"></i>
+          Cash Movement
+        </h4>
         <p>Review inflow, outflow, and closing cash for the selected cash account.</p>
         <div class="action-buttons">
           <a class="ui teal button" id="openCashbookLink" href="{{ cashbook_url }}">Open Cashbook</a>
@@ -98,7 +102,10 @@
     </div>
     <div class="column">
       <div class="action-card">
-        <h4 class="ui header">Bank Movement</h4>
+        <h4 class="ui horizontal left aligned divider header">
+          <i class="left align icon"></i>
+          Bank Movement
+        </h4>
         <p>Review receipts, payments, and closing bank balance for the selected bank.</p>
         <div class="action-buttons">
           <a class="ui teal button" id="openBankbookLink" href="{{ bankbook_url }}">Open Bankbook</a>
@@ -110,7 +117,10 @@
   </div>
 
   <div class="panel">
-    <h4 class="ui header">What This Report Helps You Check</h4>
+    <h4 class="ui horizontal left aligned divider header">
+      <i class="left align icon"></i>
+      What This Report Helps You Check
+    </h4>
     <ul class="tip-list">
       <li>Cash closing versus bank receipts for the same period.</li>
       <li>Whether the wrong account is carrying entries that should be transferred or corrected.</li>
