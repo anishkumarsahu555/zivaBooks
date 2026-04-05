@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 
@@ -36,6 +37,7 @@ User = get_user_model()
 
 class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
     def setUp(self):
+        cache.clear()
         self.client.force_login(self.owner)
         self.item = InventoryItem.objects.create(
             tenant=self.tenant,
@@ -218,6 +220,54 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
         self.assertEqual(payload[0]['name'], 'GST Cement')
         self.assertEqual(payload[0]['gst'], 5.0)
         self.assertEqual(payload[0]['non_gst'], 1.0)
+
+    def test_inventory_item_list_cache_refreshes_after_stock_change(self):
+        initial_response = self.client.get(reverse('homeApp:list_inventory_items_api'))
+        self.assertEqual(initial_response.status_code, 200)
+        initial_payload = {row['Name']: row for row in initial_response.json()['data']}
+        self.assertEqual(initial_payload['GST Cement']['GSTStock'], 0.0)
+
+        purchase_response = self.client.post(
+            reverse('homeApp:add_purchase_invoice_api'),
+            data={
+                'party': str(self.party.pk),
+                'invoiceNumber': 'P-2001',
+                'invoiceDate': '25/03/2026',
+                'gstTreatment': PurchaseInvoice.GstTreatment.GST,
+                'claimStatus': PurchaseInvoice.ClaimStatus.NOT_APPLICABLE,
+                'lineItems': self._line_items(6, unit_cost=80.0, unit_price=0.0),
+            },
+        )
+        self.assertEqual(purchase_response.status_code, 200, msg=getattr(purchase_response, 'content', b''))
+
+        refreshed_response = self.client.get(reverse('homeApp:list_inventory_items_api'))
+        self.assertEqual(refreshed_response.status_code, 200)
+        refreshed_payload = {row['Name']: row for row in refreshed_response.json()['data']}
+        self.assertEqual(refreshed_payload['GST Cement']['GSTStock'], 6.0)
+
+    def test_inventory_category_list_cache_is_tenant_scoped(self):
+        InventoryCategory.objects.create(tenant=self.tenant, name='Alpha Category')
+        response = self.client.get(reverse('homeApp:list_inventory_categories_api'))
+        self.assertEqual(response.status_code, 200)
+        names = {row['Name'] for row in response.json()['data']}
+        self.assertIn('Alpha Category', names)
+
+        other_tenant = Tenant.objects.exclude(pk=self.tenant.pk).order_by('id').first()
+        self.assertIsNotNone(other_tenant)
+        other_owner_membership = (
+            TenantMembership.objects.select_related('user')
+            .filter(tenant=other_tenant, role=TenantMembership.Role.OWNER)
+            .first()
+        )
+        self.assertIsNotNone(other_owner_membership)
+        InventoryCategory.objects.create(tenant=other_tenant, name='Beta Category')
+
+        self.client.force_login(other_owner_membership.user)
+        other_response = self.client.get(reverse('homeApp:list_inventory_categories_api'))
+        self.assertEqual(other_response.status_code, 200)
+        other_names = {row['Name'] for row in other_response.json()['data']}
+        self.assertIn('Beta Category', other_names)
+        self.assertNotIn('Alpha Category', other_names)
 
     def test_inventory_and_purchase_pages_load_for_owner(self):
         inventory_page = self.client.get(reverse('homeApp:inventory_list'))
