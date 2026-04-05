@@ -31,6 +31,12 @@ from openpyxl.utils import get_column_letter
 from weasyprint import CSS, HTML
 from home.models import *
 from home.books import ensure_bank_account, ensure_books_for_tenant, sync_book_transactions
+from home.cache_keys import (
+    inventory_list_cache_key,
+    inventory_list_version_cache_key,
+    party_list_cache_key,
+    party_list_version_cache_key,
+)
 from home.credential_links import DEFAULT_CREDENTIAL_LINK_MINUTES, create_credential_share_token
 from home.inventory import (
     get_or_create_default_warehouse,
@@ -1331,15 +1337,31 @@ def _cash_counter_collection_list_base_qs(request_or_user):
         'collectionDateTime', 'datetime', 'isApproved', 'chequeDate',
         'partyID__name', 'transferredPartyID__name', 'bankID__name', 'collectedBy__name', 'approvedBy__name'
     )
-def _get_party_cache_version():
-    version = cache.get('party_list_cache_version')
+def _get_party_cache_version(request_or_user):
+    version_key = party_list_version_cache_key(request_or_user)
+    version = cache.get(version_key)
     if version is None:
         version = 1
-        cache.set('party_list_cache_version', version, timeout=None)
+        cache.set(version_key, version, timeout=None)
     return version
-def _bump_party_cache_version():
-    version = cache.get('party_list_cache_version') or 1
-    cache.set('party_list_cache_version', version + 1, timeout=None)
+def _bump_party_cache_version(request_or_user):
+    version_key = party_list_version_cache_key(request_or_user)
+    version = cache.get(version_key) or 1
+    cache.set(version_key, version + 1, timeout=None)
+def _get_inventory_list_cache_version(resource, request_or_user=None, *, tenant=None):
+    version_key = inventory_list_version_cache_key(resource, request_or_user=request_or_user, tenant=tenant)
+    version = cache.get(version_key)
+    if version is None:
+        version = 1
+        cache.set(version_key, version, timeout=None)
+    return version
+def _bump_inventory_list_cache_version(resource, request_or_user=None, *, tenant=None):
+    version_key = inventory_list_version_cache_key(resource, request_or_user=request_or_user, tenant=tenant)
+    version = cache.get(version_key) or 1
+    cache.set(version_key, version + 1, timeout=None)
+def _inventory_list_cache_key(resource, *parts, request_or_user=None, tenant=None):
+    version = _get_inventory_list_cache_version(resource, request_or_user=request_or_user, tenant=tenant)
+    return inventory_list_cache_key(resource, f'v{version}', *parts, request_or_user=request_or_user, tenant=tenant)
 def deduct_location_balance(lat, lng):
     return _reverse_geocode_openstreetmap(lat, lng)
 def send_whatsapp_message(number, message):
@@ -2088,7 +2110,7 @@ def add_party_api(request):
             obj.userID_id = new_user.pk
             obj.save()
             ensure_membership(new_user, obj.tenant, TenantMembership.Role.PARTY)
-            _bump_party_cache_version()
+            _bump_party_cache_version(request)
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -2124,7 +2146,7 @@ def generate_party_users_api(request):
                 ensure_membership(new_user, party.tenant, TenantMembership.Role.PARTY)
                 created = created + 1
             if created > 0:
-                _bump_party_cache_version()
+                _bump_party_cache_version(request)
             return JsonResponse({
                 'message': 'success',
                 'created': created,
@@ -2307,7 +2329,7 @@ def edit_party_api(request):
             except:
                 pass
             obj.save()
-            _bump_party_cache_version()
+            _bump_party_cache_version(request)
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
@@ -2323,14 +2345,14 @@ def delete_party(request):
             obj = tenant_qs(request, Party).select_related().get(pk=int(id))
             obj.isDeleted = True
             obj.save()
-            _bump_party_cache_version()
+            _bump_party_cache_version(request)
             return JsonResponse({'message': 'success'}, safe=False)
         except:
             return JsonResponse({'message': 'error'}, safe=False)
 def list_party_api(request):
     try:
-        version = _get_party_cache_version()
-        cache_key = f'PartyList:v{version}:all'
+        version = _get_party_cache_version(request)
+        cache_key = party_list_cache_key(f'v{version}', 'all', request_or_user=request)
         o_list = cache.get(cache_key)
         if o_list is None:
             o_list = []
@@ -2362,8 +2384,8 @@ def list_party_by_executive_or_station_api(request):
         executive = request.GET.get('executive')
         station = request.GET.get('station')
         o_list = []
-        version = _get_party_cache_version()
-        cache_key = f'PartyList:v{version}:exec:{executive}:station:{station}'
+        version = _get_party_cache_version(request)
+        cache_key = party_list_cache_key(f'v{version}', 'exec', executive, 'station', station, request_or_user=request)
         cached = cache.get(cache_key)
         if cached is not None:
             return JsonResponse({'message': 'success', 'data': cached}, safe=False)
@@ -5957,6 +5979,7 @@ def delete_inventory_item_api(request):
         item.save(update_fields=['isDeleted', 'lastUpdatedOn'])
         InventoryStock.objects.filter(tenant=item.tenant, item=item).update(isDeleted=True)
         InventoryLedgerEntry.objects.filter(tenant=item.tenant, item=item).update(isDeleted=True)
+        _bump_inventory_list_cache_version('items', tenant=item.tenant)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -5973,16 +5996,12 @@ def list_inventory_items_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401)
     tenant = get_current_tenant(request)
+    cache_key = _inventory_list_cache_key('items', 'all', request_or_user=request, tenant=tenant)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse({'message': 'success', 'data': cached}, safe=False)
     non_gst_enabled = bool(getattr(tenant, 'nonGstShadowEnabled', False))
     items = tenant_qs(request, InventoryItem).filter(isDeleted=False).order_by('name')
-    stock_map = {
-        row['item_id']: row
-        for row in InventoryStock.objects.filter(
-            tenant=tenant,
-            isDeleted=False,
-            item_id__in=items.values_list('id', flat=True),
-        ).values('item_id', 'stockBucket', 'quantityOnHand')
-    }
     payload = []
     stocks = defaultdict(lambda: {'gst': 0.0, 'non_gst': 0.0})
     for row in InventoryStock.objects.filter(tenant=tenant, isDeleted=False, item__isDeleted=False):
@@ -6014,6 +6033,7 @@ def list_inventory_items_api(request):
             'NonGSTStock': stocks[item.pk]['non_gst'] if non_gst_enabled else 0.0,
             'IsLowStock': (stocks[item.pk]['gst'] + stocks[item.pk]['non_gst']) <= float(item.minimumStockLevel or 0.0),
         })
+    cache.set(cache_key, payload, timeout=60 * 10)
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
@@ -6030,6 +6050,7 @@ def add_inventory_category_api(request):
         assign_tenant(category, request)
         _apply_inventory_category_payload(request, category)
         category.save()
+        _bump_inventory_list_cache_version('categories', tenant=category.tenant)
         return JsonResponse({'message': 'success', 'categoryId': category.pk}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6048,6 +6069,8 @@ def update_inventory_category_api(request):
         _apply_inventory_category_payload(request, category)
         category.save()
         InventoryItem.objects.filter(tenant=category.tenant, category=category, isDeleted=False).update(categoryName=category.name)
+        _bump_inventory_list_cache_version('categories', tenant=category.tenant)
+        _bump_inventory_list_cache_version('items', tenant=category.tenant)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6066,6 +6089,8 @@ def delete_inventory_category_api(request):
         InventoryItem.objects.filter(tenant=category.tenant, category=category, isDeleted=False).update(category=None)
         category.isDeleted = True
         category.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        _bump_inventory_list_cache_version('categories', tenant=category.tenant)
+        _bump_inventory_list_cache_version('items', tenant=category.tenant)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6074,6 +6099,10 @@ def delete_inventory_category_api(request):
 def list_inventory_categories_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401)
+    cache_key = _inventory_list_cache_key('categories', 'all', request_or_user=request)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse({'message': 'success', 'data': cached}, safe=False)
     rows = tenant_qs(request, InventoryCategory).filter(isDeleted=False).order_by('name')
     payload = [{
         'ID': row.pk,
@@ -6083,6 +6112,7 @@ def list_inventory_categories_api(request):
         'IsActive': bool(row.isActive),
         'ItemCount': row.items.filter(isDeleted=False).count(),
     } for row in rows]
+    cache.set(cache_key, payload, timeout=60 * 30)
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
@@ -6099,6 +6129,7 @@ def add_inventory_unit_api(request):
         assign_tenant(unit, request)
         _apply_inventory_unit_payload(request, unit)
         unit.save()
+        _bump_inventory_list_cache_version('units', tenant=unit.tenant)
         return JsonResponse({'message': 'success', 'unitId': unit.pk}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6117,6 +6148,8 @@ def update_inventory_unit_api(request):
         _apply_inventory_unit_payload(request, unit)
         unit.save()
         InventoryItem.objects.filter(tenant=unit.tenant, unit=unit, isDeleted=False).update(unitName=unit.symbol)
+        _bump_inventory_list_cache_version('units', tenant=unit.tenant)
+        _bump_inventory_list_cache_version('items', tenant=unit.tenant)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6135,6 +6168,8 @@ def delete_inventory_unit_api(request):
         InventoryItem.objects.filter(tenant=unit.tenant, unit=unit, isDeleted=False).update(unit=None)
         unit.isDeleted = True
         unit.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        _bump_inventory_list_cache_version('units', tenant=unit.tenant)
+        _bump_inventory_list_cache_version('items', tenant=unit.tenant)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6143,6 +6178,10 @@ def delete_inventory_unit_api(request):
 def list_inventory_units_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401)
+    cache_key = _inventory_list_cache_key('units', 'all', request_or_user=request)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse({'message': 'success', 'data': cached}, safe=False)
     rows = tenant_qs(request, InventoryUnit).filter(isDeleted=False).order_by('name')
     payload = [{
         'ID': row.pk,
@@ -6153,6 +6192,7 @@ def list_inventory_units_api(request):
         'IsActive': bool(row.isActive),
         'ItemCount': row.items.filter(isDeleted=False).count(),
     } for row in rows]
+    cache.set(cache_key, payload, timeout=60 * 30)
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
@@ -6169,6 +6209,7 @@ def add_inventory_tax_profile_api(request):
         assign_tenant(tax_profile, request)
         _apply_inventory_tax_profile_payload(request, tax_profile)
         tax_profile.save()
+        _bump_inventory_list_cache_version('tax_profiles', tenant=tax_profile.tenant)
         return JsonResponse({'message': 'success', 'taxProfileId': tax_profile.pk}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6190,6 +6231,8 @@ def update_inventory_tax_profile_api(request):
             hsnCode=tax_profile.hsnCode,
             gstRate=tax_profile.gstRate,
         )
+        _bump_inventory_list_cache_version('tax_profiles', tenant=tax_profile.tenant)
+        _bump_inventory_list_cache_version('items', tenant=tax_profile.tenant)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6208,6 +6251,8 @@ def delete_inventory_tax_profile_api(request):
         InventoryItem.objects.filter(tenant=tax_profile.tenant, taxProfile=tax_profile, isDeleted=False).update(taxProfile=None)
         tax_profile.isDeleted = True
         tax_profile.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        _bump_inventory_list_cache_version('tax_profiles', tenant=tax_profile.tenant)
+        _bump_inventory_list_cache_version('items', tenant=tax_profile.tenant)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6216,6 +6261,10 @@ def delete_inventory_tax_profile_api(request):
 def list_inventory_tax_profiles_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401)
+    cache_key = _inventory_list_cache_key('tax_profiles', 'all', request_or_user=request)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse({'message': 'success', 'data': cached}, safe=False)
     rows = tenant_qs(request, InventoryTaxProfile).filter(isDeleted=False).order_by('name')
     payload = [{
         'ID': row.pk,
@@ -6227,6 +6276,7 @@ def list_inventory_tax_profiles_api(request):
         'IsActive': bool(row.isActive),
         'ItemCount': row.items.filter(isDeleted=False).count(),
     } for row in rows]
+    cache.set(cache_key, payload, timeout=60 * 30)
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
@@ -6257,6 +6307,7 @@ def add_inventory_warehouse_api(request):
         elif not InventoryWarehouse.objects.filter(tenant=warehouse.tenant, isDeleted=False, isDefault=True).exists():
             warehouse.isDefault = True
             warehouse.save(update_fields=['isDefault', 'lastUpdatedOn'])
+        _bump_inventory_list_cache_version('warehouses', tenant=warehouse.tenant)
         return JsonResponse({'message': 'success', 'warehouseId': warehouse.pk}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6281,6 +6332,7 @@ def update_inventory_warehouse_api(request):
         warehouse.save()
         if warehouse.isDefault:
             InventoryWarehouse.objects.filter(tenant=warehouse.tenant, isDeleted=False).exclude(pk=warehouse.pk).update(isDefault=False)
+        _bump_inventory_list_cache_version('warehouses', tenant=warehouse.tenant)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6307,6 +6359,7 @@ def delete_inventory_warehouse_api(request):
         if replacement and not InventoryWarehouse.objects.filter(tenant=warehouse.tenant, isDeleted=False, isDefault=True).exists():
             replacement.isDefault = True
             replacement.save(update_fields=['isDefault', 'lastUpdatedOn'])
+        _bump_inventory_list_cache_version('warehouses', tenant=warehouse.tenant)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
@@ -6316,6 +6369,10 @@ def list_inventory_warehouses_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401)
     tenant = get_current_tenant(request)
+    cache_key = _inventory_list_cache_key('warehouses', 'active', request_or_user=request, tenant=tenant)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse({'message': 'success', 'data': cached}, safe=False)
     warehouses = InventoryWarehouse.objects.filter(
         tenant=tenant,
         isDeleted=False,
@@ -6335,6 +6392,7 @@ def list_inventory_warehouses_api(request):
         'Address': warehouse.address or '',
         'IsDefault': bool(warehouse.isDefault),
     } for warehouse in warehouses]
+    cache.set(cache_key, payload, timeout=60 * 30)
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 

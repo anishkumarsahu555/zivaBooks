@@ -3,9 +3,11 @@ from __future__ import annotations
 from collections import defaultdict
 
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 
+from home.cache_keys import inventory_list_version_cache_key
 from home.models import (
     CashCounterLine,
     InventoryAdjustmentLine,
@@ -27,6 +29,12 @@ SALE_DEDUCT_MODES = {'Cash', 'Card', 'Credit', 'Mix'}
 RETURN_ADD_MODES = {'Return'}
 DEFAULT_WAREHOUSE_NAME = 'Main Store'
 DEFAULT_WAREHOUSE_CODE = 'MAIN'
+
+
+def _bump_inventory_list_cache_version(resource: str, *, tenant) -> None:
+    version_key = inventory_list_version_cache_key(resource, tenant=tenant)
+    version = cache.get(version_key) or 1
+    cache.set(version_key, version + 1, timeout=None)
 
 
 def _bucket_totals():
@@ -60,15 +68,18 @@ def get_or_create_default_warehouse(tenant):
         if not first_active.isDefault:
             first_active.isDefault = True
             first_active.save(update_fields=['isDefault', 'lastUpdatedOn'])
+            _bump_inventory_list_cache_version('warehouses', tenant=tenant)
         return first_active
 
-    return InventoryWarehouse.objects.create(
+    warehouse = InventoryWarehouse.objects.create(
         tenant=tenant,
         name=DEFAULT_WAREHOUSE_NAME,
         code=DEFAULT_WAREHOUSE_CODE,
         isDefault=True,
         isActive=True,
     )
+    _bump_inventory_list_cache_version('warehouses', tenant=tenant)
+    return warehouse
 
 
 @transaction.atomic
@@ -82,6 +93,7 @@ def set_default_warehouse(tenant, warehouse):
     if not warehouse.isDefault:
         warehouse.isDefault = True
         warehouse.save(update_fields=['isDefault', 'lastUpdatedOn'])
+        _bump_inventory_list_cache_version('warehouses', tenant=tenant)
     return warehouse
 
 
@@ -391,6 +403,7 @@ def rebuild_inventory_stock(tenant, item_ids=None):
                 stock.quantityOnHand = quantity
                 stock.isDeleted = False
                 stock.save(update_fields=['quantityOnHand', 'isDeleted', 'lastUpdatedOn'])
+    _bump_inventory_list_cache_version('items', tenant=tenant)
 
 
 def validate_non_negative_inventory(tenant, item_ids=None, item_bucket_pairs=None):
