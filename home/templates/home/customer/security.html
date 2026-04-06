@@ -1,0 +1,84 @@
+{% extends 'home/customer/base.html' %}
+
+{% block customer_page_body %}
+    <section class="customer-card">
+        <div class="customer-card-header">
+            <div class="customer-card-title">Change Password</div>
+        </div>
+        <div class="customer-card-copy">The customer portal keeps the existing 6-digit password flow unchanged.</div>
+        <div class="ui tiny message" id="pwdMsg" style="display:none; margin-top: 12px;"></div>
+        <form class="ui tiny form" id="pwdForm" action="{% url 'homeApp:customer_change_password' %}" method="post" style="margin-top: 12px;">
+            {% csrf_token %}
+            <div class="customer-form-grid">
+                <div class="field">
+                    <label>Current Password</label>
+                    <input type="password" name="current_password" maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric" required>
+                </div>
+                <div class="field">
+                    <label>New Password</label>
+                    <input type="password" name="new_password" maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric" required>
+                </div>
+                <div class="field">
+                    <label>Confirm New Password</label>
+                    <input type="password" name="confirm_password" maxlength="6" minlength="6" pattern="[0-9]{6}" inputmode="numeric" required>
+                </div>
+            </div>
+            <button class="ui fluid blue button" style="margin-top: 12px;" type="button" id="pwdSubmitBtn">Update Password</button>
+        </form>
+    </section>
+{% endblock %}
+
+{% block customer_page_js %}
+    <script>
+        function showPwdMessage(type, text) {
+            var box = $('#pwdMsg');
+            box.removeClass('positive negative').addClass(type === 'success' ? 'positive' : 'negative');
+            box.text(text).show();
+        }
+
+        async function submitPwd() {
+            var form = document.getElementById('pwdForm');
+            var sixDigits = /^[0-9]{6}$/;
+            var current = form.current_password.value;
+            var nextPwd = form.new_password.value;
+            var confirmPwd = form.confirm_password.value;
+            if (!sixDigits.test(current) || !sixDigits.test(nextPwd) || !sixDigits.test(confirmPwd)) {
+                showPwdMessage('error', 'All passwords must be exactly 6 digits.');
+                return;
+            }
+            if (nextPwd !== confirmPwd) {
+                showPwdMessage('error', 'New password and confirm password do not match.');
+                return;
+            }
+            var btn = document.getElementById('pwdSubmitBtn');
+            btn.classList.add('loading');
+            var formData = new FormData(form);
+            try {
+                var response = await fetch(form.action, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': form.querySelector('input[name="csrfmiddlewaretoken"]').value
+                    },
+                    body: formData
+                });
+                var payload = await response.json();
+                if (response.ok && payload && payload.message === 'success') {
+                    showPwdMessage('success', payload.success || 'Password changed successfully.');
+                    form.reset();
+                    return;
+                }
+                showPwdMessage('error', (payload && (payload.error || payload.detail)) || 'Unable to update password.');
+            } catch (e) {
+                showPwdMessage('error', 'Network error. Please try again.');
+            } finally {
+                btn.classList.remove('loading');
+            }
+        }
+
+        $(function () {
+            $('#pwdSubmitBtn').on('click', submitPwd);
+        });
+    </script>
+{% endblock %}

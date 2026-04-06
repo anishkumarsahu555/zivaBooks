@@ -622,13 +622,18 @@ def _customer_sections(user):
         {
             'title': 'General',
             'items': _filter_items(user, [
-                _nav_item('Dashboard', 'homeApp:homepage', 'tachometer alternate', 'home.view_party'),
+                _nav_item('Dashboard', 'homeApp:customer_home', 'tachometer alternate', 'home.view_party'),
+                _nav_item('Ledger', 'homeApp:customer_ledger', 'book', 'home.view_party'),
+                _nav_item('Invoices', 'homeApp:customer_invoices', 'file pdf outline', 'home.view_party'),
+                _nav_item('Payments', 'homeApp:customer_payments', 'money bill alternate outline', 'home.view_party'),
+                _nav_item('Orders', 'homeApp:customer_orders', 'shopping bag', 'home.view_party'),
             ]),
         },
         {
             'title': 'Account',
             'items': [
-                _nav_item('Change Password', 'homeApp:customer_home', 'key'),
+                _nav_item('Profile', 'homeApp:customer_profile', 'user circle'),
+                _nav_item('Security', 'homeApp:customer_security', 'shield alternate'),
                 _nav_item('Logout', 'homeApp:logout', 'sign out alternate'),
             ],
         },
@@ -642,6 +647,14 @@ def build_sidebar_sections(request_or_user):
         return []
     if hasattr(request_or_user, '_sidebar_sections_cache'):
         return request_or_user._sidebar_sections_cache
+    tenant = get_current_tenant(request_or_user)
+    if _tenant_membership_role(request_or_user, tenant) == TenantMembership.Role.PARTY:
+        sections = _customer_sections(user)
+        if hasattr(request_or_user, 'META'):
+            request_or_user._sidebar_sections_cache = sections
+        else:
+            user._sidebar_sections_cache = sections
+        return sections
     is_admin_like = _has_any_perm(request_or_user, ADMIN_LIKE_PERMS)
     party_admin_perms = ('home.can_manage_parties', 'home.can_view_party_credentials')
     bank_perms = (

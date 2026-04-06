@@ -1,0 +1,25 @@
+{% load formatting %}
+
+{% for entry in items %}
+    <article class="customer-list-card customer-progressive-item">
+        <div class="customer-list-top">
+            <div>
+                <div class="customer-list-title">{{ entry.title }}</div>
+                <div class="customer-list-subtitle">{{ entry.subtitle }}</div>
+            </div>
+            <div class="customer-badge">₹ {{ entry.balance|money }}</div>
+        </div>
+        <div class="customer-list-meta">
+            <span class="customer-meta-chip"><i class="calendar alternate outline icon"></i>{{ entry.date_label }}</span>
+            {% if entry.debit %}
+                <span class="customer-meta-chip is-debit"><i class="arrow up icon"></i>Debit ₹ {{ entry.debit|money }}</span>
+            {% endif %}
+            {% if entry.credit %}
+                <span class="customer-meta-chip is-credit"><i class="arrow down icon"></i>Credit ₹ {{ entry.credit|money }}</span>
+            {% endif %}
+        </div>
+        {% if entry.detail %}
+            <div class="customer-list-copy">{{ entry.detail }}</div>
+        {% endif %}
+    </article>
+{% endfor %}

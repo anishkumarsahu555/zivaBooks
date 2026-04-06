@@ -1,0 +1,337 @@
+{% extends 'home/customer/base.html' %}
+
+{% block customer_page_css %}
+    <style>
+        .customer-profile-shell {
+            display: grid;
+            gap: 12px;
+        }
+
+        .customer-profile-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            padding: 16px;
+            color: #f8fafc;
+            background:
+                radial-gradient(circle at top left, rgba(251, 191, 36, 0.18), transparent 28%),
+                radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.18), transparent 34%),
+                linear-gradient(135deg, #0f172a 0%, #134e4a 52%, #1d4ed8 100%);
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16);
+        }
+
+        .customer-profile-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 30%),
+                linear-gradient(300deg, rgba(255, 255, 255, 0.05), transparent 20%);
+            pointer-events: none;
+        }
+
+        .customer-profile-hero > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .customer-profile-kicker {
+            font-size: 0.74rem;
+            font-weight: 900;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(248, 250, 252, 0.72);
+        }
+
+        .customer-profile-title {
+            margin-top: 8px;
+            font-size: 1.45rem;
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: -0.03em;
+        }
+
+        .customer-profile-subtitle {
+            margin-top: 6px;
+            color: rgba(248, 250, 252, 0.84);
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+
+        .customer-profile-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .customer-profile-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
+            color: #f8fafc;
+            font-size: 0.77rem;
+            font-weight: 800;
+            backdrop-filter: blur(10px);
+        }
+
+        .customer-profile-chip.is-accent {
+            background: rgba(45, 212, 191, 0.18);
+        }
+
+        .customer-profile-chip.is-warm {
+            background: rgba(251, 146, 60, 0.18);
+        }
+
+        .customer-profile-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+            gap: 12px;
+        }
+
+        .customer-profile-card {
+            border-radius: 22px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+            overflow: hidden;
+        }
+
+        .customer-profile-card-head {
+            padding: 14px 16px 0;
+            font-size: 0.8rem;
+            font-weight: 900;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .customer-profile-card-body {
+            padding: 14px 16px 16px;
+        }
+
+        .customer-profile-identity {
+            background:
+                radial-gradient(circle at top center, rgba(15, 118, 110, 0.12), transparent 30%),
+                linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(255, 255, 255, 1));
+        }
+
+        .customer-profile-overline {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 11px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.06);
+            color: #475569;
+            font-size: 0.72rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .customer-profile-name {
+            margin-top: 14px;
+            font-size: 1.55rem;
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            color: #0f172a;
+        }
+
+        .customer-profile-handle {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 0.92rem;
+        }
+
+        .customer-profile-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .customer-profile-row {
+            display: grid;
+            grid-template-columns: 18px minmax(88px, 112px) minmax(0, 1fr);
+            gap: 10px;
+            align-items: start;
+        }
+
+        .customer-profile-row .icon {
+            margin: 2px 0 0 !important;
+            color: #0f766e;
+        }
+
+        .customer-profile-label {
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .customer-profile-value {
+            font-size: 0.94rem;
+            font-weight: 700;
+            line-height: 1.45;
+            color: #0f172a;
+            word-break: break-word;
+        }
+
+        .customer-profile-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .customer-profile-meta {
+            border-radius: 18px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(248, 250, 252, 0.9);
+            padding: 14px;
+        }
+
+        .customer-profile-meta-label {
+            color: #64748b;
+            font-size: 0.73rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .customer-profile-meta-value {
+            margin-top: 8px;
+            color: #0f172a;
+            font-size: 0.98rem;
+            font-weight: 900;
+            line-height: 1.35;
+        }
+
+        html[data-theme="dark"] .customer-profile-card {
+            background: rgba(27, 41, 68, 0.98);
+            border-color: rgba(148, 163, 184, 0.28);
+            box-shadow: 0 16px 30px rgba(2, 6, 23, 0.36);
+        }
+
+        html[data-theme="dark"] .customer-profile-identity {
+            background:
+                radial-gradient(circle at top center, rgba(20, 184, 166, 0.18), transparent 32%),
+                linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(17, 24, 39, 1));
+        }
+
+        html[data-theme="dark"] .customer-profile-card-head,
+        html[data-theme="dark"] .customer-profile-label,
+        html[data-theme="dark"] .customer-profile-handle,
+        html[data-theme="dark"] .customer-profile-meta-label {
+            color: #a7b8cd;
+        }
+
+        html[data-theme="dark"] .customer-profile-name,
+        html[data-theme="dark"] .customer-profile-value,
+        html[data-theme="dark"] .customer-profile-meta-value {
+            color: #e5edf7;
+        }
+
+        html[data-theme="dark"] .customer-profile-overline {
+            background: rgba(148, 163, 184, 0.14);
+            color: #dbe7f4;
+        }
+
+        html[data-theme="dark"] .customer-profile-row .icon {
+            color: #5eead4;
+        }
+
+        html[data-theme="dark"] .customer-profile-meta {
+            background: rgba(17, 24, 39, 0.94);
+            border-color: rgba(148, 163, 184, 0.22);
+        }
+
+        @media (max-width: 700px) {
+            .customer-profile-grid,
+            .customer-profile-meta-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block customer_page_body %}
+    <section class="customer-profile-shell">
+        <article class="customer-profile-hero">
+            <div class="customer-profile-kicker">Customer Workspace</div>
+            <div class="customer-profile-title">{{ profile_identity.name }}</div>
+            <div class="customer-profile-subtitle">{{ profile_identity.legal_name }}</div>
+            <div class="customer-profile-chip-row">
+                {% for chip in profile_chips %}
+                    <span class="customer-profile-chip{% if chip.tone == 'accent' %} is-accent{% elif chip.tone == 'warm' %} is-warm{% endif %}">{{ chip.label }}</span>
+                {% endfor %}
+            </div>
+        </article>
+
+        <section class="customer-profile-grid">
+            <article class="customer-profile-card customer-profile-identity">
+                <div class="customer-profile-card-body">
+                    <div class="customer-profile-overline">
+                        <i class="user outline icon"></i>
+                        Account Identity
+                    </div>
+                    <div class="customer-profile-name">{{ profile_identity.name }}</div>
+                    <div class="customer-profile-handle">{{ profile_identity.login_id }}</div>
+                    <div class="customer-profile-chip-row">
+                        <span class="customer-profile-chip">{{ profile_identity.phone }}</span>
+                        <span class="customer-profile-chip">{{ profile_identity.legal_name }}</span>
+                    </div>
+                </div>
+            </article>
+
+            <article class="customer-profile-card">
+                <div class="customer-profile-card-head">Portal Access</div>
+                <div class="customer-profile-card-body">
+                    <div class="customer-profile-meta-grid">
+                        {% for item in profile_meta_cards %}
+                            <div class="customer-profile-meta">
+                                <div class="customer-profile-meta-label">{{ item.label }}</div>
+                                <div class="customer-profile-meta-value">{{ item.value }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <section class="customer-profile-grid">
+            <article class="customer-profile-card">
+                <div class="customer-profile-card-head">Contact Details</div>
+                <div class="customer-profile-card-body">
+                    <div class="customer-profile-list">
+                        {% for row in profile_contact_rows %}
+                            <div class="customer-profile-row">
+                                <i class="{{ row.icon }} icon"></i>
+                                <div class="customer-profile-label">{{ row.label }}</div>
+                                <div class="customer-profile-value">{{ row.value }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </article>
+
+            <article class="customer-profile-card">
+                <div class="customer-profile-card-head">Business Details</div>
+                <div class="customer-profile-card-body">
+                    <div class="customer-profile-list">
+                        {% for row in profile_business_rows %}
+                            <div class="customer-profile-row">
+                                <i class="{{ row.icon }} icon"></i>
+                                <div class="customer-profile-label">{{ row.label }}</div>
+                                <div class="customer-profile-value">{{ row.value }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </article>
+        </section>
+    </section>
+{% endblock %}

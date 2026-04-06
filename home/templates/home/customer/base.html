@@ -1,0 +1,1181 @@
+{% extends 'home/baseIndex.html' %}
+{% load static %}
+{% load formatting %}
+
+{% block title %}
+    <title>{{ customer_page_title|default:"Customer Portal" }}</title>
+{% endblock %}
+
+{% block css %}
+    {{ block.super }}
+    <style>
+        .main-content {
+            padding-bottom: 132px;
+            background:
+                radial-gradient(900px 360px at -10% -10%, rgba(37, 99, 235, 0.08), transparent 60%),
+                radial-gradient(820px 320px at 110% 0%, rgba(14, 165, 233, 0.06), transparent 58%),
+                linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        }
+
+        .customer-app {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 5px 8px 132px;
+        }
+
+        .customer-page-head {
+            position: relative;
+            display: grid;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding: 12px 12px 10px;
+            border-radius: 18px;
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+            overflow: hidden;
+        }
+
+        .customer-page-head::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.04), transparent 24%, transparent 76%, rgba(14, 165, 233, 0.03));
+            pointer-events: none;
+        }
+
+        .customer-page-header {
+            position: relative;
+            z-index: 1;
+            display: block;
+            padding: 0;
+        }
+
+        .customer-page-title {
+            margin-top: 0;
+            font-size: 1.16rem;
+            font-weight: 900;
+            line-height: 1.1;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+        }
+
+        .customer-page-title::after {
+            content: "";
+            display: block;
+            width: 44px;
+            height: 3px;
+            margin-top: 8px;
+            border-radius: 999px;
+            background: #2563eb;
+        }
+
+        .customer-otp-stack {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            gap: 8px;
+            margin-bottom: 0;
+        }
+
+        .customer-otp-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+            padding: 10px;
+        }
+
+        .customer-otp-banner.is-received {
+            background: #ecfdf5;
+            border-color: rgba(16, 185, 129, 0.22);
+        }
+
+        .customer-otp-main,
+        .customer-otp-side {
+            min-width: 0;
+        }
+
+        .customer-otp-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 0.92rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .customer-otp-title .icon {
+            margin: 0 !important;
+        }
+
+        .customer-otp-code {
+            margin-top: 6px;
+            font-size: 1.35rem;
+            font-weight: 900;
+            letter-spacing: 0.16em;
+            color: #0b2235;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .customer-otp-sub {
+            margin-top: 6px;
+            color: #475569;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+
+        .customer-otp-side {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        .customer-otp-timer {
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.06);
+            padding: 8px 12px;
+            font-size: 0.92rem;
+            font-weight: 900;
+            color: #0f172a;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .customer-otp-chips {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .customer-otp-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            background: #eff6ff;
+            padding: 6px 10px;
+            font-size: 0.79rem;
+            font-weight: 800;
+            color: #1e40af;
+        }
+
+        .customer-otp-chip .icon {
+            margin: 0 !important;
+        }
+
+        .customer-grid {
+            display: grid;
+            gap: 8px;
+        }
+
+        .customer-grid.cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .customer-card {
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+            padding: 10px;
+        }
+
+        .customer-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .customer-card-title {
+            font-size: 1rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .customer-card-copy {
+            color: #475569;
+            line-height: 1.45;
+        }
+
+        .customer-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .customer-stat-card {
+            border-radius: 14px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid rgba(15, 23, 42, 0.07);
+            box-shadow: 0 8px 16px rgba(15, 23, 42, 0.04);
+        }
+
+        .customer-stat-card.tone-blue { background: #eff6ff; border-color: rgba(37, 99, 235, 0.12); }
+        .customer-stat-card.tone-green { background: #ecfdf5; border-color: rgba(5, 150, 105, 0.12); }
+        .customer-stat-card.tone-amber { background: #fff7ed; border-color: rgba(234, 88, 12, 0.12); }
+        .customer-stat-card.tone-slate { background: #f8fafc; border-color: rgba(100, 116, 139, 0.12); }
+
+        .customer-stat-label {
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .customer-stat-value {
+            margin-top: 8px;
+            font-size: 1.35rem;
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.1;
+        }
+
+        .customer-stat-hint {
+            margin-top: 6px;
+            color: #475569;
+            font-size: 0.84rem;
+            line-height: 1.4;
+        }
+
+        .customer-action-grid,
+        .customer-detail-list,
+        .customer-list {
+            display: grid;
+            gap: 8px;
+        }
+
+        .customer-action-row {
+            display: grid;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .customer-quick-dock {
+            position: fixed;
+            left: 50%;
+            bottom: 14px;
+            transform: translateX(-50%);
+            z-index: 950;
+            width: min(980px, calc(100vw - 28px));
+            padding: 12px;
+            border-radius: 28px;
+            background: rgba(255, 255, 255, 0.94);
+            border: 1px solid rgba(15, 23, 42, 0.1);
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.12);
+            backdrop-filter: blur(14px);
+        }
+
+        @media (min-width: 701px) {
+            .customer-quick-dock {
+                display: none;
+            }
+        }
+
+        .customer-action {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            border-radius: 14px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            padding: 10px;
+            color: #0f172a;
+            background: rgba(255, 255, 255, 0.98);
+        }
+
+        .customer-action.is-shortcut {
+            min-height: 92px;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+            gap: 10px;
+            padding: 12px 8px;
+            background: #f8fafc;
+            border-color: rgba(148, 163, 184, 0.16);
+        }
+
+        .customer-action.is-shortcut .icon {
+            margin: 0 !important;
+            font-size: 1.35rem;
+            color: #2563eb;
+        }
+
+        .customer-action.is-shortcut .customer-action-copy strong {
+            font-size: 0.84rem;
+            line-height: 1.2;
+        }
+
+        .customer-action.is-shortcut .customer-action-copy span {
+            display: none;
+        }
+
+        .customer-action-copy strong {
+            display: block;
+            font-size: 0.95rem;
+            font-weight: 900;
+        }
+
+        .customer-action-copy span {
+            display: block;
+            margin-top: 3px;
+            color: #64748b;
+            font-size: 0.84rem;
+        }
+
+        .customer-list-card {
+            border-radius: 14px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+            padding: 10px;
+        }
+
+        .customer-list-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .customer-list-title {
+            font-size: 0.98rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .customer-list-subtitle,
+        .customer-list-copy {
+            margin-top: 4px;
+            color: #64748b;
+            line-height: 1.45;
+            font-size: 0.85rem;
+        }
+
+        .customer-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 7px 10px;
+            background: #eff6ff;
+            font-size: 0.74rem;
+            font-weight: 900;
+            color: #1d4ed8;
+            white-space: nowrap;
+        }
+
+        .customer-badge.is-success {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .customer-badge.is-warning {
+            background: #fff7ed;
+            color: #b45309;
+        }
+
+        .customer-list-meta {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .customer-meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 6px 10px;
+            background: #f8fafc;
+            color: #334155;
+            font-size: 0.77rem;
+            font-weight: 800;
+        }
+
+        .customer-meta-chip .icon {
+            margin: 0 !important;
+        }
+
+        .customer-meta-chip.is-debit {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .customer-meta-chip.is-credit {
+            background: #ecfdf5;
+            color: #047857;
+        }
+
+        .customer-form-grid {
+            display: grid;
+            gap: 8px;
+        }
+
+        .customer-form-grid.cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .customer-form-grid.keep-2-mobile {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .customer-stat-grid.keep-2-mobile {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .customer-form-grid .field label {
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+
+        .customer-form-grid .ui.calendar .ui.input > .icon {
+            color: #2563eb;
+            opacity: 0.92;
+        }
+
+        .customer-search-wrap {
+            position: relative;
+        }
+
+        .customer-search-wrap .ui.input {
+            width: 100%;
+        }
+
+        .customer-search-wrap .ui.input input {
+            padding-right: 38px !important;
+        }
+
+        .customer-search-icon {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            color: #94a3b8;
+            pointer-events: none;
+        }
+
+        .customer-search-clear {
+            position: absolute;
+            top: 50%;
+            right: 8px;
+            transform: translateY(-50%);
+            display: none;
+            width: 22px;
+            height: 22px;
+            border: none;
+            border-radius: 999px;
+            background: #e2e8f0;
+            color: #1d4ed8;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            line-height: 1;
+            font-size: 0.9rem;
+            font-weight: 900;
+        }
+
+        .customer-search-wrap.has-value .customer-search-clear {
+            display: inline-flex;
+        }
+
+        .customer-search-wrap.has-value .customer-search-icon {
+            display: none;
+        }
+
+        .customer-pagination {
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 0.84rem;
+            color: #475569;
+        }
+
+        .customer-pagination a {
+            font-weight: 900;
+        }
+
+        .customer-progressive-item {
+            opacity: 0;
+            transform: translateY(16px) scale(0.985);
+            transition: opacity 0.34s ease, transform 0.38s ease;
+        }
+
+        .customer-progressive-item.is-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        .customer-list-loading {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: #475569;
+            font-size: 0.84rem;
+            font-weight: 800;
+        }
+
+        .customer-list-loading.is-active {
+            display: flex;
+        }
+
+        .customer-list-controls {
+            display: grid;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .customer-load-sentinel {
+            width: 100%;
+            height: 1px;
+        }
+
+        .customer-bottom-nav {
+            position: fixed;
+            left: 12px;
+            right: 12px;
+            bottom: 12px;
+            z-index: 1000;
+            display: none;
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 6px;
+            padding: 7px;
+            border-radius: 22px;
+            background: rgba(15, 23, 42, 0.92);
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            box-shadow: 0 16px 30px rgba(2, 6, 23, 0.28);
+            backdrop-filter: blur(16px);
+        }
+
+        .customer-bottom-link {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            min-height: 54px;
+            padding: 6px 2px;
+            border-radius: 15px;
+            color: rgba(226, 232, 240, 0.76);
+            font-size: 0.68rem;
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.01em;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .customer-bottom-link.active {
+            background: rgba(37, 99, 235, 0.24);
+            color: #f8fafc;
+            box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.22);
+        }
+
+        .customer-bottom-link.active::before {
+            content: "";
+            position: absolute;
+            top: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 3px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.92);
+        }
+
+        .customer-bottom-link .icon {
+            margin: 0 !important;
+            font-size: 1.02rem;
+            opacity: 0.95;
+        }
+
+        .customer-bottom-link span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        html[data-theme="dark"] .main-content {
+            background:
+                radial-gradient(900px 360px at -10% -10%, rgba(37, 99, 235, 0.14), transparent 60%),
+                radial-gradient(820px 320px at 110% 0%, rgba(14, 165, 233, 0.08), transparent 58%),
+                linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+        }
+
+        html[data-theme="dark"] .customer-page-head {
+            background:
+                linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(17, 24, 39, 0.98));
+            border-color: rgba(148, 163, 184, 0.22);
+            box-shadow: 0 12px 28px rgba(2, 6, 23, 0.3);
+        }
+
+        html[data-theme="dark"] .customer-card,
+        html[data-theme="dark"] .customer-stat-card,
+        html[data-theme="dark"] .customer-list-card,
+        html[data-theme="dark"] .customer-action,
+        html[data-theme="dark"] .customer-otp-banner,
+        html[data-theme="dark"] .customer-quick-dock {
+            background: rgba(15, 23, 42, 0.96);
+            border-color: rgba(148, 163, 184, 0.28);
+            box-shadow: 0 12px 24px rgba(2, 6, 23, 0.28);
+        }
+
+        html[data-theme="dark"] .customer-card-title,
+        html[data-theme="dark"] .customer-list-title,
+        html[data-theme="dark"] .customer-stat-value,
+        html[data-theme="dark"] .customer-otp-title,
+        html[data-theme="dark"] .customer-otp-code,
+        html[data-theme="dark"] .customer-page-title,
+        html[data-theme="dark"] .customer-badge,
+        html[data-theme="dark"] .customer-action {
+            color: #e5edf7;
+        }
+
+        html[data-theme="dark"] .customer-page-title::after {
+            background: #38bdf8;
+        }
+
+        html[data-theme="dark"] .customer-card-copy,
+        html[data-theme="dark"] .customer-list-subtitle,
+        html[data-theme="dark"] .customer-list-copy,
+        html[data-theme="dark"] .customer-stat-hint,
+        html[data-theme="dark"] .customer-form-grid .field label,
+        html[data-theme="dark"] .customer-pagination,
+        html[data-theme="dark"] .customer-list-loading,
+        html[data-theme="dark"] .customer-otp-sub {
+            color: #a7b8cd;
+        }
+
+        html[data-theme="dark"] .customer-meta-chip,
+        html[data-theme="dark"] .customer-otp-chip,
+        html[data-theme="dark"] .customer-otp-timer,
+        html[data-theme="dark"] .customer-badge {
+            background: rgba(30, 41, 59, 0.98);
+            color: #e2ebf6;
+        }
+
+        html[data-theme="dark"] .customer-meta-chip.is-debit {
+            background: rgba(127, 29, 29, 0.42);
+            color: #fecaca;
+        }
+
+        html[data-theme="dark"] .customer-meta-chip.is-credit {
+            background: rgba(6, 95, 70, 0.4);
+            color: #bbf7d0;
+        }
+
+        html[data-theme="dark"] .customer-form-grid .ui.calendar .ui.input > .icon {
+            color: #67e8f9;
+            opacity: 0.96;
+        }
+
+        html[data-theme="dark"] .customer-action.is-shortcut .icon {
+            color: #cbd5e1;
+        }
+
+        html[data-theme="dark"] .customer-action.is-shortcut {
+            background: rgba(17, 24, 39, 0.98);
+            border-color: rgba(148, 163, 184, 0.34);
+        }
+
+        html[data-theme="dark"] .customer-bottom-nav {
+            background: rgba(2, 6, 23, 0.94);
+            border-color: rgba(148, 163, 184, 0.18);
+            box-shadow: 0 16px 30px rgba(2, 6, 23, 0.36);
+        }
+
+        html[data-theme="dark"] .customer-bottom-link {
+            color: rgba(226, 232, 240, 0.8);
+        }
+
+        html[data-theme="dark"] .customer-bottom-link.active {
+            background: rgba(37, 99, 235, 0.28);
+            box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.24);
+        }
+
+        html[data-theme="dark"] .customer-search-clear {
+            background: rgba(148, 163, 184, 0.18);
+            color: #e2ebf6;
+        }
+
+        html[data-theme="dark"] .customer-search-icon {
+            color: #a7b8cd;
+        }
+
+        @media (max-width: 700px) {
+            .customer-grid.cols-2,
+            .customer-stat-grid:not(.keep-2-mobile),
+            .customer-form-grid.cols-2:not(.keep-2-mobile) {
+                grid-template-columns: 1fr;
+            }
+
+            .customer-action.is-shortcut {
+                min-height: 88px;
+            }
+
+            .customer-action-row {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .customer-quick-dock {
+                display: none;
+            }
+
+            .main-content {
+                padding-bottom: 124px;
+            }
+
+            .customer-bottom-nav {
+                display: grid;
+                left: 8px;
+                right: 8px;
+                bottom: 8px;
+            }
+
+            .customer-page-header {
+                padding: 0;
+            }
+
+            .customer-page-head {
+                padding: 10px 10px 8px;
+                border-radius: 16px;
+            }
+
+            .customer-otp-banner {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .customer-otp-side {
+                align-items: flex-start;
+            }
+
+            .customer-otp-chips {
+                justify-content: flex-start;
+            }
+        }
+    </style>
+    {% block customer_page_css %}{% endblock %}
+{% endblock %}
+
+{% block body %}
+    <div class="customer-app">
+        <div class="customer-page-head">
+            <header class="customer-page-header">
+                <div class="customer-page-title">{{ customer_page_title|default:"Customer Portal" }}</div>
+            </header>
+            {% include 'home/customer/_otp_banners.html' %}
+        </div>
+
+        {% block customer_page_body %}{% endblock %}
+    </div>
+
+    <nav class="customer-bottom-nav">
+        {% for item in customer_bottom_nav_items %}
+            <a class="customer-bottom-link{% if item.key == customer_page_key %} active{% endif %}" href="{{ item.url }}">
+                <i class="{{ item.icon }} icon"></i>
+                <span>{{ item.label }}</span>
+            </a>
+        {% endfor %}
+    </nav>
+
+    <script>
+        function formatMoneyINR(number) {
+            var num = Number(number || 0);
+            if (!isFinite(num)) num = 0;
+            return num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function renderOtpTime(expiresIn) {
+            var mins = Math.floor(expiresIn / 60);
+            var secs = Math.max(0, expiresIn % 60);
+            return mins + ':' + String(secs).padStart(2, '0');
+        }
+
+        var otpExpiresIn = 0;
+        var otpInterval = null;
+        var otpPollTimer = null;
+        var otpBackoffMs = 15000;
+        var otpBackoffMaxMs = 120000;
+        var otpMuteUntil = 0;
+
+        function tickOtp() {
+            if (otpExpiresIn <= 0) {
+                $('#custOtpPill').hide();
+                if (otpInterval) {
+                    clearInterval(otpInterval);
+                    otpInterval = null;
+                }
+                return;
+            }
+            $('#custOtpTimer').text(renderOtpTime(otpExpiresIn));
+            otpExpiresIn -= 1;
+        }
+
+        function showOtpReceived(payload) {
+            $('#custOtpPill').addClass('is-received').show();
+            $('#custOtpTitle').text('Payment Received');
+            $('#custOtpIcon').removeClass('key').addClass('check circle');
+            $('#custOtpCode').text(payload.paymentID ? ('Ref ' + String(payload.paymentID)) : 'Received');
+            $('#custOtpSub').text('OTP verified').show();
+            $('#custOtpTimer').hide();
+        }
+
+        function showOtpActive() {
+            $('#custOtpPill').removeClass('is-received').show();
+            $('#custOtpTitle').text('Payment OTP');
+            $('#custOtpIcon').removeClass('check circle').addClass('key');
+            $('#custOtpSub').hide();
+            $('#custOtpTimer').show();
+        }
+
+        function scheduleOtpPoll(delayMs) {
+            if (otpPollTimer) clearTimeout(otpPollTimer);
+            otpPollTimer = setTimeout(function () { pollOtp(); }, delayMs);
+        }
+
+        function muteOtpPolling(ms) {
+            otpMuteUntil = Date.now() + ms;
+            if (otpPollTimer) clearTimeout(otpPollTimer);
+            otpPollTimer = setTimeout(function () {
+                otpMuteUntil = 0;
+                otpBackoffMs = 15000;
+                pollOtp();
+            }, ms);
+        }
+
+        async function pollOtp() {
+            if (otpMuteUntil && Date.now() < otpMuteUntil) {
+                scheduleOtpPoll(Math.min(otpMuteUntil - Date.now(), 60000));
+                return;
+            }
+            if (document.visibilityState && document.visibilityState !== 'visible') {
+                scheduleOtpPoll(30000);
+                return;
+            }
+            try {
+                var res = await fetch("{% url 'homeApp:customer_active_collection_otp' %}", {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                });
+                var payload = await res.json();
+                if (!res.ok || !payload || payload.message !== 'success' || !payload.active) {
+                    if (payload && payload.status === 'received') {
+                        showOtpReceived(payload);
+                        setTimeout(function () { $('#custOtpPill').fadeOut(200); }, Math.min(10000, Number(payload.status_expires_in || 10) * 1000));
+                        muteOtpPolling(180000);
+                        return;
+                    }
+                    otpExpiresIn = 0;
+                    tickOtp();
+                    otpBackoffMs = Math.min(otpBackoffMs * 2, otpBackoffMaxMs);
+                    scheduleOtpPoll(otpBackoffMs);
+                    return;
+                }
+                otpBackoffMs = 12000;
+                showOtpActive();
+                $('#custOtpCode').text(payload.otp || '');
+                if (payload.amountPaid !== '' && payload.amountPaid !== null && payload.amountPaid !== undefined) {
+                    $('#custOtpAmt').show().find('span').last().text('₹ ' + formatMoneyINR(payload.amountPaid));
+                } else {
+                    $('#custOtpAmt').hide();
+                }
+                if (payload.paymentMode) {
+                    $('#custOtpMode').show().find('span').last().text(String(payload.paymentMode));
+                } else {
+                    $('#custOtpMode').hide();
+                }
+                if (payload.collectDate) {
+                    $('#custOtpDate').show().find('span').last().text(String(payload.collectDate));
+                } else {
+                    $('#custOtpDate').hide();
+                }
+                otpExpiresIn = Number(payload.expires_in || 0);
+                if (otpExpiresIn > 0) {
+                    tickOtp();
+                    if (!otpInterval) otpInterval = setInterval(tickOtp, 1000);
+                }
+                scheduleOtpPoll(otpBackoffMs);
+            } catch (e) {
+                otpBackoffMs = Math.min(otpBackoffMs * 2, otpBackoffMaxMs);
+                scheduleOtpPoll(otpBackoffMs);
+            }
+        }
+
+        var deliveryOtpExpiresIn = 0;
+        var deliveryOtpInterval = null;
+        var deliveryOtpPollTimer = null;
+        var deliveryOtpBackoffMs = 15000;
+        var deliveryOtpBackoffMaxMs = 120000;
+        var deliveryOtpMuteUntil = 0;
+        var deliveryOtpFadeTimer = null;
+
+        function tickDeliveryOtp() {
+            if (deliveryOtpExpiresIn <= 0) {
+                $('#custDeliveryOtpPill').hide();
+                if (deliveryOtpInterval) {
+                    clearInterval(deliveryOtpInterval);
+                    deliveryOtpInterval = null;
+                }
+                return;
+            }
+            $('#custDeliveryOtpTimer').text(renderOtpTime(deliveryOtpExpiresIn));
+            deliveryOtpExpiresIn -= 1;
+        }
+
+        function showDeliveryOtpConfirmed(payload) {
+            deliveryOtpExpiresIn = 0;
+            if (deliveryOtpInterval) {
+                clearInterval(deliveryOtpInterval);
+                deliveryOtpInterval = null;
+            }
+            if (deliveryOtpFadeTimer) {
+                clearTimeout(deliveryOtpFadeTimer);
+                deliveryOtpFadeTimer = null;
+            }
+            $('#custDeliveryOtpPill').addClass('is-received').show();
+            $('#custDeliveryOtpTitle').text('Order Delivered');
+            $('#custDeliveryOtpIcon').removeClass('key').addClass('check circle');
+            $('#custDeliveryOtpCode').text(payload.orderNumber ? ('Ref ' + String(payload.orderNumber)) : 'Delivered');
+            $('#custDeliveryOtpSub').text('OTP verified').show();
+            $('#custDeliveryOtpTimer').hide();
+            if (payload.orderNumber) {
+                $('#custDeliveryOtpOrder').show().find('span').last().text(String(payload.orderNumber));
+            } else {
+                $('#custDeliveryOtpOrder').hide();
+            }
+            if (payload.verifiedOn) {
+                $('#custDeliveryOtpVerifiedOn').show().find('span').last().text(String(payload.verifiedOn));
+            } else {
+                $('#custDeliveryOtpVerifiedOn').hide();
+            }
+        }
+
+        function showDeliveryOtpActive() {
+            if (deliveryOtpFadeTimer) {
+                clearTimeout(deliveryOtpFadeTimer);
+                deliveryOtpFadeTimer = null;
+            }
+            $('#custDeliveryOtpPill').removeClass('is-received').show();
+            $('#custDeliveryOtpTitle').text('Delivery OTP');
+            $('#custDeliveryOtpIcon').removeClass('check circle').addClass('key');
+            $('#custDeliveryOtpSub').hide();
+            $('#custDeliveryOtpTimer').show();
+            $('#custDeliveryOtpVerifiedOn').hide();
+        }
+
+        function scheduleDeliveryOtpPoll(delayMs) {
+            if (deliveryOtpPollTimer) clearTimeout(deliveryOtpPollTimer);
+            deliveryOtpPollTimer = setTimeout(function () { pollDeliveryOtp(); }, delayMs);
+        }
+
+        function muteDeliveryOtpPolling(ms) {
+            deliveryOtpMuteUntil = Date.now() + ms;
+            if (deliveryOtpPollTimer) clearTimeout(deliveryOtpPollTimer);
+            deliveryOtpPollTimer = setTimeout(function () {
+                deliveryOtpMuteUntil = 0;
+                deliveryOtpBackoffMs = 15000;
+                pollDeliveryOtp();
+            }, ms);
+        }
+
+        async function pollDeliveryOtp() {
+            if (deliveryOtpMuteUntil && Date.now() < deliveryOtpMuteUntil) {
+                scheduleDeliveryOtpPoll(Math.min(deliveryOtpMuteUntil - Date.now(), 60000));
+                return;
+            }
+            if (document.visibilityState && document.visibilityState !== 'visible') {
+                scheduleDeliveryOtpPoll(30000);
+                return;
+            }
+            try {
+                var res = await fetch("{% url 'homeApp:customer_active_delivery_otp' %}", {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                    cache: 'no-store'
+                });
+                var payload = await res.json();
+                if (!res.ok || !payload || payload.message !== 'success' || !payload.active) {
+                    if (payload && payload.status === 'delivered') {
+                        showDeliveryOtpConfirmed(payload);
+                        deliveryOtpFadeTimer = setTimeout(function () {
+                            $('#custDeliveryOtpPill').fadeOut(200);
+                            deliveryOtpFadeTimer = null;
+                        }, Math.min(20000, Number(payload.status_expires_in || 10) * 1000));
+                        muteDeliveryOtpPolling(180000);
+                        return;
+                    }
+                    deliveryOtpExpiresIn = 0;
+                    tickDeliveryOtp();
+                    deliveryOtpBackoffMs = Math.min(deliveryOtpBackoffMs * 2, deliveryOtpBackoffMaxMs);
+                    scheduleDeliveryOtpPoll(deliveryOtpBackoffMs);
+                    return;
+                }
+                deliveryOtpBackoffMs = 12000;
+                showDeliveryOtpActive();
+                $('#custDeliveryOtpCode').text(payload.otp || '');
+                if (payload.orderNumber) {
+                    $('#custDeliveryOtpOrder').show().find('span').last().text(String(payload.orderNumber));
+                } else {
+                    $('#custDeliveryOtpOrder').hide();
+                }
+                deliveryOtpExpiresIn = Number(payload.expires_in || 0);
+                if (deliveryOtpExpiresIn > 0) {
+                    tickDeliveryOtp();
+                    if (!deliveryOtpInterval) deliveryOtpInterval = setInterval(tickDeliveryOtp, 1000);
+                }
+                scheduleDeliveryOtpPoll(deliveryOtpBackoffMs);
+            } catch (e) {
+                deliveryOtpBackoffMs = Math.min(deliveryOtpBackoffMs * 2, deliveryOtpBackoffMaxMs);
+                scheduleDeliveryOtpPoll(deliveryOtpBackoffMs);
+            }
+        }
+
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') {
+                if (!otpMuteUntil || Date.now() >= otpMuteUntil) {
+                    otpBackoffMs = 15000;
+                    scheduleOtpPoll(400);
+                }
+                deliveryOtpMuteUntil = 0;
+                deliveryOtpBackoffMs = 15000;
+                scheduleDeliveryOtpPoll(600);
+            }
+        });
+
+        $(function () {
+            scheduleOtpPoll(400);
+            scheduleDeliveryOtpPoll(600);
+        });
+    </script>
+    <script>
+        function animateCustomerProgressiveItems(root) {
+            var items = (root || document).querySelectorAll('.customer-progressive-item:not(.is-visible)');
+            items.forEach(function (item, index) {
+                setTimeout(function () {
+                    item.classList.add('is-visible');
+                }, index * 45);
+            });
+        }
+
+        function initCustomerProgressiveList(options) {
+            var container = document.getElementById(options.containerId);
+            if (!container) return;
+            var button = document.getElementById(options.buttonId);
+            var sentinel = document.getElementById(options.sentinelId);
+            var loading = document.getElementById(options.loadingId);
+            var paginationText = document.getElementById(options.paginationTextId);
+
+            var baseUrl = options.baseUrl || window.location.pathname;
+            var baseQuery = options.baseQuery || '';
+            var nextPage = Number(options.nextPage || 0);
+            var hasNext = String(options.hasNext) === 'true';
+            var currentPage = Number(options.currentPage || 1);
+            var totalPages = Number(options.totalPages || 1);
+            var isLoading = false;
+            var mobileQuery = window.matchMedia('(max-width: 767px)');
+
+            function updatePaginationText() {
+                if (!paginationText) return;
+                paginationText.textContent = 'Loaded page ' + currentPage + ' of ' + totalPages;
+            }
+
+            function updateControls() {
+                if (!button || !sentinel) return;
+                button.style.display = !mobileQuery.matches && hasNext ? 'inline-flex' : 'none';
+                sentinel.style.display = mobileQuery.matches && hasNext ? 'block' : 'none';
+                if (!hasNext) {
+                    button.style.display = 'none';
+                    sentinel.style.display = 'none';
+                }
+            }
+
+            async function loadNextPage() {
+                if (isLoading || !hasNext || !nextPage) return;
+                isLoading = true;
+                if (loading) loading.classList.add('is-active');
+                if (button) button.classList.add('loading');
+                try {
+                    var query = baseQuery ? baseQuery + '&' : '';
+                    var url = baseUrl + '?' + query + 'page=' + nextPage + '&fragment=1';
+                    var response = await fetch(url, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin'
+                    });
+                    var payload = await response.json();
+                    if (!response.ok || !payload || payload.message !== 'success') return;
+                    var temp = document.createElement('div');
+                    temp.innerHTML = payload.html || '';
+                    while (temp.firstChild) {
+                        container.appendChild(temp.firstChild);
+                    }
+                    animateCustomerProgressiveItems(container);
+                    hasNext = !!payload.has_next;
+                    nextPage = payload.next_page || null;
+                    currentPage = Number(payload.current_page || currentPage);
+                    totalPages = Number(payload.total_pages || totalPages);
+                    updatePaginationText();
+                    updateControls();
+                } catch (error) {
+                } finally {
+                    isLoading = false;
+                    if (loading) loading.classList.remove('is-active');
+                    if (button) button.classList.remove('loading');
+                }
+            }
+
+            if (button) button.addEventListener('click', loadNextPage);
+
+            if (sentinel && 'IntersectionObserver' in window) {
+                var observer = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (entry) {
+                        if (entry.isIntersecting && mobileQuery.matches) {
+                            loadNextPage();
+                        }
+                    });
+                }, { rootMargin: '180px 0px' });
+                observer.observe(sentinel);
+            }
+
+            if (typeof mobileQuery.addEventListener === 'function') {
+                mobileQuery.addEventListener('change', updateControls);
+            } else if (typeof mobileQuery.addListener === 'function') {
+                mobileQuery.addListener(updateControls);
+            }
+
+            animateCustomerProgressiveItems(container);
+            updatePaginationText();
+            updateControls();
+            return {
+                reset: function (nextState) {
+                    baseQuery = nextState.baseQuery || '';
+                    nextPage = Number(nextState.nextPage || 0);
+                    hasNext = !!nextState.hasNext;
+                    currentPage = Number(nextState.currentPage || 1);
+                    totalPages = Number(nextState.totalPages || 1);
+                    updatePaginationText();
+                    updateControls();
+                }
+            };
+        }
+    </script>
+    {% block customer_page_js %}{% endblock %}
+{% endblock %}

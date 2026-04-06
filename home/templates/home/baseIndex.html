@@ -1763,25 +1763,44 @@
                 }
             });
 
-            $('.nav-section').each(function () {
+            var $navSections = $('.nav-section');
+            var $activeSection = $();
+            $navSections.each(function () {
                 var $section = $(this);
                 if ($section.find('a.item.active').length) {
                     $section.addClass('has-active-item');
-                    $section.removeClass('is-collapsed');
-                    $section.find('.nav-section-header').attr('aria-expanded', 'true');
+                    if (!$activeSection.length) {
+                        $activeSection = $section;
+                    }
                 }
+            });
+
+            $navSections.each(function () {
+                var $section = $(this);
+                var isOpen = $activeSection.length && $section.is($activeSection);
+                $section.toggleClass('is-collapsed', !isOpen);
+                $section.find('.nav-section-header').attr('aria-expanded', isOpen ? 'true' : 'false');
             });
 
             $('.nav-section-header').on('click', function () {
                 var $header = $(this);
                 var $section = $header.closest('.nav-section');
+                var willOpen = $section.hasClass('is-collapsed');
+
+                $navSections.not($section).each(function () {
+                    var $otherSection = $(this);
+                    $otherSection.addClass('is-collapsed');
+                    $otherSection.find('.nav-section-header').attr('aria-expanded', 'false');
+                });
+
                 if ($section.hasClass('has-active-item')) {
                     $section.removeClass('is-collapsed');
                     $header.attr('aria-expanded', 'true');
                     return;
                 }
-                $section.toggleClass('is-collapsed');
-                $header.attr('aria-expanded', $section.hasClass('is-collapsed') ? 'false' : 'true');
+
+                $section.toggleClass('is-collapsed', !willOpen);
+                $header.attr('aria-expanded', willOpen ? 'true' : 'false');
             });
 
             $('.nav-section').each(function () {

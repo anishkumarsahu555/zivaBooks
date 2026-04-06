@@ -1,0 +1,317 @@
+{% extends 'home/customer/base.html' %}
+
+{% block customer_page_css %}
+    <style>
+        .customer-order-shell {
+            display: grid;
+            gap: 12px;
+        }
+
+        .customer-order-title-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px;
+            border-radius: 22px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background:
+                radial-gradient(circle at top right, rgba(96, 165, 250, 0.08), transparent 26%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+        }
+
+        .customer-order-title {
+            font-size: 1.24rem;
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: -0.03em;
+            color: #0f172a;
+        }
+
+        .customer-order-subtitle {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 0.84rem;
+            line-height: 1.45;
+        }
+
+        .customer-order-status {
+            align-self: flex-start;
+        }
+
+        .customer-order-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .customer-order-summary-card {
+            border-radius: 18px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background:
+                radial-gradient(circle at top right, rgba(96, 165, 250, 0.08), transparent 26%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+            padding: 14px;
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .customer-order-summary-label {
+            color: #64748b;
+            font-size: 0.73rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .customer-order-summary-value {
+            margin-top: 8px;
+            color: #0f172a;
+            font-size: 1rem;
+            font-weight: 900;
+            line-height: 1.35;
+            word-break: break-word;
+        }
+
+        .customer-order-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 12px;
+        }
+
+        .customer-order-panel {
+            border-radius: 22px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background:
+                radial-gradient(circle at top right, rgba(45, 212, 191, 0.06), transparent 24%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+            padding: 14px;
+        }
+
+        .customer-order-panel-title {
+            font-size: 1rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .customer-order-panel-copy {
+            margin-top: 4px;
+            color: #64748b;
+            font-size: 0.84rem;
+            line-height: 1.45;
+        }
+
+        .customer-order-fact-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .customer-order-fact-row {
+            display: grid;
+            grid-template-columns: 18px minmax(88px, 110px) minmax(0, 1fr);
+            gap: 10px;
+            align-items: start;
+        }
+
+        .customer-order-fact-row .icon {
+            margin: 2px 0 0 !important;
+            color: #0f766e;
+        }
+
+        .customer-order-fact-label {
+            color: #64748b;
+            font-size: 0.74rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .customer-order-fact-value {
+            color: #0f172a;
+            font-size: 0.94rem;
+            font-weight: 700;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+
+        .customer-timeline {
+            position: relative;
+            margin-top: 14px;
+            padding-left: 22px;
+        }
+
+        .customer-timeline::before {
+            content: "";
+            position: absolute;
+            top: 6px;
+            bottom: 6px;
+            left: 8px;
+            width: 2px;
+            background: linear-gradient(180deg, rgba(22, 120, 194, 0.26), rgba(236, 72, 153, 0.18));
+        }
+
+        .customer-timeline-item {
+            position: relative;
+            padding: 0 0 16px 18px;
+        }
+
+        .customer-timeline-item:last-child {
+            padding-bottom: 0;
+        }
+
+        .customer-timeline-dot {
+            position: absolute;
+            left: -1px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #1678c2, #0ea5e9);
+            box-shadow: 0 0 0 4px rgba(22, 120, 194, 0.12);
+        }
+
+        .customer-timeline-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .customer-timeline-title {
+            font-weight: 900;
+            color: #0f172a;
+            line-height: 1.35;
+        }
+
+        .customer-timeline-time {
+            font-size: 0.8rem;
+            color: rgba(15, 23, 42, 0.54);
+            white-space: nowrap;
+        }
+
+        .customer-timeline-meta {
+            margin-top: 5px;
+            color: rgba(15, 23, 42, 0.68);
+            line-height: 1.45;
+            font-size: 0.9rem;
+        }
+
+        html[data-theme="dark"] .customer-order-summary-card,
+        html[data-theme="dark"] .customer-order-panel,
+        html[data-theme="dark"] .customer-order-title-row {
+            background:
+                radial-gradient(circle at top right, rgba(59, 130, 246, 0.16), transparent 26%),
+                radial-gradient(circle at bottom left, rgba(20, 184, 166, 0.14), transparent 28%),
+                rgba(27, 41, 68, 0.98);
+            border-color: rgba(148, 163, 184, 0.28);
+            box-shadow: 0 16px 30px rgba(2, 6, 23, 0.36);
+        }
+
+        html[data-theme="dark"] .customer-order-summary-value,
+        html[data-theme="dark"] .customer-order-panel-title,
+        html[data-theme="dark"] .customer-order-fact-value,
+        html[data-theme="dark"] .customer-timeline-title,
+        html[data-theme="dark"] .customer-order-title {
+            color: #e5edf7;
+        }
+
+        html[data-theme="dark"] .customer-order-summary-label,
+        html[data-theme="dark"] .customer-order-panel-copy,
+        html[data-theme="dark"] .customer-order-fact-label,
+        html[data-theme="dark"] .customer-timeline-time,
+        html[data-theme="dark"] .customer-timeline-meta,
+        html[data-theme="dark"] .customer-order-subtitle {
+            color: #a7b8cd;
+        }
+
+        html[data-theme="dark"] .customer-order-fact-row .icon {
+            color: #5eead4;
+        }
+
+        html[data-theme="dark"] .customer-timeline::before {
+            background: linear-gradient(180deg, rgba(56, 189, 248, 0.34), rgba(244, 114, 182, 0.2));
+        }
+
+        html[data-theme="dark"] .customer-timeline-dot {
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+        }
+
+        @media (max-width: 700px) {
+            .customer-order-title-row,
+            .customer-timeline-head {
+                display: grid;
+            }
+
+            .customer-order-summary-grid,
+            .customer-order-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .customer-order-title {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block customer_page_body %}
+    <section class="customer-order-shell">
+        <div class="customer-order-title-row">
+            <div>
+                <div class="customer-order-title">{{ order_label }}</div>
+                <div class="customer-order-subtitle">Customer order details, linked sale reference, and current delivery status.</div>
+            </div>
+            <div class="customer-badge customer-order-status{% if order.deliveryOtpVerified %} is-success{% elif order.status == 'out_for_delivery' %} is-warning{% endif %}">
+                {{ order_status_text }}
+            </div>
+        </div>
+
+        <section class="customer-order-summary-grid">
+            {% for item in order_summary_cards %}
+                <article class="customer-order-summary-card">
+                    <div class="customer-order-summary-label">{{ item.label }}</div>
+                    <div class="customer-order-summary-value">{{ item.value }}</div>
+                </article>
+            {% endfor %}
+        </section>
+
+        <section class="customer-order-grid">
+            <article class="customer-order-panel">
+                <div class="customer-order-panel-title">Order Details</div>
+                <div class="customer-order-panel-copy">Main customer-facing details captured for this order.</div>
+                <div class="customer-order-fact-list">
+                    {% for row in order_fact_rows %}
+                        <div class="customer-order-fact-row">
+                            <i class="{{ row.icon }} icon"></i>
+                            <div class="customer-order-fact-label">{{ row.label }}</div>
+                            <div class="customer-order-fact-value">{{ row.value }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="customer-order-panel">
+                <div class="customer-order-panel-title">Status Timeline</div>
+                <div class="customer-order-panel-copy">Recorded order progress from confirmation through delivery.</div>
+                <div class="customer-timeline">
+                    {% for item in timeline %}
+                        <div class="customer-timeline-item">
+                            <span class="customer-timeline-dot"></span>
+                            <div class="customer-timeline-head">
+                                <div class="customer-timeline-title">{{ item.title }}</div>
+                                <div class="customer-timeline-time">{{ item.timestamp }}</div>
+                            </div>
+                            {% if item.note %}
+                                <div class="customer-timeline-meta">{{ item.note }}</div>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <div class="customer-card-copy">No timeline events recorded yet.</div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+    </section>
+{% endblock %}

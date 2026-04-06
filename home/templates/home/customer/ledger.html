@@ -1,0 +1,232 @@
+{% extends 'home/customer/base.html' %}
+{% load formatting %}
+
+{% block customer_page_body %}
+    <section class="customer-card">
+        <div class="customer-card-header">
+            <div class="customer-card-title">Statement Filters</div>
+            <a class="ui tiny blue button" id="customerLedgerPdfLink" href="{% url 'homeApp:generate_party_ledger_pdf' party.id %}?startDate={{ startDate|urlencode }}&endDate={{ endDate|urlencode }}">
+                <i class="file pdf outline icon"></i> PDF
+            </a>
+        </div>
+        <div class="customer-card-copy">Choose a date range, then refresh the statement cards below.</div>
+        <form class="ui tiny form" id="custFilterForm" style="margin-top: 12px;">
+            <div class="customer-form-grid cols-2 keep-2-mobile">
+                <div class="field">
+                    <label>Start Date</label>
+                    <div class="ui calendar" id="custStartCal">
+                        <div class="ui input left icon">
+                            <i class="calendar alternate outline icon"></i>
+                            <input type="text" name="startDate" id="startDate" value="{{ startDate }}" placeholder="dd/mm/yyyy" autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>End Date</label>
+                    <div class="ui calendar" id="custEndCal">
+                        <div class="ui input left icon">
+                            <i class="calendar alternate outline icon"></i>
+                            <input type="text" name="endDate" id="endDate" value="{{ endDate }}" placeholder="dd/mm/yyyy" autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button class="ui fluid blue button" style="margin-top: 12px;" id="custApplyBtn" type="submit">
+                <i class="sync icon"></i> Refresh Statement
+            </button>
+        </form>
+    </section>
+
+    <section class="customer-stat-grid keep-2-mobile" style="margin-top: 12px;">
+        <article class="customer-stat-card tone-slate">
+            <div class="customer-stat-label">Opening</div>
+            <div class="customer-stat-value" id="kpiOpening">₹ {{ opening|money }}</div>
+        </article>
+        <article class="customer-stat-card tone-blue">
+            <div class="customer-stat-label">Debit</div>
+            <div class="customer-stat-value" id="kpiDebit">₹ {{ range_debit|money }}</div>
+        </article>
+        <article class="customer-stat-card tone-green">
+            <div class="customer-stat-label">Credit</div>
+            <div class="customer-stat-value" id="kpiCredit">₹ {{ range_credit|money }}</div>
+        </article>
+        <article class="customer-stat-card tone-amber">
+            <div class="customer-stat-label">Closing</div>
+            <div class="customer-stat-value" id="kpiClosing">₹ {{ closing|money }}</div>
+        </article>
+    </section>
+
+    <section class="customer-card" style="margin-top: 12px;">
+        <div class="customer-card-header">
+            <div class="customer-card-title">Search Ledger</div>
+        </div>
+        <div class="customer-search-wrap{% if search_query %} has-value{% endif %}" id="ledgerSearchWrap">
+            <div class="ui input fluid">
+                <input type="text" id="ledgerSearchInput" value="{{ search_query }}" placeholder="Search ledger">
+            </div>
+            <i class="search icon customer-search-icon"></i>
+            <button class="customer-search-clear" id="ledgerSearchClear" type="button" aria-label="Clear search">x</button>
+        </div>
+    </section>
+
+    <section class="customer-list" id="ledgerList" style="margin-top: 12px;">
+        {% include 'home/customer/_ledger_items.html' with items=ledger_entries %}
+        {% if not ledger_entries %}
+            <article class="customer-card">
+                <div class="customer-card-title">No ledger entries found</div>
+                <div class="customer-card-copy">Try a different date range or search term.</div>
+            </article>
+        {% endif %}
+    </section>
+
+    {% if page_obj.paginator.num_pages > 1 or page_obj.has_next %}
+        <div class="customer-list-controls">
+            <div class="customer-pagination">
+                <div id="ledgerPaginationText">Loaded page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+            </div>
+            <div class="customer-list-loading" id="ledgerLoading">
+                <i class="spinner loading icon"></i>
+                <span>Loading more ledger entries...</span>
+            </div>
+            <div class="ui center aligned basic segment" style="padding: 0;">
+                <button class="ui blue basic button" id="ledgerShowMore" type="button">Show More</button>
+            </div>
+            <div class="customer-load-sentinel" id="ledgerSentinel"></div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block customer_page_js %}
+    <script>
+        $(function () {
+            function initCalendar(selector) {
+                $(selector).calendar({
+                    monthFirst: false,
+                    type: 'date',
+                    formatter: {
+                        date: function (date) {
+                            if (!date) return '';
+                            var day = String(date.getDate());
+                            var month = String(date.getMonth() + 1);
+                            var year = date.getFullYear();
+                            return day + '/' + month + '/' + year;
+                        }
+                    }
+                });
+            }
+
+            initCalendar('#custStartCal');
+            initCalendar('#custEndCal');
+
+            var progressive = initCustomerProgressiveList({
+                containerId: 'ledgerList',
+                buttonId: 'ledgerShowMore',
+                sentinelId: 'ledgerSentinel',
+                loadingId: 'ledgerLoading',
+                paginationTextId: 'ledgerPaginationText',
+                baseUrl: "{% url 'homeApp:customer_ledger' %}",
+                baseQuery: "{{ pagination_base_query|escapejs }}",
+                nextPage: "{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}",
+                hasNext: "{{ page_obj.has_next|yesno:'true,false' }}",
+                currentPage: "{{ page_obj.number }}",
+                totalPages: "{{ page_obj.paginator.num_pages }}"
+            });
+            var searchTimer = null;
+            var $input = $('#ledgerSearchInput');
+            var $wrap = $('#ledgerSearchWrap');
+
+            function updatePdfLink() {
+                var baseUrl = "{% url 'homeApp:generate_party_ledger_pdf' party.id %}";
+                var startDate = encodeURIComponent($('#startDate').val() || '');
+                var endDate = encodeURIComponent($('#endDate').val() || '');
+                $('#customerLedgerPdfLink').attr('href', baseUrl + '?startDate=' + startDate + '&endDate=' + endDate);
+            }
+
+            function setKpis(payload) {
+                $('#kpiOpening').text('₹ ' + formatMoneyINR(payload.opening));
+                $('#kpiDebit').text('₹ ' + formatMoneyINR(payload.debit));
+                $('#kpiCredit').text('₹ ' + formatMoneyINR(payload.credit));
+                $('#kpiClosing').text('₹ ' + formatMoneyINR(payload.closing));
+            }
+
+            function setSearchState(value) {
+                $wrap.toggleClass('has-value', !!value);
+            }
+
+            function currentBaseQuery(searchValue) {
+                var params = new URLSearchParams();
+                var startDate = $('#startDate').val() || '';
+                var endDate = $('#endDate').val() || '';
+                if (startDate) params.set('startDate', startDate);
+                if (endDate) params.set('endDate', endDate);
+                if (searchValue) params.set('q', searchValue);
+                return params.toString();
+            }
+
+            async function loadLedgerList(searchValue) {
+                var query = currentBaseQuery(searchValue);
+                if (query) query += '&fragment=1';
+                else query = 'fragment=1';
+                var response = await fetch("{% url 'homeApp:customer_ledger' %}?" + query, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                });
+                var payload = await response.json();
+                if (!response.ok || !payload || payload.message !== 'success') return;
+                var list = document.getElementById('ledgerList');
+                list.innerHTML = payload.html || '';
+                if (!list.innerHTML.trim()) {
+                    list.innerHTML = '<article class="customer-card"><div class="customer-card-title">No ledger entries found</div><div class="customer-card-copy">Try a different date range or search term.</div></article>';
+                }
+                animateCustomerProgressiveItems(list);
+                if (progressive && typeof progressive.reset === 'function') {
+                    progressive.reset({
+                        baseQuery: currentBaseQuery(searchValue),
+                        nextPage: payload.next_page || '',
+                        hasNext: !!payload.has_next,
+                        currentPage: payload.current_page || 1,
+                        totalPages: payload.total_pages || 1
+                    });
+                }
+            }
+
+            async function refreshKpis() {
+                var url = "{% url 'homeApp:customer_ledger_kpis' %}?startDate=" + encodeURIComponent($('#startDate').val() || '') + "&endDate=" + encodeURIComponent($('#endDate').val() || '');
+                var res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                var payload = await res.json();
+                if (res.ok && payload && payload.message === 'success') {
+                    setKpis(payload);
+                }
+            }
+
+            updatePdfLink();
+            $('#startDate, #endDate').on('change keyup', updatePdfLink);
+            $input.on('input', function () {
+                var value = $(this).val() || '';
+                setSearchState(value);
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(function () {
+                    loadLedgerList(value);
+                }, 250);
+            });
+
+            $('#ledgerSearchClear').on('click', function () {
+                clearTimeout(searchTimer);
+                $input.val('').trigger('focus');
+                setSearchState('');
+                loadLedgerList('');
+            });
+
+            $('#custFilterForm').on('submit', function (event) {
+                event.preventDefault();
+                $('#custApplyBtn').addClass('loading');
+                Promise.all([
+                    refreshKpis(),
+                    loadLedgerList($input.val() || '')
+                ]).finally(function () {
+                        $('#custApplyBtn').removeClass('loading');
+                });
+            });
+        });
+    </script>
+{% endblock %}
