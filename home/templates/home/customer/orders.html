@@ -1,0 +1,111 @@
+{% extends 'home/customer/base.html' %}
+
+{% block customer_page_body %}
+    <section class="customer-card">
+        <div class="customer-card-header">
+            <div class="customer-card-title">Search Orders</div>
+        </div>
+        <div class="customer-search-wrap{% if search_query %} has-value{% endif %}" id="ordersSearchWrap">
+            <div class="ui input fluid">
+                <input type="text" id="ordersSearchInput" value="{{ search_query }}" placeholder="Search delivered or returned orders">
+            </div>
+            <i class="search icon customer-search-icon"></i>
+            <button class="customer-search-clear" id="ordersSearchClear" type="button" aria-label="Clear search">x</button>
+        </div>
+    </section>
+
+    <section class="customer-list" id="ordersList" style="margin-top: 12px;">
+        {% include 'home/customer/_orders_items.html' with items=orders %}
+        {% if not orders %}
+            <article class="customer-card">
+                <div class="customer-card-title">No orders found</div>
+                <div class="customer-card-copy">Orders linked to this customer will appear here.</div>
+            </article>
+        {% endif %}
+    </section>
+
+    {% if page_obj.paginator.num_pages > 1 or page_obj.has_next %}
+        <div class="customer-list-controls">
+            <div class="customer-pagination">
+                <div id="ordersPaginationText">Loaded page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+            </div>
+            <div class="customer-list-loading" id="ordersLoading">
+                <i class="spinner loading icon"></i>
+                <span>Loading more orders...</span>
+            </div>
+            <div class="ui center aligned basic segment" style="padding: 0;">
+                <button class="ui blue basic button" id="ordersShowMore" type="button">Show More</button>
+            </div>
+            <div class="customer-load-sentinel" id="ordersSentinel"></div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block customer_page_js %}
+    <script>
+        $(function () {
+            var progressive = initCustomerProgressiveList({
+                containerId: 'ordersList',
+                buttonId: 'ordersShowMore',
+                sentinelId: 'ordersSentinel',
+                loadingId: 'ordersLoading',
+                paginationTextId: 'ordersPaginationText',
+                baseUrl: "{% url 'homeApp:customer_orders' %}",
+                baseQuery: "{{ pagination_base_query|escapejs }}",
+                nextPage: "{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}",
+                hasNext: "{{ page_obj.has_next|yesno:'true,false' }}",
+                currentPage: "{{ page_obj.number }}",
+                totalPages: "{{ page_obj.paginator.num_pages }}"
+            });
+
+            var searchTimer = null;
+            var $input = $('#ordersSearchInput');
+            var $wrap = $('#ordersSearchWrap');
+
+            function setSearchState(value) {
+                $wrap.toggleClass('has-value', !!value);
+            }
+
+            async function runOrdersSearch(value) {
+                var query = value ? ('q=' + encodeURIComponent(value) + '&fragment=1') : 'fragment=1';
+                var response = await fetch("{% url 'homeApp:customer_orders' %}?" + query, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                });
+                var payload = await response.json();
+                if (!response.ok || !payload || payload.message !== 'success') return;
+                var list = document.getElementById('ordersList');
+                list.innerHTML = payload.html || '';
+                if (!list.innerHTML.trim()) {
+                    list.innerHTML = '<article class="customer-card"><div class="customer-card-title">No orders found</div><div class="customer-card-copy">Orders linked to this customer will appear here.</div></article>';
+                }
+                animateCustomerProgressiveItems(list);
+                if (progressive && typeof progressive.reset === 'function') {
+                    progressive.reset({
+                        baseQuery: value ? ('q=' + encodeURIComponent(value)) : '',
+                        nextPage: payload.next_page || '',
+                        hasNext: !!payload.has_next,
+                        currentPage: payload.current_page || 1,
+                        totalPages: payload.total_pages || 1
+                    });
+                }
+            }
+
+            $input.on('input', function () {
+                var value = $(this).val() || '';
+                setSearchState(value);
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(async function () {
+                    await runOrdersSearch(value);
+                }, 250);
+            });
+
+            $('#ordersSearchClear').on('click', function () {
+                clearTimeout(searchTimer);
+                $input.val('').trigger('focus');
+                setSearchState('');
+                runOrdersSearch('');
+            });
+        });
+    </script>
+{% endblock %}

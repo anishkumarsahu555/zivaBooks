@@ -1,0 +1,16 @@
+{% load formatting %}
+{% for invoice in items %}
+    <article class="customer-list-card customer-progressive-item">
+        <div class="customer-list-top">
+            <div>
+                <div class="customer-list-title">{{ invoice.invoice_no }}</div>
+                <div class="customer-list-subtitle">{{ invoice.kind }}</div>
+            </div>
+            <a class="customer-badge is-success" href="{{ invoice.download_url }}">Download PDF</a>
+        </div>
+        <div class="customer-list-meta">
+            <span class="customer-meta-chip"><i class="calendar alternate outline icon"></i>{{ invoice.date_label }}</span>
+            <span class="customer-meta-chip"><i class="money bill alternate outline icon"></i>₹ {{ invoice.amount|money }}</span>
+        </div>
+    </article>
+{% endfor %}

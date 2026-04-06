@@ -1,0 +1,482 @@
+{% extends 'home/customer/base.html' %}
+
+{% block customer_page_css %}
+    <style>
+        .customer-dashboard-shell {
+            display: grid;
+            gap: 12px;
+        }
+
+        .customer-dashboard-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: 24px;
+            padding: 16px;
+            color: #f8fafc;
+            background:
+                radial-gradient(circle at top left, rgba(251, 191, 36, 0.18), transparent 28%),
+                radial-gradient(circle at 90% 20%, rgba(45, 212, 191, 0.18), transparent 34%),
+                linear-gradient(135deg, #0f172a 0%, #123b45 52%, #1d4ed8 100%);
+            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.16);
+        }
+
+        .customer-dashboard-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 32%),
+                linear-gradient(300deg, rgba(255, 255, 255, 0.05), transparent 22%);
+            pointer-events: none;
+        }
+
+        .customer-dashboard-hero > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .customer-dashboard-kicker {
+            font-size: 0.74rem;
+            font-weight: 900;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(248, 250, 252, 0.74);
+        }
+
+        .customer-dashboard-title {
+            margin-top: 8px;
+            font-size: 1.55rem;
+            font-weight: 900;
+            line-height: 1;
+            letter-spacing: -0.03em;
+        }
+
+        .customer-dashboard-copy {
+            margin-top: 8px;
+            max-width: 620px;
+            color: rgba(248, 250, 252, 0.84);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .customer-dashboard-band {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .customer-band-card {
+            border-radius: 18px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(10px);
+        }
+
+        .customer-band-label {
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(248, 250, 252, 0.72);
+        }
+
+        .customer-band-value {
+            margin-top: 8px;
+            font-size: 1.05rem;
+            font-weight: 900;
+            color: #fff;
+            line-height: 1.2;
+        }
+
+        .customer-band-sub {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            color: rgba(248, 250, 252, 0.76);
+        }
+
+        .customer-chart-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
+            gap: 12px;
+        }
+
+        .customer-chart-stack {
+            display: grid;
+            gap: 12px;
+        }
+
+        .customer-chart-card {
+            border-radius: 22px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
+            padding: 14px;
+        }
+
+        .customer-chart-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .customer-chart-title {
+            font-size: 1rem;
+            font-weight: 900;
+            color: #0f172a;
+        }
+
+        .customer-chart-copy {
+            margin-top: 4px;
+            color: #64748b;
+            font-size: 0.84rem;
+            line-height: 1.45;
+        }
+
+        .customer-chart-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 7px 10px;
+            background: rgba(15, 23, 42, 0.05);
+            color: #334155;
+            font-size: 0.73rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .customer-chart-shell {
+            position: relative;
+            height: 280px;
+        }
+
+        .customer-chart-shell.is-short {
+            height: 220px;
+        }
+
+        .customer-chart-shell canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        html[data-theme="dark"] .customer-chart-card {
+            background: rgba(27, 41, 68, 0.98);
+            border-color: rgba(148, 163, 184, 0.28);
+            box-shadow: 0 16px 30px rgba(2, 6, 23, 0.36);
+        }
+
+        html[data-theme="dark"] .customer-chart-title {
+            color: #e5edf7;
+        }
+
+        html[data-theme="dark"] .customer-chart-copy {
+            color: #a7b8cd;
+        }
+
+        html[data-theme="dark"] .customer-chart-badge {
+            background: rgba(148, 163, 184, 0.18);
+            color: #e2ebf6;
+        }
+
+        @media (max-width: 900px) {
+            .customer-chart-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .customer-dashboard-hero {
+                padding: 12px;
+                border-radius: 18px;
+            }
+
+            .customer-dashboard-title {
+                margin-top: 6px;
+                font-size: 1.2rem;
+            }
+
+            .customer-dashboard-copy {
+                margin-top: 6px;
+                font-size: 0.82rem;
+                line-height: 1.4;
+            }
+
+            .customer-dashboard-band {
+                margin-top: 10px;
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .customer-band-card {
+                padding: 10px;
+            }
+
+            .customer-band-value {
+                margin-top: 6px;
+                font-size: 0.92rem;
+            }
+
+            .customer-band-sub {
+                margin-top: 4px;
+                font-size: 0.75rem;
+            }
+
+            .customer-chart-shell {
+                height: 240px;
+            }
+
+            .customer-chart-shell.is-short {
+                height: 210px;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block customer_page_body %}
+    <section class="customer-dashboard-shell">
+        <article class="customer-dashboard-hero">
+            <div class="customer-dashboard-kicker">Customer Analytics</div>
+            <div class="customer-dashboard-title">{{ party.legalName|default:party.name|default:"Customer Dashboard" }}</div>
+            <div class="customer-dashboard-copy">Track purchases, payments, invoices, and order movement in one place. The dashboard shows only your approved customer-side data.</div>
+            <div class="customer-dashboard-band">
+                <div class="customer-band-card">
+                    <div class="customer-band-label">Statement Window</div>
+                    <div class="customer-band-value">{{ startDate }} - {{ endDate }}</div>
+                    <div class="customer-band-sub">Live ledger range used for current balance cards.</div>
+                </div>
+                <div class="customer-band-card">
+                    <div class="customer-band-label">Last Payment</div>
+                    <div class="customer-band-value">{{ last_payment_label }}</div>
+                    <div class="customer-band-sub">Latest approved collection visible in your portal.</div>
+                </div>
+                <div class="customer-band-card">
+                    <div class="customer-band-label">Account Type</div>
+                    <div class="customer-band-value">{{ profile_type_label }}</div>
+                    <div class="customer-band-sub">Profile setup linked to this customer login.</div>
+                </div>
+            </div>
+        </article>
+
+        <section class="customer-stat-grid keep-2-mobile">
+            {% for card in dashboard_cards %}
+                <article class="customer-stat-card tone-{{ card.tone }}">
+                    <div class="customer-stat-label">{{ card.label }}</div>
+                    <div class="customer-stat-value">{{ card.value }}</div>
+                    <div class="customer-stat-hint">{{ card.hint }}</div>
+                </article>
+            {% endfor %}
+        </section>
+
+        <section class="customer-chart-grid">
+            <article class="customer-chart-card">
+                <div class="customer-chart-head">
+                    <div>
+                        <div class="customer-chart-title">Purchase vs Payment Trend</div>
+                        <div class="customer-chart-copy">Six-month comparison of approved purchases against recorded payments.</div>
+                    </div>
+                    <div class="customer-chart-badge">6 Months</div>
+                </div>
+                <div class="customer-chart-shell">
+                    <canvas id="customerTrendChart"></canvas>
+                </div>
+            </article>
+
+            <div class="customer-chart-stack">
+                <article class="customer-chart-card">
+                    <div class="customer-chart-head">
+                        <div>
+                            <div class="customer-chart-title">Order Status Mix</div>
+                            <div class="customer-chart-copy">Current order distribution by workflow status.</div>
+                        </div>
+                    </div>
+                    <div class="customer-chart-shell is-short">
+                        <canvas id="customerStatusChart"></canvas>
+                    </div>
+                </article>
+
+                <article class="customer-chart-card">
+                    <div class="customer-chart-head">
+                        <div>
+                            <div class="customer-chart-title">Activity Mix</div>
+                            <div class="customer-chart-copy">Portal activity split across invoices, payments, and orders.</div>
+                        </div>
+                    </div>
+                    <div class="customer-chart-shell is-short">
+                        <canvas id="customerActivityChart"></canvas>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section>
+            <article class="customer-chart-card">
+                <div class="customer-chart-head">
+                    <div>
+                        <div class="customer-chart-title">Monthly Orders</div>
+                        <div class="customer-chart-copy">Order count trend for the last six months.</div>
+                    </div>
+                    <div class="customer-chart-badge">Count</div>
+                </div>
+                <div class="customer-chart-shell is-short">
+                    <canvas id="customerOrdersChart"></canvas>
+                </div>
+            </article>
+        </section>
+    </section>
+
+    {{ dashboard_charts|json_script:"customerDashboardCharts" }}
+
+    <section class="customer-quick-dock">
+        <div class="customer-action-row">
+            {% for item in quick_links %}
+                <a class="customer-action is-shortcut" href="{{ item.url }}">
+                    <i class="{{ item.icon }} icon"></i>
+                    <div class="customer-action-copy">
+                        <strong>{{ item.label }}</strong>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+    </section>
+{% endblock %}
+
+{% block customer_page_js %}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <script>
+        $(function () {
+            var raw = document.getElementById('customerDashboardCharts');
+            if (!raw || typeof Chart === 'undefined') return;
+            var payload = JSON.parse(raw.textContent || '{}');
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            var axisColor = isDark ? '#a7b8cd' : '#64748b';
+            var gridColor = isDark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(148, 163, 184, 0.18)';
+            var tooltipBg = isDark ? 'rgba(15, 23, 42, 0.96)' : 'rgba(255, 255, 255, 0.96)';
+            var tooltipText = isDark ? '#e5edf7' : '#0f172a';
+
+            Chart.defaults.color = axisColor;
+            Chart.defaults.font.family = 'inherit';
+            Chart.defaults.plugins.legend.labels.boxWidth = 10;
+            Chart.defaults.plugins.legend.labels.usePointStyle = true;
+            Chart.defaults.plugins.tooltip.backgroundColor = tooltipBg;
+            Chart.defaults.plugins.tooltip.titleColor = tooltipText;
+            Chart.defaults.plugins.tooltip.bodyColor = tooltipText;
+            Chart.defaults.plugins.tooltip.borderColor = gridColor;
+            Chart.defaults.plugins.tooltip.borderWidth = 1;
+
+            function moneyTick(value) {
+                try {
+                    return '₹ ' + Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+                } catch (e) {
+                    return '₹ ' + value;
+                }
+            }
+
+            new Chart(document.getElementById('customerTrendChart'), {
+                type: 'line',
+                data: {
+                    labels: payload.trend.labels,
+                    datasets: [
+                        {
+                            label: 'Purchases',
+                            data: payload.trend.purchases,
+                            borderColor: '#2563eb',
+                            backgroundColor: 'rgba(37, 99, 235, 0.16)',
+                            fill: true,
+                            tension: 0.36,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#2563eb'
+                        },
+                        {
+                            label: 'Payments',
+                            data: payload.trend.payments,
+                            borderColor: '#0f766e',
+                            backgroundColor: 'rgba(15, 118, 110, 0.12)',
+                            fill: true,
+                            tension: 0.36,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#0f766e'
+                        }
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: axisColor } },
+                        y: { grid: { color: gridColor }, ticks: { callback: moneyTick } }
+                    }
+                }
+            });
+
+            new Chart(document.getElementById('customerOrdersChart'), {
+                type: 'bar',
+                data: {
+                    labels: payload.orders.labels,
+                    datasets: [{
+                        label: 'Orders',
+                        data: payload.orders.values,
+                        borderRadius: 10,
+                        backgroundColor: ['#0f766e', '#14b8a6', '#38bdf8', '#2563eb', '#f59e0b', '#f97316']
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: axisColor } },
+                        y: { beginAtZero: true, grid: { color: gridColor }, ticks: { precision: 0 } }
+                    }
+                }
+            });
+
+            new Chart(document.getElementById('customerStatusChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: payload.status.labels,
+                    datasets: [{
+                        data: payload.status.values,
+                        backgroundColor: ['#2563eb', '#14b8a6', '#f59e0b', '#f97316', '#22c55e', '#ef4444', '#8b5cf6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    cutout: '64%',
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            new Chart(document.getElementById('customerActivityChart'), {
+                type: 'polarArea',
+                data: {
+                    labels: payload.activity.labels,
+                    datasets: [{
+                        data: payload.activity.values,
+                        backgroundColor: [
+                            'rgba(37, 99, 235, 0.7)',
+                            'rgba(14, 165, 233, 0.7)',
+                            'rgba(15, 118, 110, 0.72)',
+                            'rgba(249, 115, 22, 0.72)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            grid: { color: gridColor },
+                            angleLines: { color: gridColor },
+                            ticks: { display: false }
+                        }
+                    },
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        });
+    </script>
+{% endblock %}

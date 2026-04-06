@@ -1,0 +1,20 @@
+{% for order in items %}
+    <a class="customer-list-card customer-progressive-item" href="{{ order.detail_url }}">
+        <div class="customer-list-top">
+            <div>
+                <div class="customer-list-title">{{ order.number }}</div>
+                <div class="customer-list-subtitle">{{ order.date_label }}</div>
+            </div>
+            <div class="customer-badge{% if order.delivery_verified %} is-success{% elif order.status_key == 'out_for_delivery' %} is-warning{% endif %}">
+                {{ order.status }}
+            </div>
+        </div>
+        <div class="customer-list-meta">
+            {% if order.linked_sales_id %}<span class="customer-meta-chip"><i class="file alternate outline icon"></i>{{ order.linked_sales_id }}</span>{% endif %}
+            <span class="customer-meta-chip"><i class="key icon"></i>{% if order.delivery_verified %}Delivery OTP verified{% else %}Delivery OTP pending{% endif %}</span>
+        </div>
+        {% if order.remark %}
+            <div class="customer-list-copy">{{ order.remark }}</div>
+        {% endif %}
+    </a>
+{% endfor %}

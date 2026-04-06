@@ -1,0 +1,21 @@
+{% for payment in items %}
+    <article class="customer-list-card customer-progressive-item">
+        <div class="customer-list-top">
+            <div>
+                <div class="customer-list-title">{{ payment.payment_id }}</div>
+                <div class="customer-list-subtitle">{{ payment.kind }}</div>
+            </div>
+            <div class="customer-badge{% if payment.verified %} is-success{% endif %}">
+                {% if payment.verified %}Verified{% else %}Pending{% endif %}
+            </div>
+        </div>
+        <div class="customer-list-meta">
+            <span class="customer-meta-chip"><i class="credit card outline icon"></i>{{ payment.mode }}</span>
+            <span class="customer-meta-chip"><i class="money bill alternate outline icon"></i>₹ {{ payment.amount|money }}</span>
+            <span class="customer-meta-chip"><i class="calendar alternate outline icon"></i>{{ payment.datetime_label }}</span>
+        </div>
+        {% if payment.detail %}
+            <div class="customer-list-copy">{{ payment.detail }}</div>
+        {% endif %}
+    </article>
+{% endfor %}

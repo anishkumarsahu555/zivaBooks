@@ -1,0 +1,112 @@
+{% extends 'home/customer/base.html' %}
+{% load formatting %}
+
+{% block customer_page_body %}
+    <section class="customer-card">
+        <div class="customer-card-header">
+            <div class="customer-card-title">Search Payments</div>
+        </div>
+        <div class="customer-search-wrap{% if search_query %} has-value{% endif %}" id="paymentsSearchWrap">
+            <div class="ui input fluid">
+                <input type="text" id="paymentsSearchInput" value="{{ search_query }}" placeholder="Search payments">
+            </div>
+            <i class="search icon customer-search-icon"></i>
+            <button class="customer-search-clear" id="paymentsSearchClear" type="button" aria-label="Clear search">x</button>
+        </div>
+    </section>
+
+    <section class="customer-list" id="paymentsList" style="margin-top: 12px;">
+        {% include 'home/customer/_payments_items.html' with items=payments %}
+        {% if not payments %}
+            <article class="customer-card">
+                <div class="customer-card-title">No payments found</div>
+                <div class="customer-card-copy">Approved collections will appear here as soon as they are recorded.</div>
+            </article>
+        {% endif %}
+    </section>
+
+    {% if page_obj.paginator.num_pages > 1 or page_obj.has_next %}
+        <div class="customer-list-controls">
+            <div class="customer-pagination">
+                <div id="paymentsPaginationText">Loaded page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+            </div>
+            <div class="customer-list-loading" id="paymentsLoading">
+                <i class="spinner loading icon"></i>
+                <span>Loading more payments...</span>
+            </div>
+            <div class="ui center aligned basic segment" style="padding: 0;">
+                <button class="ui blue basic button" id="paymentsShowMore" type="button">Show More</button>
+            </div>
+            <div class="customer-load-sentinel" id="paymentsSentinel"></div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block customer_page_js %}
+    <script>
+        $(function () {
+            var progressive = initCustomerProgressiveList({
+                containerId: 'paymentsList',
+                buttonId: 'paymentsShowMore',
+                sentinelId: 'paymentsSentinel',
+                loadingId: 'paymentsLoading',
+                paginationTextId: 'paymentsPaginationText',
+                baseUrl: "{% url 'homeApp:customer_payments' %}",
+                baseQuery: "{{ pagination_base_query|escapejs }}",
+                nextPage: "{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}",
+                hasNext: "{{ page_obj.has_next|yesno:'true,false' }}",
+                currentPage: "{{ page_obj.number }}",
+                totalPages: "{{ page_obj.paginator.num_pages }}"
+            });
+
+            var searchTimer = null;
+            var $input = $('#paymentsSearchInput');
+            var $wrap = $('#paymentsSearchWrap');
+
+            function setSearchState(value) {
+                $wrap.toggleClass('has-value', !!value);
+            }
+
+            async function runPaymentsSearch(value) {
+                var query = value ? ('q=' + encodeURIComponent(value) + '&fragment=1') : 'fragment=1';
+                var response = await fetch("{% url 'homeApp:customer_payments' %}?" + query, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                });
+                var payload = await response.json();
+                if (!response.ok || !payload || payload.message !== 'success') return;
+                var list = document.getElementById('paymentsList');
+                list.innerHTML = payload.html || '';
+                if (!list.innerHTML.trim()) {
+                    list.innerHTML = '<article class="customer-card"><div class="customer-card-title">No payments found</div><div class="customer-card-copy">Approved collections will appear here as soon as they are recorded.</div></article>';
+                }
+                animateCustomerProgressiveItems(list);
+                if (progressive && typeof progressive.reset === 'function') {
+                    progressive.reset({
+                        baseQuery: value ? ('q=' + encodeURIComponent(value)) : '',
+                        nextPage: payload.next_page || '',
+                        hasNext: !!payload.has_next,
+                        currentPage: payload.current_page || 1,
+                        totalPages: payload.total_pages || 1
+                    });
+                }
+            }
+
+            $input.on('input', function () {
+                var value = $(this).val() || '';
+                setSearchState(value);
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(async function () {
+                    await runPaymentsSearch(value);
+                }, 250);
+            });
+
+            $('#paymentsSearchClear').on('click', function () {
+                clearTimeout(searchTimer);
+                $input.val('').trigger('focus');
+                setSearchState('');
+                runPaymentsSearch('');
+            });
+        });
+    </script>
+{% endblock %}

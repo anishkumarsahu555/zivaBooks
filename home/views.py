@@ -8,12 +8,15 @@ from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
-from django.db.models import Q, Sum
-from django.db.models.functions import Length
+from django.core.paginator import Paginator
+from django.db.models import Q, Sum, F, FloatField, ExpressionWrapper, Window, Count
+from django.db.models.functions import Length, TruncMonth
 from django.http import JsonResponse, HttpResponse
+from django.template.loader import render_to_string
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils import timezone
+from weasyprint import CSS, HTML
 # Create your views here.
 from django.views.decorators.csrf import ensure_csrf_cookie
 # import xlwt
@@ -1524,6 +1527,182 @@ def _parse_customer_date(value, default=None):
         return datetime.strptime(value, '%Y-%m-%d').date()
     except Exception:
         return default
+
+
+def _customer_page_context(page_key, page_title, page_subtitle=''):
+    return {
+        'customer_page_key': page_key,
+        'customer_page_title': page_title,
+        'customer_page_subtitle': page_subtitle,
+    }
+
+
+def _get_customer_party(request, fields=None):
+    party_fields = list(fields or [])
+    for required in ['id', 'tenant_id', 'name', 'phone', 'openingBalance']:
+        if required not in party_fields:
+            party_fields.append(required)
+    party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only(
+        *party_fields
+    ).order_by('-id').first()
+    if party:
+        try:
+            request.session['cust_party_id'] = int(party.pk)
+            request.session['cust_tenant_id'] = int(party.tenant_id) if party.tenant_id is not None else None
+        except Exception:
+            pass
+    return party
+
+
+def _customer_date_range_from_request(request):
+    today = datetime.today().date()
+    start_default = today.replace(day=1)
+    start_date = _parse_customer_date(request.GET.get('startDate'), start_default)
+    end_date = _parse_customer_date(request.GET.get('endDate'), today)
+    if end_date and start_date and end_date < start_date:
+        start_date, end_date = end_date, start_date
+    return start_date, end_date, today
+
+
+def _format_customer_datetime(value, fallback='-'):
+    if not value:
+        return fallback
+    dt_value = value
+    if timezone.is_naive(dt_value):
+        dt_value = timezone.make_aware(dt_value)
+    return timezone.localtime(dt_value).strftime('%d %b %Y, %I:%M %p')
+
+
+def _format_customer_date_value(value, fallback='-'):
+    if not value:
+        return fallback
+    return value.strftime('%d %b %Y')
+
+
+def _customer_bottom_nav_items():
+    return [
+        {'key': 'dashboard', 'label': 'Home', 'icon': 'home', 'url': reverse('homeApp:customer_home')},
+        {'key': 'ledger', 'label': 'Ledger', 'icon': 'book', 'url': reverse('homeApp:customer_ledger')},
+        {'key': 'invoices', 'label': 'Invoices', 'icon': 'file pdf outline', 'url': reverse('homeApp:customer_invoices')},
+        {'key': 'payments', 'label': 'Payments', 'icon': 'money bill alternate outline', 'url': reverse('homeApp:customer_payments')},
+        {'key': 'orders', 'label': 'Orders', 'icon': 'shopping bag', 'url': reverse('homeApp:customer_orders')},
+        {'key': 'profile', 'label': 'Profile', 'icon': 'user outline', 'url': reverse('homeApp:customer_profile')},
+    ]
+
+
+def _customer_dashboard_actions():
+    return [
+        {'label': 'Home', 'icon': 'home', 'url': reverse('homeApp:customer_home')},
+        {'label': 'Ledger', 'icon': 'book', 'url': reverse('homeApp:customer_ledger')},
+        {'label': 'Invoices', 'icon': 'file pdf outline', 'url': reverse('homeApp:customer_invoices')},
+        {'label': 'Payments', 'icon': 'money bill alternate outline', 'url': reverse('homeApp:customer_payments')},
+        {'label': 'Orders', 'icon': 'shopping bag', 'url': reverse('homeApp:customer_orders')},
+        {'label': 'Profile', 'icon': 'user outline', 'url': reverse('homeApp:customer_profile')},
+    ]
+
+
+def _customer_shift_month(date_obj, delta):
+    month_index = (date_obj.month - 1) + delta
+    year = date_obj.year + (month_index // 12)
+    month = (month_index % 12) + 1
+    return date_obj.replace(year=year, month=month, day=1)
+
+
+def _customer_querystring(request, **overrides):
+    params = request.GET.copy()
+    for key, value in overrides.items():
+        if value in (None, ''):
+            params.pop(key, None)
+        else:
+            params[key] = value
+    return params.urlencode()
+
+
+def _customer_fragment_requested(request):
+    return str(request.GET.get('fragment') or '').strip() == '1'
+
+
+def _customer_fragment_response(request, template_name, items, page_obj):
+    html = render_to_string(template_name, {'items': items}, request=request)
+    return JsonResponse({
+        'message': 'success',
+        'html': html,
+        'has_next': bool(page_obj.has_next()),
+        'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+        'current_page': page_obj.number,
+        'total_pages': page_obj.paginator.num_pages,
+    })
+
+
+def _customer_sales_invoice_item(sale):
+    return {
+        'kind': 'Sales',
+        'id': sale.id,
+        'invoice_no': sale.invoiceNumber or sale.salesID or f'SAL-{sale.pk}',
+        'date_label': _format_customer_date_value(sale.buildDate),
+        'amount': float(sale.amount or 0.0),
+        'download_url': reverse('homeApp:customer_download_sales_invoice_pdf') + f'?id={sale.id}',
+        'search_text': ' '.join([
+            str(sale.invoiceNumber or ''),
+            str(sale.salesID or ''),
+            str(sale.paymentID or ''),
+            str(sale.remark or ''),
+        ]).strip().lower(),
+    }
+
+
+def _customer_cash_counter_invoice_item(counter):
+    return {
+        'kind': 'Cash Counter',
+        'id': counter.id,
+        'invoice_no': counter.invoiceNumber or counter.counterID or f'CC-{counter.pk}',
+        'date_label': _format_customer_datetime(counter.entryDate),
+        'amount': float(counter.amount or 0.0),
+        'download_url': reverse('homeApp:customer_download_cash_counter_invoice_pdf') + f'?id={counter.id}',
+        'search_text': ' '.join([
+            str(counter.invoiceNumber or ''),
+            str(counter.counterID or ''),
+            str(counter.remark or ''),
+            str(counter.mode or ''),
+        ]).strip().lower(),
+    }
+def _customer_ledger_display_datetime(entry):
+    dt_value = entry.txDateTime
+    try:
+        if (
+            entry.source in (PartyLedgerEntry.Source.COLLECTION, PartyLedgerEntry.Source.COUNTER_COLLECTION)
+            and entry.txDateTime
+            and entry.txDateTime.time().strftime('%H:%M:%S') == '00:00:00'
+            and getattr(entry, 'datetime', None)
+        ):
+            dt_value = entry.datetime
+    except Exception:
+        dt_value = entry.txDateTime
+    return dt_value
+
+
+def _customer_ledger_item(entry, opening):
+    running_total = float(getattr(entry, 'running_total', 0.0) or 0.0)
+    balance = opening + running_total
+    debit = float(entry.debit or 0.0)
+    credit = float(entry.credit or 0.0)
+    reference = str(entry.reference or '').strip()
+    particulars = str(entry.particulars or '').strip()
+    source_label = entry.get_source_display() if hasattr(entry, 'get_source_display') else str(entry.source or '').replace('_', ' ').title()
+    title = reference or source_label or f'Entry #{entry.pk}'
+    detail = particulars if particulars and particulars != title else ''
+    return {
+        'id': entry.id,
+        'title': title,
+        'subtitle': source_label,
+        'detail': detail,
+        'date_label': _format_customer_datetime(_customer_ledger_display_datetime(entry)),
+        'debit': debit,
+        'credit': credit,
+        'balance': balance,
+    }
+
+
 def _customer_visible_party_ledger_qs(request, qs):
     """
     Customer portal should show only:
@@ -1548,18 +1727,13 @@ def _customer_visible_party_ledger_qs(request, qs):
 @ensure_csrf_cookie
 @permission_required_any('home.view_party')
 def customer_home(request):
-    party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only(
-        'id', 'name', 'phone', 'address', 'username', 'password', 'openingBalance'
-    ).order_by('-id').first()
+    party = _get_customer_party(
+        request,
+        fields=['address', 'billingAddress', 'legalName', 'gstNumber', 'isB2B', 'username', 'password'],
+    )
     if not party:
         return redirect('/')
-    today = datetime.today().date()
-    # Default: current month range (better than "today" for customers).
-    start_default = today.replace(day=1)
-    start_date = _parse_customer_date(request.GET.get('startDate'), start_default)
-    end_date = _parse_customer_date(request.GET.get('endDate'), today)
-    if end_date and start_date and end_date < start_date:
-        start_date, end_date = end_date, start_date
+    start_date, end_date, today = _customer_date_range_from_request(request)
     base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
     base_qs = _customer_visible_party_ledger_qs(request, base_qs)
     prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
@@ -1572,6 +1746,90 @@ def customer_home(request):
     range_debit = float(range_totals['debit_total'] or 0.0)
     range_credit = float(range_totals['credit_total'] or 0.0)
     closing = opening + range_debit - range_credit
+    order_qs = tenant_qs(request, Order).filter(isDeleted=False, partyID=party)
+    payment_qs = tenant_qs(request, Collection).filter(isDeleted=False, isApproved=True, partyID=party)
+    counter_payment_qs = tenant_qs(request, CollectionCashCounter).filter(isDeleted=False, isApproved=True, partyID=party)
+    sales_qs = tenant_qs(request, Sales).filter(
+        isDeleted=False,
+        isApproved=True,
+        partyID=party,
+    )
+    cash_invoice_qs = tenant_qs(request, CashCounter).filter(
+        isDeleted=False,
+        partyID=party,
+    ).exclude(invoiceNumber__isnull=True).exclude(invoiceNumber__exact='')
+    current_month_orders = order_qs.filter(buildDate__range=[start_date, end_date]).count()
+    current_month_purchases = sales_qs.filter(buildDate__range=[start_date, end_date]).aggregate(total=Sum('amount'))
+    last_payment = payment_qs.order_by('-collectionDateTime', '-id').first()
+    if not last_payment:
+        last_payment = counter_payment_qs.order_by('-collectionDateTime', '-id').first()
+    trend_start = _customer_shift_month(today.replace(day=1), -5)
+    trend_months = [_customer_shift_month(trend_start, index) for index in range(6)]
+    trend_labels = [month.strftime('%b') for month in trend_months]
+
+    sales_month_map = {
+        row['month'].date().replace(day=1) if hasattr(row['month'], 'date') else row['month'].replace(day=1): float(row['total'] or 0.0)
+        for row in sales_qs.filter(buildDate__gte=trend_start, buildDate__lte=end_date).annotate(
+            month=TruncMonth('buildDate')
+        ).values('month').annotate(total=Sum('amount')).order_by('month')
+    }
+    payment_month_map = {}
+    for row in payment_qs.filter(
+        collectionDateTime__date__gte=trend_start,
+        collectionDateTime__date__lte=end_date,
+    ).annotate(
+        month=TruncMonth('collectionDateTime')
+    ).values('month').annotate(total=Sum('paidAmount')).order_by('month'):
+        month_key = row['month'].date().replace(day=1) if hasattr(row['month'], 'date') else row['month'].replace(day=1)
+        payment_month_map[month_key] = payment_month_map.get(month_key, 0.0) + float(row['total'] or 0.0)
+    for row in counter_payment_qs.filter(
+        collectionDateTime__date__gte=trend_start,
+        collectionDateTime__date__lte=end_date,
+    ).annotate(
+        month=TruncMonth('collectionDateTime')
+    ).values('month').annotate(total=Sum('paidAmount')).order_by('month'):
+        month_key = row['month'].date().replace(day=1) if hasattr(row['month'], 'date') else row['month'].replace(day=1)
+        payment_month_map[month_key] = payment_month_map.get(month_key, 0.0) + float(row['total'] or 0.0)
+    order_month_map = {
+        row['month'].date().replace(day=1) if hasattr(row['month'], 'date') else row['month'].replace(day=1): int(row['total'] or 0)
+        for row in order_qs.filter(buildDate__gte=trend_start, buildDate__lte=end_date).annotate(
+            month=TruncMonth('buildDate')
+        ).values('month').annotate(total=Count('id')).order_by('month')
+    }
+    trend_purchases = [round(sales_month_map.get(month, 0.0), 2) for month in trend_months]
+    trend_payments = [round(payment_month_map.get(month, 0.0), 2) for month in trend_months]
+    trend_orders = [int(order_month_map.get(month, 0)) for month in trend_months]
+
+    status_label_map = {
+        Order.Status.DRAFT: 'Draft',
+        Order.Status.SUBMITTED: 'Submitted',
+        Order.Status.APPROVED: 'Confirmed',
+        Order.Status.PACKED: 'Packed',
+        Order.Status.OUT_FOR_DELIVERY: 'Out for Delivery',
+        Order.Status.DELIVERED: 'Delivered',
+        Order.Status.RETURNED: 'Returned',
+        Order.Status.FULFILLED: 'Delivered',
+        Order.Status.CANCELLED: 'Cancelled',
+    }
+    raw_status_counts = order_qs.values('status').annotate(total=Count('id'))
+    status_counts = {}
+    for row in raw_status_counts:
+        label = status_label_map.get(row['status'], _order_tracking_status_text(row['status']))
+        status_counts[label] = status_counts.get(label, 0) + int(row['total'] or 0)
+    status_labels = [label for label, total in status_counts.items() if total > 0]
+    status_values = [status_counts[label] for label in status_labels]
+    if not status_labels:
+        status_labels = ['No Orders']
+        status_values = [1]
+
+    cash_invoice_count = cash_invoice_qs.filter(mode__in=['Cash', 'Credit', 'Card', 'Mix', 'Return']).count()
+    activity_labels = ['Sales Invoices', 'Cash Counter', 'Payments', 'Orders']
+    activity_values = [
+        sales_qs.count(),
+        cash_invoice_count,
+        payment_qs.count() + counter_payment_qs.count(),
+        order_qs.count(),
+    ]
     context = {
         'party': party,
         'startDate': start_date.strftime('%d/%m/%Y'),
@@ -1580,28 +1838,556 @@ def customer_home(request):
         'range_debit': range_debit,
         'range_credit': range_credit,
         'closing': closing,
+        'dashboard_cards': [
+            {
+                'label': 'Outstanding',
+                'value': f'₹ {closing:,.2f}',
+                'hint': 'Live closing balance for the selected range.',
+                'tone': 'amber',
+            },
+            {
+                'label': 'This Period Purchase',
+                'value': f'₹ {float(current_month_purchases.get("total") or 0.0):,.2f}',
+                'hint': f'{start_date.strftime("%d %b")} to {end_date.strftime("%d %b")}',
+                'tone': 'blue',
+            },
+            {
+                'label': 'Payments Received',
+                'value': f'₹ {range_credit:,.2f}',
+                'hint': 'Approved customer payments only.',
+                'tone': 'green',
+            },
+            {
+                'label': 'Orders',
+                'value': str(current_month_orders),
+                'hint': 'Orders in the current filtered range.',
+                'tone': 'slate',
+            },
+        ],
+        'quick_links': _customer_dashboard_actions(),
+        'recent_summary': [
+            {'label': 'Customer', 'value': party.legalName or party.name or '-'},
+            {'label': 'Phone', 'value': party.phone or '-'},
+            {'label': 'Last Payment', 'value': _format_customer_datetime(getattr(last_payment, 'collectionDateTime', None))},
+            {'label': 'Profile Type', 'value': 'B2B Customer' if party.isB2B else 'Retail Customer'},
+        ],
+        'last_payment_label': _format_customer_datetime(getattr(last_payment, 'collectionDateTime', None)),
+        'profile_type_label': 'B2B Customer' if party.isB2B else 'Retail Customer',
+        'dashboard_charts': {
+            'trend': {
+                'labels': trend_labels,
+                'purchases': trend_purchases,
+                'payments': trend_payments,
+            },
+            'orders': {
+                'labels': trend_labels,
+                'values': trend_orders,
+            },
+            'status': {
+                'labels': status_labels,
+                'values': status_values,
+            },
+            'activity': {
+                'labels': activity_labels,
+                'values': activity_values,
+            },
+        },
     }
-    try:
-        request.session['cust_party_id'] = int(party.pk)
-        request.session['cust_tenant_id'] = int(party.tenant_id) if party.tenant_id is not None else None
-    except Exception:
-        pass
-    return render(request, 'home/customer.html', context)
+    context.update(_customer_page_context('dashboard', 'Customer Dashboard', 'Live account view built for mobile use.'))
+    context['customer_bottom_nav_items'] = _customer_bottom_nav_items()
+    return render(request, 'home/customer/dashboard.html', context)
+
+
+@ensure_csrf_cookie
+@permission_required_any('home.view_party')
+def customer_ledger(request):
+    party = _get_customer_party(request, fields=['address', 'billingAddress', 'legalName'])
+    if not party:
+        return redirect('/')
+    start_date, end_date, _today = _customer_date_range_from_request(request)
+    search = str(request.GET.get('q') or '').strip()
+    base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
+    base_qs = _customer_visible_party_ledger_qs(request, base_qs)
+    prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
+        debit_total=Sum('debit'),
+        credit_total=Sum('credit'),
+    )
+    opening = float(party.openingBalance or 0.0) + float(prior['debit_total'] or 0.0) - float(prior['credit_total'] or 0.0)
+    range_totals = base_qs.filter(txDateTime__date__range=[start_date, end_date]).aggregate(
+        debit_total=Sum('debit'),
+        credit_total=Sum('credit'),
+    )
+    range_debit = float(range_totals['debit_total'] or 0.0)
+    range_credit = float(range_totals['credit_total'] or 0.0)
+    closing = opening + range_debit - range_credit
+    ledger_qs = base_qs.filter(txDateTime__date__range=[start_date, end_date])
+    if search:
+        ledger_qs = ledger_qs.filter(
+            Q(particulars__icontains=search) |
+            Q(reference__icontains=search) |
+            Q(source__icontains=search)
+        )
+    ledger_qs = ledger_qs.annotate(
+        signed_amount=ExpressionWrapper(F('debit') - F('credit'), output_field=FloatField()),
+    ).annotate(
+        running_total=Window(
+            expression=Sum('signed_amount'),
+            order_by=[F('txDateTime').asc(), F('id').asc()],
+        ),
+    ).order_by('-txDateTime', '-id')
+    paginator = Paginator(ledger_qs, 12)
+    page_obj = paginator.get_page(request.GET.get('page') or 1)
+    ledger_entries = [
+        _customer_ledger_item(entry, opening)
+        for entry in page_obj.object_list
+    ]
+    context = {
+        'party': party,
+        'startDate': start_date.strftime('%d/%m/%Y'),
+        'endDate': end_date.strftime('%d/%m/%Y'),
+        'opening': opening,
+        'range_debit': range_debit,
+        'range_credit': range_credit,
+        'closing': closing,
+        'page_obj': page_obj,
+        'ledger_entries': ledger_entries,
+        'search_query': search,
+        'pagination_base_query': _customer_querystring(request, page=None),
+        'customer_bottom_nav_items': _customer_bottom_nav_items(),
+    }
+    if _customer_fragment_requested(request):
+        return _customer_fragment_response(request, 'home/customer/_ledger_items.html', ledger_entries, page_obj)
+    context.update(_customer_page_context('ledger', 'Ledger', 'Filter the statement range and review the account flow.'))
+    return render(request, 'home/customer/ledger.html', context)
+
+
+@permission_required_any('home.view_party')
+def customer_payments(request):
+    party = _get_customer_party(request, fields=['address'])
+    if not party:
+        return redirect('/')
+    search = str(request.GET.get('q') or '').strip()
+
+    payments_qs = tenant_qs(request, PartyLedgerEntry).filter(
+        isDeleted=False,
+        party=party,
+        source__in=[
+            PartyLedgerEntry.Source.COLLECTION,
+            PartyLedgerEntry.Source.COUNTER_COLLECTION,
+        ],
+    ).order_by('-txDateTime', '-id')
+    if search:
+        payments_qs = payments_qs.filter(
+            Q(reference__icontains=search) |
+            Q(particulars__icontains=search)
+        )
+
+    paginator = Paginator(payments_qs, 12)
+    page_obj = paginator.get_page(request.GET.get('page') or 1)
+    page_entries = list(page_obj.object_list)
+    collection_ids = [item.source_object_id for item in page_entries if item.source == PartyLedgerEntry.Source.COLLECTION and item.source_object_id]
+    counter_ids = [item.source_object_id for item in page_entries if item.source == PartyLedgerEntry.Source.COUNTER_COLLECTION and item.source_object_id]
+    collections_map = {
+        item.id: item
+        for item in tenant_qs(request, Collection).filter(
+            isDeleted=False,
+            isApproved=True,
+            partyID=party,
+            id__in=collection_ids,
+        )
+    }
+    counter_map = {
+        item.id: item
+        for item in tenant_qs(request, CollectionCashCounter).filter(
+            isDeleted=False,
+            isApproved=True,
+            partyID=party,
+            id__in=counter_ids,
+        )
+    }
+    payments = []
+    for entry in page_entries:
+        if entry.source == PartyLedgerEntry.Source.COLLECTION:
+            item = collections_map.get(entry.source_object_id)
+            if not item:
+                continue
+            payments.append({
+                'kind': 'Field Collection',
+                'payment_id': item.paymentID or entry.reference or f'COL-{item.pk}',
+                'mode': item.modeOfPayment or '-',
+                'amount': float(item.paidAmount or entry.credit or 0.0),
+                'datetime_label': _format_customer_datetime(item.collectionDateTime or item.datetime),
+                'verified': bool(item.otpVerified),
+                'detail': item.detail or item.remark or entry.particulars or '',
+            })
+        else:
+            item = counter_map.get(entry.source_object_id)
+            if not item:
+                continue
+            payments.append({
+                'kind': 'Counter Collection',
+                'payment_id': item.paymentID or entry.reference or f'CC-{item.pk}',
+                'mode': item.modeOfPayment or '-',
+                'amount': float(item.paidAmount or entry.credit or 0.0),
+                'datetime_label': _format_customer_datetime(item.collectionDateTime or item.datetime),
+                'verified': True,
+                'detail': item.detail or item.remark or entry.particulars or '',
+            })
+    context = {
+        'party': party,
+        'page_obj': page_obj,
+        'payments': payments,
+        'search_query': search,
+        'pagination_base_query': _customer_querystring(request, page=None),
+        'customer_bottom_nav_items': _customer_bottom_nav_items(),
+    }
+    if _customer_fragment_requested(request):
+        return _customer_fragment_response(request, 'home/customer/_payments_items.html', payments, page_obj)
+    context.update(_customer_page_context('payments', 'Payments', 'Approved payments and collection references.'))
+    return render(request, 'home/customer/payments.html', context)
+
+
+@permission_required_any('home.view_party')
+def customer_orders(request):
+    party = _get_customer_party(request)
+    if not party:
+        return redirect('/')
+    order_qs = tenant_qs(request, Order).filter(
+        isDeleted=False,
+        partyID=party,
+        status__in=[Order.Status.DELIVERED, Order.Status.RETURNED, Order.Status.FULFILLED],
+    ).order_by('-buildDate', '-id')
+    search = str(request.GET.get('q') or '').strip()
+    if search:
+        order_qs = order_qs.filter(
+            Q(orderNumber__icontains=search) |
+            Q(orderText__icontains=search) |
+            Q(remark__icontains=search) |
+            Q(linkedSales__salesID__icontains=search) |
+            Q(linkedSales__invoiceNumber__icontains=search)
+        )
+    paginator = Paginator(order_qs, 12)
+    page_obj = paginator.get_page(request.GET.get('page') or 1)
+    orders = []
+    for order in page_obj.object_list:
+        orders.append({
+            'id': order.id,
+            'number': order.orderNumber or f'Order #{order.pk}',
+            'date_label': _format_customer_date_value(order.buildDate),
+            'status': _order_tracking_status_text(order.status),
+            'status_key': str(order.status or ''),
+            'remark': order.remark or '',
+            'linked_sales_id': getattr(order.linkedSales, 'salesID', '') if getattr(order, 'linkedSales', None) else '',
+            'delivery_verified': bool(order.deliveryOtpVerified),
+            'detail_url': reverse('homeApp:customer_order_detail', args=[order.id]),
+        })
+    context = {
+        'party': party,
+        'page_obj': page_obj,
+        'orders': orders,
+        'search_query': search,
+        'pagination_base_query': _customer_querystring(request, page=None),
+        'customer_bottom_nav_items': _customer_bottom_nav_items(),
+    }
+    if _customer_fragment_requested(request):
+        return _customer_fragment_response(request, 'home/customer/_orders_items.html', orders, page_obj)
+    context.update(_customer_page_context('orders', 'Orders', 'Track order progress from confirmation to delivery.'))
+    return render(request, 'home/customer/orders.html', context)
+
+
+@permission_required_any('home.view_party')
+def customer_invoices(request):
+    party = _get_customer_party(request)
+    if not party:
+        return redirect('/')
+    search = str(request.GET.get('q') or '').strip()
+    sales_qs = tenant_qs(request, Sales).filter(
+        isDeleted=False,
+        isApproved=True,
+        partyID=party,
+    ).order_by('-buildDate', '-id')
+    if search:
+        sales_qs = sales_qs.filter(
+            Q(invoiceNumber__icontains=search) |
+            Q(salesID__icontains=search) |
+            Q(paymentID__icontains=search) |
+            Q(remark__icontains=search)
+        )
+    sales_rows = [
+        _customer_sales_invoice_item(item)
+        for item in sales_qs
+    ]
+    cash_qs = tenant_qs(request, CashCounter).filter(
+        isDeleted=False,
+        partyID=party,
+    ).exclude(invoiceNumber__isnull=True).exclude(invoiceNumber__exact='').order_by('-entryDate', '-id')
+    if search:
+        cash_qs = cash_qs.filter(
+            Q(invoiceNumber__icontains=search) |
+            Q(counterID__icontains=search) |
+            Q(remark__icontains=search) |
+            Q(mode__icontains=search)
+        )
+    cash_rows = [
+        _customer_cash_counter_invoice_item(item)
+        for item in cash_qs
+        if str(item.mode or '') in {'Cash', 'Credit', 'Card', 'Mix', 'Return'}
+    ]
+    invoice_rows = sales_rows + cash_rows
+    invoice_rows.sort(key=lambda item: (item.get('date_label') or '', item.get('id') or 0), reverse=True)
+    paginator = Paginator(invoice_rows, 12)
+    page_obj = paginator.get_page(request.GET.get('page') or 1)
+    invoices = list(page_obj.object_list)
+    context = {
+        'party': party,
+        'page_obj': page_obj,
+        'invoices': invoices,
+        'search_query': search,
+        'pagination_base_query': _customer_querystring(request, page=None),
+        'customer_bottom_nav_items': _customer_bottom_nav_items(),
+    }
+    if _customer_fragment_requested(request):
+        return _customer_fragment_response(request, 'home/customer/_invoice_items.html', invoices, page_obj)
+    context.update(_customer_page_context('invoices', 'Invoices', 'Download approved sales and cash counter invoices.'))
+    return render(request, 'home/customer/invoices.html', context)
+
+
+@permission_required_any('home.view_party')
+def customer_download_sales_invoice_pdf(request):
+    sale_id = request.GET.get('id')
+    if not sale_id or not str(sale_id).isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Sale id is required.'}, status=400)
+    party = _get_customer_party(request)
+    if not party:
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    sale = get_object_or_404(
+        tenant_qs(request, Sales).select_related('partyID', 'createdBy', 'approvedBy', 'bankID', 'tenant'),
+        pk=int(sale_id),
+        isDeleted=False,
+        isApproved=True,
+        partyID=party,
+    )
+    from .apiView import _gst_breakup_from_sale, _pdf_base_context
+    tenant = get_current_tenant(request)
+    lines = list(sale.lines.filter(isDeleted=False).select_related('item').order_by('id'))
+    gst_breakup = _gst_breakup_from_sale(sale, tenant)
+    total_before_round_off = round(float(gst_breakup['taxable_total'] or 0.0) + float(gst_breakup['gst_total'] or 0.0), 2)
+    round_off_amount = round(float(getattr(sale, 'roundOffAmount', 0.0) or 0.0), 2)
+    context = {
+        'sale': sale,
+        'lines': lines,
+        'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
+        'seller_gst_number': getattr(tenant, 'gstNumber', None) or '',
+        'seller_address': getattr(tenant, 'billingAddress', None) or '',
+        'seller_phone': getattr(tenant, 'phone', None) or '',
+        'buyer_name': sale.buyerLegalName or getattr(getattr(sale, 'partyID', None), 'legalName', None) or getattr(getattr(sale, 'partyID', None), 'name', None) or '-',
+        'buyer_gst_number': sale.buyerGstNumber or '',
+        'buyer_address': sale.buyerBillingAddress or getattr(getattr(sale, 'partyID', None), 'billingAddress', None) or getattr(getattr(sale, 'partyID', None), 'address', None) or '',
+        'gst_total': gst_breakup['gst_total'],
+        'taxable_total': gst_breakup['taxable_total'],
+        'total_before_round_off': total_before_round_off,
+        'round_off_amount': round_off_amount,
+        'grand_total': float(sale.amount or 0.0),
+        'tax_mode_label': gst_breakup['tax_mode_label'],
+        'seller_state_code': gst_breakup['seller_state_code'],
+        'buyer_state_code': gst_breakup['buyer_state_code'],
+        'place_of_supply_state_code': gst_breakup['place_of_supply_state_code'],
+        'effective_buyer_state_code': gst_breakup['effective_buyer_state_code'],
+        'cgst_total': gst_breakup['cgst_total'],
+        'sgst_total': gst_breakup['sgst_total'],
+        'utgst_total': gst_breakup['utgst_total'],
+        'igst_total': gst_breakup['igst_total'],
+    }
+    context.update(_pdf_base_context(request, [
+        f'Invoice: {sale.invoiceNumber or sale.pk}',
+        f'Buyer: {context["buyer_name"]}',
+        f'Kind: {sale.get_invoiceKind_display()}',
+    ]))
+    response = HttpResponse(content_type="application/pdf")
+    response['Content-Disposition'] = f'attachment; filename=sales-invoice-{sale.invoiceNumber or sale.pk}.pdf'
+    html = render_to_string("home/report/salesInvoicePDF.html", context)
+    base_url = request.build_absolute_uri('/')
+    HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 0.9cm; }')])
+    return response
+
+
+@permission_required_any('home.view_party')
+def customer_download_cash_counter_invoice_pdf(request):
+    counter_id = request.GET.get('id')
+    if not counter_id or not str(counter_id).isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Cash counter id is required.'}, status=400)
+    party = _get_customer_party(request)
+    if not party:
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    counter = get_object_or_404(
+        tenant_qs(request, CashCounter).select_related('partyID', 'createdBy', 'bankID', 'tenant'),
+        pk=int(counter_id),
+        isDeleted=False,
+        partyID=party,
+    )
+    if str(counter.mode or '') not in {'Cash', 'Credit', 'Card', 'Mix', 'Return'} or not getattr(counter, 'invoiceNumber', None):
+        return JsonResponse({'message': 'error', 'error': 'Invoice download is only available for billing entries.'}, status=400)
+    from .apiView import _gst_breakup_from_cash_counter, _pdf_base_context
+    tenant = get_current_tenant(request)
+    lines = list(counter.lines.filter(isDeleted=False).select_related('item').order_by('id'))
+    gst_breakup = _gst_breakup_from_cash_counter(counter, tenant)
+    total_before_round_off = round(float(gst_breakup['taxable_total'] or 0.0) + float(gst_breakup['gst_total'] or 0.0), 2)
+    round_off_amount = round(float(getattr(counter, 'roundOffAmount', 0.0) or 0.0), 2)
+    grand_total = round(float(counter.amount or 0.0), 2)
+    if counter.mode == 'Mix':
+        grand_total = round(float(counter.mixCashAmount or 0.0) + float(counter.mixCardAmount or 0.0), 2)
+    context = {
+        'counter': counter,
+        'lines': lines,
+        'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
+        'seller_gst_number': getattr(tenant, 'gstNumber', None) or '',
+        'seller_address': getattr(tenant, 'billingAddress', None) or '',
+        'seller_phone': getattr(tenant, 'phone', None) or '',
+        'buyer_name': counter.buyerLegalName or getattr(getattr(counter, 'partyID', None), 'legalName', None) or getattr(getattr(counter, 'partyID', None), 'name', None) or '-',
+        'buyer_gst_number': counter.buyerGstNumber or '',
+        'buyer_address': counter.buyerBillingAddress or getattr(getattr(counter, 'partyID', None), 'billingAddress', None) or getattr(getattr(counter, 'partyID', None), 'address', None) or '',
+        'gst_total': gst_breakup['gst_total'],
+        'taxable_total': gst_breakup['taxable_total'],
+        'total_before_round_off': total_before_round_off,
+        'round_off_amount': round_off_amount,
+        'grand_total': grand_total,
+        'tax_mode_label': gst_breakup['tax_mode_label'],
+        'seller_state_code': gst_breakup['seller_state_code'],
+        'buyer_state_code': gst_breakup['buyer_state_code'],
+        'place_of_supply_state_code': gst_breakup['place_of_supply_state_code'],
+        'effective_buyer_state_code': gst_breakup['effective_buyer_state_code'],
+        'cgst_total': gst_breakup['cgst_total'],
+        'sgst_total': gst_breakup['sgst_total'],
+        'utgst_total': gst_breakup['utgst_total'],
+        'igst_total': gst_breakup['igst_total'],
+    }
+    context.update(_pdf_base_context(request, [
+        f'Invoice: {counter.invoiceNumber or counter.pk}',
+        f'Buyer: {context["buyer_name"]}',
+        f'Mode: {counter.mode or "-"}',
+    ]))
+    response = HttpResponse(content_type="application/pdf")
+    response['Content-Disposition'] = f'attachment; filename=cash-counter-invoice-{counter.invoiceNumber or counter.pk}.pdf'
+    html = render_to_string("home/report/cashCounterInvoicePDF.html", context)
+    base_url = request.build_absolute_uri('/')
+    HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 0.9cm; }')])
+    return response
+
+
+@permission_required_any('home.view_party')
+def customer_order_detail(request, id):
+    party = _get_customer_party(request)
+    if not party:
+        return redirect('/')
+    order = get_object_or_404(
+        tenant_qs(request, Order).filter(isDeleted=False, partyID=party).select_related('linkedSales'),
+        pk=id,
+    )
+    events = tenant_qs(request, OrderStatusEvent).filter(isDeleted=False, order=order).order_by('datetime', 'id')
+    delivery_state = 'Verified' if order.deliveryOtpVerified else ('Pending' if str(order.status or '') in [Order.Status.OUT_FOR_DELIVERY, Order.Status.DELIVERED, Order.Status.FULFILLED] else 'Not Required')
+    context = {
+        'party': party,
+        'order': order,
+        'order_label': order.orderNumber or f'Order #{order.pk}',
+        'order_status_text': _order_tracking_status_text(order.status),
+        'order_summary_cards': [
+            {'label': 'Current Status', 'value': _order_tracking_status_text(order.status)},
+            {'label': 'Order Date', 'value': _format_customer_date_value(order.buildDate)},
+            {'label': 'Linked Sale', 'value': getattr(order.linkedSales, 'salesID', '') or getattr(order.linkedSales, 'invoiceNumber', '') or '-'},
+            {'label': 'Delivery OTP', 'value': delivery_state},
+        ],
+        'order_fact_rows': [
+            {'icon': 'calendar alternate outline', 'label': 'Build Date', 'value': _format_customer_date_value(order.buildDate)},
+            {'icon': 'file alternate outline', 'label': 'Sales Link', 'value': getattr(order.linkedSales, 'salesID', '') or getattr(order.linkedSales, 'invoiceNumber', '') or '-'},
+            {'icon': 'clipboard outline', 'label': 'Order Notes', 'value': order.orderText or order.remark or '-'},
+            {'icon': 'comment alternate outline', 'label': 'Remark', 'value': order.remark or '-'},
+        ],
+        'milestone_rows': [
+            {'label': 'Confirmed', 'value': _format_customer_datetime(getattr(order, 'approvedOn', None))},
+            {'label': 'Packed', 'value': _format_customer_datetime(getattr(order, 'packedOn', None))},
+            {'label': 'Out for Delivery', 'value': _format_customer_datetime(getattr(order, 'outForDeliveryOn', None))},
+            {'label': 'Delivered', 'value': _format_customer_datetime(getattr(order, 'deliveredOn', None))},
+            {'label': 'OTP Verified On', 'value': _format_customer_datetime(getattr(order, 'deliveryOtpVerifiedOn', None))},
+            {'label': 'Returned', 'value': _format_customer_datetime(getattr(order, 'returnedOn', None))},
+        ],
+        'timeline': [
+            {
+                'title': _order_tracking_status_text(event.toStatus),
+                'timestamp': _format_customer_datetime(event.datetime),
+                'note': event.note or '',
+            }
+            for event in events
+        ],
+        'customer_bottom_nav_items': _customer_bottom_nav_items(),
+    }
+    context.update(_customer_page_context('orders', 'Order Detail', 'Single order view with delivery status.'))
+    return render(request, 'home/customer/order_detail.html', context)
+
+
+@permission_required_any('home.view_party')
+def customer_profile(request):
+    party = _get_customer_party(
+        request,
+        fields=['address', 'billingAddress', 'legalName', 'gstNumber', 'isB2B', 'username'],
+    )
+    if not party:
+        return redirect('/')
+    context = {
+        'party': party,
+        'customer_bottom_nav_items': _customer_bottom_nav_items(),
+        'profile_chips': [
+            {'label': 'Customer Account', 'tone': 'accent'},
+            {'label': 'B2B Customer' if party.isB2B else 'Retail Customer', 'tone': 'default'},
+            {'label': party.phone or 'Phone not added', 'tone': 'warm'},
+        ],
+        'profile_identity': {
+            'name': party.name or '-',
+            'legal_name': party.legalName or party.name or '-',
+            'login_id': party.username or request.user.username or '-',
+            'phone': party.phone or '-',
+        },
+        'profile_contact_rows': [
+            {'icon': 'phone', 'label': 'Phone', 'value': party.phone or '-'},
+            {'icon': 'user outline', 'label': 'Login ID', 'value': party.username or request.user.username or '-'},
+            {'icon': 'map marker alternate', 'label': 'Billing Address', 'value': party.billingAddress or party.address or '-'},
+        ],
+        'profile_business_rows': [
+            {'icon': 'building outline', 'label': 'Legal Name', 'value': party.legalName or '-'},
+            {'icon': 'id card outline', 'label': 'GST Number', 'value': party.gstNumber or '-'},
+            {'icon': 'briefcase', 'label': 'Type', 'value': 'B2B Customer' if party.isB2B else 'Retail Customer'},
+        ],
+        'profile_meta_cards': [
+            {'label': 'Portal Access', 'value': 'Active Customer Login'},
+            {'label': 'Statement Access', 'value': 'Ledger, Payments, Orders'},
+            {'label': 'Invoice Access', 'value': 'Approved Sales Only'},
+            {'label': 'Security', 'value': '6-digit password enabled'},
+        ]
+    }
+    context.update(_customer_page_context('profile', 'Profile', 'Business details linked to this customer account.'))
+    return render(request, 'home/customer/profile.html', context)
+
+
+@permission_required_any('home.view_party')
+def customer_security(request):
+    party = _get_customer_party(request)
+    if not party:
+        return redirect('/')
+    context = {
+        'party': party,
+        'customer_bottom_nav_items': _customer_bottom_nav_items(),
+    }
+    context.update(_customer_page_context('security', 'Security', 'Update the 6-digit portal password for this account.'))
+    return render(request, 'home/customer/security.html', context)
+
+
 @permission_required_any('home.view_party')
 def customer_ledger_kpis(request):
     if request.method != 'GET':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
-    party = tenant_qs(request, Party).filter(userID_id=request.user.pk, isDeleted=False).only(
-        'id', 'openingBalance'
-    ).order_by('-id').first()
+    party = _get_customer_party(request, fields=['openingBalance'])
     if not party:
         return JsonResponse({'message': 'error', 'error': 'Party not found.'}, status=404)
-    today = datetime.today().date()
-    start_default = today.replace(day=1)
-    start_date = _parse_customer_date(request.GET.get('startDate'), start_default)
-    end_date = _parse_customer_date(request.GET.get('endDate'), today)
-    if end_date and start_date and end_date < start_date:
-        start_date, end_date = end_date, start_date
+    start_date, end_date, _today = _customer_date_range_from_request(request)
     base_qs = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, party=party)
     base_qs = _customer_visible_party_ledger_qs(request, base_qs)
     prior = base_qs.filter(txDateTime__date__lt=start_date).aggregate(
