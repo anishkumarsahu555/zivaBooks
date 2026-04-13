@@ -178,6 +178,17 @@
             width: 6px;
         }
 
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+
         .ui.vertical.menu.sidebar-menu {
             margin-top: 40px !important;
             max-height: calc(100% - 40px) !important;
@@ -742,6 +753,68 @@
             border-color: var(--app-line) !important;
         }
 
+        html[data-theme="dark"] .ui.calendar .ui.popup,
+        html[data-theme="dark"] .ui.calendar .ui.popup .ui.grid,
+        html[data-theme="dark"] .ui.calendar .ui.table,
+        html[data-theme="dark"] .ui.popup.calendar,
+        html[data-theme="dark"] .ui.popup.calendar .ui.grid,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table {
+            background: #101b31 !important;
+            color: var(--app-text) !important;
+            border-color: rgba(71, 85, 105, 0.48) !important;
+            box-shadow: 0 16px 34px rgba(2, 6, 23, 0.42) !important;
+        }
+
+        html[data-theme="dark"] .ui.popup.calendar:before {
+            background: #101b31 !important;
+            box-shadow: -1px -1px 0 0 rgba(71, 85, 105, 0.48) !important;
+        }
+
+        html[data-theme="dark"] .ui.calendar .ui.table thead th,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody tr td.link,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table thead th,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody tr td.link {
+            background: transparent !important;
+            color: var(--app-text) !important;
+            border-color: rgba(71, 85, 105, 0.34) !important;
+        }
+
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.link:hover,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.link.today,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.link.focus,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.link.range,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.range,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.link:hover,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.link.today,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.link.focus,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.link.range,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.range {
+            background: rgba(14, 165, 233, 0.28) !important;
+            color: #f0f9ff !important;
+        }
+
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.link.active,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.active,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.link.active.focus,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.link.active,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.active,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.link.active.focus {
+            background: #38bdf8 !important;
+            color: #061827 !important;
+            box-shadow: inset 0 0 0 1px rgba(240, 249, 255, 0.72) !important;
+            font-weight: 800 !important;
+        }
+
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.disabled,
+        html[data-theme="dark"] .ui.calendar .ui.table tbody td.disabled.link,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.disabled,
+        html[data-theme="dark"] .ui.popup.calendar .ui.table tbody td.disabled.link {
+            color: rgba(148, 163, 184, 0.42) !important;
+            background: transparent !important;
+        }
+
         html[data-theme="dark"] .dataTables_wrapper .dataTables_length,
         html[data-theme="dark"] .dataTables_wrapper .dataTables_filter,
         html[data-theme="dark"] .dataTables_wrapper .dataTables_info,
@@ -872,16 +945,58 @@
             color: var(--app-muted) !important;
         }
 
-        html[data-theme="dark"] .ui.basic.button,
-        html[data-theme="dark"] .ui.button:not(.primary):not(.positive):not(.negative):not(.teal):not(.blue):not(.green):not(.red):not(.orange):not(.violet):not(.purple):not(.black) {
+        html[data-theme="dark"] .ui.basic.button:not(.youtube),
+        html[data-theme="dark"] .ui.button:not(.primary):not(.positive):not(.negative):not(.teal):not(.blue):not(.green):not(.red):not(.orange):not(.violet):not(.purple):not(.black):not(.youtube) {
             background: var(--app-surface-soft) !important;
             color: var(--app-text) !important;
             box-shadow: inset 0 0 0 1px var(--app-line) !important;
         }
 
-        html[data-theme="dark"] .ui.basic.button:hover,
-        html[data-theme="dark"] .ui.button:not(.primary):not(.positive):not(.negative):not(.teal):not(.blue):not(.green):not(.red):not(.orange):not(.violet):not(.purple):not(.black):hover {
+        html[data-theme="dark"] .ui.basic.button:not(.youtube):hover,
+        html[data-theme="dark"] .ui.button:not(.primary):not(.positive):not(.negative):not(.teal):not(.blue):not(.green):not(.red):not(.orange):not(.violet):not(.purple):not(.black):not(.youtube):hover {
             background: #1b2a42 !important;
+        }
+
+        .ui.circular.youtube.icon.button,
+        .ui.youtube.icon.button,
+        .ui.youtube.button {
+            background: #db2828 !important;
+            border-color: #db2828 !important;
+            box-shadow: none !important;
+        }
+
+        .ui.circular.youtube.icon.button:hover,
+        .ui.youtube.icon.button:hover,
+        .ui.youtube.button:hover {
+            background: #bb1f1f !important;
+            border-color: #bb1f1f !important;
+        }
+
+        .ui.circular.youtube.icon.button i.icon,
+        .ui.youtube.icon.button i.icon,
+        .ui.youtube.button i.icon {
+            color: #ffffff !important;
+        }
+
+        html[data-theme="dark"] .ui.circular.youtube.icon.button,
+        html[data-theme="dark"] .ui.youtube.icon.button,
+        html[data-theme="dark"] .ui.youtube.button {
+            background: #db2828 !important;
+            border-color: #db2828 !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] .ui.circular.youtube.icon.button:hover,
+        html[data-theme="dark"] .ui.youtube.icon.button:hover,
+        html[data-theme="dark"] .ui.youtube.button:hover {
+            background: #bb1f1f !important;
+            border-color: #bb1f1f !important;
+        }
+
+        html[data-theme="dark"] .ui.circular.youtube.icon.button i.icon,
+        html[data-theme="dark"] .ui.youtube.icon.button i.icon,
+        html[data-theme="dark"] .ui.youtube.button i.icon {
+            color: #ffffff !important;
         }
 
         html[data-theme="dark"] .ui.top.attached.menu,

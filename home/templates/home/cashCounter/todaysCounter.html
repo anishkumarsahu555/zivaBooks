@@ -216,6 +216,253 @@
             box-shadow: none !important;
         }
 
+        .cash-lookup-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 0.45rem;
+        }
+
+        .cash-lookup-header label {
+            margin-bottom: 0 !important;
+        }
+
+        .cash-lookup-toggle {
+            border: 0;
+            border-radius: 8px;
+            background: #e0f2fe;
+            color: #0f5f9c;
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease, transform 0.22s ease;
+        }
+
+        .cash-lookup-toggle i.icon,
+        .cash-lookup-clear i.icon {
+            margin: 0 !important;
+        }
+
+        .cash-lookup-toggle:hover {
+            transform: translateY(-1px);
+        }
+
+        .cash-lookup-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.28);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.22s ease;
+            z-index: 1000;
+        }
+
+        .cash-lookup-backdrop.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .cash-lookup-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: min(360px, 26vw);
+            height: 100vh;
+            background: #ffffff;
+            padding: 16px 14px;
+            box-shadow: -16px 0 32px rgba(15, 23, 42, 0.14);
+            overflow-y: auto;
+            transform: translateX(100%);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.24s ease, opacity 0.22s ease;
+            z-index: 1001;
+        }
+
+        .cash-lookup-drawer.open {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .cash-lookup-sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .cash-lookup-sidebar-title {
+            font-size: 0.92rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .cash-lookup-sidebar-close {
+            border: 0;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+        }
+
+        .cash-lookup-panel {
+            display: block;
+            padding: 10px;
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 10px;
+            background: #fbfffe;
+        }
+
+        .cash-lookup-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .cash-lookup-row .input,
+        .cash-lookup-input {
+            flex: 1 1 auto;
+        }
+
+        .cash-lookup-input {
+            position: relative;
+        }
+
+        .cash-lookup-input input {
+            padding-right: 34px !important;
+            font-size: 0.82rem !important;
+        }
+
+        .cash-lookup-clear {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            border: 0;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 0;
+            width: 18px;
+            height: 18px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cash-lookup-clear.visible {
+            display: inline-flex;
+        }
+
+        .cash-lookup-btn {
+            white-space: nowrap;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+            box-shadow: none !important;
+        }
+
+        .cash-lookup-section-title {
+            margin: 0 0 8px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: #64748b;
+        }
+
+        .cash-lookup-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0 12px;
+        }
+
+        .cash-lookup-chip {
+            border: 1px solid rgba(15, 118, 110, 0.18);
+            background: #f7fbfb;
+            color: #0f766e;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .cash-lookup-chip.active {
+            background: #0f766e;
+            border-color: #0f766e;
+            color: #ffffff;
+        }
+
+        .cash-lookup-results {
+            margin-top: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .cash-lookup-results:empty {
+            display: none;
+        }
+
+        .cash-lookup-detail {
+            margin-top: 12px;
+        }
+
+        .cash-lookup-result {
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fff;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+        }
+
+        .cash-lookup-result-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .cash-lookup-title {
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .cash-lookup-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 10px;
+            color: #5f6b7a;
+            font-size: 0.73rem;
+            line-height: 1.35;
+        }
+
+        .cash-lookup-print-btn.ui.button {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            min-height: 32px;
+            padding: 0 12px !important;
+            font-size: 0.72rem !important;
+            line-height: 1 !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            align-self: center !important;
+            flex: 0 0 auto;
+        }
+
         .sales-gst-toolbar {
             display: flex;
             align-items: center;
@@ -297,6 +544,21 @@
             .cash-invoice-picker .cash-invoice-input {
                 width: calc(100% - 120px) !important;
                 font-size: 0.92rem !important;
+            }
+
+            .cash-lookup-drawer {
+                width: min(100vw, 360px) !important;
+            }
+
+            .cash-lookup-row {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .cash-lookup-row .input,
+            .cash-lookup-btn {
+                width: 100%;
+                flex: 0 0 100%;
             }
 
             .invoice-chip-wrap {
@@ -432,6 +694,61 @@
             border-color: rgba(56, 189, 248, 0.16) !important;
         }
 
+        html[data-theme="dark"] .cash-lookup-toggle {
+            background: rgba(22, 120, 194, 0.2) !important;
+            color: #d7efff !important;
+        }
+
+        html[data-theme="dark"] .cash-lookup-panel,
+        html[data-theme="dark"] .cash-lookup-result {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-color: rgba(56, 189, 248, 0.14) !important;
+        }
+
+        html[data-theme="dark"] .cash-lookup-backdrop {
+            background: rgba(2, 6, 23, 0.54);
+        }
+
+        html[data-theme="dark"] .cash-lookup-drawer {
+            background: #101b31 !important;
+            box-shadow: -16px 0 30px rgba(2, 6, 23, 0.42) !important;
+        }
+
+        html[data-theme="dark"] .cash-lookup-sidebar-title,
+        html[data-theme="dark"] .cash-lookup-sidebar-close,
+        html[data-theme="dark"] .cash-lookup-title {
+            color: #f8fbff !important;
+        }
+
+        html[data-theme="dark"] .cash-lookup-meta,
+        html[data-theme="dark"] .cash-lookup-section-title {
+            color: #93a4bd !important;
+        }
+
+        html[data-theme="dark"] .cash-lookup-clear {
+            color: #95a8c5 !important;
+        }
+
+        html[data-theme="dark"] .cash-lookup-chip {
+            background: rgba(15, 23, 42, 0.84) !important;
+            border-color: rgba(56, 189, 248, 0.22) !important;
+            color: #8fe5dc !important;
+        }
+
+        html[data-theme="dark"] .cash-lookup-chip.active {
+            background: linear-gradient(135deg, #0f766e, rgba(45, 212, 191, 0.3)) !important;
+            border-color: rgba(45, 212, 191, 0.38) !important;
+            color: #effffc !important;
+        }
+
+        html[data-theme="dark"] .cash-lookup-btn.ui.teal.button,
+        html[data-theme="dark"] .cash-lookup-print-btn.ui.teal.button {
+            background: linear-gradient(135deg, #1678c2, rgba(14, 165, 233, 0.26)) !important;
+            color: #f8fdff !important;
+            border: 1px solid transparent !important;
+            box-shadow: none !important;
+        }
+
         html[data-theme="dark"] .cash-reset-btn.ui.teal.double.button,
         html[data-theme="dark"] .saveBtnLoad.ui.teal.double.loading.button {
             background: linear-gradient(135deg, #1678c2, rgba(14, 165, 233, 0.26)) !important;
@@ -487,7 +804,12 @@
                                             <h4 class="ui horizontal left aligned divider header"><i class="file alternate outline icon"></i>Invoice Setup</h4>
                                             <div class="cash-invoice-layout">
                                                 <div class="field required">
-                                                    <label>Invoice Number</label>
+                                                    <div class="cash-lookup-header">
+                                                        <label>Invoice Number</label>
+                                                        <button type="button" class="cash-lookup-toggle" onclick="toggleCashCounterInvoiceLookup()" title="Open invoice search" aria-label="Open invoice search">
+                                                            <i class="search icon"></i>
+                                                        </button>
+                                                    </div>
                                                     <div class="cash-invoice-picker">
                                                     <div class="ui left labeled input">
                                                         <div class="ui selection dropdown teal label" id="invoiceSeriesCash">
@@ -538,7 +860,12 @@
                                         <h4 class="ui horizontal left aligned divider header"><i class="reply icon"></i>Sales Return Setup</h4>
                                         <div class="cash-invoice-layout">
                                             <div class="field required">
-                                                <label>Return Invoice Number</label>
+                                                <div class="cash-lookup-header">
+                                                    <label>Return Invoice Number</label>
+                                                    <button type="button" class="cash-lookup-toggle" onclick="toggleCashCounterInvoiceLookup()" title="Open invoice search" aria-label="Open invoice search">
+                                                        <i class="search icon"></i>
+                                                    </button>
+                                                </div>
                                                 <div class="cash-invoice-picker">
                                                 <div class="ui left labeled input">
                                                     <div class="ui selection dropdown teal label" id="invoiceSeriesCredit">
@@ -594,7 +921,12 @@
                                         <h4 class="ui horizontal left aligned divider header"><i class="file alternate outline icon"></i>Invoice Setup</h4>
                                         <div class="cash-invoice-layout">
                                             <div class="field required">
-                                                <label>Invoice Number</label>
+                                                <div class="cash-lookup-header">
+                                                    <label>Invoice Number</label>
+                                                    <button type="button" class="cash-lookup-toggle" onclick="toggleCashCounterInvoiceLookup()" title="Open invoice search" aria-label="Open invoice search">
+                                                        <i class="search icon"></i>
+                                                    </button>
+                                                </div>
                                                 <div class="cash-invoice-picker">
                                                 <div class="ui left labeled input">
                                                     <div class="ui selection dropdown teal label" id="invoiceSeriesCard">
@@ -660,7 +992,12 @@
                                         <h4 class="ui horizontal left aligned divider header"><i class="file alternate outline icon"></i>Invoice Setup</h4>
                                         <div class="cash-invoice-layout">
                                             <div class="field required">
-                                                <label>Invoice Number</label>
+                                                <div class="cash-lookup-header">
+                                                    <label>Invoice Number</label>
+                                                    <button type="button" class="cash-lookup-toggle" onclick="toggleCashCounterInvoiceLookup()" title="Open invoice search" aria-label="Open invoice search">
+                                                        <i class="search icon"></i>
+                                                    </button>
+                                                </div>
                                                 <div class="cash-invoice-picker">
                                                 <div class="ui left labeled input">
                                                     <div class="ui selection dropdown teal label" id="invoiceSeriesMix">
@@ -916,7 +1253,12 @@
                                         <h4 class="ui horizontal left aligned divider header"><i class="file alternate outline icon"></i>Invoice Setup</h4>
                                         <div class="cash-invoice-layout">
                                             <div class="field required">
-                                                <label>Invoice Number</label>
+                                                <div class="cash-lookup-header">
+                                                    <label>Invoice Number</label>
+                                                    <button type="button" class="cash-lookup-toggle" onclick="toggleCashCounterInvoiceLookup()" title="Open invoice search" aria-label="Open invoice search">
+                                                        <i class="search icon"></i>
+                                                    </button>
+                                                </div>
                                                 <div class="cash-invoice-picker">
                                                 <div class="ui left labeled input">
                                                     <div class="ui selection dropdown teal label" id="invoiceSeriesReturn">
@@ -1176,6 +1518,32 @@
 
 
     </div>
+
+    <div class="cash-lookup-backdrop" id="cashCounterInvoiceLookupBackdrop" onclick="closeCashCounterInvoiceLookup()"></div>
+    <div class="cash-lookup-drawer" id="cashCounterInvoiceLookupDrawer">
+        <div class="cash-lookup-sidebar-header">
+            <div class="cash-lookup-sidebar-title">Invoice Search</div>
+            <button type="button" class="cash-lookup-sidebar-close" onclick="closeCashCounterInvoiceLookup()" aria-label="Close invoice search">
+                <i class="close icon"></i>
+            </button>
+        </div>
+        <div class="cash-lookup-panel">
+            <div class="cash-lookup-row">
+                <div class="ui input cash-lookup-input">
+                    <input type="text" id="cashCounterInvoiceLookupInput" placeholder="Search invoice">
+                    <button type="button" class="cash-lookup-clear" id="cashCounterInvoiceLookupClearBtn" onclick="clearCashCounterInvoiceLookup()" aria-label="Clear search">
+                        <i class="close icon"></i>
+                    </button>
+                </div>
+                <button type="button" class="ui mini teal button cash-lookup-btn" onclick="searchCashCounterInvoiceLookup()">Search</button>
+            </div>
+            <div class="cash-lookup-results" id="cashCounterInvoiceLookupResults"></div>
+            <div class="cash-lookup-section-title" id="cashCounterLookupSectionTitle" style="margin-top:10px;">Today's used invoices</div>
+            <div class="cash-lookup-chip-row" id="cashCounterTodayInvoiceChipRow"></div>
+            <div class="cash-lookup-detail" id="cashCounterInvoiceLookupDetail"></div>
+        </div>
+    </div>
+    <iframe id="cashCounterThermalPrintFrame" title="Cash Counter Thermal Print" style="position:fixed; width:1px; height:1px; right:0; bottom:0; opacity:0; pointer-events:none; border:0;"></iframe>
 
 
 {% endblock %}
@@ -2106,6 +2474,322 @@
             });
         }
 
+        var selectedCashCounterInvoiceLookupRow = null;
+        var todayCashCounterInvoiceLookupRows = [];
+        var cashCounterInvoiceLookupRows = [];
+        var cashCounterInvoiceLookupSearchCache = {};
+        var cashCounterInvoiceLookupRequest = null;
+        var cashCounterInvoiceLookupDebounceTimer = null;
+        var CASH_COUNTER_INVOICE_LOOKUP_MIN_QUERY = 2;
+        var CASH_COUNTER_INVOICE_LOOKUP_DEBOUNCE_MS = 300;
+
+        function cashCounterInvoiceLookupResultCardHtml(row) {
+            return (
+                '<div class="cash-lookup-result">' +
+                    '<div class="cash-lookup-result-head">' +
+                        '<div class="cash-lookup-title">' + $('<div>').text(row.InvoiceNumber).html() + '</div>' +
+                        '<button type="button" class="ui tiny teal button cash-lookup-print-btn">Print</button>' +
+                    '</div>' +
+                    '<div class="cash-lookup-meta">' +
+                        '<span>' + $('<div>').text(row.PartyName || '-').html() + '</span>' +
+                        '<span>' + $('<div>').text(row.BuildDate || '-').html() + '</span>' +
+                        '<span>Rs. ' + Number(row.Amount || 0).toFixed(2) + '</span>' +
+                        '<span>' + $('<div>').text(row.Mode || '-').html() + '</span>' +
+                        (row.Remark ? '<span>' + $('<div>').text(row.Remark).html() + '</span>' : '') +
+                    '</div>' +
+                '</div>'
+            );
+        }
+
+        function sameCashCounterInvoiceLookupRow(a, b) {
+            return a && b && String(a.ID || '') === String(b.ID || '');
+        }
+
+        function setActiveCashCounterInvoiceLookupChips() {
+            $('#cashCounterTodayInvoiceChipRow .cash-lookup-chip, #cashCounterInvoiceLookupResults .cash-lookup-chip').each(function () {
+                var chip = $(this);
+                chip.toggleClass('active', String(chip.data('invoiceId') || '') === String((selectedCashCounterInvoiceLookupRow || {}).ID || ''));
+            });
+        }
+
+        function renderCashCounterInvoiceLookupList() {
+            var wrap = $('#cashCounterInvoiceLookupResults');
+            wrap.html('');
+            if (!cashCounterInvoiceLookupRows.length) {
+                return;
+            }
+            wrap.append('<div class="cash-lookup-section-title">Matching invoices</div><div class="cash-lookup-chip-row" id="cashCounterSearchInvoiceChipRow"></div>');
+            var chipWrap = $('#cashCounterSearchInvoiceChipRow');
+            cashCounterInvoiceLookupRows.forEach(function (row) {
+                var chip = $('<button type="button" class="cash-lookup-chip"></button>');
+                chip.text(row.InvoiceNumber);
+                chip.attr('data-invoice-id', row.ID || '');
+                chip.data('invoiceId', row.ID || '');
+                chip.on('click', function () {
+                    selectedCashCounterInvoiceLookupRow = row;
+                    renderCashCounterInvoiceLookupDetail(row);
+                });
+                chipWrap.append(chip);
+            });
+            setActiveCashCounterInvoiceLookupChips();
+        }
+
+        function renderCashCounterInvoiceLookupDetail(row) {
+            var wrap = $('#cashCounterInvoiceLookupDetail');
+            selectedCashCounterInvoiceLookupRow = row || null;
+            wrap.html('');
+            setActiveCashCounterInvoiceLookupChips();
+            if (!selectedCashCounterInvoiceLookupRow) {
+                wrap.append('<div class="ui tiny message" style="margin:0;">Choose an invoice to see the detail.</div>');
+                return;
+            }
+            var card = $(cashCounterInvoiceLookupResultCardHtml(selectedCashCounterInvoiceLookupRow));
+            card.find('.cash-lookup-print-btn').on('click', function () {
+                printCashCounterInvoiceThermal(selectedCashCounterInvoiceLookupRow.ThermalPrintUrl);
+            });
+            wrap.append(card);
+        }
+
+        function renderCashCounterInvoiceLookupResults(rows, query) {
+            cashCounterInvoiceLookupRows = rows || [];
+            renderCashCounterInvoiceLookupList();
+            if (!cashCounterInvoiceLookupRows.length && query) {
+                $('#cashCounterInvoiceLookupResults').html('<div class="ui tiny message" style="margin:0;">No used invoice found for "' + $('<div>').text(query).html() + '".</div>');
+            }
+        }
+
+        function runCashCounterInvoiceLookupSearch(query) {
+            query = String(query || '').trim();
+            var wrap = $('#cashCounterInvoiceLookupResults');
+            toggleCashCounterInvoiceLookupClear();
+            if (!query) {
+                cashCounterInvoiceLookupRows = [];
+                renderCashCounterInvoiceLookupList();
+                return;
+            }
+            if (query.length < CASH_COUNTER_INVOICE_LOOKUP_MIN_QUERY) {
+                cashCounterInvoiceLookupRows = [];
+                wrap.html('<div class="ui tiny message" style="margin:0;">Type at least ' + CASH_COUNTER_INVOICE_LOOKUP_MIN_QUERY + ' characters.</div>');
+                return;
+            }
+            if (cashCounterInvoiceLookupSearchCache[query]) {
+                renderCashCounterInvoiceLookupResults(cashCounterInvoiceLookupSearchCache[query], query);
+                return;
+            }
+            if (cashCounterInvoiceLookupRequest && cashCounterInvoiceLookupRequest.readyState !== 4) {
+                cashCounterInvoiceLookupRequest.abort();
+            }
+            wrap.html('<div class="ui tiny active inline loader" style="margin:2px 0;"></div>');
+            cashCounterInvoiceLookupRequest = $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:search_cash_counter_invoice_lookup_api' %}",
+                data: {q: query},
+                success: function (response) {
+                    var rows = (response && response.data) || [];
+                    cashCounterInvoiceLookupSearchCache[query] = rows;
+                    renderCashCounterInvoiceLookupResults(rows, query);
+                },
+                error: function (xhr) {
+                    if (xhr && xhr.statusText === 'abort') {
+                        return;
+                    }
+                    wrap.html('<div class="ui tiny negative message">' + (((xhr.responseJSON || {}).error) || 'Unable to search invoice number.') + '</div>');
+                },
+                complete: function () {
+                    cashCounterInvoiceLookupRequest = null;
+                }
+            });
+        }
+
+        function searchCashCounterInvoiceLookup() {
+            if (cashCounterInvoiceLookupDebounceTimer) {
+                clearTimeout(cashCounterInvoiceLookupDebounceTimer);
+                cashCounterInvoiceLookupDebounceTimer = null;
+            }
+            runCashCounterInvoiceLookupSearch(($('#cashCounterInvoiceLookupInput').val() || '').trim());
+        }
+
+        function scheduleCashCounterInvoiceLookupSearch() {
+            var query = ($('#cashCounterInvoiceLookupInput').val() || '').trim();
+            toggleCashCounterInvoiceLookupClear();
+            if (cashCounterInvoiceLookupDebounceTimer) {
+                clearTimeout(cashCounterInvoiceLookupDebounceTimer);
+            }
+            if (!query) {
+                if (cashCounterInvoiceLookupRequest && cashCounterInvoiceLookupRequest.readyState !== 4) {
+                    cashCounterInvoiceLookupRequest.abort();
+                }
+                cashCounterInvoiceLookupRows = [];
+                renderCashCounterInvoiceLookupList();
+                return;
+            }
+            if (query.length < CASH_COUNTER_INVOICE_LOOKUP_MIN_QUERY) {
+                if (cashCounterInvoiceLookupRequest && cashCounterInvoiceLookupRequest.readyState !== 4) {
+                    cashCounterInvoiceLookupRequest.abort();
+                }
+                cashCounterInvoiceLookupRows = [];
+                $('#cashCounterInvoiceLookupResults').html('<div class="ui tiny message" style="margin:0;">Type at least ' + CASH_COUNTER_INVOICE_LOOKUP_MIN_QUERY + ' characters.</div>');
+                return;
+            }
+            cashCounterInvoiceLookupDebounceTimer = setTimeout(function () {
+                runCashCounterInvoiceLookupSearch(query);
+            }, CASH_COUNTER_INVOICE_LOOKUP_DEBOUNCE_MS);
+        }
+
+        function loadTodayCashCounterInvoiceLookup() {
+            $('#cashCounterInvoiceLookupResults').html('');
+            $('#cashCounterInvoiceLookupDetail').html('<div class="ui tiny active inline loader" style="margin:2px 0;"></div>');
+            $('#cashCounterTodayInvoiceChipRow').html('');
+            $('#cashCounterLookupSectionTitle').text("Today's used invoices");
+            selectedCashCounterInvoiceLookupRow = null;
+            todayCashCounterInvoiceLookupRows = [];
+            cashCounterInvoiceLookupRows = [];
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:search_cash_counter_invoice_lookup_api' %}",
+                data: {today: 1},
+                success: function (response) {
+                    var rows = (response && response.data) || [];
+                    var chipWrap = $('#cashCounterTodayInvoiceChipRow');
+                    todayCashCounterInvoiceLookupRows = rows;
+                    chipWrap.html('');
+                    if (!rows.length) {
+                        loadRecentCashCounterInvoiceLookup();
+                        return;
+                    }
+                    rows.forEach(function (row, index) {
+                        var chip = $('<button type="button" class="cash-lookup-chip"></button>');
+                        chip.text(row.InvoiceNumber);
+                        chip.attr('data-invoice-id', row.ID || '');
+                        chip.data('invoiceId', row.ID || '');
+                        chip.on('click', function () {
+                            selectedCashCounterInvoiceLookupRow = row;
+                            renderCashCounterInvoiceLookupDetail(row);
+                        });
+                        chipWrap.append(chip);
+                        if (index === 0) {
+                            selectedCashCounterInvoiceLookupRow = row;
+                            renderCashCounterInvoiceLookupDetail(row);
+                        }
+                    });
+                    renderCashCounterInvoiceLookupList();
+                },
+                error: function () {
+                    $('#cashCounterInvoiceLookupDetail').html('<div class="ui tiny negative message">Unable to load today\'s invoices.</div>');
+                }
+            });
+        }
+
+        function loadRecentCashCounterInvoiceLookup() {
+            $('#cashCounterInvoiceLookupResults').html('');
+            $('#cashCounterInvoiceLookupDetail').html('<div class="ui tiny active inline loader" style="margin:2px 0;"></div>');
+            $('#cashCounterTodayInvoiceChipRow').html('');
+            $('#cashCounterLookupSectionTitle').text('Used invoices');
+            selectedCashCounterInvoiceLookupRow = null;
+            todayCashCounterInvoiceLookupRows = [];
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:search_cash_counter_invoice_lookup_api' %}",
+                data: {recent: 1},
+                success: function (response) {
+                    var rows = (response && response.data) || [];
+                    var chipWrap = $('#cashCounterTodayInvoiceChipRow');
+                    todayCashCounterInvoiceLookupRows = rows;
+                    chipWrap.html('');
+                    if (!rows.length) {
+                        $('#cashCounterInvoiceLookupDetail').html('<div class="ui tiny message" style="margin:0;">No used invoice found.</div>');
+                        return;
+                    }
+                    rows.forEach(function (row, index) {
+                        var chip = $('<button type="button" class="cash-lookup-chip"></button>');
+                        chip.text(row.InvoiceNumber);
+                        chip.attr('data-invoice-id', row.ID || '');
+                        chip.data('invoiceId', row.ID || '');
+                        chip.on('click', function () {
+                            selectedCashCounterInvoiceLookupRow = row;
+                            renderCashCounterInvoiceLookupDetail(row);
+                        });
+                        chipWrap.append(chip);
+                        if (index === 0) {
+                            selectedCashCounterInvoiceLookupRow = row;
+                            renderCashCounterInvoiceLookupDetail(row);
+                        }
+                    });
+                    renderCashCounterInvoiceLookupList();
+                },
+                error: function () {
+                    $('#cashCounterInvoiceLookupDetail').html('<div class="ui tiny negative message">Unable to load recent invoices.</div>');
+                }
+            });
+        }
+
+        function toggleCashCounterInvoiceLookupClear() {
+            $('#cashCounterInvoiceLookupClearBtn').toggleClass('visible', Boolean(($('#cashCounterInvoiceLookupInput').val() || '').trim()));
+        }
+
+        function clearCashCounterInvoiceLookup() {
+            $('#cashCounterInvoiceLookupInput').val('');
+            $('#cashCounterInvoiceLookupResults').html('');
+            if (cashCounterInvoiceLookupDebounceTimer) {
+                clearTimeout(cashCounterInvoiceLookupDebounceTimer);
+                cashCounterInvoiceLookupDebounceTimer = null;
+            }
+            if (cashCounterInvoiceLookupRequest && cashCounterInvoiceLookupRequest.readyState !== 4) {
+                cashCounterInvoiceLookupRequest.abort();
+            }
+            toggleCashCounterInvoiceLookupClear();
+            loadTodayCashCounterInvoiceLookup();
+            $('#cashCounterInvoiceLookupInput').trigger('focus');
+        }
+
+        function printCashCounterInvoiceThermal(url) {
+            var frame = document.getElementById('cashCounterThermalPrintFrame');
+            if (!frame) {
+                window.location = url;
+                return;
+            }
+            var targetUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_print=' + Date.now();
+            frame.onload = null;
+            frame.src = 'about:blank';
+            setTimeout(function () {
+                frame.src = targetUrl;
+            }, 20);
+        }
+
+        function toggleCashCounterInvoiceLookup() {
+            var drawer = $('#cashCounterInvoiceLookupDrawer');
+            var backdrop = $('#cashCounterInvoiceLookupBackdrop');
+            var shouldOpen = !drawer.hasClass('open');
+            drawer.toggleClass('open', shouldOpen);
+            backdrop.toggleClass('open', shouldOpen);
+            if (shouldOpen) {
+                loadTodayCashCounterInvoiceLookup();
+                setTimeout(function () {
+                    $('#cashCounterInvoiceLookupInput').trigger('focus');
+                }, 50);
+            } else {
+                if (cashCounterInvoiceLookupDebounceTimer) {
+                    clearTimeout(cashCounterInvoiceLookupDebounceTimer);
+                    cashCounterInvoiceLookupDebounceTimer = null;
+                }
+                if (cashCounterInvoiceLookupRequest && cashCounterInvoiceLookupRequest.readyState !== 4) {
+                    cashCounterInvoiceLookupRequest.abort();
+                }
+            }
+        }
+
+        function closeCashCounterInvoiceLookup() {
+            $('#cashCounterInvoiceLookupDrawer').removeClass('open');
+            $('#cashCounterInvoiceLookupBackdrop').removeClass('open');
+            if (cashCounterInvoiceLookupDebounceTimer) {
+                clearTimeout(cashCounterInvoiceLookupDebounceTimer);
+                cashCounterInvoiceLookupDebounceTimer = null;
+            }
+            if (cashCounterInvoiceLookupRequest && cashCounterInvoiceLookupRequest.readyState !== 4) {
+                cashCounterInvoiceLookupRequest.abort();
+            }
+        }
+
         $(loadCashCounterInvoiceSeries());
         $(loadSalesReturnSourceSales());
         $('#salesIdReturn').off('change.returnSourceDirect').on('change.returnSourceDirect', function () {
@@ -2121,6 +2805,17 @@
         }
         $('#buyerGstNumber, #placeOfSupply').on('input change', function () {
             updateLiveCashCounterTaxBreakup({gstTotal: Number($('#cashCounterSalesLineItemBox .sales-gst-total').text() || 0)});
+        });
+
+        $('#cashCounterInvoiceLookupInput').on('input', function () {
+            scheduleCashCounterInvoiceLookupSearch();
+        });
+
+        $('#cashCounterInvoiceLookupInput').on('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                searchCashCounterInvoiceLookup();
+            }
         });
 
 

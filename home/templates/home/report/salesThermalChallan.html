@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thermal Challan {{ sale.invoiceNumber|default:sale.pk }}</title>
+    <style>
+        @page { size: 80mm auto; margin: 4mm; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #fff; color: #000; }
+        .sheet { width: 72mm; margin: 0 auto; padding: 2mm 0 6mm; }
+        .top-actions { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+        .print-btn { border: 1px solid #111; background: #111; color: #fff; padding: 6px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+        .center { text-align: center; }
+        .title { font-size: 18px; font-weight: 800; margin: 4px 0 2px; }
+        .subtitle { font-size: 12px; font-weight: 700; margin-bottom: 8px; }
+        .muted { font-size: 11px; line-height: 1.4; }
+        .divider { border-top: 1px dashed #111; margin: 8px 0; }
+        .row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; line-height: 1.45; margin-bottom: 3px; }
+        .amount { font-size: 15px; font-weight: 800; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th, td { padding: 4px 0; vertical-align: top; text-align: left; border-bottom: 1px dashed #bbb; }
+        th:last-child, td:last-child { text-align: right; }
+        .foot { text-align: center; font-size: 11px; margin-top: 10px; }
+        @media print { .top-actions { display: none; } }
+    </style>
+</head>
+<body>
+<div class="sheet">
+    <div class="top-actions">
+        <button type="button" class="print-btn" onclick="window.print()">Print</button>
+    </div>
+    <div class="center">
+        <div class="title">{{ seller_name }}</div>
+        <div class="subtitle">Sale Challan</div>
+        {% if seller_address %}<div class="muted">{{ seller_address }}</div>{% endif %}
+        {% if seller_phone %}<div class="muted">Phone: {{ seller_phone }}</div>{% endif %}
+    </div>
+    <div class="divider"></div>
+    <div class="row"><span><strong>Invoice</strong></span><span>{{ sale.invoiceNumber|default:"-" }}</span></div>
+    <div class="row"><span><strong>Date</strong></span><span>{{ sale.buildDate|date:"d/m/Y" }}</span></div>
+    <div class="row"><span><strong>Party</strong></span><span>{{ buyer_name }}</span></div>
+    {% if buyer_phone %}<div class="row"><span><strong>Phone</strong></span><span>{{ buyer_phone }}</span></div>{% endif %}
+    <div class="row"><span><strong>Mode</strong></span><span>{{ mode_label }}</span></div>
+    <div class="row"><span><strong>Amount</strong></span><span class="amount">Rs. {{ sale.amount|floatformat:2 }}</span></div>
+    {% if sale.remark %}<div class="row"><span><strong>Remark</strong></span><span>{{ sale.remark }}</span></div>{% endif %}
+    {% if lines %}
+        <div class="divider"></div>
+        <table>
+            <thead>
+            <tr>
+                <th>Item</th>
+                <th>Amt</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for line in lines %}
+                <tr>
+                    <td>{{ line.item.name|default:"Item" }}{% if line.quantity %}<div>{{ line.quantity|floatformat:-2 }} x {{ line.unitPrice|floatformat:2 }}</div>{% endif %}</td>
+                    <td>{{ line.lineTotal|floatformat:2 }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+    <div class="divider"></div>
+    <div class="row"><span><strong>Prepared By</strong></span><span>{{ created_by }}</span></div>
+    <div class="foot">Thermal challan print</div>
+</div>
+<script>
+    window.addEventListener('load', function () {
+        setTimeout(function () {
+            try {
+                window.focus();
+                window.print();
+            } catch (e) {}
+        }, 200);
+    });
+</script>
+</body>
+</html>

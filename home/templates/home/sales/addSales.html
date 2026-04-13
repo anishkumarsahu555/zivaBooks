@@ -154,6 +154,71 @@
                 font-size: 0.92rem !important;
             }
 
+            .sales-invoice-header {
+                margin-bottom: 8px;
+            }
+
+            .sales-lookup-toggle {
+                width: 32px;
+                height: 32px;
+                min-width: 32px;
+                padding: 0;
+                gap: 0;
+            }
+
+            .sales-lookup-panel {
+                width: 100%;
+                border: 1px solid rgba(15, 118, 110, 0.12);
+                border-radius: 8px;
+                background: #fbfffe;
+                box-shadow: none;
+            }
+
+            .sales-lookup-row {
+                width: 100%;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+
+            .sales-lookup-row .input {
+                min-width: 0;
+                width: 100%;
+                flex: 0 0 100%;
+            }
+
+            .sales-lookup-row input {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .sales-lookup-btn {
+                flex: 0 0 100%;
+                width: 100%;
+                padding-left: 10px !important;
+                padding-right: 10px !important;
+            }
+
+            .sales-lookup-results {
+                margin-top: 8px;
+            }
+
+            .sales-lookup-result {
+                padding: 8px;
+            }
+
+            .sales-lookup-result-head {
+                align-items: flex-start;
+            }
+
+            .sales-lookup-title {
+                font-size: 0.78rem;
+            }
+
+            .sales-lookup-meta {
+                font-size: 0.7rem;
+                gap: 4px 8px;
+            }
+
             .ui.row.teal.stacked.segment.padded {
                 padding: 0.8rem !important;
             }
@@ -370,9 +435,325 @@
             margin-top: 8px;
         }
 
+        .sales-invoice-layout {
+            display: block;
+        }
+
+        .sales-invoice-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .sales-invoice-header label {
+            margin-bottom: 0 !important;
+        }
+
+        .sales-lookup-toggle {
+            border: 0;
+            border-radius: 8px;
+            background: #e0f2fe;
+            color: #0f5f9c;
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            cursor: pointer;
+            box-shadow: none;
+            transition: background-color 0.2s ease, color 0.2s ease, transform 0.22s ease, box-shadow 0.22s ease;
+        }
+
+        .sales-lookup-toggle i.icon {
+            color: inherit;
+            margin: 0 !important;
+            transition: transform 0.22s ease, opacity 0.22s ease;
+        }
+
+        .sales-lookup-toggle:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(14, 116, 144, 0.14);
+        }
+
+        .sales-lookup-toggle.is-open {
+            background: #1678c2;
+            color: #f8fdff;
+        }
+
+        .sales-lookup-toggle.is-open i.icon {
+            transform: none;
+        }
+
+        .sales-lookup-panel {
+            display: block;
+            padding: 10px;
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 10px;
+            background: #fbfffe;
+            box-shadow: none;
+        }
+
+        .sales-lookup-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.28);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.22s ease;
+            z-index: 1000;
+        }
+
+        .sales-lookup-backdrop.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .sales-lookup-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: min(360px, 26vw);
+            height: 100vh;
+            background: #ffffff;
+            padding: 16px 14px;
+            box-shadow: -16px 0 32px rgba(15, 23, 42, 0.14);
+            overflow-y: auto;
+            transform: translateX(100%);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.24s ease, opacity 0.22s ease;
+            z-index: 1001;
+        }
+
+        .sales-lookup-drawer.open {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .sales-lookup-sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .sales-lookup-sidebar-title {
+            font-size: 0.92rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .sales-lookup-sidebar-close {
+            border: 0;
+            background: transparent;
+            color: #64748b;
+            cursor: pointer;
+            padding: 4px;
+            line-height: 1;
+        }
+
+        .sales-lookup-sidebar-close i.icon {
+            margin: 0 !important;
+        }
+
+        .sales-lookup-chip-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 10px 0 12px;
+        }
+
+        .sales-lookup-chip {
+            border: 1px solid rgba(15, 118, 110, 0.18);
+            background: #f7fbfb;
+            color: #0f766e;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .sales-lookup-chip.active {
+            background: #0f766e;
+            border-color: #0f766e;
+            color: #ffffff;
+        }
+
+        @media only screen and (max-width: 991px) {
+            .sales-lookup-drawer {
+                width: min(100vw, 360px) !important;
+            }
+
+            .sales-lookup-row {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .sales-lookup-row .input,
+            .sales-lookup-btn {
+                width: 100%;
+                flex: 0 0 100%;
+            }
+        }
+
+        .sales-lookup-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .sales-lookup-row .input,
+        .sales-lookup-input {
+            flex: 1 1 auto;
+        }
+
+        .sales-lookup-input {
+            position: relative;
+        }
+
+        .sales-lookup-row input {
+            font-size: 0.82rem !important;
+        }
+
+        .sales-lookup-input input {
+            padding-right: 34px !important;
+        }
+
+        .sales-lookup-clear {
+            position: absolute;
+            top: 50%;
+            right: 10px;
+            transform: translateY(-50%);
+            border: 0;
+            background: transparent;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 0;
+            width: 18px;
+            height: 18px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sales-lookup-clear.visible {
+            display: inline-flex;
+        }
+
+        .sales-lookup-clear i.icon {
+            margin: 0 !important;
+        }
+
+        .sales-lookup-btn {
+            white-space: nowrap;
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+            background: #1678c2 !important;
+            color: #ffffff !important;
+            border-color: #1678c2 !important;
+            box-shadow: none !important;
+        }
+
+        .ui.button.sales-lookup-btn,
+        .sales-lookup-panel .ui.button.sales-lookup-btn {
+            background: #1678c2 !important;
+            color: #ffffff !important;
+            border: 1px solid #1678c2 !important;
+        }
+
+        .sales-lookup-results {
+            margin-top: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .sales-lookup-results:empty {
+            display: none;
+        }
+
+        .sales-lookup-result {
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #fff;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+        }
+
+        .sales-lookup-result-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .sales-lookup-print-btn.ui.button {
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            min-height: 32px;
+            padding: 0 12px !important;
+            font-size: 0.72rem !important;
+            line-height: 1 !important;
+            border-radius: 8px !important;
+            background: linear-gradient(135deg, #1678c2, #0ea5e9) !important;
+            color: #ffffff !important;
+            border-color: transparent !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            align-self: center !important;
+            flex: 0 0 auto;
+        }
+
+        .sales-lookup-title {
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: #0f172a;
+        }
+
+        .sales-lookup-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 10px;
+            color: #5f6b7a;
+            font-size: 0.73rem;
+            line-height: 1.35;
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .sales-lookup-section-title {
+            margin: 0 0 8px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            color: #64748b;
+        }
+
+        .sales-lookup-search-group {
+            margin-top: 10px;
+        }
+
+        .sales-lookup-detail {
+            margin-top: 12px;
+        }
+
+        .sales-lookup-empty {
+            margin: 0;
+        }
+
         html[data-theme="dark"] .ui.row.teal.stacked.segment.padded {
             background: var(--surface-1) !important;
-            border-color: var(--border-subtle) !important;
+            border-color: transparent !important;
             box-shadow: 0 18px 40px rgba(2, 6, 23, 0.28) !important;
         }
 
@@ -394,7 +775,9 @@
         }
 
         html[data-theme="dark"] .sales-section-card,
-        html[data-theme="dark"] .sales-advanced-card {
+        html[data-theme="dark"] .sales-advanced-card,
+        html[data-theme="dark"] .sales-invoice-lookup,
+        html[data-theme="dark"] .sales-lookup-result {
             background: rgba(15, 23, 42, 0.86) !important;
             border-color: rgba(56, 189, 248, 0.12) !important;
         }
@@ -402,9 +785,88 @@
         html[data-theme="dark"] .sales-section-help,
         html[data-theme="dark"] .sales-mode-note,
         html[data-theme="dark"] .sales-gst-summary,
-        html[data-theme="dark"] #invoiceNatureHelp {
+        html[data-theme="dark"] #invoiceNatureHelp,
+        html[data-theme="dark"] .sales-lookup-meta {
             color: #93a4bd !important;
         }
+
+        html[data-theme="dark"] .sales-lookup-title {
+            color: #f8fbff !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-toggle {
+            background: rgba(22, 120, 194, 0.2) !important;
+            color: #d7efff !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-toggle:hover {
+            box-shadow: 0 10px 20px rgba(2, 6, 23, 0.32);
+        }
+
+        html[data-theme="dark"] .sales-lookup-toggle.is-open {
+            background: linear-gradient(135deg, #1678c2, #0ea5e9) !important;
+            color: #f8fdff !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-toggle i.icon {
+            color: #d7efff !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-btn,
+        html[data-theme="dark"] .sales-lookup-print-btn.ui.button,
+        html[data-theme="dark"] .ui.button.sales-lookup-btn,
+        html[data-theme="dark"] .ui.button.sales-lookup-print-btn,
+        html[data-theme="dark"] .sales-lookup-panel .ui.button.sales-lookup-btn,
+        html[data-theme="dark"] .sales-lookup-panel .ui.button.sales-lookup-print-btn {
+            background: #1678c2 !important;
+            color: #ffffff !important;
+            border: 1px solid #1678c2 !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-panel .ui.button.sales-lookup-btn:hover,
+        html[data-theme="dark"] .sales-lookup-panel .ui.button.sales-lookup-print-btn:hover {
+            background: #1678c2 !important;
+            border-color: #1678c2 !important;
+            color: #ffffff !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-panel {
+            background: rgba(15, 23, 42, 0.9) !important;
+            border-color: rgba(56, 189, 248, 0.14) !important;
+            box-shadow: 0 16px 30px rgba(2, 6, 23, 0.34);
+        }
+
+        html[data-theme="dark"] .sales-lookup-backdrop {
+            background: rgba(2, 6, 23, 0.54);
+        }
+
+        html[data-theme="dark"] .sales-lookup-drawer {
+            background: #101b31 !important;
+            box-shadow: -16px 0 30px rgba(2, 6, 23, 0.42) !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-sidebar-title,
+        html[data-theme="dark"] .sales-lookup-sidebar-close {
+            color: #e2ebf7 !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-clear {
+            color: #95a8c5 !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-chip {
+            background: rgba(15, 23, 42, 0.84) !important;
+            border-color: rgba(56, 189, 248, 0.22) !important;
+            color: #8fe5dc !important;
+        }
+
+        html[data-theme="dark"] .sales-lookup-chip.active {
+            background: #0f766e !important;
+            border-color: #0f766e !important;
+            color: #ffffff !important;
+        }
+
 
         html[data-theme="dark"] .sales-inline-pill {
             background: rgba(15, 23, 42, 0.78) !important;
@@ -513,23 +975,30 @@
                                         Invoice Setup
                                     </h4>
                                     <div class="sales-section-help">Pick the invoice series first, confirm the generated number, then choose the invoice date.</div>
-                                    <div class="field required">
-                                        <label>Invoice Number</label>
-                                        <div class="invoice-picker">
-                                            <div class="ui left labeled input" style="width:100%;">
-                                                <div class="ui selection dropdown teal label" id="invoiceSeries" style="width:225px; min-width:225px; background:#18b3ae; color:#fff; border-color:#18b3ae; border-top-right-radius:0; border-bottom-right-radius:0; font-weight:700;">
-                                                    <input type="hidden" id="invoiceSeriesId" name="invoiceSeriesId">
-                                                    <div class="default text">Select Series</div>
-                                                    <i class="dropdown icon"></i>
-                                                    <div class="menu"></div>
-                                                </div>
-                                                <input type="text" placeholder="Auto assigned" id="invoiceNo"
-                                                       name="invoiceNo" readonly style="font-size:1rem; font-weight:700; color:#1f2937; background:#fff; border-left:0;">
-                                            </div>
+                                    <div class="sales-invoice-layout" id="salesInvoiceLayout">
+                                        <div class="field required" style="margin-bottom:0;">
+                                            <div class="sales-invoice-header">
+                                            <label>Invoice Number</label>
+                                            <button type="button" class="sales-lookup-toggle" onclick="toggleSalesInvoiceLookup()" title="Open invoice search" aria-label="Open invoice search">
+                                                <i class="search icon"></i>
+                                            </button>
                                         </div>
-                                        <input type="hidden" id="requestedInvoiceNumber" name="requestedInvoiceNumber">
-                                        <div class="sales-section-help" style="margin-top:8px;">Tap any available invoice below if you want to use a visible gap number.</div>
-                                        <div class="invoice-chip-wrap" id="invoiceChipWrap"></div>
+                                            <div class="invoice-picker">
+                                                <div class="ui left labeled input" style="width:100%;">
+                                                    <div class="ui selection dropdown teal label" id="invoiceSeries" style="width:225px; min-width:225px; background:#18b3ae; color:#fff; border-color:#18b3ae; border-top-right-radius:0; border-bottom-right-radius:0; font-weight:700;">
+                                                        <input type="hidden" id="invoiceSeriesId" name="invoiceSeriesId">
+                                                        <div class="default text">Select Series</div>
+                                                        <i class="dropdown icon"></i>
+                                                        <div class="menu"></div>
+                                                    </div>
+                                                    <input type="text" placeholder="Auto assigned" id="invoiceNo"
+                                                           name="invoiceNo" readonly style="font-size:1rem; font-weight:700; color:#1f2937; background:#fff; border-left:0;">
+                                                </div>
+                                            </div>
+                                            <input type="hidden" id="requestedInvoiceNumber" name="requestedInvoiceNumber">
+                                            <div class="sales-section-help" style="margin-top:8px;">Tap any available invoice below if you want to use a visible gap number.</div>
+                                            <div class="invoice-chip-wrap" id="invoiceChipWrap"></div>
+                                        </div>
                                     </div>
 
                                     <div class="field required">
@@ -688,6 +1157,32 @@
     <input type="hidden" id="lat" value="24.809611">
     <input type="hidden" id="lng" value="93.935577">
     <input type="hidden" id="loc" value="N/A">
+
+    <div class="sales-lookup-backdrop" id="salesInvoiceLookupBackdrop" onclick="closeSalesInvoiceLookup()"></div>
+    <div class="sales-lookup-drawer" id="salesInvoiceLookupDrawer">
+        <div class="sales-lookup-sidebar-header">
+            <div class="sales-lookup-sidebar-title">Invoice Search</div>
+            <button type="button" class="sales-lookup-sidebar-close" onclick="closeSalesInvoiceLookup()" aria-label="Close invoice search">
+                <i class="close icon"></i>
+            </button>
+        </div>
+        <div class="sales-lookup-panel">
+            <div class="sales-lookup-row">
+                <div class="ui input sales-lookup-input">
+                    <input type="text" id="invoiceLookupInput" placeholder="Search invoice">
+                    <button type="button" class="sales-lookup-clear" id="invoiceLookupClearBtn" onclick="clearSalesInvoiceLookup()" aria-label="Clear search">
+                        <i class="close icon"></i>
+                    </button>
+                </div>
+                <button type="button" class="ui mini primary button sales-lookup-btn" onclick="searchSalesInvoiceLookup()">Search</button>
+            </div>
+            <div class="sales-lookup-results" id="invoiceLookupResults"></div>
+            <div class="sales-lookup-section-title" style="margin-top:10px;">Today's used invoices</div>
+            <div class="sales-lookup-chip-row" id="todayInvoiceChipRow"></div>
+            <div class="sales-lookup-detail" id="invoiceLookupDetail"></div>
+        </div>
+    </div>
+    <iframe id="salesThermalPrintFrame" title="Thermal Print" style="position:fixed; width:1px; height:1px; right:0; bottom:0; opacity:0; pointer-events:none; border:0;"></iframe>
 
     <p id="demo"></p>
 
@@ -976,6 +1471,293 @@
             renderInvoiceChips(meta.upcomingNumbers || []);
         }
 
+        var selectedTodayInvoiceLookupRow = null;
+        var todayInvoiceLookupRows = [];
+        var salesInvoiceLookupRows = [];
+        var salesInvoiceLookupSearchCache = {};
+        var salesInvoiceLookupRequest = null;
+        var salesInvoiceLookupDebounceTimer = null;
+        var SALES_INVOICE_LOOKUP_MIN_QUERY = 2;
+        var SALES_INVOICE_LOOKUP_DEBOUNCE_MS = 300;
+
+        function invoiceLookupResultCardHtml(row) {
+            return (
+                '<div class="sales-lookup-result">' +
+                    '<div class="sales-lookup-result-head">' +
+                        '<div class="sales-lookup-title">' + $('<div>').text(row.InvoiceNumber).html() + '</div>' +
+                        '<button type="button" class="ui tiny primary button sales-lookup-print-btn">Print</button>' +
+                    '</div>' +
+                    '<div class="sales-lookup-meta">' +
+                        '<span>' + $('<div>').text(row.PartyName || '-').html() + '</span>' +
+                        '<span>' + $('<div>').text(row.BuildDate || '-').html() + '</span>' +
+                        '<span>Rs. ' + Number(row.Amount || 0).toFixed(2) + '</span>' +
+                        '<span>' + $('<div>').text(row.Mode || '-').html() + '</span>' +
+                        (row.Remark ? '<span>' + $('<div>').text(row.Remark).html() + '</span>' : '') +
+                    '</div>' +
+                '</div>'
+            );
+        }
+
+        function sameInvoiceLookupRow(a, b) {
+            return a && b && String(a.ID || '') === String(b.ID || '');
+        }
+
+        function setActiveInvoiceLookupChips() {
+            $('#todayInvoiceChipRow .sales-lookup-chip, #invoiceLookupResults .sales-lookup-chip').each(function () {
+                var chip = $(this);
+                chip.toggleClass('active', String(chip.data('invoiceId') || '') === String((selectedTodayInvoiceLookupRow || {}).ID || ''));
+            });
+        }
+
+        function renderSalesInvoiceLookupList() {
+            var wrap = $('#invoiceLookupResults');
+            wrap.html('');
+            if (!salesInvoiceLookupRows.length) {
+                return;
+            }
+
+            wrap.append('<div class="sales-lookup-search-group"><div class="sales-lookup-section-title">Matching invoices</div><div class="sales-lookup-chip-row" id="salesLookupSearchChipRow"></div></div>');
+            var chipWrap = $('#salesLookupSearchChipRow');
+
+            salesInvoiceLookupRows.forEach(function (row) {
+                var chip = $('<button type="button" class="sales-lookup-chip"></button>');
+                chip.text(row.InvoiceNumber);
+                chip.attr('data-invoice-id', row.ID || '');
+                chip.data('invoiceId', row.ID || '');
+                chip.on('click', function () {
+                    selectedTodayInvoiceLookupRow = row;
+                    renderSalesInvoiceLookupDetail(row);
+                });
+                chipWrap.append(chip);
+            });
+            setActiveInvoiceLookupChips();
+        }
+
+        function renderSalesInvoiceLookupDetail(row) {
+            var wrap = $('#invoiceLookupDetail');
+            selectedTodayInvoiceLookupRow = row || null;
+            wrap.html('');
+            setActiveInvoiceLookupChips();
+            if (!selectedTodayInvoiceLookupRow) {
+                wrap.append('<div class="ui tiny message sales-lookup-empty">Choose an invoice to see the detail.</div>');
+                return;
+            }
+            var card = $(invoiceLookupResultCardHtml(selectedTodayInvoiceLookupRow));
+            card.find('.sales-lookup-print-btn').on('click', function () {
+                printSalesInvoiceThermal(selectedTodayInvoiceLookupRow.ThermalPrintUrl);
+            });
+            wrap.append(card);
+        }
+
+        function renderSalesInvoiceLookupResults(rows, query) {
+            salesInvoiceLookupRows = rows || [];
+            renderSalesInvoiceLookupList();
+            if (!salesInvoiceLookupRows.length && query) {
+                $('#invoiceLookupResults').html('<div class="ui tiny message sales-lookup-empty">No used invoice found for "' + $('<div>').text(query).html() + '".</div>');
+            }
+        }
+
+        function runSalesInvoiceLookupSearch(query) {
+            query = String(query || '').trim();
+            var wrap = $('#invoiceLookupResults');
+            toggleSalesInvoiceLookupClear();
+            if (!query) {
+                salesInvoiceLookupRows = [];
+                renderSalesInvoiceLookupList();
+                return;
+            }
+            if (query.length < SALES_INVOICE_LOOKUP_MIN_QUERY) {
+                salesInvoiceLookupRows = [];
+                wrap.html('<div class="ui tiny message sales-lookup-empty">Type at least ' + SALES_INVOICE_LOOKUP_MIN_QUERY + ' characters.</div>');
+                return;
+            }
+            if (salesInvoiceLookupSearchCache[query]) {
+                renderSalesInvoiceLookupResults(salesInvoiceLookupSearchCache[query], query);
+                return;
+            }
+            if (salesInvoiceLookupRequest && salesInvoiceLookupRequest.readyState !== 4) {
+                salesInvoiceLookupRequest.abort();
+            }
+            wrap.html('<div class="ui tiny active inline loader" style="margin:2px 0;"></div>');
+            salesInvoiceLookupRequest = $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:search_sales_invoice_lookup_api' %}",
+                data: {q: query},
+                success: function (response) {
+                    var rows = (response && response.data) || [];
+                    salesInvoiceLookupSearchCache[query] = rows;
+                    renderSalesInvoiceLookupResults(rows, query);
+                },
+                error: function (xhr) {
+                    if (xhr && xhr.statusText === 'abort') {
+                        return;
+                    }
+                    wrap.html('<div class="ui tiny negative message">' + (((xhr.responseJSON || {}).error) || 'Unable to search invoice number.') + '</div>');
+                },
+                complete: function () {
+                    salesInvoiceLookupRequest = null;
+                }
+            });
+        }
+
+        function searchSalesInvoiceLookup() {
+            if (salesInvoiceLookupDebounceTimer) {
+                clearTimeout(salesInvoiceLookupDebounceTimer);
+                salesInvoiceLookupDebounceTimer = null;
+            }
+            runSalesInvoiceLookupSearch(($('#invoiceLookupInput').val() || '').trim());
+        }
+
+        function scheduleSalesInvoiceLookupSearch() {
+            var query = ($('#invoiceLookupInput').val() || '').trim();
+            toggleSalesInvoiceLookupClear();
+            if (salesInvoiceLookupDebounceTimer) {
+                clearTimeout(salesInvoiceLookupDebounceTimer);
+            }
+            if (!query) {
+                if (salesInvoiceLookupRequest && salesInvoiceLookupRequest.readyState !== 4) {
+                    salesInvoiceLookupRequest.abort();
+                }
+                salesInvoiceLookupRows = [];
+                renderSalesInvoiceLookupList();
+                return;
+            }
+            if (query.length < SALES_INVOICE_LOOKUP_MIN_QUERY) {
+                if (salesInvoiceLookupRequest && salesInvoiceLookupRequest.readyState !== 4) {
+                    salesInvoiceLookupRequest.abort();
+                }
+                salesInvoiceLookupRows = [];
+                $('#invoiceLookupResults').html('<div class="ui tiny message sales-lookup-empty">Type at least ' + SALES_INVOICE_LOOKUP_MIN_QUERY + ' characters.</div>');
+                return;
+            }
+            salesInvoiceLookupDebounceTimer = setTimeout(function () {
+                runSalesInvoiceLookupSearch(query);
+            }, SALES_INVOICE_LOOKUP_DEBOUNCE_MS);
+        }
+
+        function loadTodaySalesInvoiceLookup() {
+            $('#invoiceLookupResults').html('');
+            $('#invoiceLookupDetail').html('<div class="ui tiny active inline loader" style="margin:2px 0;"></div>');
+            $('#todayInvoiceChipRow').html('');
+            selectedTodayInvoiceLookupRow = null;
+            todayInvoiceLookupRows = [];
+            salesInvoiceLookupRows = [];
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:search_sales_invoice_lookup_api' %}",
+                data: {today: 1},
+                success: function (response) {
+                    var rows = (response && response.data) || [];
+                    var chipWrap = $('#todayInvoiceChipRow');
+                    todayInvoiceLookupRows = rows;
+                    chipWrap.html('');
+                    if (!rows.length) {
+                        $('#invoiceLookupDetail').html('<div class="ui tiny message sales-lookup-empty">No used invoice found.</div>');
+                        return;
+                    }
+                    rows.forEach(function (row, index) {
+                        var chip = $('<button type="button" class="sales-lookup-chip"></button>');
+                        chip.text(row.InvoiceNumber);
+                        chip.attr('data-invoice-id', row.ID || '');
+                        chip.data('invoiceId', row.ID || '');
+                        chip.on('click', function () {
+                            selectedTodayInvoiceLookupRow = row;
+                            renderSalesInvoiceLookupDetail(row);
+                        });
+                        chipWrap.append(chip);
+                        if (index === 0) {
+                            selectedTodayInvoiceLookupRow = row;
+                            renderSalesInvoiceLookupDetail(row);
+                        }
+                    });
+                    renderSalesInvoiceLookupList();
+                },
+                error: function () {
+                    $('#invoiceLookupDetail').html('<div class="ui tiny negative message">Unable to load today\'s invoices.</div>');
+                }
+            });
+        }
+
+        function updateSalesLookupToggleState(isOpen) {
+            var toggle = $('.sales-lookup-toggle');
+            toggle.toggleClass('is-open', isOpen);
+            toggle.attr('title', isOpen ? 'Hide invoice search' : 'Open invoice search');
+            toggle.attr('aria-label', isOpen ? 'Hide invoice search' : 'Open invoice search');
+            toggle.find('i.icon').removeClass('close').addClass('search');
+        }
+
+        function toggleSalesInvoiceLookupClear() {
+            $('#invoiceLookupClearBtn').toggleClass('visible', Boolean(($('#invoiceLookupInput').val() || '').trim()));
+        }
+
+        function clearSalesInvoiceLookup() {
+            $('#invoiceLookupInput').val('');
+            $('#invoiceLookupResults').html('');
+            if (salesInvoiceLookupDebounceTimer) {
+                clearTimeout(salesInvoiceLookupDebounceTimer);
+                salesInvoiceLookupDebounceTimer = null;
+            }
+            if (salesInvoiceLookupRequest && salesInvoiceLookupRequest.readyState !== 4) {
+                salesInvoiceLookupRequest.abort();
+            }
+            toggleSalesInvoiceLookupClear();
+            loadTodaySalesInvoiceLookup();
+            $('#invoiceLookupInput').trigger('focus');
+        }
+
+        function printSalesInvoiceThermal(url) {
+            var frame = document.getElementById('salesThermalPrintFrame');
+            if (!frame) {
+                window.location = url;
+                return;
+            }
+            var targetUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + '_print=' + Date.now();
+            frame.onload = null;
+            frame.src = 'about:blank';
+            setTimeout(function () {
+                frame.src = targetUrl;
+            }, 20);
+        }
+
+        function toggleSalesInvoiceLookup() {
+            var drawer = $('#salesInvoiceLookupDrawer');
+            var backdrop = $('#salesInvoiceLookupBackdrop');
+            var shouldOpen = !drawer.hasClass('open');
+            drawer.toggleClass('open', shouldOpen);
+            backdrop.toggleClass('open', shouldOpen);
+            updateSalesLookupToggleState(shouldOpen);
+            if (shouldOpen) {
+                loadTodaySalesInvoiceLookup();
+                setTimeout(function () {
+                    $('#invoiceLookupInput').trigger('focus');
+                }, 50);
+            }
+        }
+
+        function closeSalesInvoiceLookup() {
+            $('#salesInvoiceLookupDrawer').removeClass('open');
+            $('#salesInvoiceLookupBackdrop').removeClass('open');
+            if (salesInvoiceLookupDebounceTimer) {
+                clearTimeout(salesInvoiceLookupDebounceTimer);
+                salesInvoiceLookupDebounceTimer = null;
+            }
+            if (salesInvoiceLookupRequest && salesInvoiceLookupRequest.readyState !== 4) {
+                salesInvoiceLookupRequest.abort();
+            }
+            updateSalesLookupToggleState(false);
+        }
+
+        $('#invoiceLookupInput').on('input', function () {
+            scheduleSalesInvoiceLookupSearch();
+        });
+
+        $('#invoiceLookupInput').on('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                searchSalesInvoiceLookup();
+            }
+        });
+
         function syncInvoiceSeriesFromSelection(value) {
             const selectedValue = String(value || $('#invoiceSeries').dropdown('get value') || '').trim();
             if (!selectedValue) {
@@ -1241,6 +2023,17 @@
 
         $(getCustomerList());
         $(initSalesInventory());
+        $('#invoiceLookupInput').on('input', function () {
+            toggleSalesInvoiceLookupClear();
+        });
+        $('#invoiceLookupInput').on('keyup', function (event) {
+            if (event.key === 'Enter') {
+                searchSalesInvoiceLookup();
+            }
+            if (event.key === 'Escape') {
+                closeSalesInvoiceLookup();
+            }
+        });
 
         function resetSalesForm() {
             $('#addForm')[0].reset();

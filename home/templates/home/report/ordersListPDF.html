@@ -1,0 +1,73 @@
+{% load formatting %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Orders List</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #0f172a; font-size: 10px; }
+        .title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+        .subtitle { color: #475569; margin-bottom: 10px; }
+        .meta { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .meta td { padding: 6px 8px; border: 1px solid #dbe5f0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #dbe5f0; padding: 6px 7px; text-align: left; vertical-align: top; }
+        th { background: #eff6ff; font-size: 9px; text-transform: uppercase; color: #334155; }
+        .small { font-size: 9px; color: #64748b; }
+        .center { text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="title">Orders List</div>
+    <div class="subtitle">{{ pdf_brand_name }} | {{ pdf_tenant_name }} | {{ start_date|date:"d M Y" }} to {{ end_date|date:"d M Y" }}</div>
+
+    <table class="meta">
+        <tr>
+            <td><strong>Staff</strong><br>{{ staff_name }}</td>
+            <td><strong>Search</strong><br>{{ search }}</td>
+            <td><strong>Total Orders</strong><br>{{ total_orders }}</td>
+            <td><strong>Generated On</strong><br>{{ pdf_generated_on }}</td>
+        </tr>
+    </table>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Order No</th>
+                <th>Party</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Approved By</th>
+                <th>Approved On</th>
+                <th>Created By</th>
+                <th>Updated</th>
+                <th>Created</th>
+                <th>Images</th>
+                <th>Remark</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.order_number }}</td>
+                <td>{{ row.party_name }}</td>
+                <td>{{ row.build_date }}</td>
+                <td>{{ row.status }}</td>
+                <td>{{ row.approved_by }}</td>
+                <td>{{ row.approved_on }}</td>
+                <td>{{ row.created_by }}</td>
+                <td>{{ row.updated_on }}</td>
+                <td>{{ row.created_on }}</td>
+                <td class="center">{{ row.images_count }}</td>
+                <td>{{ row.remark }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="11" class="small">No orders were found for this filter.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% include 'home/report/_pdfFooter.html' %}
+</body>
+</html>
