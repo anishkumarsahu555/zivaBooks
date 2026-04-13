@@ -1630,12 +1630,11 @@
         }
 
         function selectTab(newMode) {
-            mode = newMode
-            resetForm()
+            mode = newMode;
+            $('.cash-counter-mode-menu .item').tab('change tab', String(newMode || '').toLowerCase());
+            resetForm();
             syncCashCounterInventoryState();
-
-            return mode
-
+            return mode;
         }
 
         $(getCustomerList());
@@ -2805,6 +2804,29 @@
         }
         $('#buyerGstNumber, #placeOfSupply').on('input change', function () {
             updateLiveCashCounterTaxBreakup({gstTotal: Number($('#cashCounterSalesLineItemBox .sales-gst-total').text() || 0)});
+        });
+
+        $('.cash-counter-mode-menu .item').tab({
+            context: $('.cash-counter-panel'),
+            auto: true,
+            onVisible: function (tabPath) {
+                var nextMode = {
+                    cash: 'Cash',
+                    credit: 'Credit',
+                    card: 'Card',
+                    mix: 'Mix',
+                    collection: 'Collection',
+                    return: 'Return',
+                    expense: 'Expense',
+                    advance: 'Advance'
+                }[String(tabPath || '').toLowerCase()];
+                if (!nextMode || nextMode === mode) {
+                    return;
+                }
+                mode = nextMode;
+                resetForm();
+                syncCashCounterInventoryState();
+            }
         });
 
         $('#cashCounterInvoiceLookupInput').on('input', function () {
