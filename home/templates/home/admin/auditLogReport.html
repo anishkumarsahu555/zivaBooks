@@ -27,6 +27,16 @@
         overflow-x: auto;
     }
 
+    #AuditTable {
+        width: 100% !important;
+    }
+
+    #AuditTable th,
+    #AuditTable td {
+        white-space: nowrap;
+        word-break: normal;
+    }
+
     .audit-json {
         margin: 0;
         padding: 14px;
@@ -98,22 +108,83 @@
         font-size: 0.86rem;
     }
 
-       #AuditTable_length {
-            left: 20px;
-            position: absolute;
-        }
+    #AuditTable_length {
+        left: 20px;
+        position: absolute;
+    }
 
-        #AuditTable_filter {
-            float: right;
-        }
+    #AuditTable_filter {
+        width: 50%;
+        float: right;
+    }
 
-        .dt-buttons {
-            position: absolute;
-            left: 174px;
-        }
+    #AuditTable_wrapper .dt-buttons {
+        position: absolute;
+        left: 174px;
+    }
 
-    input[type=search] {
+    #AuditTable_filter input[type=search] {
         width: 100px !important;
+    }
+
+    .audit-detail-trigger {
+        width: 34px;
+        height: 34px;
+        padding: 0 !important;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px !important;
+    }
+
+    .audit-download-menu {
+        position: relative;
+        z-index: 20;
+    }
+
+    .audit-download-menu-panel {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        min-width: 190px;
+        background: #fff;
+        border: 1px solid rgba(34, 36, 38, 0.12);
+        border-radius: 8px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+        padding: 8px 0;
+        display: none;
+        z-index: 30;
+    }
+
+    .audit-download-menu.open .audit-download-menu-panel {
+        display: block;
+    }
+
+    .audit-download-menu-header {
+        padding: 6px 14px;
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #6b7280;
+    }
+
+    .audit-download-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 10px 14px;
+        border: 0;
+        background: transparent;
+        text-align: left;
+        font-size: 0.9rem;
+        color: #111827;
+        cursor: pointer;
+    }
+
+    .audit-download-menu-item:hover {
+        background: #f8fafc;
     }
 
     html[data-theme="dark"] .audit-compare-wrap {
@@ -156,6 +227,12 @@
         color: #cbd5e1;
     }
 
+    html[data-theme="dark"] .audit-detail-trigger {
+        background: #1e293b !important;
+        border-color: rgba(96, 165, 250, 0.22) !important;
+        color: #e2ebf7 !important;
+    }
+
     html[data-theme="dark"] #auditDetailModal .header {
         background: #111827 !important;
         color: #f8fafc !important;
@@ -164,6 +241,24 @@
 
     html[data-theme="dark"] #auditDetailModal .content {
         background: #0f172a !important;
+    }
+
+    html[data-theme="dark"] .audit-download-menu-panel {
+        background: #101b31;
+        border-color: rgba(56, 189, 248, 0.18);
+        box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+    }
+
+    html[data-theme="dark"] .audit-download-menu-header {
+        color: #95a8c5;
+    }
+
+    html[data-theme="dark"] .audit-download-menu-item {
+        color: #e2ebf7;
+    }
+
+    html[data-theme="dark"] .audit-download-menu-item:hover {
+        background: rgba(22, 120, 194, 0.16);
     }
 
     @media (max-width: 767px) {
@@ -177,6 +272,102 @@
         #AuditTable_wrapper {
             margin-top: 4px;
         }
+
+        #AuditTable_wrapper .row:first-child {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #AuditTable_wrapper .row:first-child > div {
+            width: 50% !important;
+            max-width: 50% !important;
+            flex: 0 0 50%;
+            min-width: 0;
+        }
+
+        #AuditTable_length,
+        #AuditTable_filter {
+            width: 50%;
+            position: static;
+            left: auto;
+            float: none;
+        }
+
+        #AuditTable_wrapper .dt-buttons {
+            position: static;
+            left: auto;
+            margin-top: 8px;
+        }
+
+        #AuditTable_length label,
+        #AuditTable_filter label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+            margin: 0;
+            white-space: nowrap;
+        }
+
+        #AuditTable_filter {
+            text-align: right;
+            display: flex;
+            justify-content: flex-end;
+            float: right;
+        }
+
+        #AuditTable_filter label {
+            justify-content: flex-end;
+        }
+
+        #AuditTable_filter input[type=search] {
+            width: 100px !important;
+            flex: 0 0 100px;
+            min-width: 100px;
+        }
+
+        .audit-form .fields {
+            display: flex !important;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px !important;
+        }
+
+        .audit-form .field {
+            width: 100% !important;
+            margin: 0 !important;
+        }
+
+        .audit-form .audit-field-search {
+            width: 100% !important;
+        }
+
+        .audit-form .audit-field-action,
+        .audit-form .audit-field-actor {
+            width: calc(50% - 4px) !important;
+        }
+
+        .audit-form .audit-field-date {
+            width: 100% !important;
+        }
+
+        .audit-form .audit-field-date .two.fields {
+            display: flex !important;
+            gap: 8px;
+            margin-bottom: 0 !important;
+        }
+
+        .audit-form .audit-field-date .two.fields > .field {
+            width: calc(50% - 4px) !important;
+        }
+
+        .audit-form .audit-actions-help,
+        .audit-form .audit-actions-row {
+            width: 100% !important;
+            text-align: left !important;
+        }
     }
 </style>
 
@@ -189,14 +380,23 @@
                 </div>
                 {% if audit_can_export %}
                     <div style="position: absolute;right: 1.5rem;top: 18px;">
-                        <button class="ui basic mini button" type="button" onclick="exportAuditExcel()">
-                            <i class="file excel outline icon"></i>
-                            Export Excel
-                        </button>
-                        <button class="ui teal mini button" type="button" onclick="exportAuditCsv()">
-                            <i class="download icon"></i>
-                            Export CSV
-                        </button>
+                        <div class="audit-download-menu" id="auditDownloadDropdown">
+                            <button class="ui teal mini labeled icon button" type="button" onclick="toggleAuditDownloadMenu(event)">
+                                <i class="download icon"></i>
+                                Download
+                            </button>
+                            <div class="audit-download-menu-panel">
+                                <div class="audit-download-menu-header">Audit Export</div>
+                                <button class="audit-download-menu-item" type="button" onclick="exportAuditCsv(); closeAuditDownloadMenu();">
+                                    <i class="file alternate outline icon"></i>
+                                    <span>Export CSV</span>
+                                </button>
+                                <button class="audit-download-menu-item" type="button" onclick="exportAuditExcel(); closeAuditDownloadMenu();">
+                                    <i class="file excel outline icon"></i>
+                                    <span>Export Excel</span>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 {% endif %}
             </div>
@@ -206,11 +406,11 @@
                         <div class="ui form">
                             <form class="ui tiny form audit-form" onsubmit="return false;">
                                 <div class="fields">
-                                    <div class="three wide field">
+                                    <div class="three wide field audit-field-search">
                                         <label for="auditSearch">Keyword Search</label>
                                         <input type="text" id="auditSearch" placeholder="Search object, actor, action, or changed data">
                                     </div>
-                                    <div class="two wide field">
+                                    <div class="two wide field audit-field-action">
                                         <label for="auditAction">Action</label>
                                         <select class="ui fluid selection dropdown" id="auditAction">
                                             <option value="">All actions</option>
@@ -219,7 +419,7 @@
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div class="three wide field">
+                                    <div class="three wide field audit-field-actor">
                                         <label for="auditActor">Actor</label>
                                         <select class="ui fluid search selection dropdown" id="auditActor">
                                             <option value="">All actors</option>
@@ -228,16 +428,7 @@
                                             {% endfor %}
                                         </select>
                                     </div>
-                                    <div class="three wide field">
-                                        <label for="auditContentType">Model</label>
-                                        <select class="ui fluid selection dropdown" id="auditContentType">
-                                            <option value="">All models</option>
-                                            {% for item in audit_content_types %}
-                                                <option value="{{ item.content_type_id }}">{{ item.content_type__model|title }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="four wide field">
+                                    <div class="four wide field audit-field-date">
                                         <label>Date Range</label>
                                         <div class="two fields" style="margin-bottom: 0;">
                                             <div class="field">
@@ -258,13 +449,13 @@
                                     </div>
                                 </div>
                                 <div class="fields">
-                                    <div class="eight wide field">
+                                    <div class="eight wide field audit-actions-help">
                                         <label>&nbsp;</label>
                                         <div style="color: #64748b; font-size: 0.82rem;">
                                             Press Enter in keyword search or use Apply Filters to refresh the timeline.
                                         </div>
                                     </div>
-                                    <div class="eight wide field" style="text-align: right;">
+                                    <div class="eight wide field audit-actions-row" style="text-align: right;">
                                         <label>&nbsp;</label>
                                         <button class="ui basic button" type="button" onclick="resetAuditFilters()">Reset</button>
                                         <button class="ui green button" type="button" onclick="reloadAuditTable()">
@@ -282,7 +473,7 @@
                                 <i class="left align icon"></i>
                                 Audit Log
                             </h4>
-                            <table class="ui unstackable tiny sortable celled very compact table" id="AuditTable" style="margin-top: 5px; width: 100%">
+                            <table class="ui unstackable tiny sortable celled very compact nowrap table" id="AuditTable" style="margin-top: 5px; width: 100%">
                                 <thead>
                                 <tr>
                                     <th>Datetime</th>
@@ -366,13 +557,13 @@
             keyword: $('#auditSearch').val(),
             action: $('#auditAction').val(),
             actor: $('#auditActor').val(),
-            content_type: $('#auditContentType').val(),
             date_from: toIsoDate($('#auditDateFrom').val()),
             date_to: toIsoDate($('#auditDateTo').val())
         };
     }
 
     function reloadAuditTable() {
+        closeAuditDownloadMenu();
         auditTable.ajax.reload();
     }
 
@@ -380,7 +571,6 @@
         $('#auditSearch').val('');
         $('#auditAction').val('').change();
         $('#auditActor').val('').change();
-        $('#auditContentType').val('').change();
         $('#auditDateFrom').val('');
         $('#auditDateTo').val('');
         reloadAuditTable();
@@ -394,6 +584,15 @@
     function exportAuditExcel() {
         var params = $.param(currentAuditFilters());
         window.location = '{% url "homeApp:export_audit_log_excel" %}?' + params;
+    }
+
+    function toggleAuditDownloadMenu(event) {
+        if (event) event.stopPropagation();
+        $('#auditDownloadDropdown').toggleClass('open');
+    }
+
+    function closeAuditDownloadMenu() {
+        $('#auditDownloadDropdown').removeClass('open');
     }
 
     function formatAuditCompareValue(value) {
@@ -464,6 +663,7 @@
         $('#auditDateFromCal').calendar({
             monthFirst: false,
             type: 'date',
+            endCalendar: $('#auditDateToCal'),
             formatter: {
                 date: function (date) {
                     if (!date) return '';
@@ -474,6 +674,7 @@
         $('#auditDateToCal').calendar({
             monthFirst: false,
             type: 'date',
+            startCalendar: $('#auditDateFromCal'),
             formatter: {
                 date: function (date) {
                     if (!date) return '';
@@ -512,6 +713,12 @@
         $('#auditSearch').on('keyup', function (event) {
             if (event.key === 'Enter') {
                 reloadAuditTable();
+            }
+        });
+
+        $(document).on('click', function (event) {
+            if (!$(event.target).closest('#auditDownloadDropdown').length) {
+                closeAuditDownloadMenu();
             }
         });
     });

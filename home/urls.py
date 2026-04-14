@@ -316,7 +316,11 @@ urlpatterns = [
     path('api/list_order_sale_link_candidates_api/', list_order_sale_link_candidates_api, name='list_order_sale_link_candidates_api'),
     path('api/link_order_to_sale_api/', link_order_to_sale_api, name='link_order_to_sale_api'),
     path('api/export_sales_list_excel/', export_sales_list_excel, name='export_sales_list_excel'),
+    path('api/search_sales_invoice_lookup_api/', search_sales_invoice_lookup_api, name='search_sales_invoice_lookup_api'),
+    path('api/search_cash_counter_invoice_lookup_api/', search_cash_counter_invoice_lookup_api, name='search_cash_counter_invoice_lookup_api'),
     path('api/generate_sales_invoice_pdf/', generate_sales_invoice_pdf, name='generate_sales_invoice_pdf'),
+    path('api/print_sales_thermal_challan/', print_sales_thermal_challan, name='print_sales_thermal_challan'),
+    path('api/print_cash_counter_thermal_challan/', print_cash_counter_thermal_challan, name='print_cash_counter_thermal_challan'),
     path('api/generate_cash_counter_invoice_pdf/', generate_cash_counter_invoice_pdf, name='generate_cash_counter_invoice_pdf'),
     path('api/list_sales_return_source_sales_api/', list_sales_return_source_sales_api, name='list_sales_return_source_sales_api'),
     path('api/get_sales_return_source_detail_api/', get_sales_return_source_detail_api, name='get_sales_return_source_detail_api'),
@@ -398,6 +402,7 @@ urlpatterns = [
     path('api/generate_order_pdf/', generate_order_pdf, name='generate_order_pdf'),
     path('api/OrdersByAdminListJson/', OrdersByAdminListJson.as_view(), name='OrdersByAdminListJson'),
     path('api/OrdersByStaffListJson/', OrdersByStaffListJson.as_view(), name='OrdersByStaffListJson'),
+    path('api/export_orders_list_pdf/', export_orders_list_pdf, name='export_orders_list_pdf'),
     path('api/export_orders_list_excel/', export_orders_list_excel, name='export_orders_list_excel'),
 
     # cashCounter

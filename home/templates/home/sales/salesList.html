@@ -44,11 +44,79 @@
             width: 100px !important;
         }
 
+        .sales-download-menu {
+            position: relative;
+            z-index: 20;
+        }
+
+        .sales-download-menu-panel {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 190px;
+            background: #fff;
+            border: 1px solid rgba(34, 36, 38, 0.12);
+            border-radius: 8px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+            padding: 8px 0;
+            display: none;
+            z-index: 30;
+        }
+
+        .sales-download-menu.open .sales-download-menu-panel {
+            display: block;
+        }
+
+        .sales-download-menu-header {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        .sales-download-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            font-size: 0.9rem;
+            color: #111827;
+            cursor: pointer;
+        }
+
+        .sales-download-menu-item:hover {
+            background: #f8fafc;
+        }
+
         html[data-theme="dark"] #deleteUser .content,
         html[data-theme="dark"] #imgModal .content,
         html[data-theme="dark"] #deleteUser .header,
         html[data-theme="dark"] #imgModal .header {
             color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .sales-download-menu-panel {
+            background: #101b31;
+            border-color: rgba(56, 189, 248, 0.18);
+            box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+        }
+
+        html[data-theme="dark"] .sales-download-menu-header {
+            color: #95a8c5;
+        }
+
+        html[data-theme="dark"] .sales-download-menu-item {
+            color: #e2ebf7;
+        }
+
+        html[data-theme="dark"] .sales-download-menu-item:hover {
+            background: rgba(22, 120, 194, 0.16);
         }
     </style>
 
@@ -106,8 +174,25 @@
                                                 Search
                                             </button>
                                             {% if sales_capabilities.can_export %}
-                                                <a id="reportUrl" href="{% url 'homeApp:generate_sales_report' %}" style="float: right;" class="pink tiny ui button">Download PDF</a>
-                                                <a id="excelUrl" href="{% url 'homeApp:export_sales_list_excel' %}" style="float: right; margin-right: 8px;" class="green tiny ui button">Excel Export</a>
+                                                <div style="float: right; margin-right: 8px; display:flex; gap:8px; flex-wrap:wrap;">
+                                                    <div class="sales-download-menu" id="salesDownloadDropdown">
+                                                        <button type="button" class="ui teal tiny labeled icon button" onclick="toggleSalesDownloadMenu(event)" style="overflow: hidden;">
+                                                            <i class="download icon"></i>
+                                                            Download
+                                                        </button>
+                                                        <div class="sales-download-menu-panel">
+                                                            <div class="sales-download-menu-header">Sales Export</div>
+                                                            <button type="button" class="sales-download-menu-item" onclick="downloadSalesListReport('pdf'); closeSalesDownloadMenu();">
+                                                                <i class="file pdf outline icon"></i>
+                                                                <span>PDF Report</span>
+                                                            </button>
+                                                            <button type="button" class="sales-download-menu-item" onclick="downloadSalesListReport('excel'); closeSalesDownloadMenu();">
+                                                                <i class="file excel outline icon"></i>
+                                                                <span>Excel Export</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -338,6 +423,35 @@
             setTimeout(function () { document.body.removeChild(a); }, 1000);
         }
 
+        function getSalesListDownloadUrl(downloadType) {
+            var startDateF = $('#startDateF').val() || '';
+            var endDateF = $('#endDateF').val() || '';
+            var staffID = $('#staffID').val() || 'All';
+            if (downloadType === 'pdf') {
+                return "{% url 'homeApp:generate_sales_report' %}?cDate=" + encodeURIComponent(startDateF) + '&staffID=' + encodeURIComponent(staffID);
+            }
+            if (downloadType === 'excel') {
+                return "{% url 'homeApp:export_sales_list_excel' %}?startDate=" + encodeURIComponent(startDateF) + '&endDate=' + encodeURIComponent(endDateF) + '&staffID=' + encodeURIComponent(staffID);
+            }
+            return '';
+        }
+
+        function toggleSalesDownloadMenu(event) {
+            if (event) event.stopPropagation();
+            $('#salesDownloadDropdown').toggleClass('open');
+        }
+
+        function closeSalesDownloadMenu() {
+            $('#salesDownloadDropdown').removeClass('open');
+        }
+
+        function downloadSalesListReport(downloadType) {
+            var downloadUrl = getSalesListDownloadUrl(downloadType);
+            if (downloadUrl) {
+                window.location.href = downloadUrl;
+            }
+        }
+
         {% if sales_capabilities.can_message %}
         function showConfirmationModal(id) {
             $('#imgModal').modal('show');
@@ -380,14 +494,14 @@
         $(ChangeDate());
 
         function ChangeDate() {
-            var startDateF = $('#startDateF').val();
-            var endDateF = $('#endDateF').val();
-            var staffID = $('#staffID').val();
-            if ($('#reportUrl').length) {
-                $("#reportUrl").attr("href", "{% url 'homeApp:generate_sales_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
-                $("#excelUrl").attr("href", "{% url 'homeApp:export_sales_list_excel' %}?startDate=" + startDateF + '&endDate=' + endDateF + '&staffID=' + staffID);
-            }
+            closeSalesDownloadMenu();
         }
+
+        $(document).on('click', function (event) {
+            if (!$(event.target).closest('#salesDownloadDropdown').length) {
+                closeSalesDownloadMenu();
+            }
+        });
     </script>
 
 {% endblock %}

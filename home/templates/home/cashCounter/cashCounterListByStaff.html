@@ -45,9 +45,77 @@
             width: 100px !important;
         }
 
+        .cash-counter-download-menu {
+            position: relative;
+            z-index: 20;
+        }
+
+        .cash-counter-download-menu-panel {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 190px;
+            background: #fff;
+            border: 1px solid rgba(34, 36, 38, 0.12);
+            border-radius: 8px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+            padding: 8px 0;
+            display: none;
+            z-index: 30;
+        }
+
+        .cash-counter-download-menu.open .cash-counter-download-menu-panel {
+            display: block;
+        }
+
+        .cash-counter-download-menu-header {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        .cash-counter-download-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            font-size: 0.9rem;
+            color: #111827;
+            cursor: pointer;
+        }
+
+        .cash-counter-download-menu-item:hover {
+            background: #f8fafc;
+        }
+
         .ui.ignored.message {
             padding-left: 3px !important;
             padding-right: 3px !important;
+        }
+
+        html[data-theme="dark"] .cash-counter-download-menu-panel {
+            background: #101b31;
+            border-color: rgba(56, 189, 248, 0.18);
+            box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+        }
+
+        html[data-theme="dark"] .cash-counter-download-menu-header {
+            color: #95a8c5;
+        }
+
+        html[data-theme="dark"] .cash-counter-download-menu-item {
+            color: #e2ebf7;
+        }
+
+        html[data-theme="dark"] .cash-counter-download-menu-item:hover {
+            background: rgba(22, 120, 194, 0.16);
         }
     </style>
 
@@ -121,11 +189,25 @@
                                                 </button>
                                             {% endif %}
                                             {% if cash_counter_capabilities.can_export %}
-                                                <a id="reportUrl"
-                                               href="{% url 'homeApp:generate_cash_counter_report' %}"
-                                               style="float: right;"
-                                               class="teal tiny ui button">Download Report
-                                            </a>
+                                                <div style="float: right; display:flex; gap:8px; flex-wrap:wrap;">
+                                                    <div class="cash-counter-download-menu" id="cashCounterDownloadDropdown">
+                                                        <button type="button" class="ui teal tiny labeled icon button" onclick="toggleCashCounterDownloadMenu(event)" style="overflow: hidden;">
+                                                            <i class="download icon"></i>
+                                                            Download
+                                                        </button>
+                                                        <div class="cash-counter-download-menu-panel">
+                                                            <div class="cash-counter-download-menu-header">Cash Counter Export</div>
+                                                            <button type="button" class="cash-counter-download-menu-item" onclick="downloadCashCounterReport('pdf'); closeCashCounterDownloadMenu();">
+                                                                <i class="file pdf outline icon"></i>
+                                                                <span>PDF Report</span>
+                                                            </button>
+                                                            <button type="button" class="cash-counter-download-menu-item" onclick="downloadCashCounterReport('excel'); closeCashCounterDownloadMenu();">
+                                                                <i class="file excel outline icon"></i>
+                                                                <span>Excel Export</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             {% endif %}
 
                                         </div>
@@ -794,6 +876,34 @@
 
         }
 
+        function getCashCounterReportUrl(downloadType) {
+            var startDateF = $('#startDateF').val() || '';
+            var staffID = $('#staffID').val() || 'All';
+            if (downloadType === 'pdf') {
+                return "{% url 'homeApp:generate_cash_counter_report' %}?cDate=" + encodeURIComponent(startDateF) + '&staffID=' + encodeURIComponent(staffID);
+            }
+            if (downloadType === 'excel') {
+                return "{% url 'homeApp:generate_cash_counter_report_excel' %}?cDate=" + encodeURIComponent(startDateF) + '&staffID=' + encodeURIComponent(staffID);
+            }
+            return '';
+        }
+
+        function toggleCashCounterDownloadMenu(event) {
+            if (event) event.stopPropagation();
+            $('#cashCounterDownloadDropdown').toggleClass('open');
+        }
+
+        function closeCashCounterDownloadMenu() {
+            $('#cashCounterDownloadDropdown').removeClass('open');
+        }
+
+        function downloadCashCounterReport(downloadType) {
+            var downloadUrl = getCashCounterReportUrl(downloadType);
+            if (downloadUrl) {
+                window.location.href = downloadUrl;
+            }
+        }
+
         function showConfirmationModal(id) {
             $('#imgModal').modal('show');
             $('#approveCollectionID').val('' + id);
@@ -856,13 +966,14 @@
         $(ChangeDate());
 
         function ChangeDate() {
-            var startDateF = $('#startDateF').val();
-            var staffID = $('#staffID').val() || 'All';
-            var reportUrl = $('#reportUrl');
-            if (reportUrl.length) {
-                reportUrl.attr("href", "{% url 'homeApp:generate_cash_counter_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
-            }
+            closeCashCounterDownloadMenu();
         }
+
+        $(document).on('click', function (event) {
+            if (!$(event.target).closest('#cashCounterDownloadDropdown').length) {
+                closeCashCounterDownloadMenu();
+            }
+        });
     </script>
 
 {% endblock %}

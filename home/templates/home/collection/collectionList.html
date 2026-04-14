@@ -48,6 +48,56 @@
             width: 100px !important;
         }
 
+        .collection-download-menu {
+            position: relative;
+            z-index: 20;
+        }
+
+        .collection-download-menu-panel {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 190px;
+            background: #fff;
+            border: 1px solid rgba(34, 36, 38, 0.12);
+            border-radius: 8px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+            padding: 8px 0;
+            display: none;
+            z-index: 30;
+        }
+
+        .collection-download-menu.open .collection-download-menu-panel {
+            display: block;
+        }
+
+        .collection-download-menu-header {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        .collection-download-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            font-size: 0.9rem;
+            color: #111827;
+            cursor: pointer;
+        }
+
+        .collection-download-menu-item:hover {
+            background: #f8fafc;
+        }
+
         html[data-theme="dark"] #deleteUser .content,
         html[data-theme="dark"] #imgModal .content,
         html[data-theme="dark"] #TallyModal .content,
@@ -55,6 +105,24 @@
         html[data-theme="dark"] #imgModal .header,
         html[data-theme="dark"] #TallyModal .header {
             color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .collection-download-menu-panel {
+            background: #101b31;
+            border-color: rgba(56, 189, 248, 0.18);
+            box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+        }
+
+        html[data-theme="dark"] .collection-download-menu-header {
+            color: #95a8c5;
+        }
+
+        html[data-theme="dark"] .collection-download-menu-item {
+            color: #e2ebf7;
+        }
+
+        html[data-theme="dark"] .collection-download-menu-item:hover {
+            background: rgba(22, 120, 194, 0.16);
         }
     </style>
 
@@ -117,8 +185,25 @@
                                                 Search
                                             </button>
                                             {% if collection_capabilities.can_export %}
-                                                <a id="reportUrl" href="{% url 'homeApp:generate_collection_report' %}" style="float: right;" class="pink tiny ui button">Download PDF</a>
-                                                <a id="excelUrl" href="{% url 'homeApp:export_collection_list_excel' %}" style="float: right; margin-right: 8px;" class="green tiny ui button">Excel Export</a>
+                                                <div style="float: right; margin-right: 8px; display:flex; gap:8px; flex-wrap:wrap;">
+                                                    <div class="collection-download-menu" id="collectionDownloadDropdown">
+                                                        <button type="button" class="ui teal tiny labeled icon button" onclick="toggleCollectionDownloadMenu(event)" style="overflow: hidden;">
+                                                            <i class="download icon"></i>
+                                                            Download
+                                                        </button>
+                                                        <div class="collection-download-menu-panel">
+                                                            <div class="collection-download-menu-header">Collection Export</div>
+                                                            <button type="button" class="collection-download-menu-item" onclick="downloadCollectionListReport('pdf'); closeCollectionDownloadMenu();">
+                                                                <i class="file pdf outline icon"></i>
+                                                                <span>PDF Report</span>
+                                                            </button>
+                                                            <button type="button" class="collection-download-menu-item" onclick="downloadCollectionListReport('excel'); closeCollectionDownloadMenu();">
+                                                                <i class="file excel outline icon"></i>
+                                                                <span>Excel Export</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -384,6 +469,35 @@
         }
 
         {% if collection_capabilities.can_filter_staff %}
+        function getCollectionListDownloadUrl(downloadType) {
+            var startDateF = $('#startDateF').val() || '';
+            var endDateF = $('#endDateF').val() || '';
+            var staffID = $('#staffID').val() || 'All';
+            if (downloadType === 'pdf') {
+                return "{% url 'homeApp:generate_collection_report' %}?cDate=" + encodeURIComponent(startDateF) + '&staffID=' + encodeURIComponent(staffID);
+            }
+            if (downloadType === 'excel') {
+                return "{% url 'homeApp:export_collection_list_excel' %}?startDate=" + encodeURIComponent(startDateF) + '&endDate=' + encodeURIComponent(endDateF) + '&staffID=' + encodeURIComponent(staffID);
+            }
+            return '';
+        }
+
+        function toggleCollectionDownloadMenu(event) {
+            if (event) event.stopPropagation();
+            $('#collectionDownloadDropdown').toggleClass('open');
+        }
+
+        function closeCollectionDownloadMenu() {
+            $('#collectionDownloadDropdown').removeClass('open');
+        }
+
+        function downloadCollectionListReport(downloadType) {
+            var downloadUrl = getCollectionListDownloadUrl(downloadType);
+            if (downloadUrl) {
+                window.location.href = downloadUrl;
+            }
+        }
+
         function showConfirmationModal(id) {
             $('#imgModal').modal('show');
             $('#approveCollectionID').val('' + id);
@@ -422,12 +536,14 @@
         }
 
         function ChangeDate() {
-            var startDateF = $('#startDateF').val();
-            var endDateF = $('#endDateF').val();
-            var staffID = $('#staffID').val();
-            $("#reportUrl").attr("href", "{% url 'homeApp:generate_collection_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
-            $("#excelUrl").attr("href", "{% url 'homeApp:export_collection_list_excel' %}?startDate=" + startDateF + '&endDate=' + endDateF + '&staffID=' + staffID);
+            closeCollectionDownloadMenu();
         }
+
+        $(document).on('click', function (event) {
+            if (!$(event.target).closest('#collectionDownloadDropdown').length) {
+                closeCollectionDownloadMenu();
+            }
+        });
 
         function confirmTallyModel(id) {
             $('#TallyModal').modal('show');

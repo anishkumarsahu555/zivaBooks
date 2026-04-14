@@ -43,6 +43,56 @@
             width: 100px !important;
         }
 
+        .order-download-menu {
+            position: relative;
+            z-index: 20;
+        }
+
+        .order-download-menu-panel {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 190px;
+            background: #fff;
+            border: 1px solid rgba(34, 36, 38, 0.12);
+            border-radius: 8px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+            padding: 8px 0;
+            display: none;
+            z-index: 30;
+        }
+
+        .order-download-menu.open .order-download-menu-panel {
+            display: block;
+        }
+
+        .order-download-menu-header {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        .order-download-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            font-size: 0.9rem;
+            color: #111827;
+            cursor: pointer;
+        }
+
+        .order-download-menu-item:hover {
+            background: #f8fafc;
+        }
+
         html[data-theme="dark"] #deleteUser .content,
         html[data-theme="dark"] #approveOrderModal .content,
         html[data-theme="dark"] #downloadOrderPdfModal .content,
@@ -50,6 +100,24 @@
         html[data-theme="dark"] #approveOrderModal .header,
         html[data-theme="dark"] #downloadOrderPdfModal .header {
             color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .order-download-menu-panel {
+            background: #101b31;
+            border-color: rgba(56, 189, 248, 0.18);
+            box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+        }
+
+        html[data-theme="dark"] .order-download-menu-header {
+            color: #95a8c5;
+        }
+
+        html[data-theme="dark"] .order-download-menu-item {
+            color: #e2ebf7;
+        }
+
+        html[data-theme="dark"] .order-download-menu-item:hover {
+            background: rgba(22, 120, 194, 0.16);
         }
     </style>
 
@@ -108,7 +176,25 @@
                                             <i class="funnel dollar icon"></i>
                                             Search
                                         </button>
-                                        <a id="excelUrl" href="{% url 'homeApp:export_orders_list_excel' %}" style="float: right;" class="green tiny ui button">Excel Export</a>
+                                        <div style="float: right; margin-right: 8px; display:flex; gap:8px; flex-wrap:wrap;">
+                                            <div class="order-download-menu" id="orderDownloadDropdown">
+                                                <button type="button" class="ui teal tiny labeled icon button" onclick="toggleOrderDownloadMenu(event)" style="overflow: hidden;">
+                                                    <i class="download icon"></i>
+                                                    Download
+                                                </button>
+                                                <div class="order-download-menu-panel">
+                                                    <div class="order-download-menu-header">Order Export</div>
+                                                    <button type="button" class="order-download-menu-item" onclick="downloadOrderListReport('pdf'); closeOrderDownloadMenu();">
+                                                        <i class="file pdf outline icon"></i>
+                                                        <span>PDF Report</span>
+                                                    </button>
+                                                    <button type="button" class="order-download-menu-item" onclick="downloadOrderListReport('excel'); closeOrderDownloadMenu();">
+                                                        <i class="file excel outline icon"></i>
+                                                        <span>Excel Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </form>
@@ -207,8 +293,10 @@
 
         var today = new Date();
         $('#rangestart').calendar({
+            initialDate: today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear(),
             monthFirst: false,
             type: 'date',
+            endCalendar: $('#rangeend'),
             formatter: {
                 date: function (date) {
                     if (!date) return '';
@@ -217,8 +305,10 @@
             }
         });
         $('#rangeend').calendar({
+            initialDate: today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear(),
             monthFirst: false,
             type: 'date',
+            startCalendar: $('#rangestart'),
             formatter: {
                 date: function (date) {
                     if (!date) return '';
@@ -229,6 +319,9 @@
 
         $('#startDateF').val(today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear());
         $('#endDateF').val(today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear());
+        var todayDateString = $('#startDateF').val();
+        var initialOrderStaffID = $('#staffID').val() || 'All';
+        var initialOrdersAjaxUrl = '{% if order_capabilities.can_filter_staff %}{% url 'homeApp:OrdersByAdminListJson' %}{% else %}{% url 'homeApp:OrdersByStaffListJson' %}{% endif %}?startDate=' + encodeURIComponent(todayDateString) + '&endDate=' + encodeURIComponent(todayDateString) + '&staffID=' + encodeURIComponent(initialOrderStaffID);
 
         var userTab = $('#UserTable').DataTable({
             dom: 'Blfrtip',
@@ -272,7 +365,7 @@
             pageLength: 10,
             processing: true,
             serverSide: true,
-            ajax: "{% if order_capabilities.can_filter_staff %}{% url 'homeApp:OrdersByAdminListJson' %}{% else %}{% url 'homeApp:OrdersByStaffListJson' %}{% endif %}"
+            ajax: initialOrdersAjaxUrl
         });
 
         function downloadOrderPdf(id) {
@@ -299,6 +392,35 @@
             document.body.appendChild(a);
             a.click();
             setTimeout(function () { document.body.removeChild(a); }, 1000);
+        }
+
+        function getOrderListDownloadUrl(downloadType) {
+            var startDateF = $('#startDateF').val() || '';
+            var endDateF = $('#endDateF').val() || '';
+            var staffID = $('#staffID').val() || 'All';
+            if (downloadType === 'pdf') {
+                return "{% url 'homeApp:export_orders_list_pdf' %}?startDate=" + encodeURIComponent(startDateF) + '&endDate=' + encodeURIComponent(endDateF) + '&staffID=' + encodeURIComponent(staffID);
+            }
+            if (downloadType === 'excel') {
+                return "{% url 'homeApp:export_orders_list_excel' %}?startDate=" + encodeURIComponent(startDateF) + '&endDate=' + encodeURIComponent(endDateF) + '&staffID=' + encodeURIComponent(staffID);
+            }
+            return '';
+        }
+
+        function toggleOrderDownloadMenu(event) {
+            if (event) event.stopPropagation();
+            $('#orderDownloadDropdown').toggleClass('open');
+        }
+
+        function closeOrderDownloadMenu() {
+            $('#orderDownloadDropdown').removeClass('open');
+        }
+
+        function downloadOrderListReport(downloadType) {
+            var downloadUrl = getOrderListDownloadUrl(downloadType);
+            if (downloadUrl) {
+                window.location.href = downloadUrl;
+            }
         }
 
         function filterDetails() {
@@ -392,10 +514,13 @@
         $(ChangeDate());
 
         function ChangeDate() {
-            var startDateF = $('#startDateF').val();
-            var endDateF = $('#endDateF').val();
-            var staffID = $('#staffID').val() || 'All';
-            $('#excelUrl').attr('href', "{% url 'homeApp:export_orders_list_excel' %}?startDate=" + startDateF + '&endDate=' + endDateF + '&staffID=' + staffID);
+            closeOrderDownloadMenu();
         }
+
+        $(document).on('click', function (event) {
+            if (!$(event.target).closest('#orderDownloadDropdown').length) {
+                closeOrderDownloadMenu();
+            }
+        });
     </script>
 {% endblock %}

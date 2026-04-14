@@ -24,6 +24,7 @@ from django.utils.html import escape
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.views.decorators.cache import cache_page
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django_datatables_view.base_datatable_view import BaseDatatableView
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -5376,8 +5377,10 @@ class AuditLogListJson(BaseDatatableView):
             action_label = escape(item.get_action_display())
             changes_count = len(item.changes or {})
             detail_btn = (
-                '<button class="ui tiny teal basic button" type="button" onclick="openAuditDetail(\'{}\', {})">'
-                '<i class="eye icon"></i>View</button>'
+                '<button class="ui tiny teal basic icon button audit-detail-trigger" '
+                'type="button" title="View detail" data-tooltip="View detail" data-position="left center" '
+                'onclick="openAuditDetail(\'{}\', {})">'
+                '<i class="eye icon"></i></button>'
             ).format(reverse('homeApp:get_audit_log_detail_api'), item.pk)
             data.append([
                 escape(_format_audit_datetime(item.datetime)),
@@ -5892,6 +5895,68 @@ def export_orders_list_excel(request):
         'metadata': [('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')), ('From', start_date.strftime('%d/%m/%Y')), ('To', end_date.strftime('%d/%m/%Y')), ('Staff', staff_name), ('Search', search or '-')],
         'tables': [{'title': 'Orders', 'headers': ['Order No', 'Party', 'Date', 'Status', 'Approved By', 'Approved On', 'Created By', 'Updated', 'Created', 'Images', 'Remark'], 'rows': rows}],
     }])
+def export_orders_list_pdf(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    qs = _orders_list_base_qs(request).filter(isDeleted=False)
+    if not _can_filter_all_orders(request.user):
+        qs = qs.filter(createdBy__user_ID_id=request.user.pk)
+        staff_name = 'My Orders'
+    else:
+        staff_id = request.GET.get('staffID')
+        if staff_id and staff_id != 'All':
+            qs = qs.filter(createdBy_id=int(staff_id))
+            staff = tenant_qs(request, StaffUser).filter(pk=int(staff_id)).first()
+            staff_name = staff.name if staff else 'Selected Staff'
+        else:
+            staff_name = 'All'
+    try:
+        start_date = datetime.strptime(request.GET.get('startDate'), '%d/%m/%Y').date()
+        end_date = datetime.strptime(request.GET.get('endDate'), '%d/%m/%Y').date()
+    except Exception:
+        start_date = end_date = datetime.today().date()
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    qs = qs.filter(buildDate__range=[start_date, end_date])
+    search = (request.GET.get('search') or '').strip()
+    if search:
+        qs = qs.filter(
+            Q(orderNumber__icontains=search) | Q(partyID__name__icontains=search) |
+            Q(status__icontains=search) | Q(remark__icontains=search)
+        )
+    rows = []
+    for item in qs.order_by('-datetime'):
+        rows.append({
+            'order_number': _order_public_id(item),
+            'party_name': item.partyID.name if item.partyID_id else '-',
+            'build_date': item.buildDate.strftime('%d/%m/%Y') if item.buildDate else '-',
+            'status': item.get_status_display(),
+            'approved_by': item.approvedBy.name if item.approvedBy_id else '-',
+            'approved_on': item.approvedOn.strftime('%d/%m/%Y %I:%M %p') if item.approvedOn else '-',
+            'created_by': item.createdBy.name if item.createdBy_id else '-',
+            'updated_on': item.lastUpdatedOn.strftime('%d/%m/%Y %I:%M %p') if item.lastUpdatedOn else '-',
+            'created_on': item.datetime.strftime('%d/%m/%Y %I:%M %p') if item.datetime else '-',
+            'remark': item.remark or '-',
+            'images_count': tenant_qs(request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count(),
+        })
+    context = {
+        'start_date': start_date,
+        'end_date': end_date,
+        'staff_name': staff_name,
+        'search': search or '-',
+        'rows': rows,
+        'total_orders': len(rows),
+    }
+    context.update(_pdf_base_context(request, [
+        f'From: {start_date.strftime("%d/%m/%Y")}',
+        f'To: {end_date.strftime("%d/%m/%Y")}',
+        f'Staff: {staff_name}',
+    ]))
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename=orders-list.pdf'
+    html = render_to_string('home/report/ordersListPDF.html', context)
+    HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A4 landscape; margin: 0.7cm; }')])
+    return response
 def generate_order_pdf(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
@@ -8863,6 +8928,124 @@ def generate_sales_report(request):
     return response
 
 
+def search_sales_invoice_lookup_api(request):
+    if request.method != 'GET':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_sales_access(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+    query = (request.GET.get('q') or '').strip()
+    today_only = str(request.GET.get('today') or '').strip().lower() in {'1', 'true', 'yes'}
+
+    qs = tenant_qs(request, Sales).filter(isDeleted=False).select_related('partyID', 'createdBy', 'bankID')
+    if not _can_filter_all_sales(request.user):
+        qs = qs.filter(createdBy__user_ID_id=request.user.pk)
+    if today_only and not query:
+        qs = qs.filter(buildDate=datetime.now().date()).order_by('-id')[:20]
+    elif query:
+        if len(query) < 2:
+            return JsonResponse({'message': 'success', 'data': []}, safe=False)
+        qs = qs.annotate(
+            match_rank=Case(
+                When(invoiceNumber__iexact=query, then=Value(0)),
+                When(paymentID__iexact=query, then=Value(1)),
+                When(invoiceNumber__istartswith=query, then=Value(2)),
+                When(paymentID__istartswith=query, then=Value(3)),
+                When(partyID__name__istartswith=query, then=Value(4)),
+                When(invoiceNumber__icontains=query, then=Value(5)),
+                When(paymentID__icontains=query, then=Value(6)),
+                When(partyID__name__icontains=query, then=Value(7)),
+                default=Value(99),
+            )
+        ).filter(
+            Q(invoiceNumber__icontains=query) |
+            Q(paymentID__icontains=query) |
+            Q(partyID__name__icontains=query)
+        ).order_by('match_rank', '-buildDate', '-id')[:10]
+    else:
+        return JsonResponse({'message': 'success', 'data': []}, safe=False)
+
+    rows = []
+    for sale in qs:
+        rows.append({
+            'ID': sale.pk,
+            'InvoiceNumber': sale.invoiceNumber or '-',
+            'PaymentID': sale.paymentID or '-',
+            'PartyName': getattr(getattr(sale, 'partyID', None), 'name', None) or '-',
+            'Amount': float(sale.amount or 0.0),
+            'BuildDate': sale.buildDate.strftime('%d/%m/%Y') if sale.buildDate else '-',
+            'Mode': sale.modeOfPayment or '-',
+            'CreatedBy': getattr(getattr(sale, 'createdBy', None), 'name', None) or '-',
+            'Remark': sale.remark or '',
+            'ThermalPrintUrl': reverse('homeApp:print_sales_thermal_challan') + f'?id={sale.pk}',
+        })
+    return JsonResponse({'message': 'success', 'data': rows}, safe=False)
+
+
+def search_cash_counter_invoice_lookup_api(request):
+    if request.method != 'GET':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.can_manage_cash_counter', 'home.view_cashcounter'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+    query = (request.GET.get('q') or '').strip()
+    today_only = str(request.GET.get('today') or '').strip().lower() in {'1', 'true', 'yes'}
+    recent_only = str(request.GET.get('recent') or '').strip().lower() in {'1', 'true', 'yes'}
+
+    qs = tenant_qs(request, CashCounter).filter(
+        isDeleted=False,
+        mode__in=_cash_counter_billing_modes(),
+    ).exclude(invoiceNumber__isnull=True).exclude(invoiceNumber__exact='').select_related('partyID', 'createdBy', 'bankID')
+
+    if today_only and not query:
+        qs = qs.filter(entryDate__date=datetime.now().date()).order_by('-entryDate', '-id')[:20]
+    elif recent_only and not query:
+        qs = qs.order_by('-entryDate', '-id')
+    elif query:
+        if len(query) < 2:
+            return JsonResponse({'message': 'success', 'data': []}, safe=False)
+        qs = qs.annotate(
+            match_rank=Case(
+                When(invoiceNumber__iexact=query, then=Value(0)),
+                When(partyID__name__iexact=query, then=Value(1)),
+                When(invoiceNumber__istartswith=query, then=Value(2)),
+                When(partyID__name__istartswith=query, then=Value(3)),
+                When(invoiceNumber__icontains=query, then=Value(4)),
+                When(partyID__name__icontains=query, then=Value(5)),
+                When(remark__icontains=query, then=Value(6)),
+                default=Value(99),
+            )
+        ).filter(
+            Q(invoiceNumber__icontains=query) |
+            Q(partyID__name__icontains=query) |
+            Q(remark__icontains=query)
+        ).order_by('match_rank', '-entryDate', '-id')[:10]
+    else:
+        return JsonResponse({'message': 'success', 'data': []}, safe=False)
+
+    rows = []
+    for counter in qs:
+        total_amount = float(counter.amount or 0.0)
+        if counter.mode == 'Mix':
+            total_amount = float(counter.mixCashAmount or 0.0) + float(counter.mixCardAmount or 0.0)
+        rows.append({
+            'ID': counter.pk,
+            'InvoiceNumber': counter.invoiceNumber or '-',
+            'PartyName': getattr(getattr(counter, 'partyID', None), 'name', None) or '-',
+            'Amount': total_amount,
+            'BuildDate': counter.entryDate.strftime('%d/%m/%Y') if counter.entryDate else '-',
+            'Mode': counter.mode or '-',
+            'CreatedBy': getattr(getattr(counter, 'createdBy', None), 'name', None) or '-',
+            'Remark': counter.remark or '',
+            'ThermalPrintUrl': reverse('homeApp:print_cash_counter_thermal_challan') + f'?id={counter.pk}',
+        })
+    return JsonResponse({'message': 'success', 'data': rows}, safe=False)
+
+
 def generate_sales_invoice_pdf(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
@@ -8922,6 +9105,83 @@ def generate_sales_invoice_pdf(request):
     base_url = request.build_absolute_uri('/')
     HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 0.9cm; }')])
     return response
+
+
+@xframe_options_exempt
+def print_sales_thermal_challan(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_sales_access(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    sale_id = request.GET.get('id')
+    if not sale_id or not str(sale_id).isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Sale id is required.'}, status=400, safe=False)
+
+    sale = get_object_or_404(
+        tenant_qs(request, Sales).select_related('partyID', 'createdBy', 'bankID', 'tenant'),
+        pk=int(sale_id),
+        isDeleted=False,
+    )
+    if not _can_filter_all_sales(request.user):
+        if getattr(getattr(sale, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+    tenant = get_current_tenant(request)
+    context = {
+        'sale': sale,
+        'lines': list(sale.lines.filter(isDeleted=False).select_related('item').order_by('id')),
+        'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
+        'seller_phone': getattr(tenant, 'phone', None) or '',
+        'seller_address': getattr(tenant, 'billingAddress', None) or '',
+        'buyer_name': sale.buyerLegalName or getattr(getattr(sale, 'partyID', None), 'legalName', None) or getattr(getattr(sale, 'partyID', None), 'name', None) or '-',
+        'buyer_phone': getattr(getattr(sale, 'partyID', None), 'phone', None) or '',
+        'mode_label': sale.modeOfPayment or '-',
+        'created_by': getattr(getattr(sale, 'createdBy', None), 'name', None) or '-',
+    }
+    html = render_to_string('home/report/salesThermalChallan.html', context, request=request)
+    return HttpResponse(html)
+
+
+@xframe_options_exempt
+def print_cash_counter_thermal_challan(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.can_manage_cash_counter', 'home.view_cashcounter'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+    counter_id = request.GET.get('id')
+    if not counter_id or not str(counter_id).isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Cash counter id is required.'}, status=400, safe=False)
+
+    counter = get_object_or_404(
+        tenant_qs(request, CashCounter).select_related('partyID', 'createdBy', 'bankID', 'tenant'),
+        pk=int(counter_id),
+        isDeleted=False,
+    )
+    if counter.mode not in _cash_counter_billing_modes() or not getattr(counter, 'invoiceNumber', None):
+        return JsonResponse({'message': 'error', 'error': 'Thermal print is only available for billing entries.'}, status=400, safe=False)
+    if not _can_filter_all_cash_counter(request.user):
+        if getattr(getattr(counter, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+
+    tenant = get_current_tenant(request)
+    total_amount = float(counter.amount or 0.0)
+    if counter.mode == 'Mix':
+        total_amount = float(counter.mixCashAmount or 0.0) + float(counter.mixCardAmount or 0.0)
+    context = {
+        'counter': counter,
+        'lines': list(counter.lines.filter(isDeleted=False).select_related('item').order_by('id')),
+        'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
+        'seller_phone': getattr(tenant, 'phone', None) or '',
+        'seller_address': getattr(tenant, 'billingAddress', None) or '',
+        'buyer_name': counter.buyerLegalName or getattr(getattr(counter, 'partyID', None), 'legalName', None) or getattr(getattr(counter, 'partyID', None), 'name', None) or '-',
+        'buyer_phone': getattr(getattr(counter, 'partyID', None), 'phone', None) or '',
+        'mode_label': counter.mode or '-',
+        'created_by': getattr(getattr(counter, 'createdBy', None), 'name', None) or '-',
+        'amount_value': total_amount,
+    }
+    html = render_to_string('home/report/cashCounterThermalChallan.html', context, request=request)
+    return HttpResponse(html)
 
 
 def generate_cash_counter_invoice_pdf(request):

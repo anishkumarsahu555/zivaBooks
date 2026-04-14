@@ -51,6 +51,74 @@
             border: 1px solid rgba(15, 23, 42, 0.08);
             display: block;
         }
+
+        .attendance-download-menu {
+            position: relative;
+            z-index: 20;
+        }
+
+        .attendance-download-menu-panel {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 210px;
+            background: #fff;
+            border: 1px solid rgba(34, 36, 38, 0.12);
+            border-radius: 8px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+            padding: 8px 0;
+            display: none;
+            z-index: 30;
+        }
+
+        .attendance-download-menu.open .attendance-download-menu-panel {
+            display: block;
+        }
+
+        .attendance-download-menu-header {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        .attendance-download-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            font-size: 0.9rem;
+            color: #111827;
+            cursor: pointer;
+        }
+
+        .attendance-download-menu-item:hover {
+            background: #f8fafc;
+        }
+
+        html[data-theme="dark"] .attendance-download-menu-panel {
+            background: #101b31;
+            border-color: rgba(56, 189, 248, 0.18);
+            box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+        }
+
+        html[data-theme="dark"] .attendance-download-menu-header {
+            color: #95a8c5;
+        }
+
+        html[data-theme="dark"] .attendance-download-menu-item {
+            color: #e2ebf7;
+        }
+
+        html[data-theme="dark"] .attendance-download-menu-item:hover {
+            background: rgba(22, 120, 194, 0.16);
+        }
     </style>
 
     <div class="ui left aligned basic grid">
@@ -104,21 +172,29 @@
                                             <i class="funnel dollar icon"></i>
                                             Search
                                         </button>
-                                        <a id="reportUrl"
-                                           href="{% if attendance_capabilities.can_filter_staff %}{% url 'homeApp:generate_attendance_pdf_admin_report' %}{% else %}{% url 'homeApp:generate_attendance_pdf_staff_report' %}{% endif %}"
-                                           style="float: right;"
-                                           class="pink tiny ui button">Download PDF
-                                        </a>
-                                        <a id="monthlyReportUrl"
-                                           href="{% if attendance_capabilities.can_filter_staff %}{% url 'homeApp:generate_attendance_monthly_pdf_admin_report' %}{% else %}{% url 'homeApp:generate_attendance_monthly_pdf_staff_report' %}{% endif %}"
-                                           style="float: right; margin-right: 8px;"
-                                           class="violet tiny ui button">Monthly View PDF
-                                        </a>
-                                        <a id="excelUrl"
-                                           href="{% url 'homeApp:export_attendance_list_excel' %}"
-                                           style="float: right; margin-right: 8px;"
-                                           class="green tiny ui button">Excel Export
-                                        </a>
+                                        <div style="float: right; margin-right: 8px; display:flex; gap:8px; flex-wrap:wrap;">
+                                            <div class="attendance-download-menu" id="attendanceDownloadDropdown">
+                                                <button type="button" class="ui teal tiny labeled icon button" onclick="toggleAttendanceDownloadMenu(event)" style="overflow: hidden;">
+                                                    <i class="download icon"></i>
+                                                    Download
+                                                </button>
+                                                <div class="attendance-download-menu-panel">
+                                                    <div class="attendance-download-menu-header">Attendance Export</div>
+                                                    <button type="button" class="attendance-download-menu-item" onclick="downloadAttendanceReport('daily_pdf'); closeAttendanceDownloadMenu();">
+                                                        <i class="file pdf outline icon"></i>
+                                                        <span>Daily PDF</span>
+                                                    </button>
+                                                    <button type="button" class="attendance-download-menu-item" onclick="downloadAttendanceReport('monthly_pdf'); closeAttendanceDownloadMenu();">
+                                                        <i class="calendar icon"></i>
+                                                        <span>Monthly View PDF</span>
+                                                    </button>
+                                                    <button type="button" class="attendance-download-menu-item" onclick="downloadAttendanceReport('excel'); closeAttendanceDownloadMenu();">
+                                                        <i class="file excel outline icon"></i>
+                                                        <span>Excel Export</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </form>
@@ -243,22 +319,61 @@
             {% endif %}
         }
 
+        function getAttendanceDownloadUrl(downloadType) {
+            var startDateF = $('#startDateF').val() || '';
+            var endDate = $('#endDateF').val() || '';
+            {% if attendance_capabilities.can_filter_staff %}
+                var staffID = $('#staffID').val() || 'All';
+                if (downloadType === 'daily_pdf') {
+                    return "{% url 'homeApp:generate_attendance_pdf_admin_report' %}?cDate=" + encodeURIComponent(startDateF) + '&staffID=' + encodeURIComponent(staffID) + '&eDate=' + encodeURIComponent(endDate);
+                }
+                if (downloadType === 'monthly_pdf') {
+                    return "{% url 'homeApp:generate_attendance_monthly_pdf_admin_report' %}?cDate=" + encodeURIComponent(startDateF) + '&staffID=' + encodeURIComponent(staffID);
+                }
+                if (downloadType === 'excel') {
+                    return "{% url 'homeApp:export_attendance_list_excel' %}?startDate=" + encodeURIComponent(startDateF) + '&endDate=' + encodeURIComponent(endDate) + '&staffID=' + encodeURIComponent(staffID);
+                }
+            {% else %}
+                if (downloadType === 'daily_pdf') {
+                    return "{% url 'homeApp:generate_attendance_pdf_staff_report' %}?cDate=" + encodeURIComponent(startDateF) + '&eDate=' + encodeURIComponent(endDate);
+                }
+                if (downloadType === 'monthly_pdf') {
+                    return "{% url 'homeApp:generate_attendance_monthly_pdf_staff_report' %}?cDate=" + encodeURIComponent(startDateF);
+                }
+                if (downloadType === 'excel') {
+                    return "{% url 'homeApp:export_attendance_list_excel' %}?startDate=" + encodeURIComponent(startDateF) + '&endDate=' + encodeURIComponent(endDate);
+                }
+            {% endif %}
+            return '';
+        }
+
+        function toggleAttendanceDownloadMenu(event) {
+            if (event) event.stopPropagation();
+            $('#attendanceDownloadDropdown').toggleClass('open');
+        }
+
+        function closeAttendanceDownloadMenu() {
+            $('#attendanceDownloadDropdown').removeClass('open');
+        }
+
+        function downloadAttendanceReport(downloadType) {
+            var downloadUrl = getAttendanceDownloadUrl(downloadType);
+            if (downloadUrl) {
+                window.location.href = downloadUrl;
+            }
+        }
+
         $(ChangeDate());
 
         function ChangeDate() {
-            var startDateF = $('#startDateF').val();
-            var endDate = $('#endDateF').val();
-            {% if attendance_capabilities.can_filter_staff %}
-                var staffID = $('#staffID').val();
-                $("#reportUrl").attr("href", "{% url 'homeApp:generate_attendance_pdf_admin_report' %}?cDate=" + startDateF + '&staffID=' + staffID + '&eDate=' + endDate);
-                $("#monthlyReportUrl").attr("href", "{% url 'homeApp:generate_attendance_monthly_pdf_admin_report' %}?cDate=" + startDateF + '&staffID=' + staffID);
-                $("#excelUrl").attr("href", "{% url 'homeApp:export_attendance_list_excel' %}?startDate=" + startDateF + '&endDate=' + endDate + '&staffID=' + staffID);
-            {% else %}
-                $("#reportUrl").attr("href", "{% url 'homeApp:generate_attendance_pdf_staff_report' %}?cDate=" + startDateF + '&eDate=' + endDate);
-                $("#monthlyReportUrl").attr("href", "{% url 'homeApp:generate_attendance_monthly_pdf_staff_report' %}?cDate=" + startDateF);
-                $("#excelUrl").attr("href", "{% url 'homeApp:export_attendance_list_excel' %}?startDate=" + startDateF + '&endDate=' + endDate);
-            {% endif %}
+            closeAttendanceDownloadMenu();
         }
+
+        $(document).on('click', function (event) {
+            if (!$(event.target).closest('#attendanceDownloadDropdown').length) {
+                closeAttendanceDownloadMenu();
+            }
+        });
     </script>
 
 {% endblock %}
