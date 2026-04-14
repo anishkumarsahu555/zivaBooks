@@ -1989,7 +1989,7 @@
             }
             const help = $('#invoiceNatureHelp');
             if (!meta) {
-                $('#invoiceKind').dropdown('set enabled');
+                $('#invoiceKind').dropdown('setting', 'disabled', false);
                 help.text('Invoice series can default this value for GST billing.');
                 updateInvoiceKindUI();
                 return;
@@ -1998,10 +1998,10 @@
                 $('#invoiceKind').dropdown('set selected', meta.invoiceNature);
             }
             if (meta.lockInvoiceNature && meta.invoiceNature && meta.invoiceNature !== 'mixed') {
-                $('#invoiceKind').dropdown('set disabled');
+                $('#invoiceKind').dropdown('setting', 'disabled', true);
                 help.text('Invoice type is locked by the selected series: ' + meta.invoiceNatureLabel + '.');
             } else {
-                $('#invoiceKind').dropdown('set enabled');
+                $('#invoiceKind').dropdown('setting', 'disabled', false);
                 help.text(meta.invoiceNature && meta.invoiceNature !== 'mixed'
                     ? 'Invoice type defaults from the selected series: ' + meta.invoiceNatureLabel + '.'
                     : 'Invoice series can default this value for GST billing.');

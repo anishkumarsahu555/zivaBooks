@@ -590,7 +590,7 @@
 
             // Semantic/Fomantic select dropdowns often render a separate div; disable both.
             try {
-                $select.dropdown(disabled ? 'set disabled' : 'set enabled');
+                $select.dropdown('setting', 'disabled', !!disabled);
             } catch (e) {}
 
             var $dropdown = $select.closest('.ui.dropdown');

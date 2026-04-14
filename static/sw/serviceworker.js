@@ -1,4 +1,4 @@
-var version = 'v1.4.0::';
+var version = 'v1.4.1::';
 var OFFLINE_URL = '/static/sw/offline.html';
 var CORE_CACHE = version + 'fundamentals';
 var RUNTIME_CACHE = version + 'pages';
@@ -9,8 +9,8 @@ var CORE_ASSETS = [
     '/static/sw/images/icon-512.png',
     '/static/sw/images/apple-touch-icon.png',
     'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.1/jquery.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.css',
-    'https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.0/semantic.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.4/semantic.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/fomantic-ui/2.9.4/semantic.min.js',
     'https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css',
     'https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js',
     'https://cdn.datatables.net/1.12.1/js/dataTables.semanticui.min.js',
@@ -56,13 +56,26 @@ self.addEventListener("fetch", function (event) {
 
     if (isNavigation) {
         event.respondWith(
-            fetch(request)
-                .then(function (response) {
-                    var cacheCopy = response.clone();
-                    caches.open(RUNTIME_CACHE).then(function (cache) {
-                        cache.put(request, cacheCopy);
+            Promise.resolve(event.preloadResponse)
+                .then(function (preloadedResponse) {
+                    if (preloadedResponse) {
+                        var preloadCopy = preloadedResponse.clone();
+                        event.waitUntil(
+                            caches.open(RUNTIME_CACHE).then(function (cache) {
+                                return cache.put(request, preloadCopy);
+                            })
+                        );
+                        return preloadedResponse;
+                    }
+                    return fetch(request).then(function (response) {
+                        var cacheCopy = response.clone();
+                        event.waitUntil(
+                            caches.open(RUNTIME_CACHE).then(function (cache) {
+                                return cache.put(request, cacheCopy);
+                            })
+                        );
+                        return response;
                     });
-                    return response;
                 })
                 .catch(function () {
                     return caches.match(request).then(function (cachedPage) {
@@ -128,8 +141,13 @@ self.addEventListener("activate", function (event) {
             })
             .then(function () {
                 console.log('WORKER: activate completed.');
-                return self.clients.claim();
+                return Promise.resolve(
+                    self.registration.navigationPreload &&
+                    self.registration.navigationPreload.enable &&
+                    self.registration.navigationPreload.enable()
+                ).then(function () {
+                    return self.clients.claim();
+                });
             })
     );
 });
-
