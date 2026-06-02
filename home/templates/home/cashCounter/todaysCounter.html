@@ -1629,11 +1629,46 @@
             };
         }
 
+        function cashCounterModeToTabName(newMode) {
+            const tabMap = {
+                Cash: 'cash',
+                Credit: 'credit',
+                Card: 'card',
+                Mix: 'mix',
+                Collection: 'collection',
+                Return: 'return',
+                Expense: 'expense',
+                Advance: 'advance'
+            };
+            return tabMap[newMode] || String(newMode || '').toLowerCase();
+        }
+
+        function activateCashCounterModeTab(newMode) {
+            const tabName = cashCounterModeToTabName(newMode);
+            const panel = document.querySelector('.cash-counter-panel');
+            if (!panel || !tabName) {
+                return;
+            }
+            panel.querySelectorAll('.cash-counter-mode-menu .item').forEach(function (item) {
+                item.classList.toggle('active', item.getAttribute('data-tab') === tabName);
+            });
+            panel.querySelectorAll('.ui.tab.segment').forEach(function (segment) {
+                const isActive = segment.getAttribute('data-tab') === tabName;
+                segment.classList.toggle('active', isActive);
+                segment.style.display = isActive ? '' : 'none';
+            });
+        }
+
         function selectTab(newMode) {
             mode = newMode;
-            $('.cash-counter-mode-menu .item').tab('change tab', String(newMode || '').toLowerCase());
-            resetForm();
-            syncCashCounterInventoryState();
+            if (window.jQuery && $.fn && $.fn.tab) {
+                $('.cash-counter-mode-menu .item').tab('change tab', cashCounterModeToTabName(newMode));
+            }
+            activateCashCounterModeTab(newMode);
+            if (window.jQuery) {
+                resetForm();
+                syncCashCounterInventoryState();
+            }
             return mode;
         }
 
