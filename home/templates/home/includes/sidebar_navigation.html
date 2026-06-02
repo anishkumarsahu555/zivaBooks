@@ -1,3 +1,20 @@
+<div class="sidebar-workspace">
+    <div class="sidebar-workspace-kicker">Workspace</div>
+    <div class="sidebar-workspace-title">{{ current_tenant.name|default:"zivaBooks" }}</div>
+    <div class="sidebar-workspace-meta">
+        <span class="sidebar-workspace-chip">Navigation</span>
+        <span class="sidebar-workspace-chip sidebar-workspace-chip--role">{{ request.user.username|default:"User" }}</span>
+    </div>
+</div>
+
+<div class="sidebar-search" role="search">
+    <i class="search icon sidebar-search-icon"></i>
+    <input id="sidebarSearchInput" type="text" autocomplete="off" placeholder="Search menu" role="searchbox">
+    <button class="sidebar-search-clear" type="button" aria-label="Clear search" hidden>
+        <i class="times icon"></i>
+    </button>
+</div>
+
 {% if sidebar_sections %}
     {% for section in sidebar_sections %}
         {% if section.items %}
@@ -20,6 +37,11 @@
         {% endif %}
     {% endfor %}
 {% endif %}
+
+<div class="sidebar-empty-state" data-sidebar-empty-state hidden>
+    <i class="search icon"></i>
+    <span>No matching menu items</span>
+</div>
 
 <div class="sidebar-meta">
     <div class="sidebar-meta-brand">zivaBooks</div>
