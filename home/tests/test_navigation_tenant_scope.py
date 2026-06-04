@@ -41,7 +41,7 @@ class NavigationTenantScopeTests(SeededTenantMixin, TestCase):
         labels = self._nav_labels(build_sidebar_sections(self.owner))
 
         self.assertIn('Add Order', labels)
-        self.assertIn('My Orders List', labels)
+        self.assertIn('Orders List', labels)
         self.assertNotIn('Add Sale', labels)
         self.assertNotIn('Party List', labels)
         self.assertNotIn('Audit Report', labels)
@@ -230,7 +230,7 @@ class NavigationTenantScopeTests(SeededTenantMixin, TestCase):
         labels = self._nav_labels(build_sidebar_sections(request))
 
         self.assertIn("Today's Attendance", labels)
-        self.assertIn('Attendance Report (Mine)', labels)
+        self.assertIn('Attendance List', labels)
         self.assertNotIn('Attendance Report', labels)
 
         response = self.client.get('/attendance_report_admin/')

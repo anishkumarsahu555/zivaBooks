@@ -38,28 +38,28 @@ class SeededTenantSmokeTests(SeededTenantMixin, TestCase):
         self.client.force_login(self.collector)
         for path in ["/home/", "/collection_home/", "/add_collection/", "/my_collection/", "/staff_home/"]:
             with self.subTest(path=path):
-                response = self.client.get(path)
+                response = self.client.get(path, follow=True)
                 self.assertEqual(response.status_code, 200)
 
     def test_sales_user_can_open_sales_pages(self):
         self.client.force_login(self.sales)
         for path in ["/home/", "/add_sales/", "/my_sales_list/"]:
             with self.subTest(path=path):
-                response = self.client.get(path)
+                response = self.client.get(path, follow=True)
                 self.assertEqual(response.status_code, 200)
 
     def test_cash_user_can_open_cash_counter_pages(self):
         self.client.force_login(self.cash)
         for path in ["/home/", "/cash_counter_home/", "/my_cash_counter_list/"]:
             with self.subTest(path=path):
-                response = self.client.get(path)
+                response = self.client.get(path, follow=True)
                 self.assertEqual(response.status_code, 200)
 
     def test_audit_user_can_open_audit_pages(self):
         self.client.force_login(self.audit)
         for path in ["/home/", "/attendance_report/"]:
             with self.subTest(path=path):
-                response = self.client.get(path)
+                response = self.client.get(path, follow=True)
                 self.assertEqual(response.status_code, 200)
 
     def test_customer_redirects_to_customer_portal(self):

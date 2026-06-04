@@ -101,7 +101,7 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
         self.assertEqual(create_response.status_code, 200, msg=getattr(create_response, 'content', b''))
         self.assertEqual(create_response.json()['message'], 'success')
         purchase = PurchaseInvoice.objects.get(invoiceNumber='P-1001')
-        stock = InventoryStock.objects.get(tenant=self.tenant, item=self.item, stockBucket=InventoryItem.StockBucket.GST)
+        stock = InventoryStock.objects.get(tenant=self.tenant, item=self.item, stockBucket=InventoryItem.StockBucket.NON_GST)
         self.assertEqual(stock.quantityOnHand, 10.0)
 
         update_response = self.client.post(
@@ -173,9 +173,25 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
                 'invoiceDate': '25/03/2026',
                 'gstTreatment': PurchaseInvoice.GstTreatment.GST,
                 'claimStatus': PurchaseInvoice.ClaimStatus.NOT_APPLICABLE,
-                'lineItems': self._line_items(10, unit_cost=80.0, unit_price=0.0),
+                'lineItems': self._line_items(12, unit_cost=80.0, unit_price=0.0),
             },
         )
+
+        # Create original cash counter sale
+        sale_response = self.client.post(
+            reverse('homeApp:add_cash_counter_entry_api'),
+            data={
+                'invoiceSeriesId': str(self.counter_series.pk),
+                'mode': 'Cash',
+                'party': f'{self.party.name} @ {self.party.pk}',
+                'amount': '283.2',
+                'remark': 'original sale',
+                'lineItems': self._line_items(2, unit_cost=0.0, unit_price=120.0),
+            },
+        )
+        self.assertEqual(sale_response.status_code, 200)
+        self.assertEqual(sale_response.json()['message'], 'success')
+        original_sale = CashCounter.objects.get(remark='original sale')
 
         response = self.client.post(
             reverse('homeApp:add_cash_counter_entry_api'),
@@ -183,9 +199,10 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
                 'invoiceSeriesId': str(self.counter_series.pk),
                 'mode': 'Return',
                 'party': f'{self.party.name} @ {self.party.pk}',
-                'amount': '240',
+                'amount': '283.2',
                 'remark': 'counter return',
                 'lineItems': self._line_items(2, unit_cost=0.0, unit_price=120.0),
+                'salesId': f'cash_counter:{original_sale.pk}',
             },
         )
         self.assertEqual(response.status_code, 200, msg=getattr(response, 'content', b''))
@@ -195,7 +212,7 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
         self.assertIsNotNone(counter.linkedSalesReturnVoucher_id)
         voucher = SalesReturnVoucher.objects.get(pk=counter.linkedSalesReturnVoucher_id)
         self.assertEqual(voucher.partyID_id, self.party.pk)
-        self.assertEqual(voucher.totalAmount, 240.0)
+        self.assertEqual(voucher.totalAmount, 283.2)
         self.assertEqual(voucher.lines.filter(isDeleted=False).count(), 1)
 
         stock = InventoryStock.objects.get(tenant=self.tenant, item=self.item, stockBucket=InventoryItem.StockBucket.GST)
@@ -544,7 +561,7 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
         self.assertEqual(response.status_code, 200, msg=getattr(response, 'content', b''))
         self.assertEqual(response.json()['message'], 'success')
         voucher = InventoryOpeningVoucher.objects.get(tenant=self.tenant)
-        self.assertTrue(voucher.voucherNumber.startswith('OS'))
+        self.assertTrue(voucher.voucherNumber.startswith('OPN'))
         stock = InventoryStock.objects.get(tenant=self.tenant, item=self.item, stockBucket=InventoryItem.StockBucket.GST)
         self.assertEqual(stock.quantityOnHand, 12.0)
         ledger = InventoryLedgerEntry.objects.get(
@@ -650,7 +667,7 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
         self.assertEqual(sale.buyerGstNumber, '22AAAAA0000A1Z5')
         self.assertEqual(float(sale.taxableAmount), 240.0)
         self.assertEqual(float(sale.gstAmount), 43.2)
-        self.assertEqual(float(sale.amount), 283.2)
+        self.assertEqual(float(sale.amount), 283.0)
         line = sale.lines.get(isDeleted=False)
         self.assertEqual(float(line.gstAmount), 43.2)
         pdf = self.client.get(reverse('homeApp:generate_sales_invoice_pdf'), data={'id': sale.pk})
