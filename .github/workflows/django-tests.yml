@@ -26,4 +26,5 @@ jobs:
         USE_REDIS_CACHE: 'False'
         DATABASE_ENGINE: 'sqlite'
       run: |
+        uv run python manage.py makemigrations
         uv run python manage.py test

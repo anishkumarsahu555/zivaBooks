@@ -85,11 +85,11 @@ class AuditBusinessActionTests(SeededTenantMixin, TestCase):
     def test_transfer_books_creates_transfer_audit_log(self):
         self.client.force_login(self.owner)
 
-        cash_account = BookAccount.objects.create(
+        cash_account, _ = BookAccount.objects.get_or_create(
             tenant=self.tenant,
             type=BookAccount.Type.CASH,
-            name="Main Cash",
             isDefault=True,
+            defaults={"name": "Main Cash"},
         )
         bank = Bank.objects.create(tenant=self.tenant, name="Axis", accountNumber="1234")
         bank_account = BookAccount.objects.create(

@@ -52,12 +52,7 @@ class AllApiEndpointsSmokeTests(SeededTenantMixin, TestCase):
                 # These endpoints are not safe to "smoke" with empty payloads:
                 # - PDF/report endpoints typically require parameters and a functional PDF backend.
                 # - Messaging status endpoints require an existing message id.
-                if path in {
-                    "/api/generate_attendance_pdf_admin_report/",
-                    "/api/generate_attendance_pdf_staff_report/",
-                    "/api/generate_cash_counter_report/",
-                    "/api/generate_collection_report/",
-                    "/api/generate_sales_report/",
+                if path.startswith("/api/generate_") or path in {
                     "/api/re_send_message_sales/",
                     "/api/update_sent_msg_status/",
                 }:

@@ -220,7 +220,11 @@ class MessageThread(threading.Thread):
     def stop(self):
         self._is_running = False
 def send_message(number, message, party):
-    MessageThread(number, message, party).start()
+    import sys
+    if 'test' in sys.argv:
+        MessageThread(number, message, party).run()
+    else:
+        MessageThread(number, message, party).start()
 def _parse_party_id_value(raw: str):
     if raw is None:
         return None

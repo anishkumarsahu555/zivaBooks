@@ -47,3 +47,7 @@ migrations-old
 .env.example
 server-setup.md
 zivabooks_deployment.md
+
+# Migrations
+**/migrations/*.py
+!**/migrations/__init__.py
