@@ -60,7 +60,7 @@ from home.otp import (
     set_collection_status,
 )
 from home.party_ledger import sync_party_ledger_entries_for_object
-from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_qs
+from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, get_staff_user_for_request, tenant_object_or_superuser, tenant_qs
 from home.audit import log_audit_event, snapshot_instance
 from home.navigation import _effective_permission_names
 User = get_user_model()
@@ -71,6 +71,7 @@ OPENSTREETMAP_USER_AGENT = "zivaBooks/attendance-location"
 INVOICE_MODULE_MODEL_MAP = {
     InvoiceSeries.Module.SALES: Sales,
     InvoiceSeries.Module.CASH_COUNTER: CashCounter,
+    InvoiceSeries.Module.PROFORMA: ProformaInvoice,
 }
 TENANT_SEQUENCE_DEFAULTS = {
     TenantSequence.Scope.COLLECTION_PAYMENT: {'prefix': 'COL', 'padding': 6},
@@ -85,6 +86,7 @@ TENANT_SEQUENCE_DEFAULTS = {
     TenantSequence.Scope.INVENTORY_TRANSFER: {'prefix': 'TRF', 'padding': 6},
     TenantSequence.Scope.PURCHASE_RETURN: {'prefix': 'PRN', 'padding': 6},
     TenantSequence.Scope.SALES_RETURN: {'prefix': 'SRN', 'padding': 6},
+    TenantSequence.Scope.PROFORMA_INVOICE: {'prefix': 'PI', 'padding': 6},
 }
 DEFAULT_GROUP_PERMISSION_MAP = {
     'Owner': '__all__',
@@ -218,7 +220,11 @@ class MessageThread(threading.Thread):
     def stop(self):
         self._is_running = False
 def send_message(number, message, party):
-    MessageThread(number, message, party).start()
+    import sys
+    if 'test' in sys.argv:
+        MessageThread(number, message, party).run()
+    else:
+        MessageThread(number, message, party).start()
 def _parse_party_id_value(raw: str):
     if raw is None:
         return None
@@ -657,6 +663,8 @@ def _next_tenant_sequence_value(request_or_user, scope):
     return f"{sequence.prefix}{str(number).zfill(sequence.paddingLength)}"
 def _sales_public_id(obj):
     return getattr(obj, 'salesID', None) or getattr(obj, 'paymentID', None) or f'SAL{str(getattr(obj, "pk", 0)).zfill(6)}'
+def _proforma_public_id(obj):
+    return getattr(obj, 'proformaID', None) or getattr(obj, 'invoiceNumber', None) or f'PI{str(getattr(obj, "pk", 0)).zfill(6)}'
 def _purchase_public_id(obj):
     return getattr(obj, 'purchaseID', None) or f'PUR{str(getattr(obj, "pk", 0)).zfill(6)}'
 def _order_public_id(obj):
@@ -1031,6 +1039,37 @@ def _can_approve_sales(user):
     return user.has_perm('home.can_approve_sales')
 def _has_sales_access(user):
     return _has_any_permission(user, 'home.can_manage_sales', 'home.can_approve_sales', 'home.view_sales', 'home.add_sales', 'home.change_sales')
+def _can_manage_proforma_invoice(user):
+    return user.has_perm('home.can_manage_proforma_invoice')
+def _can_convert_proforma_invoice(user):
+    return user.has_perm('home.can_convert_proforma_invoice')
+def _has_proforma_access(user):
+    return _has_any_permission(
+        user,
+        'home.can_manage_proforma_invoice',
+        'home.can_convert_proforma_invoice',
+        'home.can_view_proforma_invoice_reports',
+        'home.view_proformainvoice',
+        'home.add_proformainvoice',
+        'home.change_proformainvoice',
+    )
+def _can_edit_proforma_invoice(user):
+    return _has_any_permission(user, 'home.change_proformainvoice', 'home.can_manage_proforma_invoice')
+def _can_filter_all_proforma(user):
+    return _can_manage_proforma_invoice(user) or user.has_perm('home.can_view_proforma_invoice_reports') or _can_convert_proforma_invoice(user)
+def _can_edit_proforma_record(user, proforma_obj):
+    if not user.is_authenticated:
+        return False
+    if not _can_edit_proforma_invoice(user):
+        return False
+    if proforma_obj is None or proforma_obj.status == ProformaInvoice.Status.CONVERTED:
+        return False
+    if _can_manage_proforma_invoice(user):
+        return True
+    staff = tenant_qs(user, StaffUser).filter(user_ID_id=user.pk, isDeleted=False).only('id').first()
+    if not staff:
+        return False
+    return proforma_obj.createdBy_id == staff.pk
 def _has_return_source_access(user):
     return _has_sales_access(user) or _has_any_permission(user, 'home.can_manage_cash_counter', 'home.view_cashcounter', 'home.can_view_party_credentials')
 def _can_manage_cash_counter_records(user):
@@ -8295,6 +8334,118 @@ def _sync_sales_lines(request, sale: Sales):
     validate_non_negative_inventory(sale.tenant, affected_item_ids, item_bucket_pairs=list(set(existing_pairs + new_pairs)))
 
 
+def _apply_proforma_invoice_payload(request, proforma: ProformaInvoice, party: Party | None, *, line_items=None) -> None:
+    line_items = line_items if line_items is not None else (_request_line_items_payload(request) if _request_line_items_present(request) else [])
+    if _advanced_invoicing_enabled(request):
+        proforma.invoiceKind = _normalize_invoice_kind(
+            request.POST.get('invoiceKind'),
+            party,
+            series=getattr(proforma, 'invoiceSeries', None),
+            request=request,
+        )
+        buyer_legal_name = (request.POST.get('buyerLegalName') or '').strip()
+        if not buyer_legal_name and party:
+            buyer_legal_name = (party.legalName or party.name or '').strip()
+        proforma.buyerLegalName = buyer_legal_name or None
+
+        buyer_gst_number = _normalize_gst_number(request.POST.get('buyerGstNumber'))
+        if not buyer_gst_number and party:
+            buyer_gst_number = _normalize_gst_number(party.gstNumber)
+        proforma.buyerGstNumber = buyer_gst_number or None
+
+        buyer_billing_address = (request.POST.get('buyerBillingAddress') or '').strip()
+        if not buyer_billing_address and party:
+            buyer_billing_address = (party.billingAddress or party.address or '').strip()
+        proforma.buyerBillingAddress = buyer_billing_address or None
+        proforma.placeOfSupply = (request.POST.get('placeOfSupply') or '').strip() or None
+    else:
+        proforma.invoiceKind = ProformaInvoice.InvoiceKind.B2C
+        proforma.buyerLegalName = None
+        proforma.buyerGstNumber = None
+        proforma.buyerBillingAddress = None
+        proforma.placeOfSupply = None
+
+    if line_items:
+        proforma.taxableAmount, proforma.gstAmount, computed_total = _sales_totals_from_lines(line_items)
+        proforma.roundOffAmount, proforma.amount = _sales_round_off_from_total(computed_total)
+    else:
+        proforma.amount = _safe_sales_float(request.POST.get('amount'))
+        if proforma.amount <= 0:
+            raise ValueError('Amount must be greater than zero.')
+        proforma.taxableAmount = round(float(proforma.amount or 0.0), 2)
+        proforma.gstAmount = 0.0
+        proforma.roundOffAmount = 0.0
+
+    if proforma.invoiceKind == ProformaInvoice.InvoiceKind.B2C:
+        proforma.buyerGstNumber = None
+
+
+def _sync_proforma_lines(request, proforma: ProformaInvoice):
+    if not _inventory_feature_enabled(request) or not _request_line_items_present(request):
+        return
+    proforma.lines.filter(isDeleted=False).update(isDeleted=True)
+    warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
+    for row in _request_line_items_payload(request):
+        item = _parse_inventory_item(request, row.get('itemId'))
+        if item.isSaleBlocked:
+            raise ValueError(f'Sale is blocked for inventory item: {item.name}.')
+        quantity = _safe_sales_float(row.get('quantity'))
+        if quantity <= 0:
+            raise ValueError('Proforma quantity must be greater than zero.')
+        _validate_inventory_quantity_for_unit(item, quantity, label='Proforma quantity')
+        stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        unit_price = _safe_sales_float(row.get('unitPrice'))
+        discount_percent = max(0.0, min(100.0, _safe_sales_float(row.get('discountPercent'))))
+        gross_amount = round(quantity * unit_price, 2)
+        taxable_amount = round(gross_amount - ((gross_amount * discount_percent) / 100.0), 2)
+        gst_rate = _safe_sales_float(row.get('gstRate'))
+        if stock_bucket == InventoryItem.StockBucket.NON_GST:
+            gst_rate = 0.0
+            gst_amount = 0.0
+        else:
+            gst_amount = round(taxable_amount * gst_rate / 100.0, 2)
+        line_total = round(taxable_amount + gst_amount, 2)
+        ProformaInvoiceLine.objects.create(
+            tenant=proforma.tenant,
+            proformaInvoice=proforma,
+            warehouse=warehouse,
+            item=item,
+            hsnCode=item.hsnCode,
+            stockBucket=stock_bucket,
+            quantity=quantity,
+            unitPrice=unit_price,
+            discountPercent=discount_percent,
+            taxableAmount=taxable_amount,
+            gstRate=gst_rate,
+            gstAmount=gst_amount,
+            lineTotal=line_total,
+            remark=(row.get('remark') or '')[:500],
+        )
+
+
+def _copy_proforma_lines_to_sale(proforma: ProformaInvoice, sale: Sales) -> list[int]:
+    item_ids = []
+    for line in proforma.lines.filter(isDeleted=False).select_related('item', 'warehouse').order_by('id'):
+        SalesLine.objects.create(
+            tenant=sale.tenant,
+            sales=sale,
+            warehouse=line.warehouse,
+            item=line.item,
+            hsnCode=line.hsnCode,
+            stockBucket=line.stockBucket,
+            quantity=line.quantity,
+            unitPrice=line.unitPrice,
+            discountPercent=line.discountPercent,
+            taxableAmount=line.taxableAmount,
+            gstRate=line.gstRate,
+            gstAmount=line.gstAmount,
+            lineTotal=line.lineTotal,
+            remark=line.remark,
+        )
+        item_ids.append(line.item_id)
+    return item_ids
+
+
 def _sync_cash_counter_lines(request, counter: CashCounter):
     if not _request_line_items_present(request):
         return
@@ -8683,6 +8834,454 @@ def link_order_to_sale_api(request):
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
         return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def add_proforma_invoice_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.add_proformainvoice', 'home.can_manage_proforma_invoice'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        invoice_series_id = request.POST.get('invoiceSeriesId')
+        requested_invoice_number = request.POST.get('requestedInvoiceNumber')
+        party = _parse_sales_party(request, request.POST.get('party'))
+        line_items = _request_line_items_payload(request) if (_inventory_feature_enabled(request) and _request_line_items_present(request)) else []
+        obj = ProformaInvoice()
+        assign_tenant(obj, request)
+        obj.partyID_id = party.pk
+        series, sequence_number, invoice_number = _reserve_invoice_number(
+            request,
+            InvoiceSeries.Module.PROFORMA,
+            invoice_series_id,
+            preferred_number=requested_invoice_number or None,
+        )
+        obj.invoiceSeries = series
+        obj.invoiceSequenceNumber = sequence_number
+        obj.invoiceNumber = invoice_number
+        obj.remark = (request.POST.get('remark') or '').strip() or None
+        obj.terms = (request.POST.get('terms') or '').strip() or None
+        obj.buildDate = datetime.strptime(request.POST.get('colDate'), '%d/%m/%Y').date()
+        valid_until_raw = (request.POST.get('validUntil') or '').strip()
+        obj.validUntil = datetime.strptime(valid_until_raw, '%d/%m/%Y').date() if valid_until_raw else None
+        obj.status = ProformaInvoice.Status.DRAFT
+        _apply_proforma_invoice_payload(request, obj, party, line_items=line_items)
+        obj.createdBy_id = _staff_for_request(request).pk
+        obj.save()
+        obj.proformaID = _next_tenant_sequence_value(request, TenantSequence.Scope.PROFORMA_INVOICE)
+        obj.save(update_fields=['proformaID', 'lastUpdatedOn'])
+        _sync_proforma_lines(request, obj)
+        return JsonResponse({'message': 'success', 'invoiceNumber': obj.invoiceNumber}, safe=False)
+    except Exception as exc:
+        transaction.set_rollback(True)
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def update_proforma_invoice_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    try:
+        obj = tenant_object_or_superuser(request, ProformaInvoice, pk=int(request.POST.get('ID')), isDeleted=False)
+        if obj is None:
+            return JsonResponse({'message': 'error', 'error': 'Proforma invoice not found.'}, status=404, safe=False)
+        if obj.status == ProformaInvoice.Status.CONVERTED:
+            return JsonResponse({'message': 'error', 'error': 'Converted proforma invoices cannot be edited.'}, status=400, safe=False)
+        if not _can_edit_proforma_record(request.user, obj):
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+        party = _parse_sales_party(request, request.POST.get('party'))
+        line_items = _request_line_items_payload(request) if (_inventory_feature_enabled(request) and _request_line_items_present(request)) else []
+        obj.partyID_id = party.pk
+        obj.remark = (request.POST.get('remark') or '').strip() or None
+        obj.terms = (request.POST.get('terms') or '').strip() or None
+        obj.buildDate = datetime.strptime(request.POST.get('colDate'), '%d/%m/%Y').date()
+        valid_until_raw = (request.POST.get('validUntil') or '').strip()
+        obj.validUntil = datetime.strptime(valid_until_raw, '%d/%m/%Y').date() if valid_until_raw else None
+        status = (request.POST.get('status') or obj.status or ProformaInvoice.Status.DRAFT).strip()
+        if status in {choice[0] for choice in ProformaInvoice.Status.choices} and status != ProformaInvoice.Status.CONVERTED:
+            obj.status = status
+        _apply_proforma_invoice_payload(request, obj, party, line_items=line_items)
+        obj.save()
+        _sync_proforma_lines(request, obj)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        transaction.set_rollback(True)
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def delete_proforma_invoice(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.delete_proformainvoice', 'home.can_manage_proforma_invoice'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        obj = tenant_object_or_superuser(request, ProformaInvoice, pk=int(request.POST.get('userID')))
+        if obj is None:
+            return JsonResponse({'message': 'error', 'error': 'Proforma invoice not found.'}, status=404, safe=False)
+        if obj.status == ProformaInvoice.Status.CONVERTED:
+            return JsonResponse({'message': 'error', 'error': 'Converted proforma invoices cannot be deleted.'}, status=400, safe=False)
+        obj.isDeleted = True
+        obj.save(update_fields=['isDeleted', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success'}, safe=False)
+    except Exception as exc:
+        transaction.set_rollback(True)
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+@transaction.atomic
+def convert_proforma_to_sales_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_convert_proforma_invoice(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        proforma = tenant_object_or_superuser(request, ProformaInvoice.objects.select_for_update(), pk=int(request.POST.get('ID')), isDeleted=False)
+        if proforma is None:
+            return JsonResponse({'message': 'error', 'error': 'Proforma invoice not found.'}, status=404, safe=False)
+        if proforma.status == ProformaInvoice.Status.CONVERTED or proforma.convertedSales_id:
+            return JsonResponse({'message': 'error', 'error': 'This proforma invoice is already converted.'}, status=400, safe=False)
+        if proforma.status == ProformaInvoice.Status.CANCELLED:
+            return JsonResponse({'message': 'error', 'error': 'Cancelled proforma invoices cannot be converted.'}, status=400, safe=False)
+
+        sales_series_id = request.POST.get('salesInvoiceSeriesId')
+        if not sales_series_id:
+            return JsonResponse({'message': 'error', 'error': 'Sales invoice series is required.'}, status=400, safe=False)
+        sale = Sales()
+        assign_tenant(sale, request)
+        sale.partyID = proforma.partyID
+        series, sequence_number, invoice_number = _reserve_invoice_number(
+            request,
+            InvoiceSeries.Module.SALES,
+            sales_series_id,
+            preferred_number=request.POST.get('requestedInvoiceNumber') or None,
+        )
+        sale.invoiceSeries = series
+        sale.invoiceSequenceNumber = sequence_number
+        sale.invoiceNumber = invoice_number
+        sale.invoiceKind = proforma.invoiceKind
+        sale.buyerLegalName = proforma.buyerLegalName
+        sale.buyerGstNumber = proforma.buyerGstNumber
+        sale.buyerBillingAddress = proforma.buyerBillingAddress
+        sale.placeOfSupply = proforma.placeOfSupply
+        sale.taxableAmount = proforma.taxableAmount
+        sale.gstAmount = proforma.gstAmount
+        sale.roundOffAmount = proforma.roundOffAmount
+        sale.amount = proforma.amount
+        sale.modeOfPayment = _normalize_sales_mode(request.POST.get('paymentMode') or Sales.Mode.CREDIT)
+        sale.remark = (request.POST.get('remark') or proforma.remark or f'Converted from {proforma.invoiceNumber}')[:500]
+        sale.buildDate = datetime.strptime((request.POST.get('colDate') or proforma.buildDate.strftime('%d/%m/%Y')), '%d/%m/%Y').date()
+        sale.createdBy_id = _staff_for_request(request).pk
+
+        if sale.modeOfPayment == Sales.Mode.ONLINE:
+            sale.bankID_id = _parse_sales_bank_id(request, request.POST.get('bank'))
+            if not sale.bankID_id:
+                raise ValueError('Select a bank for online sales.')
+        elif sale.modeOfPayment == Sales.Mode.MIX:
+            sale.mixCashAmount = _safe_sales_float(request.POST.get('amountMixCash'))
+            sale.mixOnlineAmount = _safe_sales_float(request.POST.get('amountMixOnline'))
+            sale.bankID_id = _parse_sales_bank_id(request, request.POST.get('bank'))
+            if sale.mixCashAmount <= 0 or sale.mixOnlineAmount <= 0 or not sale.bankID_id:
+                raise ValueError('Cash amount, online amount, and bank are required for mix sales.')
+            if abs(round(sale.mixCashAmount + sale.mixOnlineAmount, 2) - round(float(sale.amount or 0.0), 2)) > 0.01:
+                raise ValueError('Mix sales total must match proforma amount.')
+        sale.save()
+        sale.salesID = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES)
+        sale.paymentID = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES_PAYMENT)
+        sale.save(update_fields=['salesID', 'paymentID', 'lastUpdatedOn'])
+
+        item_ids = _copy_proforma_lines_to_sale(proforma, sale)
+        if item_ids:
+            rebuild_inventory_stock(sale.tenant, item_ids)
+            validate_non_negative_inventory(sale.tenant, item_ids)
+        sync_book_transactions(sale)
+        sync_party_ledger_entries_for_object(sale)
+
+        proforma.status = ProformaInvoice.Status.CONVERTED
+        proforma.convertedSales = sale
+        proforma.convertedOn = timezone.now()
+        proforma.save(update_fields=['status', 'convertedSales', 'convertedOn', 'lastUpdatedOn'])
+        return JsonResponse({'message': 'success', 'salesID': sale.pk, 'invoiceNumber': sale.invoiceNumber}, safe=False)
+    except Exception as exc:
+        transaction.set_rollback(True)
+        return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+class ProformaInvoiceListJson(BaseDatatableView):
+    order_columns = ['proformaID', 'partyID__name', 'invoiceNumber', 'status', 'amount', 'buildDate', 'validUntil', 'createdBy__name', 'datetime', 'remark', 'id']
+
+    def get_order_columns(self):
+        if _can_filter_all_proforma(self.request.user):
+            return ['proformaID', 'partyID__name', 'invoiceNumber', 'status', 'amount', 'id', 'buildDate', 'validUntil', 'createdBy__name', 'convertedSales__invoiceNumber', 'remark']
+        return ['proformaID', 'partyID__name', 'invoiceNumber', 'status', 'amount', 'buildDate', 'validUntil', 'createdBy__name', 'convertedSales__invoiceNumber', 'remark', 'id']
+
+    def get_initial_queryset(self):
+        queryset = tenant_qs(self.request, ProformaInvoice).filter(isDeleted=False).select_related('partyID', 'createdBy', 'convertedSales')
+        if not _can_filter_all_proforma(self.request.user):
+            queryset = queryset.filter(createdBy__user_ID_id=self.request.user.pk)
+        try:
+            start_date = datetime.strptime(self.request.GET.get('startDate'), '%d/%m/%Y').date()
+            end_date = datetime.strptime(self.request.GET.get('endDate'), '%d/%m/%Y').date()
+            queryset = queryset.filter(buildDate__range=[start_date, end_date])
+            status = (self.request.GET.get('status') or '').strip()
+            if status and status != 'All':
+                queryset = queryset.filter(status=status)
+            staff_id = self.request.GET.get('staffID')
+            if _can_filter_all_proforma(self.request.user) and staff_id and staff_id != 'All':
+                queryset = queryset.filter(createdBy_id=int(staff_id))
+            return queryset
+        except Exception:
+            return queryset.filter(buildDate=datetime.today().date())
+
+    def filter_queryset(self, qs):
+        search = self.request.GET.get('search[value]', None)
+        if search:
+            qs = qs.filter(
+                Q(proformaID__icontains=search) |
+                Q(invoiceNumber__icontains=search) |
+                Q(partyID__name__icontains=search) |
+                Q(status__icontains=search) |
+                Q(amount__icontains=search) |
+                Q(remark__icontains=search)
+            )
+        return qs
+
+    def prepare_results(self, qs):
+        json_data = []
+        admin_mode = _can_filter_all_proforma(self.request.user)
+        for item in qs:
+            action_parts = []
+            if _can_edit_proforma_record(self.request.user, item):
+                action_parts.append('''<a href="/edit_proforma_invoice/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
+            action_parts.append('''<button data-inverted="" data-tooltip="Download Proforma" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="downloadProformaInvoice('{}')" class="ui circular blue icon button"><i class="file pdf outline icon"></i></button>'''.format(item.pk))
+            if _can_convert_proforma_invoice(self.request.user) and item.status != ProformaInvoice.Status.CONVERTED and item.status != ProformaInvoice.Status.CANCELLED:
+                action_parts.append('''<button data-inverted="" data-tooltip="Convert to Sales" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showConvertModal('{}')" class="ui circular purple icon button"><i class="exchange alternate icon"></i></button>'''.format(item.pk))
+            if _has_any_permission(self.request.user, 'home.delete_proformainvoice', 'home.can_manage_proforma_invoice') and item.status != ProformaInvoice.Status.CONVERTED:
+                action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
+            status_class = {
+                ProformaInvoice.Status.DRAFT: 'grey',
+                ProformaInvoice.Status.SENT: 'blue',
+                ProformaInvoice.Status.ACCEPTED: 'green',
+                ProformaInvoice.Status.CONVERTED: 'purple',
+                ProformaInvoice.Status.CANCELLED: 'red',
+            }.get(item.status, 'grey')
+            converted_ref = getattr(getattr(item, 'convertedSales', None), 'invoiceNumber', None) or '-'
+            row = [
+                escape(_proforma_public_id(item)),
+                escape(item.partyID.name if item.partyID_id else '-'),
+                escape(item.invoiceNumber or '-'),
+                f'<div class="ui tiny {status_class} label">{escape(item.get_status_display())}</div>',
+                formatINR(format(item.amount or 0.0, '.0f')),
+            ]
+            if admin_mode:
+                row.append(''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>')
+            row.extend([
+                escape(item.buildDate.strftime('%d-%m-%Y') if item.buildDate else '-'),
+                escape(item.validUntil.strftime('%d-%m-%Y') if item.validUntil else '-'),
+                escape(item.createdBy.name if item.createdBy_id else '-'),
+                escape(converted_ref),
+                escape(item.remark or '-'),
+            ])
+            if not admin_mode:
+                row.append(''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>')
+            json_data.append(row)
+        return json_data
+
+
+def generate_proforma_invoice_pdf(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_proforma_access(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    proforma_id = request.GET.get('id')
+    if not proforma_id or not str(proforma_id).isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Proforma id is required.'}, status=400, safe=False)
+    proforma = tenant_object_or_superuser(
+        request,
+        ProformaInvoice.objects.select_related('partyID', 'createdBy', 'tenant'),
+        pk=int(proforma_id),
+        isDeleted=False,
+    )
+    if proforma is None:
+        return JsonResponse({'message': 'error', 'error': 'Proforma invoice not found.'}, status=404, safe=False)
+    if not _can_filter_all_proforma(request.user):
+        if getattr(getattr(proforma, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
+            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    tenant = get_current_tenant(request)
+    lines = list(proforma.lines.filter(isDeleted=False).select_related('item').order_by('id'))
+    gst_breakup = _gst_breakup_from_sale(proforma, tenant)
+    total_before_round_off = round(float(gst_breakup['taxable_total'] or 0.0) + float(gst_breakup['gst_total'] or 0.0), 2)
+    context = {
+        'proforma': proforma,
+        'lines': lines,
+        'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
+        'seller_gst_number': getattr(tenant, 'gstNumber', None) or '',
+        'seller_address': getattr(tenant, 'billingAddress', None) or '',
+        'seller_phone': getattr(tenant, 'phone', None) or '',
+        'buyer_name': proforma.buyerLegalName or getattr(getattr(proforma, 'partyID', None), 'legalName', None) or getattr(getattr(proforma, 'partyID', None), 'name', None) or '-',
+        'buyer_gst_number': proforma.buyerGstNumber or '',
+        'buyer_address': proforma.buyerBillingAddress or getattr(getattr(proforma, 'partyID', None), 'billingAddress', None) or getattr(getattr(proforma, 'partyID', None), 'address', None) or '',
+        'gst_total': gst_breakup['gst_total'],
+        'taxable_total': gst_breakup['taxable_total'],
+        'total_before_round_off': total_before_round_off,
+        'round_off_amount': round(float(getattr(proforma, 'roundOffAmount', 0.0) or 0.0), 2),
+        'grand_total': float(proforma.amount or 0.0),
+        'tax_mode_label': gst_breakup['tax_mode_label'],
+        'seller_state_code': gst_breakup['seller_state_code'],
+        'buyer_state_code': gst_breakup['buyer_state_code'],
+        'place_of_supply_state_code': gst_breakup['place_of_supply_state_code'],
+        'effective_buyer_state_code': gst_breakup['effective_buyer_state_code'],
+        'cgst_total': gst_breakup['cgst_total'],
+        'sgst_total': gst_breakup['sgst_total'],
+        'utgst_total': gst_breakup['utgst_total'],
+        'igst_total': gst_breakup['igst_total'],
+    }
+    context.update(_pdf_base_context(request, [
+        f'Proforma: {proforma.invoiceNumber or proforma.pk}',
+        f'Buyer: {context["buyer_name"]}',
+        f'Status: {proforma.get_status_display()}',
+    ]))
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename=proforma-invoice-{proforma.invoiceNumber or proforma.pk}.pdf'
+    html = render_to_string('home/report/proformaInvoicePDF.html', context)
+    base_url = request.build_absolute_uri('/')
+    HTML(string=html, base_url=base_url).write_pdf(response, stylesheets=[CSS(string='@page { size: A4; margin: 0.9cm; }')])
+    return response
+
+
+def _proforma_list_export_queryset(request):
+    qs = tenant_qs(request, ProformaInvoice).filter(isDeleted=False).select_related('partyID', 'createdBy', 'convertedSales')
+    if not _can_filter_all_proforma(request.user):
+        qs = qs.filter(createdBy__user_ID_id=request.user.pk)
+        staff_name = 'My Proforma'
+    else:
+        staff_id = request.GET.get('staffID')
+        if staff_id and staff_id != 'All':
+            qs = qs.filter(createdBy_id=int(staff_id))
+            staff = tenant_qs(request, StaffUser).filter(pk=int(staff_id)).first()
+            staff_name = staff.name if staff else 'Selected Staff'
+        else:
+            staff_name = 'All'
+    try:
+        start_date = datetime.strptime(request.GET.get('startDate'), '%d/%m/%Y').date()
+        end_date = datetime.strptime(request.GET.get('endDate'), '%d/%m/%Y').date()
+    except Exception:
+        start_date = end_date = datetime.today().date()
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+    qs = qs.filter(buildDate__range=[start_date, end_date])
+    status = (request.GET.get('status') or '').strip()
+    if status and status != 'All':
+        qs = qs.filter(status=status)
+    search = (request.GET.get('search') or '').strip()
+    if search:
+        qs = qs.filter(
+            Q(proformaID__icontains=search) | Q(invoiceNumber__icontains=search) |
+            Q(partyID__name__icontains=search) | Q(status__icontains=search) |
+            Q(amount__icontains=search) | Q(createdBy__name__icontains=search) |
+            Q(remark__icontains=search)
+        )
+    return qs, start_date, end_date, staff_name, status or 'All', search
+
+
+def export_proforma_list_excel(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.can_view_proforma_invoice_reports', 'home.can_manage_proforma_invoice', 'home.can_view_audit_logs'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    qs, start_date, end_date, staff_name, status, search = _proforma_list_export_queryset(request)
+    rows = []
+    total_amount = 0.0
+    for item in qs.order_by('-datetime'):
+        amount = float(item.amount or 0.0)
+        total_amount += amount
+        rows.append([
+            _proforma_public_id(item),
+            item.partyID.name if item.partyID_id else '-',
+            item.invoiceNumber or '-',
+            item.get_status_display(),
+            amount,
+            item.buildDate.strftime('%d/%m/%Y') if item.buildDate else '-',
+            item.validUntil.strftime('%d/%m/%Y') if item.validUntil else '-',
+            item.createdBy.name if item.createdBy_id else '-',
+            item.convertedSales.invoiceNumber if item.convertedSales_id else '-',
+            item.datetime.strftime('%d/%m/%Y %I:%M %p') if item.datetime else '-',
+            item.remark or '-',
+        ])
+    return _xlsx_report_response('proforma-list', [{
+        'title': 'Proforma',
+        'report_title': 'Proforma Invoice List Export',
+        'report_subtitle': 'Detailed filtered proforma invoice rows',
+        'metadata': [
+            ('Tenant', getattr(get_current_tenant(request), 'name', 'zivabooks.in')),
+            ('From', start_date.strftime('%d/%m/%Y')),
+            ('To', end_date.strftime('%d/%m/%Y')),
+            ('Staff', staff_name),
+            ('Status', status),
+            ('Search', search or '-'),
+            ('Total Amount', total_amount),
+        ],
+        'tables': [{'title': 'Proforma Invoices', 'headers': ['Proforma ID', 'Party', 'Proforma Number', 'Status', 'Amount', 'Date', 'Valid Until', 'Created By', 'Sales Invoice', 'Added On', 'Remark'], 'rows': rows}],
+    }])
+
+
+def export_proforma_list_pdf(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _has_any_permission(request.user, 'home.can_view_proforma_invoice_reports', 'home.can_manage_proforma_invoice', 'home.can_view_audit_logs'):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    qs, start_date, end_date, staff_name, status, search = _proforma_list_export_queryset(request)
+    rows = []
+    total_amount = 0.0
+    status_counts = defaultdict(int)
+    for item in qs.order_by('-datetime'):
+        amount = float(item.amount or 0.0)
+        total_amount += amount
+        status_counts[item.get_status_display()] += 1
+        rows.append({
+            'proforma_id': _proforma_public_id(item),
+            'party_name': item.partyID.name if item.partyID_id else '-',
+            'invoice_number': item.invoiceNumber or '-',
+            'status': item.get_status_display(),
+            'amount': amount,
+            'build_date': item.buildDate.strftime('%d/%m/%Y') if item.buildDate else '-',
+            'valid_until': item.validUntil.strftime('%d/%m/%Y') if item.validUntil else '-',
+            'created_by': item.createdBy.name if item.createdBy_id else '-',
+            'sales_invoice': item.convertedSales.invoiceNumber if item.convertedSales_id else '-',
+            'remark': item.remark or '-',
+        })
+    context = {
+        'start_date': start_date,
+        'end_date': end_date,
+        'staff_name': staff_name,
+        'status': status,
+        'search': search or '-',
+        'rows': rows,
+        'total_count': len(rows),
+        'total_amount': total_amount,
+        'status_counts': sorted(status_counts.items()),
+    }
+    context.update(_pdf_base_context(request, [
+        f'From: {start_date.strftime("%d/%m/%Y")}',
+        f'To: {end_date.strftime("%d/%m/%Y")}',
+        f'Staff: {staff_name}',
+        f'Status: {status}',
+    ]))
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename=proforma-list.pdf'
+    html = render_to_string('home/report/proformaListPDF.html', context)
+    HTML(string=html).write_pdf(response, stylesheets=[CSS(string='@page { size: A4 landscape; margin: 0.7cm; }')])
+    return response
+
+
 class SalesByAdminListJson(BaseDatatableView):
     order_columns = ['paymentID', 'partyID__name', 'invoiceNumber', 'modeOfPayment', 'bankID__name', 'amount', 'id', 'buildDate', 'createdBy__name',
                      'isApproved', 'approvedBy__name', 'approvedOn',

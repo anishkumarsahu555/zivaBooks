@@ -333,6 +333,19 @@ urlpatterns = [
     path('api/send_message_sales/', send_message_sales, name='send_message_sales'),
     path('edit_sales/<int:id>/', edit_sales, name='edit_sales'),
 
+    # Proforma Invoices
+    path('add_proforma_invoice/', add_proforma_invoice, name='add_proforma_invoice'),
+    path('proforma_invoice_list/', proforma_invoice_list, name='proforma_invoice_list'),
+    path('edit_proforma_invoice/<int:id>/', edit_proforma_invoice, name='edit_proforma_invoice'),
+    path('api/add_proforma_invoice_api/', add_proforma_invoice_api, name='add_proforma_invoice_api'),
+    path('api/update_proforma_invoice_api/', update_proforma_invoice_api, name='update_proforma_invoice_api'),
+    path('api/delete_proforma_invoice/', delete_proforma_invoice, name='delete_proforma_invoice'),
+    path('api/convert_proforma_to_sales_api/', convert_proforma_to_sales_api, name='convert_proforma_to_sales_api'),
+    path('api/ProformaInvoiceListJson/', ProformaInvoiceListJson.as_view(), name='ProformaInvoiceListJson'),
+    path('api/generate_proforma_invoice_pdf/', generate_proforma_invoice_pdf, name='generate_proforma_invoice_pdf'),
+    path('api/export_proforma_list_pdf/', export_proforma_list_pdf, name='export_proforma_list_pdf'),
+    path('api/export_proforma_list_excel/', export_proforma_list_excel, name='export_proforma_list_excel'),
+
     # Orders
     path('add_order/', add_order, name='add_order'),
     path('orders_list/', orders_list, name='orders_list'),

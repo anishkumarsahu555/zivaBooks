@@ -1,0 +1,592 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/4.1.0/css/fixedColumns.dataTables.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.1.0/js/dataTables.fixedColumns.min.js"></script>
+{% endblock %}
+
+{% block title %}
+    <title>Proforma Invoice List</title>
+{% endblock %}
+
+{% block body %}
+    <style>
+        #UserTable_length {
+            left: 20px;
+            position: absolute;
+        }
+
+        #UserTable_filter {
+            float: right;
+        }
+
+        .dt-buttons {
+            position: absolute;
+            left: 174px;
+        }
+
+        input[type=search] {
+            width: 100px !important;
+        }
+
+        .proforma-filter-card {
+            padding: 0 5px;
+        }
+
+        .proforma-action-cell .button {
+            margin-bottom: 2px;
+        }
+
+        .sales-download-menu {
+            position: relative;
+            z-index: 20;
+        }
+
+        .sales-download-menu-panel {
+            position: absolute;
+            top: calc(100% + 6px);
+            right: 0;
+            min-width: 190px;
+            background: #fff;
+            border: 1px solid rgba(34, 36, 38, 0.12);
+            border-radius: 8px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+            padding: 8px 0;
+            display: none;
+            z-index: 30;
+        }
+
+        .sales-download-menu.open .sales-download-menu-panel {
+            display: block;
+        }
+
+        .sales-download-menu-header {
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #6b7280;
+        }
+
+        .sales-download-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 10px 14px;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            font-size: 0.9rem;
+            color: #111827;
+            cursor: pointer;
+        }
+
+        .sales-download-menu-item:hover {
+            background: #f8fafc;
+        }
+
+        html[data-theme="dark"] #deleteUser .content,
+        html[data-theme="dark"] #convertModal .content,
+        html[data-theme="dark"] #deleteUser .header,
+        html[data-theme="dark"] #convertModal .header {
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .sales-download-menu-panel {
+            background: #101b31;
+            border-color: rgba(56, 189, 248, 0.18);
+            box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+        }
+
+        html[data-theme="dark"] .sales-download-menu-header {
+            color: #95a8c5;
+        }
+
+        html[data-theme="dark"] .sales-download-menu-item {
+            color: #e2ebf7;
+        }
+
+        html[data-theme="dark"] .sales-download-menu-item:hover {
+            background: rgba(22, 120, 194, 0.16);
+        }
+    </style>
+
+    <div class="ui basic grid">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user">Proforma Invoice List</div>
+
+                {% if proforma_capabilities.can_add %}
+                    <div style="position: absolute; right: 1.5rem; top: 18px;">
+                        <a href="{% url 'homeApp:add_proforma_invoice' %}" class="ui green mini plus button right">
+                            <i class="plus square outline icon"></i>
+                            Add Proforma
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="ui tab" data-tab="user">
+                <div class="row proforma-filter-card">
+                    <div class="">
+                        <div class="ui form">
+                            <form class="ui tiny form">
+                                <div class="fields">
+                                    <div class="four wide field" style="width: 24%">
+                                        <label>Start Date</label>
+                                        <div class="ui calendar" id="rangestart">
+                                            <div class="ui input left icon">
+                                                <input type="text" placeholder="Start Date" style="width:100%;" id="startDateF" onchange="ChangeDate()">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="three wide field" style="width: 24%">
+                                        <label>End Date</label>
+                                        <div class="ui calendar" id="rangeend">
+                                            <div class="ui input left icon">
+                                                <input type="text" placeholder="End Date" style="width:100%;" id="endDateF" onchange="ChangeDate()">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="three wide field" style="width: 22%">
+                                        <label>Status</label>
+                                        <select class="ui fluid dropdown" id="statusF" onchange="ChangeDate()">
+                                            <option value="All">All</option>
+                                            {% for value, label in proforma_statuses %}
+                                                <option value="{{ value }}">{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    {% if proforma_capabilities.can_filter_staff %}
+                                        <div class="three wide field" style="width: 30%">
+                                            <label>Staff</label>
+                                            <select class="ui fluid search dropdown" id="staffID" onchange="ChangeDate()">
+                                                <option value="All">All</option>
+                                                {% for staff in staffs %}
+                                                    <option value="{{ staff.id }}">{{ staff.name|capfirst }} - {{ staff.partyGroupID.name|capfirst }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    {% else %}
+                                        <input type="hidden" id="staffID" value="All">
+                                    {% endif %}
+                                    <div class="seven wide field">
+                                        <label>Action</label>
+                                        <button class="ui tiny active button" type="button" onclick="filterDetails()">
+                                            <i class="funnel dollar icon"></i>
+                                            Search
+                                        </button>
+                                        {% if proforma_capabilities.can_export %}
+                                            <div style="float: right; margin-right: 8px; display:flex; gap:8px; flex-wrap:wrap;">
+                                                <div class="sales-download-menu" id="salesDownloadDropdown">
+                                                    <button type="button" class="ui teal tiny labeled icon button" onclick="toggleSalesDownloadMenu(event)" style="overflow: hidden;">
+                                                        <i class="download icon"></i>
+                                                        Download
+                                                    </button>
+                                                    <div class="sales-download-menu-panel">
+                                                        <div class="sales-download-menu-header">Proforma Export</div>
+                                                        <button type="button" class="sales-download-menu-item" onclick="downloadProformaListReport('pdf'); closeSalesDownloadMenu();">
+                                                            <i class="file pdf outline icon"></i>
+                                                            <span>PDF Report</span>
+                                                        </button>
+                                                        <button type="button" class="sales-download-menu-item" onclick="downloadProformaListReport('excel'); closeSalesDownloadMenu();">
+                                                            <i class="file excel outline icon"></i>
+                                                            <span>Excel Export</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <h4 class="ui horizontal left aligned divider header">
+                            <i class="left align icon"></i>
+                            Proforma Invoice List
+                        </h4>
+                        <table class="ui unstackable sortable celled very nowrap very small compact table" id="UserTable" style="margin-top: 5px; width: 100%">
+                            <thead>
+                            <tr>
+                                <th>Proforma ID</th>
+                                <th>Party Name</th>
+                                <th>Proforma Number</th>
+                                <th>Status</th>
+                                <th>Amount</th>
+                                {% if proforma_capabilities.can_filter_staff %}
+                                    <th>Action</th>
+                                {% endif %}
+                                <th>Proforma Date</th>
+                                <th>Valid Until</th>
+                                <th>Created By</th>
+                                <th>Sales Invoice</th>
+                                <th>Remark</th>
+                                {% if not proforma_capabilities.can_filter_staff %}
+                                    <th>Action</th>
+                                {% endif %}
+                            </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {% if proforma_capabilities.can_delete %}
+                    <div class="ui basic modal custom" id="deleteUser">
+                        <div class="ui icon header">
+                            <i class="archive icon"></i>
+                            Proforma Invoice Details will be Deleted
+                        </div>
+                        <div class="content">
+                            <p style="text-align: center">The proforma invoice will be deleted, are you sure to delete this proforma invoice?</p>
+                        </div>
+                        <div class="actions">
+                            <div class="ui red basic cancel inverted button">
+                                <i class="remove icon"></i>
+                                No
+                            </div>
+                            <input type="hidden" id="UserID">
+                            <div class="ui green ok inverted button" onclick="deleteUser()">
+                                <i class="checkmark icon"></i>
+                                Yes
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if proforma_capabilities.can_convert %}
+        <div class="ui small modal" id="convertModal">
+            <div class="header">Convert Proforma To Sales</div>
+            <div class="content">
+                <div class="ui form">
+                    <input type="hidden" id="convertID">
+                    <div class="field required">
+                        <label>Sales Invoice Series</label>
+                        <select class="ui fluid search dropdown" id="salesInvoiceSeriesId"></select>
+                    </div>
+                    <div class="field">
+                        <label>Payment Mode</label>
+                        <select class="ui fluid dropdown" id="paymentMode">
+                            <option value="Credit">Credit</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Online">Online</option>
+                            <option value="Mix">Mix</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Invoice Date</label>
+                        <div class="ui calendar" id="convertDateCalendar">
+                            <div class="ui input left icon">
+                                <input type="text" placeholder="Invoice Date" id="convertDate">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label>Remark</label>
+                        <input type="text" id="convertRemark" placeholder="Optional conversion note">
+                    </div>
+                </div>
+            </div>
+            <div class="actions">
+                <div class="ui negative button">No</div>
+                <button class="ui purple right labeled icon button saveBtn" onclick="convertProforma()">
+                    Convert
+                    <i class="exchange alternate icon"></i>
+                </button>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block js %}
+    <script>
+        var today = new Date();
+        var userTab = null;
+
+        function formatCalendarDate(date) {
+            if (!date) return '';
+            return date.getDate() + '/' + (date.getMonth() + 1) + '/' + date.getFullYear();
+        }
+
+        $('#rangestart').calendar({
+            initialDate: formatCalendarDate(today),
+            monthFirst: false,
+            type: 'date',
+            endCalendar: $('#rangeend'),
+            formatter: {
+                date: function (date, settings) {
+                    return formatCalendarDate(date);
+                }
+            }
+        });
+        $('#rangeend').calendar({
+            initialDate: formatCalendarDate(today),
+            monthFirst: false,
+            type: 'date',
+            startCalendar: $('#rangestart'),
+            formatter: {
+                date: function (date, settings) {
+                    return formatCalendarDate(date);
+                }
+            }
+        });
+        $('#convertDateCalendar').calendar({
+            initialDate: formatCalendarDate(today),
+            monthFirst: false,
+            type: 'date',
+            formatter: {
+                date: function (date, settings) {
+                    return formatCalendarDate(date);
+                }
+            }
+        });
+
+        userTab = $('#UserTable').DataTable({
+            dom: '{% if proforma_capabilities.can_export %}Blfrtip{% else %}lfrtip{% endif %}',
+            scrollY: '350px',
+            scrollX: true,
+            fixedColumns: {
+                left: 1{% if not proforma_capabilities.can_filter_staff %},
+                right: 1{% endif %}
+            },
+            {% if proforma_capabilities.can_export %}
+                buttons: [{
+                    extend: 'excel',
+                    exportOptions: {
+                        columns: [{% if proforma_capabilities.can_filter_staff %}0, 1, 2, 3, 4, 6, 7, 8, 9, 10{% else %}0, 1, 2, 3, 4, 5, 6, 7, 8, 9{% endif %}]
+                    }
+                }],
+            {% endif %}
+            columnDefs: [
+                {% if proforma_capabilities.can_filter_staff %}
+                    {"name": "proformaID", "targets": 0, "orderable": true},
+                    {"name": "partyID__name", "targets": 1, "orderable": true},
+                    {"name": "invoiceNumber", "targets": 2, "orderable": true},
+                    {"name": "status", "targets": 3, "orderable": true},
+                    {"name": "amount", "targets": 4, "orderable": true, "className": "dt-body-right"},
+                    {"name": "id", "targets": 5, "orderable": false, "className": "proforma-action-cell"},
+                    {"name": "buildDate", "targets": 6, "orderable": true},
+                    {"name": "validUntil", "targets": 7, "orderable": true},
+                    {"name": "createdBy__name", "targets": 8, "orderable": true},
+                    {"name": "convertedSales__invoiceNumber", "targets": 9, "orderable": true},
+                    {"name": "remark", "targets": 10, "orderable": true}
+                {% else %}
+                    {"name": "proformaID", "targets": 0, "orderable": true},
+                    {"name": "partyID__name", "targets": 1, "orderable": true},
+                    {"name": "invoiceNumber", "targets": 2, "orderable": true},
+                    {"name": "status", "targets": 3, "orderable": true},
+                    {"name": "amount", "targets": 4, "orderable": true, "className": "dt-body-right"},
+                    {"name": "buildDate", "targets": 5, "orderable": true},
+                    {"name": "validUntil", "targets": 6, "orderable": true},
+                    {"name": "createdBy__name", "targets": 7, "orderable": true},
+                    {"name": "convertedSales__invoiceNumber", "targets": 8, "orderable": true},
+                    {"name": "remark", "targets": 9, "orderable": true},
+                    {"name": "id", "targets": 10, "orderable": false, "className": "proforma-action-cell"}
+                {% endif %}
+            ],
+            aaSorting: [[{% if proforma_capabilities.can_filter_staff %}6{% else %}5{% endif %}, 'desc']],
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
+            pageLength: 10,
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: "{% url 'homeApp:ProformaInvoiceListJson' %}",
+                data: function (d) {
+                    d.startDate = $('#startDateF').val();
+                    d.endDate = $('#endDateF').val();
+                    d.status = $('#statusF').val();
+                    d.staffID = $('#staffID').val() || 'All';
+                }
+            }
+        });
+
+        function filterDetails() {
+            userTab.ajax.reload();
+        }
+
+        function downloadProformaInvoice(id) {
+            var baseUrl = "{% url 'homeApp:generate_proforma_invoice_pdf' %}";
+            $('body').toast({class: 'info', message: 'Preparing proforma PDF...'});
+            var a = document.createElement('a');
+            a.href = baseUrl + '?id=' + encodeURIComponent(id);
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { document.body.removeChild(a); }, 1000);
+        }
+
+        function getProformaListDownloadUrl(downloadType) {
+            var startDateF = $('#startDateF').val() || '';
+            var endDateF = $('#endDateF').val() || '';
+            var staffID = $('#staffID').val() || 'All';
+            var status = $('#statusF').val() || 'All';
+            var search = '';
+            if (userTab) {
+                search = userTab.search() || '';
+            }
+            var query = '?startDate=' + encodeURIComponent(startDateF)
+                + '&endDate=' + encodeURIComponent(endDateF)
+                + '&staffID=' + encodeURIComponent(staffID)
+                + '&status=' + encodeURIComponent(status)
+                + '&search=' + encodeURIComponent(search);
+            if (downloadType === 'pdf') {
+                return "{% url 'homeApp:export_proforma_list_pdf' %}" + query;
+            }
+            if (downloadType === 'excel') {
+                return "{% url 'homeApp:export_proforma_list_excel' %}" + query;
+            }
+            return '';
+        }
+
+        function toggleSalesDownloadMenu(event) {
+            if (event) event.stopPropagation();
+            $('#salesDownloadDropdown').toggleClass('open');
+        }
+
+        function closeSalesDownloadMenu() {
+            $('#salesDownloadDropdown').removeClass('open');
+        }
+
+        function downloadProformaListReport(downloadType) {
+            var downloadUrl = getProformaListDownloadUrl(downloadType);
+            if (downloadUrl) {
+                $('body').toast({class: 'info', message: 'Preparing proforma ' + (downloadType === 'pdf' ? 'PDF' : 'Excel') + ' export...'});
+                window.location.href = downloadUrl;
+            }
+        }
+
+        function delUser(id) {
+            if (!$('#deleteUser').length) {
+                return;
+            }
+            $('#deleteUser').modal('show');
+            $('#UserID').val(id);
+        }
+
+        function deleteUser() {
+            showLoading();
+            var id = $('#UserID').val();
+            var formdata = new FormData();
+            formdata.append('userID', id);
+
+            $.ajax({
+                url: "{% url 'homeApp:delete_proforma_invoice' %}",
+                type: 'post',
+                data: formdata,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: 'Proforma invoice deleted successfully.'});
+                        $('#deleteUser').modal('hide');
+                        userTab.ajax.reload(null, false);
+                        hideLoading();
+                    } else {
+                        $('body').toast({class: 'error', message: response.error || 'Unable to delete proforma invoice.'});
+                        hideLoading();
+                    }
+                },
+                error: function () {
+                    $('body').toast({class: 'error', message: 'Unable to delete proforma invoice.'});
+                    hideLoading();
+                }
+            });
+        }
+
+        function loadSalesSeries() {
+            $.get("{% url 'homeApp:invoice_series_suggestions_api' %}", {module: 'sales'}, function (response) {
+                var select = $('#salesInvoiceSeriesId');
+                select.html('<option value="">Select Sales Series</option>');
+                (response.data || []).forEach(function (item) {
+                    select.append('<option value="' + item.id + '">' + item.seriesCode + ' - ' + item.invoiceNumber + '</option>');
+                });
+                select.dropdown('refresh');
+            });
+        }
+
+        function showConvertModal(id) {
+            if (!$('#convertModal').length) {
+                return;
+            }
+            $('#convertID').val(id);
+            $('#convertDate').val(formatCalendarDate(today));
+            $('#convertRemark').val('');
+            loadSalesSeries();
+            $('#convertModal').modal('show');
+        }
+
+        function convertProforma() {
+            if (!$('#salesInvoiceSeriesId').val()) {
+                $('body').toast({class: 'orange', message: 'Select a sales invoice series.'});
+                return;
+            }
+            showLoading();
+            var formdata = new FormData();
+            formdata.append('ID', $('#convertID').val());
+            formdata.append('salesInvoiceSeriesId', $('#salesInvoiceSeriesId').val());
+            formdata.append('paymentMode', $('#paymentMode').val());
+            formdata.append('colDate', $('#convertDate').val());
+            formdata.append('remark', $('#convertRemark').val());
+
+            $.ajax({
+                url: "{% url 'homeApp:convert_proforma_to_sales_api' %}",
+                type: 'post',
+                data: formdata,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: 'Converted to sales invoice ' + response.invoiceNumber + '.'});
+                        $('#convertModal').modal('hide');
+                        userTab.ajax.reload(null, false);
+                        hideLoading();
+                    } else {
+                        $('body').toast({class: 'error', message: response.error || 'Unable to convert proforma invoice.'});
+                        hideLoading();
+                    }
+                },
+                error: function () {
+                    $('body').toast({class: 'error', message: 'Unable to convert proforma invoice.'});
+                    hideLoading();
+                }
+            });
+        }
+
+        function ChangeDate() {
+            closeSalesDownloadMenu();
+            return true;
+        }
+
+        $(document).on('click', function (event) {
+            if (!$(event.target).closest('#salesDownloadDropdown').length) {
+                closeSalesDownloadMenu();
+            }
+        });
+
+        $(function () {
+            $('.ui.dropdown').dropdown();
+            $('#startDateF').val(formatCalendarDate(today));
+            $('#endDateF').val(formatCalendarDate(today));
+            $('#convertDate').val(formatCalendarDate(today));
+        });
+    </script>
+{% endblock %}

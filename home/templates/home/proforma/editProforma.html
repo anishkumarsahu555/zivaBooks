@@ -1,0 +1,500 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block title %}
+    <title>Edit Proforma Invoice</title>
+{% endblock %}
+
+{% block css %}
+    <style>
+        .invoice-chip-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .invoice-chip {
+            border: 1px solid rgba(91, 33, 182, 0.18);
+            background: #fbf8ff;
+            color: #5b21b6;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: default;
+        }
+
+        .invoice-chip.active {
+            background: #6d28d9;
+            border-color: #6d28d9;
+            color: #fff;
+        }
+
+        .proforma-mode-panel {
+            padding: 1rem;
+            border: 1px solid rgba(91, 33, 182, 0.12);
+            border-radius: 14px;
+            background: #fdfcff;
+        }
+
+        .proforma-mode-note {
+            margin: 0 0 12px;
+            font-size: 0.82rem;
+            color: #5f6b7a;
+        }
+
+        .proforma-advanced-card {
+            margin-top: 14px;
+            padding: 1rem;
+            border: 1px dashed rgba(91, 33, 182, 0.2);
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        html[data-theme="dark"] #addForm.ui.form {
+            color: #d7e3f4;
+        }
+
+        html[data-theme="dark"] .proforma-mode-panel {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.84)) !important;
+            border-color: rgba(167, 139, 250, 0.18) !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] .proforma-mode-note,
+        html[data-theme="dark"] #addForm small,
+        html[data-theme="dark"] #addForm p {
+            color: #93a4bd !important;
+        }
+
+        html[data-theme="dark"] .invoice-chip {
+            background: rgba(15, 23, 42, 0.84) !important;
+            border-color: rgba(167, 139, 250, 0.24) !important;
+            color: #ddd6fe !important;
+        }
+
+        html[data-theme="dark"] .invoice-chip.active {
+            background: linear-gradient(135deg, #6d28d9, rgba(167, 139, 250, 0.26)) !important;
+            border-color: rgba(167, 139, 250, 0.38) !important;
+            color: #f7f2ff !important;
+        }
+
+        html[data-theme="dark"] .proforma-advanced-card {
+            background: rgba(15, 23, 42, 0.88) !important;
+            border-color: rgba(167, 139, 250, 0.18) !important;
+        }
+
+        html[data-theme="dark"] #addForm .field > label {
+            color: #dce8f7 !important;
+        }
+
+        html[data-theme="dark"] #addForm .ui.label {
+            background: rgba(15, 23, 42, 0.82) !important;
+            border: 1px solid rgba(167, 139, 250, 0.16) !important;
+            color: #dce8f7 !important;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="ui aligned basic grid">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user">
+                    Edit Proforma Invoice
+                </div>
+                <div style="position: absolute; right: 1.5rem; top: 18px;">
+                    <a href="{{ proforma_return_url }}" class="ui tiny button">
+                        <i class="clipboard list icon"></i>
+                        Proforma List
+                    </a>
+                </div>
+            </div>
+
+            <div class="ui tab" data-tab="user">
+                <div class="ui row purple stacked segment padded">
+                    <div class="content">
+                        <form class="ui small form" id="addForm">{% csrf_token %}
+                            <div class="proforma-mode-panel">
+                                {% if proforma_edit_readonly %}
+                                    <div class="ui orange basic label" style="margin-bottom: 12px;">
+                                        {% if obj.status == 'converted' %}
+                                            This proforma is converted to sales and is locked for editing.
+                                        {% else %}
+                                            You can view this proforma, but you do not have edit permission for it.
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+
+                                <p class="proforma-mode-note">
+                                    Proforma invoice does not post stock or ledger entries until it is converted to a sales invoice.
+                                </p>
+
+                                <input type="hidden" id="ID" value="{{ obj.id }}">
+                                <input type="hidden" id="advancedInvoicingEnabled" value="{% if advanced_invoicing_enabled %}1{% else %}0{% endif %}">
+
+                                <div class="two fields">
+                                    <div class="eight wide field required">
+                                        <label>Proforma Number</label>
+                                        <input type="hidden" id="invoiceNo" value="{{ invoice_display }}">
+                                        <div class="invoice-chip-wrap">
+                                            <span class="invoice-chip active" id="invoiceChipDisplay">{{ invoice_display }}</span>
+                                            <span class="ui tiny purple basic label">{{ obj.get_status_display }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="eight wide field required">
+                                        <label>Status</label>
+                                        <select class="ui dropdown" id="status">
+                                            {% for value, label in proforma_statuses %}
+                                                <option value="{{ value }}" {% if obj.status == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="three fields">
+                                    <div class="five wide field required">
+                                        <label>Proforma Date</label>
+                                        <div class="ui calendar" id="cDate">
+                                            <div class="ui input">
+                                                <input type="text" placeholder="Date" id="colDate" value="{{ obj.buildDate|date:'d/m/Y' }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="five wide field">
+                                        <label>Valid Until</label>
+                                        <div class="ui calendar" id="validUntilCalendar">
+                                            <div class="ui input">
+                                                <input type="text" placeholder="Valid Until" id="validUntil" value="{{ obj.validUntil|date:'d/m/Y' }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="six wide field required">
+                                        <label>Amount (₹ <a class="ui violet label" id="money">{{ obj.amount|convert }}</a>)</label>
+                                        <input type="number" name="amount" id="amount" placeholder="Amount" min="0" step="0.01" onkeyup="toIndianCurrency()" value="{{ obj.amount }}">
+                                    </div>
+                                </div>
+
+                                <div class="two fields">
+                                    <div class="eight wide field required">
+                                        <label>Party Name</label>
+                                        <select class="ui clearable search dropdown" id="party">
+                                            <option value="">Search By Party Name</option>
+                                            {% if obj.partyID_id %}
+                                                <option value="{{ obj.partyID_id }}" selected>{{ obj.partyID.name }} - {{ obj.partyID.partyGroupID.name|default:'N/A' }}</option>
+                                            {% endif %}
+                                        </select>
+                                    </div>
+                                    <div class="eight wide field">
+                                        <label>Invoice Type</label>
+                                        {% if advanced_invoicing_enabled %}
+                                            <select class="ui dropdown" id="invoiceKind">
+                                                <option value="b2c" {% if obj.invoiceKind == 'b2c' %}selected{% endif %}>B2C</option>
+                                                <option value="b2b" {% if obj.invoiceKind == 'b2b' %}selected{% endif %}>B2B</option>
+                                            </select>
+                                            <small id="invoiceNatureHelp" style="display:block; margin-top:6px; color:#667085;">Use B2B when GST buyer details are required on the proforma.</small>
+                                        {% else %}
+                                            <input type="hidden" id="invoiceKind" value="b2c">
+                                            <div class="ui basic label">B2C</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                {% if advanced_invoicing_enabled %}
+                                    <div class="proforma-advanced-card" id="advancedInvoiceCard">
+                                        <div class="two fields">
+                                            <div class="eight wide field">
+                                                <label>Place Of Supply</label>
+                                                <input type="text" id="placeOfSupply" placeholder="Optional place of supply" value="{{ obj.placeOfSupply|default:'' }}">
+                                            </div>
+                                            <div class="eight wide field">
+                                                <label>Buyer Billing Address</label>
+                                                <input type="text" id="buyerBillingAddress" placeholder="Billing address" value="{{ obj.buyerBillingAddress|default:'' }}">
+                                            </div>
+                                        </div>
+
+                                        <div class="two fields" id="buyerInvoiceFields">
+                                            <div class="eight wide field">
+                                                <label>Buyer Legal Name</label>
+                                                <input type="text" id="buyerLegalName" placeholder="Auto-filled from party" value="{{ obj.buyerLegalName|default:'' }}">
+                                            </div>
+                                            <div class="eight wide field">
+                                                <label>Buyer GST Number</label>
+                                                <input type="text" id="buyerGstNumber" placeholder="Optional GSTIN for B2B" value="{{ obj.buyerGstNumber|default:'' }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <input type="hidden" id="placeOfSupply" value="">
+                                    <input type="hidden" id="buyerLegalName" value="">
+                                    <input type="hidden" id="buyerGstNumber" value="">
+                                    <input type="hidden" id="buyerBillingAddress" value="">
+                                {% endif %}
+
+                                {% if inventory_enabled %}
+                                    {% include 'home/includes/sales_invoice_lines.html' with section_id='salesLineItemBox' hidden_input_id='salesLineItems' title='Track GST proforma rows' enabled=proforma_line_items allow_non_gst=non_gst_shadow_enabled seller_gst_number=seller_gst_number %}
+                                {% else %}
+                                    <input type="hidden" id="salesLineItems" value="[]">
+                                {% endif %}
+
+                                <div class="one fields">
+                                    <div class="sixteen wide field">
+                                        <label>Terms</label>
+                                        <textarea id="terms" placeholder="Terms and conditions" rows="2">{{ obj.terms|default_if_none:'' }}</textarea>
+                                    </div>
+                                </div>
+
+                                <div class="one fields">
+                                    <div class="sixteen wide field">
+                                        <label>Remark</label>
+                                        <textarea id="remark" placeholder="Any Remark" rows="3">{{ obj.remark|default_if_none:'' }}</textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="ui aligned basic grid">
+                        <div class="row" style="padding-left: 5px; padding-right: 5px">
+                            <div class="16 wide column center aligned">
+                                <button onclick="saveProforma()" id="saveBtn" class="ui green button saveBtn">
+                                    Update Detail
+                                </button>
+                                <button style="display: none;" class="ui teal double loading button saveBtnLoad">
+                                    Saving ....
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    {{ proforma_line_items|json_script:"proforma-line-items-data" }}
+    <script src="{% static 'js/sales-gst-lines.js' %}?v=proforma-edit-2"></script>
+    <script type="text/javascript">
+        $('.ui.dropdown').dropdown({fullTextSearch: true});
+    </script>
+
+    <script>
+        var proformaEditReadOnly = {{ proforma_edit_readonly|yesno:"true,false" }};
+        var proformaReturnUrl = "{{ proforma_return_url|default:'' }}";
+        var selectedPartyId = "{{ obj.partyID_id|default:'' }}";
+        var partyCatalog = [];
+        var proformaInitialLineItems = JSON.parse(document.getElementById('proforma-line-items-data').textContent || '[]').map(function (row) {
+            return {
+                itemId: row.item_id,
+                unitName: row.item__unitName,
+                unitAllowsDecimal: row.item__unit__allowsDecimal,
+                stockBucket: row.stockBucket,
+                quantity: row.quantity,
+                unitPrice: row.unitPrice,
+                discountPercent: row.discountPercent,
+                taxableAmount: row.taxableAmount,
+                gstRate: row.gstRate,
+                gstAmount: row.gstAmount,
+                lineTotal: row.lineTotal,
+                remark: row.remark
+            };
+        });
+
+        function formatCalendarDate(date) {
+            if (!date) return '';
+            return String(date.getDate()) + '/' + String(date.getMonth() + 1) + '/' + date.getFullYear();
+        }
+
+        $('#cDate').calendar({
+            initialDate: "{{ obj.buildDate|date:'d/m/Y' }}",
+            monthFirst: false,
+            type: 'date',
+            endCalendar: $('#validUntilCalendar'),
+            formatter: {
+                date: function (date, settings) {
+                    return formatCalendarDate(date);
+                }
+            }
+        });
+
+        $('#validUntilCalendar').calendar({
+            initialDate: "{{ obj.validUntil|date:'d/m/Y' }}",
+            monthFirst: false,
+            type: 'date',
+            startCalendar: $('#cDate'),
+            formatter: {
+                date: function (date, settings) {
+                    return formatCalendarDate(date);
+                }
+            }
+        });
+
+        function loadParties() {
+            $.get("{% url 'homeApp:list_party_api' %}", function (response) {
+                var select = $('#party');
+                partyCatalog = response.data || [];
+                select.html('<option value="">Search By Party Name</option>');
+                partyCatalog.forEach(function (item) {
+                    var selected = String(item.ID) === String(selectedPartyId) ? ' selected' : '';
+                    select.append('<option value="' + item.ID + '"' + selected + '>' + item.DisplayDetail + '</option>');
+                });
+                select.dropdown('refresh');
+                if (selectedPartyId) {
+                    select.val(String(selectedPartyId));
+                    select.dropdown('refresh');
+                    select.dropdown('set selected', selectedPartyId);
+                    select.dropdown('set value', selectedPartyId);
+                }
+                applyProformaReadonly();
+            });
+        }
+
+        function updateInvoiceKindUI() {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            $('#buyerInvoiceFields').toggle(($('#invoiceKind').val() || 'b2c') === 'b2b');
+        }
+
+        function syncPartyInvoiceFields(partyId) {
+            if ($('#advancedInvoicingEnabled').val() !== '1') {
+                return;
+            }
+            var selected = partyCatalog.find(function (row) { return String(row.ID) === String(partyId || ''); });
+            if (!selected) {
+                return;
+            }
+            if (!$('#buyerLegalName').val()) {
+                $('#buyerLegalName').val(selected.LegalName || selected.Name || '');
+            }
+            if (!$('#buyerGstNumber').val()) {
+                $('#buyerGstNumber').val(selected.GSTNumber || '');
+            }
+            if (!$('#buyerBillingAddress').val()) {
+                $('#buyerBillingAddress').val(selected.BillingAddress || selected.Address || '');
+            }
+            if (selected.IsB2B || selected.GSTNumber) {
+                $('#invoiceKind').dropdown('set selected', 'b2b');
+            }
+            updateInvoiceKindUI();
+        }
+
+        function initProformaInventory() {
+            if (!window.SalesInvoiceLines || !$('#salesLineItemBox').length) {
+                return;
+            }
+            var hasInitialLineItems = (proformaInitialLineItems || []).length > 0;
+            window.SalesInvoiceLines.init({
+                containerSelector: '#salesLineItemBox',
+                hiddenInputSelector: '#salesLineItems',
+                catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+                initialRows: proformaInitialLineItems || [],
+                syncTotals: function (totals) {
+                    if (!hasInitialLineItems && !$('#salesLineItemBox .sales-lines-enable-toggle').is(':checked')) {
+                        return;
+                    }
+                    $('#amount').val((totals.roundedPayable || 0).toFixed(2));
+                    toIndianCurrency();
+                }
+            });
+        }
+
+        function collectSalesLineItemsBeforeSave() {
+            if (!$('#salesLineItemBox').length) {
+                return [];
+            }
+            var enabled = $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked');
+            if (!enabled) {
+                $('#salesLineItems').val('[]');
+                return [];
+            }
+            var api = $('#salesLineItemBox').data('salesInvoiceLinesApi');
+            if (api && typeof api.collect === 'function') {
+                return api.collect() || [];
+            }
+            try {
+                return JSON.parse($('#salesLineItems').val() || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function applyProformaReadonly() {
+            if (!proformaEditReadOnly) {
+                return;
+            }
+            $('#addForm input, #addForm select, #addForm textarea').prop('disabled', true);
+            $('#saveBtn').hide();
+            $('.saveBtnLoad').hide();
+        }
+
+        function toIndianCurrency() {
+            var value = Number($('#amount').val() || 0);
+            $('#money').text(value.toLocaleString('en-IN', {maximumFractionDigits: 2}));
+        }
+
+        function saveProforma() {
+            if (proformaEditReadOnly) {
+                $('body').toast({class: 'warning', message: 'This proforma invoice is locked for editing.'});
+                return;
+            }
+            showLoading();
+            var lineItems = window.collectSalesLineItemsBeforeSave ? collectSalesLineItemsBeforeSave() : [];
+            if (!$('#ID').val() || !$('#party').val() || !$('#colDate').val()) {
+                $('body').toast({class: 'orange', message: '* fields are required !'});
+                hideLoading();
+                return;
+            }
+            if ($('#salesLineItemBox').length && $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked') && !lineItems.length) {
+                $('body').toast({class: 'orange', message: 'Add at least one valid GST item row before saving.'});
+                hideLoading();
+                return;
+            }
+            $('.saveBtn').hide();
+            $('.saveBtnLoad').show();
+            var data = new FormData();
+            ['ID', 'colDate', 'validUntil', 'party', 'amount', 'invoiceKind', 'buyerLegalName', 'buyerGstNumber', 'buyerBillingAddress', 'placeOfSupply', 'terms', 'remark', 'status'].forEach(function (id) {
+                data.append(id, $('#' + id).val() || '');
+            });
+            data.append('lineItems', JSON.stringify(lineItems || []));
+            $.ajax({
+                type: 'post',
+                url: "{% url 'homeApp:update_proforma_invoice_api' %}",
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    hideLoading();
+                    $('.saveBtnLoad').hide();
+                    $('.saveBtn').show();
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: 'Proforma invoice updated successfully.'});
+                        location.href = proformaReturnUrl || "{% url 'homeApp:proforma_invoice_list' %}";
+                    } else {
+                        $('body').toast({class: 'red', message: response.error || 'Unable to update proforma invoice.'});
+                    }
+                },
+                error: function () {
+                    hideLoading();
+                    $('.saveBtnLoad').hide();
+                    $('.saveBtn').show();
+                    $('body').toast({class: 'red', message: 'Unable to update proforma invoice.'});
+                }
+            });
+        }
+
+        $(function () {
+            loadParties();
+            initProformaInventory();
+            updateInvoiceKindUI();
+            toIndianCurrency();
+            $('#party').on('change', function () { syncPartyInvoiceFields($(this).val()); });
+            $('#invoiceKind').on('change', updateInvoiceKindUI);
+            applyProformaReadonly();
+        });
+    </script>
+{% endblock %}

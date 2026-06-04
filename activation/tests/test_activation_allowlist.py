@@ -51,9 +51,17 @@ class TenantActivationAllowlistTests(TestCase):
 
     def test_expired_tenant_allows_home_and_shows_banner_message(self):
         tenant = Tenant.objects.create(name="Acme", slug="acme")
+        from django.contrib.auth.models import Group, Permission
+        group, _ = Group.objects.get_or_create(name=f"{tenant.slug}:Tenant Admin")
+        perms = Permission.objects.filter(
+            codename__in=["can_view_party_credentials", "can_manage_staff"],
+            content_type__app_label="home"
+        )
+        group.permissions.set(perms)
+
         user_model = get_user_model()
         user = user_model.objects.create_user(username="u1", password="pass12345")
-        TenantMembership.objects.create(user=user, tenant=tenant, role=TenantMembership.Role.STAFF, isDefault=True)
+        TenantMembership.objects.create(user=user, tenant=tenant, role=TenantMembership.Role.OWNER, isDefault=True)
 
         Validity.objects.create(
             tenant=tenant,

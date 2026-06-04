@@ -98,6 +98,10 @@ class SalesPermissionUiTests(TestCase):
         tenant = Tenant.objects.create(name="Sales Tenant", slug="sales-tenant")
         user = User.objects.create_user(username="sales-viewer", password="sales123")
         view_sales = Permission.objects.get(codename="view_sales", content_type__app_label="home")
+        
+        tenant_admin_group = Group.objects.create(name=f"{tenant.slug}:Tenant Admin")
+        tenant_admin_group.permissions.add(view_sales)
+
         django_group = Group.objects.create(name="sales-tenant:Read Only Sales")
         django_group.permissions.add(view_sales)
         staff_group = StaffGroup.objects.create(
@@ -127,7 +131,7 @@ class SalesPermissionUiTests(TestCase):
         home_response = self.client.get("/home/")
         self.assertEqual(home_response.status_code, 200)
 
-        sales_response = self.client.get(reverse("homeApp:my_sales_list"))
+        sales_response = self.client.get(reverse("homeApp:my_sales_list"), follow=True)
         self.assertEqual(sales_response.status_code, 200)
         self.assertFalse(sales_response.context["sales_capabilities"]["can_add"])
         self.assertFalse(sales_response.context["sales_capabilities"]["can_delete"])
@@ -143,6 +147,8 @@ class MyListScopeUiTests(TestCase):
                 content_type__app_label="home",
             )
         )
+        tenant_admin_group = Group.objects.create(name=f"{tenant.slug}:Tenant Admin")
+        tenant_admin_group.permissions.set(permissions)
         django_group = Group.objects.create(name=f"{tenant.slug}:Scoped Group")
         django_group.permissions.set(permissions)
         staff_group = StaffGroup.objects.create(
@@ -172,7 +178,7 @@ class MyListScopeUiTests(TestCase):
         user = self._make_staff_user("collection-viewer", ["view_collection"])
         self.client.force_login(user)
 
-        response = self.client.get(reverse("homeApp:my_collection"))
+        response = self.client.get(reverse("homeApp:my_collection"), follow=True)
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context["collection_capabilities"]["can_filter_staff"])
@@ -434,6 +440,9 @@ class CollectionOtpEndToEndTests(TestCase):
 
         staff_auth = User.objects.create_user(username="e2e-staff", password="secret123")
         add_collection_perm = Permission.objects.get(codename="add_collection", content_type__app_label="home")
+        view_party_perm = Permission.objects.get(codename="view_party", content_type__app_label="home")
+        tenant_admin_group = Group.objects.create(name=f"{tenant.slug}:Tenant Admin")
+        tenant_admin_group.permissions.add(add_collection_perm, view_party_perm)
         collector_group = Group.objects.create(name=f"{tenant.slug}:Collector")
         collector_group.permissions.add(add_collection_perm)
         staff_group = StaffGroup.objects.create(tenant=tenant, name="Collector", djangoGroup=collector_group)

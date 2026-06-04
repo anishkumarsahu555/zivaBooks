@@ -155,6 +155,13 @@ class Command(BaseCommand):
             tenant.isActive = True
             tenant.save(update_fields=["name", "isActive", "lastUpdatedOn"])
 
+        # Seed the Tenant Admin group with all tenant-level permissions
+        tenant_admin_group, _ = Group.objects.get_or_create(name=f"{tenant.slug}:Tenant Admin")
+        tenant_admin_perms = Permission.objects.exclude(
+            content_type__app_label__in=["admin", "auth", "contenttypes", "sessions"]
+        )
+        tenant_admin_group.permissions.set(tenant_admin_perms)
+
         staff_groups = {
             group_name: self._ensure_staff_group(tenant, group_name)
             for group_name in DEFAULT_STAFF_GROUPS

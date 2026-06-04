@@ -118,17 +118,13 @@ def _effective_permission_names(request_or_user):
 
     tenant_permissions = _tenant_permission_names(request_or_user, tenant)
     membership_role = _tenant_membership_role(request_or_user, tenant)
-    if not tenant_permissions:
-        if hasattr(request_or_user, 'META'):
-            request_or_user._tenant_effective_perm_cache = user_permissions
-        user._tenant_effective_perm_cache = user_permissions
-        return user_permissions
+
     if membership_role in {TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN}:
         owner_admin_permissions = {
             f'{permission.content_type.app_label}.{permission.codename}'
             for permission in Permission.objects.select_related('content_type').filter(content_type__app_label='home')
         }
-        effective_permissions = user_permissions | tenant_permissions | owner_admin_permissions
+        effective_permissions = (user_permissions | owner_admin_permissions) & tenant_permissions
         if hasattr(request_or_user, 'META'):
             request_or_user._tenant_effective_perm_cache = effective_permissions
         user._tenant_effective_perm_cache = effective_permissions
@@ -198,6 +194,18 @@ def _admin_sections(user):
             'items': _filter_items(user, [
                 _nav_item('Add Sale', 'homeApp:add_sales', 'shopping cart', 'home.add_sales'),
                 _nav_item('Sales List', 'homeApp:sales_list', 'book', 'home.view_sales'),
+                _nav_item('Add Proforma', 'homeApp:add_proforma_invoice', 'file alternate outline', (
+                    'home.add_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                )),
+                _nav_item('Proforma List', 'homeApp:proforma_invoice_list', 'clipboard list', (
+                    'home.view_proformainvoice',
+                    'home.add_proformainvoice',
+                    'home.change_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                    'home.can_convert_proforma_invoice',
+                    'home.can_view_proforma_invoice_reports',
+                )),
             ]),
         },
         {
@@ -469,6 +477,18 @@ def _collection_sections(user):
                     'home.change_sales',
                     'home.can_manage_sales',
                 )),
+                _nav_item('Add Proforma', 'homeApp:add_proforma_invoice', 'file alternate outline', (
+                    'home.add_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                )),
+                _nav_item('Proforma List', 'homeApp:proforma_invoice_list', 'clipboard list', (
+                    'home.view_proformainvoice',
+                    'home.add_proformainvoice',
+                    'home.change_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                    'home.can_convert_proforma_invoice',
+                    'home.can_view_proforma_invoice_reports',
+                )),
             ]),
         },
         {
@@ -503,6 +523,18 @@ def _staff_sections(user):
                     'home.add_sales',
                     'home.change_sales',
                     'home.can_manage_sales',
+                )),
+                _nav_item('Add Proforma', 'homeApp:add_proforma_invoice', 'file alternate outline', (
+                    'home.add_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                )),
+                _nav_item('Proforma List', 'homeApp:proforma_invoice_list', 'clipboard list', (
+                    'home.view_proformainvoice',
+                    'home.add_proformainvoice',
+                    'home.change_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                    'home.can_convert_proforma_invoice',
+                    'home.can_view_proforma_invoice_reports',
                 )),
             ]),
         },
@@ -549,6 +581,18 @@ def _sales_sections(user):
                     'home.view_sales',
                     'home.change_sales',
                     'home.can_manage_sales',
+                )),
+                _nav_item('Add Proforma', 'homeApp:add_proforma_invoice', 'file alternate outline', (
+                    'home.add_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                )),
+                _nav_item('Proforma List', 'homeApp:proforma_invoice_list', 'clipboard list', (
+                    'home.view_proformainvoice',
+                    'home.add_proformainvoice',
+                    'home.change_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                    'home.can_convert_proforma_invoice',
+                    'home.can_view_proforma_invoice_reports',
                 )),
             ]),
         },
@@ -603,6 +647,18 @@ def _cash_counter_sections(user):
                     'home.add_sales',
                     'home.change_sales',
                     'home.can_manage_sales',
+                )),
+                _nav_item('Add Proforma', 'homeApp:add_proforma_invoice', 'file alternate outline', (
+                    'home.add_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                )),
+                _nav_item('Proforma List', 'homeApp:proforma_invoice_list', 'clipboard list', (
+                    'home.view_proformainvoice',
+                    'home.add_proformainvoice',
+                    'home.change_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                    'home.can_convert_proforma_invoice',
+                    'home.can_view_proforma_invoice_reports',
                 )),
             ]),
         },
@@ -722,6 +778,18 @@ def build_sidebar_sections(request_or_user):
                     'home.change_sales',
                     'home.can_manage_sales',
                     'home.can_approve_sales',
+                )),
+                _nav_item('Add Proforma', 'homeApp:add_proforma_invoice', 'file alternate outline', (
+                    'home.add_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                )),
+                _nav_item('Proforma List', 'homeApp:proforma_invoice_list', 'clipboard list', (
+                    'home.view_proformainvoice',
+                    'home.add_proformainvoice',
+                    'home.change_proformainvoice',
+                    'home.can_manage_proforma_invoice',
+                    'home.can_convert_proforma_invoice',
+                    'home.can_view_proforma_invoice_reports',
                 )),
             ]),
         },

@@ -1,0 +1,30 @@
+name: Django CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        python-version: '3.14'
+        enable-cache: true
+
+    - name: Run Tests
+      env:
+        SECRET_KEY: 'ci-secret-key-for-testing'
+        USE_REDIS_CACHE: 'False'
+        DATABASE_ENGINE: 'sqlite'
+      run: |
+        uv run python manage.py makemigrations
+        uv run python manage.py test
