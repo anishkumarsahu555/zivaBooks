@@ -656,6 +656,60 @@ class Sales(TenantOwnedModel):
         ]
 
 
+class ProformaInvoice(TenantOwnedModel):
+    class InvoiceKind(models.TextChoices):
+        B2C = 'b2c', 'B2C'
+        B2B = 'b2b', 'B2B'
+
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        SENT = 'sent', 'Sent'
+        ACCEPTED = 'accepted', 'Accepted'
+        CONVERTED = 'converted', 'Converted'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='proforma_invoices')
+    partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL, related_name='proforma_invoices')
+    proformaID = models.CharField(max_length=40, blank=True, null=True, db_index=True)
+    invoiceSeries = models.ForeignKey('InvoiceSeries', blank=True, null=True, on_delete=models.SET_NULL, related_name='proforma_invoices')
+    invoiceSequenceNumber = models.PositiveIntegerField(blank=True, null=True)
+    invoiceNumber = models.CharField(max_length=200, default='Proforma')
+    invoiceKind = models.CharField(max_length=10, choices=InvoiceKind.choices, default=InvoiceKind.B2C)
+    buyerLegalName = models.CharField(max_length=255, blank=True, null=True)
+    buyerGstNumber = models.CharField(max_length=20, blank=True, null=True)
+    buyerBillingAddress = models.TextField(blank=True, null=True)
+    placeOfSupply = models.CharField(max_length=120, blank=True, null=True)
+    taxableAmount = models.FloatField(default=0.0)
+    gstAmount = models.FloatField(default=0.0)
+    roundOffAmount = models.FloatField(default=0.0)
+    amount = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+    terms = models.TextField(blank=True, null=True)
+    buildDate = models.DateField(blank=True, null=True)
+    validUntil = models.DateField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
+    convertedSales = models.ForeignKey(Sales, blank=True, null=True, on_delete=models.SET_NULL, related_name='source_proformas')
+    convertedOn = models.DateTimeField(blank=True, null=True)
+    createdBy = models.ForeignKey(StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='created_proforma_invoices')
+
+    def __str__(self):
+        return self.invoiceNumber or self.proformaID or f'Proforma {self.pk}'
+
+    class Meta:
+        verbose_name_plural = 'K1) Proforma Invoices'
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'buildDate'], name='proforma_tenant_del_date_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'createdBy'], name='proforma_tenant_del_staff_idx'),
+            models.Index(fields=['tenant', 'proformaID'], name='proforma_tenant_pid_idx'),
+            models.Index(fields=['tenant', 'status'], name='proforma_tenant_status_idx'),
+        ]
+        permissions = [
+            ('can_manage_proforma_invoice', 'Can manage proforma invoices'),
+            ('can_convert_proforma_invoice', 'Can convert proforma invoices'),
+            ('can_view_proforma_invoice_reports', 'Can view proforma invoice reports'),
+        ]
+
+
 class InventoryItem(TenantOwnedModel):
     class StockBucket(models.TextChoices):
         GST = 'gst', 'GST'
@@ -1114,6 +1168,36 @@ class SalesLine(TenantOwnedModel):
         ]
 
 
+class ProformaInvoiceLine(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='proforma_invoice_lines')
+    proformaInvoice = models.ForeignKey(ProformaInvoice, on_delete=models.CASCADE, related_name='lines')
+    warehouse = models.ForeignKey(
+        InventoryWarehouse,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='proforma_invoice_lines',
+    )
+    item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='proforma_invoice_lines')
+    hsnCode = models.CharField(max_length=40, blank=True, null=True)
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantity = models.FloatField(default=0.0)
+    unitPrice = models.FloatField(default=0.0)
+    discountPercent = models.FloatField(default=0.0)
+    taxableAmount = models.FloatField(default=0.0)
+    gstRate = models.FloatField(default=0.0)
+    gstAmount = models.FloatField(default=0.0)
+    lineTotal = models.FloatField(default=0.0)
+    remark = models.CharField(max_length=500, blank=True, null=True)
+
+    class Meta:
+        verbose_name_plural = 'Proforma Invoice Lines'
+        indexes = [
+            models.Index(fields=['tenant', 'proformaInvoice'], name='piform_tenant_doc_idx'),
+            models.Index(fields=['tenant', 'item', 'stockBucket'], name='piform_tenant_item_bkt_idx'),
+        ]
+
+
 class CashCounterLine(TenantOwnedModel):
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='cash_counter_lines')
     cashCounter = models.ForeignKey(CashCounter, on_delete=models.CASCADE, related_name='lines')
@@ -1345,6 +1429,7 @@ class TenantSequence(TenantAwareModel):
         INVENTORY_TRANSFER = 'inventory_transfer', 'Inventory Transfer'
         PURCHASE_RETURN = 'purchase_return', 'Purchase Return'
         SALES_RETURN = 'sales_return', 'Sales Return'
+        PROFORMA_INVOICE = 'proforma_invoice', 'Proforma Invoice'
 
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sequences')
     scope = models.CharField(max_length=40, choices=Scope.choices)
@@ -1369,6 +1454,7 @@ class InvoiceSeries(TenantOwnedModel):
     class Module(models.TextChoices):
         SALES = 'sales', 'Sales'
         CASH_COUNTER = 'cash_counter', 'Cash Counter'
+        PROFORMA = 'proforma', 'Proforma Invoice'
 
     class InvoiceNature(models.TextChoices):
         MIXED = 'mixed', 'Mixed / Manual'

@@ -1,0 +1,82 @@
+{% load formatting %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Proforma Invoice List</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #0f172a; font-size: 10px; }
+        .title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+        .subtitle { color: #475569; margin-bottom: 10px; }
+        .meta { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .meta td { padding: 6px 8px; border: 1px solid #dbe5f0; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #dbe5f0; padding: 6px 7px; text-align: left; vertical-align: top; }
+        th { background: #f5f3ff; font-size: 9px; text-transform: uppercase; color: #4c1d95; }
+        .small { font-size: 9px; color: #64748b; }
+        .right { text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="title">Proforma Invoice List</div>
+    <div class="subtitle">{{ pdf_brand_name }} | {{ pdf_tenant_name }} | {{ start_date|date:"d M Y" }} to {{ end_date|date:"d M Y" }}</div>
+
+    <table class="meta">
+        <tr>
+            <td><strong>Staff</strong><br>{{ staff_name }}</td>
+            <td><strong>Status</strong><br>{{ status }}</td>
+            <td><strong>Search</strong><br>{{ search }}</td>
+            <td><strong>Total</strong><br>{{ total_count }} invoices | ₹ {{ total_amount|convert }}</td>
+            <td><strong>Generated On</strong><br>{{ pdf_generated_on }}</td>
+        </tr>
+    </table>
+
+    <table class="meta">
+        <tr>
+            {% for label, count in status_counts %}
+                <td><strong>{{ label }}</strong><br>{{ count }}</td>
+            {% empty %}
+                <td><strong>Status Summary</strong><br>No proforma invoices found</td>
+            {% endfor %}
+        </tr>
+    </table>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Proforma ID</th>
+                <th>Party</th>
+                <th>Proforma No</th>
+                <th>Status</th>
+                <th>Amount</th>
+                <th>Date</th>
+                <th>Valid Until</th>
+                <th>Created By</th>
+                <th>Sales Invoice</th>
+                <th>Remark</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                <td>{{ row.proforma_id }}</td>
+                <td>{{ row.party_name }}</td>
+                <td>{{ row.invoice_number }}</td>
+                <td>{{ row.status }}</td>
+                <td class="right">₹ {{ row.amount|convert }}</td>
+                <td>{{ row.build_date }}</td>
+                <td>{{ row.valid_until }}</td>
+                <td>{{ row.created_by }}</td>
+                <td>{{ row.sales_invoice }}</td>
+                <td>{{ row.remark }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="10" class="small">No proforma invoices were found for this filter.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% include 'home/report/_pdfFooter.html' %}
+</body>
+</html>

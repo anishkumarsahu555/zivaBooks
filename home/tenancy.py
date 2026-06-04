@@ -10,6 +10,14 @@ def get_current_tenant(request_or_user=None):
     if user is not None and hasattr(user, '_cached_current_tenant'):
         return user._cached_current_tenant
     if user is not None and getattr(user, 'is_authenticated', False):
+        if getattr(user, 'is_superuser', False) and request_or_user is not None and hasattr(request_or_user, 'session'):
+            tenant_id = request_or_user.session.get('superuser_current_tenant_id')
+            if tenant_id:
+                membership_tenant = Tenant.objects.filter(pk=tenant_id).first()
+                if membership_tenant:
+                    setattr(request_or_user, '_cached_current_tenant', membership_tenant)
+                    setattr(user, '_cached_current_tenant', membership_tenant)
+                    return membership_tenant
         membership = TenantMembership.objects.select_related('tenant').filter(
             user=user,
             isDefault=True,
@@ -45,6 +53,26 @@ def tenant_qs(request_or_user, model_or_qs, include_unassigned=True):
     if include_unassigned:
         tenant_filter |= Q(tenant__isnull=True)
     return qs.filter(tenant_filter)
+
+
+def tenant_object_or_superuser(request_or_user, model_or_qs, **filters):
+    qs = model_or_qs._default_manager.all() if hasattr(model_or_qs, '_default_manager') else model_or_qs
+    obj = tenant_qs(request_or_user, qs).filter(**filters).first()
+    if obj is not None:
+        return obj
+    user = getattr(request_or_user, 'user', request_or_user)
+    if not getattr(user, 'is_superuser', False):
+        return None
+    obj = qs.filter(**filters).first()
+    tenant = getattr(obj, 'tenant', None)
+    if obj is not None and tenant is not None:
+        if request_or_user is not None:
+            setattr(request_or_user, '_cached_current_tenant', tenant)
+            if hasattr(request_or_user, 'session'):
+                request_or_user.session['superuser_current_tenant_id'] = tenant.pk
+        if user is not None:
+            setattr(user, '_cached_current_tenant', tenant)
+    return obj
 
 
 def assign_tenant(instance, request_or_user, force=False):

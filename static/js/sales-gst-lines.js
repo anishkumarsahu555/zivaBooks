@@ -286,7 +286,7 @@
                     $row.find('.sales-item').dropdown({
                         fullTextSearch: true,
                         onChange: function () {
-                            applySelectedDefaults($row, {forceItemDefaults: true});
+                            applySelectedDefaults($row, {forceItemDefaults: !$row.data('loadingInitialRow')});
                             applyQuantityStep($row);
                             recalcRow($row, 'sales-item');
                             collect($box, config.hiddenInputSelector, config.syncTotals);
@@ -299,7 +299,9 @@
                         }
                     });
                     if (row && row.itemId) {
+                        $row.data('loadingInitialRow', true);
                         $row.find('.sales-item').dropdown('set selected', String(row.itemId));
+                        $row.data('loadingInitialRow', false);
                         $row.find('.sales-bucket').dropdown('set selected', row.stockBucket || 'gst');
                     }
                     applySelectedDefaults($row);

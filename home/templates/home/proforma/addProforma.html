@@ -1,0 +1,678 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block title %}
+    <title>Add Proforma Invoice</title>
+{% endblock %}
+
+{% block css %}
+    <style>
+        .proforma-mode-panel {
+            padding: 0.85rem;
+            border: 1px solid rgba(15, 118, 110, 0.12);
+            border-radius: 14px;
+            background: #fbfffe;
+        }
+
+        .proforma-section-card,
+        .proforma-advanced-card {
+            margin-top: 10px;
+            padding: 0.85rem;
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        .proforma-section-card {
+            border: 1px solid rgba(15, 118, 110, 0.12);
+        }
+
+        .proforma-section-card:first-of-type {
+            margin-top: 0;
+        }
+
+        .proforma-advanced-card {
+            border: 1px dashed rgba(15, 118, 110, 0.2);
+        }
+
+        .proforma-section-help,
+        .proforma-gst-summary {
+            color: #667085;
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
+        .proforma-section-help {
+            margin: -4px 0 10px;
+        }
+
+        .proforma-invoice-picker .ui.left.labeled.input {
+            width: 100%;
+        }
+
+        .proforma-invoice-picker .ui.selection.dropdown {
+            min-width: 225px !important;
+            width: 225px !important;
+            background: #18b3ae !important;
+            color: #fff !important;
+            border-color: #18b3ae !important;
+            border-top-right-radius: 0 !important;
+            border-bottom-right-radius: 0 !important;
+            font-weight: 700 !important;
+        }
+
+        .proforma-invoice-picker .ui.selection.dropdown > .text,
+        .proforma-invoice-picker .ui.selection.dropdown > .dropdown.icon {
+            color: #fff !important;
+        }
+
+        .proforma-invoice-picker #invoiceNo {
+            flex: 1 1 auto !important;
+            width: calc(100% - 225px) !important;
+            font-size: 1rem !important;
+            font-weight: 700 !important;
+            color: #1f2937 !important;
+            background: #fff !important;
+            border-left: 0 !important;
+            box-shadow: none !important;
+        }
+
+        .proforma-chip-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .proforma-chip {
+            border: 1px solid rgba(15, 118, 110, 0.18) !important;
+            background: #f8fffe !important;
+            color: #0f766e !important;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .proforma-chip.active {
+            background: #0f766e !important;
+            color: #fff !important;
+            border-color: #0f766e !important;
+        }
+
+        .proforma-gst-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .proforma-gst-extra-fields {
+            display: none;
+            margin-top: 8px;
+        }
+
+        .proforma-form-actions {
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 2px;
+        }
+
+        .proforma-form-actions .button {
+            margin: 0 !important;
+        }
+
+        @media only screen and (max-width: 767px) {
+            .proforma-mode-panel,
+            .proforma-section-card,
+            .proforma-advanced-card {
+                padding: 0.7rem;
+                border-radius: 10px;
+            }
+
+            .proforma-invoice-picker .ui.selection.dropdown {
+                min-width: 120px !important;
+                width: 120px !important;
+            }
+
+            .proforma-invoice-picker #invoiceNo {
+                width: calc(100% - 120px) !important;
+                font-size: 0.92rem !important;
+            }
+
+            .proforma-form-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="ui aligned basic grid">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div style="cursor: pointer;" class="item active" data-tab="user">Add Proforma Invoice</div>
+                <div style="position:absolute; right:1.5rem; top:18px;">
+                    <a href="{% url 'homeApp:proforma_invoice_list' %}" class="ui tiny button">
+                        <i class="clipboard list icon"></i>
+                        Proforma List
+                    </a>
+                </div>
+            </div>
+
+            <div class="ui tab" data-tab="user">
+                <div class="ui row teal stacked segment padded">
+                    <div class="content">
+                        <form class="ui small form sales-mobile-stack" id="addProformaForm">{% csrf_token %}
+                            <div class="proforma-mode-panel">
+                                <input type="hidden" id="advancedInvoicingEnabled" value="{% if advanced_invoicing_enabled %}1{% else %}0{% endif %}">
+
+                                <div class="proforma-section-card">
+                                    <h4 class="ui horizontal left aligned divider header">
+                                        <i class="file alternate outline icon"></i>
+                                        Proforma Setup
+                                    </h4>
+                                    <div class="proforma-section-help">Pick the proforma series first, confirm the generated number, then choose the document date and validity.</div>
+
+                                    <div class="field required">
+                                        <label>Proforma Number</label>
+                                        <div class="proforma-invoice-picker">
+                                            <div class="ui left labeled input">
+                                                <div class="ui selection dropdown teal label" id="invoiceSeries">
+                                                    <input type="hidden" id="invoiceSeriesId" name="invoiceSeriesId">
+                                                    <div class="default text">Select Series</div>
+                                                    <i class="dropdown icon"></i>
+                                                    <div class="menu"></div>
+                                                </div>
+                                                <input type="text" placeholder="Auto assigned" id="invoiceNo" name="invoiceNo" readonly>
+                                            </div>
+                                        </div>
+                                        <input type="hidden" id="requestedInvoiceNumber" name="requestedInvoiceNumber">
+                                        <div class="proforma-section-help" style="margin-top:8px;">Tap any available number below if you want to use a visible gap number.</div>
+                                        <div class="proforma-chip-wrap" id="invoiceChipWrap"></div>
+                                    </div>
+
+                                    <div class="two fields">
+                                        <div class="eight wide field required">
+                                            <label>Proforma Date</label>
+                                            <div class="ui calendar" id="cDate">
+                                                <div class="ui input">
+                                                    <input type="text" placeholder="Date" id="colDate">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="eight wide field">
+                                            <label>Valid Until</label>
+                                            <div class="ui calendar" id="validUntilCalendar">
+                                                <div class="ui input">
+                                                    <input type="text" placeholder="Optional validity date" id="validUntil">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="proforma-section-card">
+                                    <h4 class="ui horizontal left aligned divider header">
+                                        <i class="users icon"></i>
+                                        Party And Value
+                                    </h4>
+                                    <div class="proforma-section-help">Select the customer and enter a total amount, or enable GST item rows below to calculate the amount automatically.</div>
+                                    <div class="two fields">
+                                        <div class="eight wide field required">
+                                            <label>Party Name</label>
+                                            <select class="ui clearable search dropdown" id="party">
+                                                <option value="">Search By Party Name</option>
+                                            </select>
+                                        </div>
+                                        <div class="eight wide field required">
+                                            <label>Amount (₹ <a class="ui violet label" id="money">0.0</a>)</label>
+                                            <input type="number" name="amount" id="amount" placeholder="Amount" onkeyup="toIndianCurrency()">
+                                        </div>
+                                    </div>
+
+                                    <div class="field" style="margin-top:8px;">
+                                        <label>Remark</label>
+                                        <textarea id="remark" placeholder="Any Remark" rows="2"></textarea>
+                                    </div>
+                                </div>
+
+                                {% if advanced_invoicing_enabled %}
+                                    <div class="proforma-advanced-card" id="advancedInvoiceCard">
+                                        <div class="proforma-gst-toolbar">
+                                            <div>
+                                                <h4 class="ui horizontal left aligned divider header" style="margin:0 0 6px;">
+                                                    <i class="percent icon"></i>
+                                                    GST Billing
+                                                </h4>
+                                                <div class="proforma-gst-summary" id="advancedInvoiceSummary">B2C proforma. Expand only when buyer GST details are needed.</div>
+                                            </div>
+                                            <button type="button" class="ui mini basic teal button" id="advancedInvoiceToggleBtn" onclick="toggleAdvancedInvoiceFields()">Show Details</button>
+                                        </div>
+
+                                        <div class="two fields">
+                                            <div class="eight wide field">
+                                                <label>Invoice Type</label>
+                                                <select class="ui dropdown" id="invoiceKind">
+                                                    <option value="b2c">B2C</option>
+                                                    <option value="b2b">B2B</option>
+                                                </select>
+                                                <small id="invoiceNatureHelp" style="display:block; margin-top:6px; color:#667085;">Series can default this value for GST billing.</small>
+                                            </div>
+                                            <div class="eight wide field">
+                                                <label>Place Of Supply</label>
+                                                <input type="text" id="placeOfSupply" placeholder="Optional place of supply">
+                                            </div>
+                                        </div>
+
+                                        <div class="three fields proforma-gst-extra-fields" id="buyerInvoiceFields">
+                                            <div class="field">
+                                                <label>Buyer Legal Name</label>
+                                                <input type="text" id="buyerLegalName" placeholder="Auto-filled from party">
+                                            </div>
+                                            <div class="field">
+                                                <label>Buyer GST Number</label>
+                                                <input type="text" id="buyerGstNumber" placeholder="Optional GSTIN for B2B">
+                                            </div>
+                                            <div class="field">
+                                                <label>Buyer Billing Address</label>
+                                                <input type="text" id="buyerBillingAddress" placeholder="Billing address">
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <input type="hidden" id="invoiceKind" value="b2c">
+                                    <input type="hidden" id="placeOfSupply" value="">
+                                    <input type="hidden" id="buyerLegalName" value="">
+                                    <input type="hidden" id="buyerGstNumber" value="">
+                                    <input type="hidden" id="buyerBillingAddress" value="">
+                                {% endif %}
+
+                                {% if inventory_enabled %}
+                                    {% include 'home/includes/sales_invoice_lines.html' with section_id='salesLineItemBox' hidden_input_id='salesLineItems' title='Track GST proforma rows' enabled=False allow_non_gst=non_gst_shadow_enabled seller_gst_number=seller_gst_number %}
+                                {% else %}
+                                    <input type="hidden" id="salesLineItems" value="[]">
+                                {% endif %}
+
+                                <div class="proforma-section-card">
+                                    <h4 class="ui horizontal left aligned divider header">
+                                        <i class="clipboard outline icon"></i>
+                                        Terms
+                                    </h4>
+                                    <div class="proforma-section-help">These terms print on the proforma invoice and do not affect accounts or inventory.</div>
+                                    <div class="field">
+                                        <label>Terms And Conditions</label>
+                                        <textarea id="terms" placeholder="Validity, delivery, payment terms, or any declaration" rows="3"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="ui aligned basic grid">
+                        <div class="row" style="padding-left:5px; padding-right:5px;">
+                            <div class="sixteen wide column center aligned">
+                                <div class="proforma-form-actions">
+                                    <button class="ui teal double button" type="button" onclick="resetProformaForm()">Reset</button>
+                                    <button class="ui green button saveBtn" type="button" onclick="saveProforma()">
+                                        Submit Detail
+                                    </button>
+                                    <button style="display:none;" class="ui teal double loading button saveBtnLoad">
+                                        Saving ....
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+<script src="{% static 'js/sales-gst-lines.js' %}"></script>
+<script>
+    $('.ui.dropdown').dropdown({fullTextSearch: true});
+
+    var proformaInventoryWidget = null;
+    var partyCatalog = [];
+    var selectedInvoiceSeriesMeta = null;
+    var invoiceSeriesCatalog = {};
+    var advancedInvoiceExpanded = false;
+
+    function formatDate(date) {
+        if (!date) return '';
+        return String(date.getDate()) + '/' + String(date.getMonth() + 1) + '/' + date.getFullYear();
+    }
+
+    function todayText() {
+        return formatDate(new Date());
+    }
+
+    $('#cDate').calendar({
+        initialDate: new Date(),
+        monthFirst: false,
+        type: 'date',
+        formatter: {date: formatDate}
+    });
+
+    $('#validUntilCalendar').calendar({
+        monthFirst: false,
+        type: 'date',
+        formatter: {date: formatDate}
+    });
+
+    function toIndianCurrency() {
+        const value = Number($('#amount').val() || 0);
+        $('#money').text(value.toLocaleString('en-IN', {maximumFractionDigits: 2}));
+    }
+
+    function syncInventoryToggle() {
+        const checked = $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked');
+        $('#salesLineItemBox .sales-lines-wrap').toggle(checked);
+        if (!checked) {
+            $('#salesLineItems').val('[]');
+        }
+    }
+
+    function collectSalesLineItemsBeforeSave() {
+        if (!$('#salesLineItemBox').length) {
+            return [];
+        }
+        const enabled = $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked');
+        if (!enabled) {
+            $('#salesLineItems').val('[]');
+            return [];
+        }
+        if (proformaInventoryWidget && typeof proformaInventoryWidget.collect === 'function') {
+            return proformaInventoryWidget.collect() || [];
+        }
+        const api = $('#salesLineItemBox').data('salesInvoiceLinesApi');
+        if (api && typeof api.collect === 'function') {
+            return api.collect() || [];
+        }
+        try {
+            return JSON.parse($('#salesLineItems').val() || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function applyInvoiceSeriesRule(meta) {
+        selectedInvoiceSeriesMeta = meta || null;
+        if ($('#advancedInvoicingEnabled').val() !== '1') {
+            return;
+        }
+        const help = $('#invoiceNatureHelp');
+        if (!meta) {
+            $('#invoiceKind').dropdown('setting', 'disabled', false);
+            help.text('Series can default this value for GST billing.');
+            updateInvoiceKindUI();
+            return;
+        }
+        if (meta.invoiceNature && meta.invoiceNature !== 'mixed') {
+            $('#invoiceKind').dropdown('set selected', meta.invoiceNature);
+        }
+        if (meta.lockInvoiceNature && meta.invoiceNature && meta.invoiceNature !== 'mixed') {
+            $('#invoiceKind').dropdown('setting', 'disabled', true);
+            help.text('Invoice type is locked by the selected series: ' + meta.invoiceNatureLabel + '.');
+        } else {
+            $('#invoiceKind').dropdown('setting', 'disabled', false);
+            help.text(meta.invoiceNature && meta.invoiceNature !== 'mixed'
+                ? 'Invoice type defaults from the selected series: ' + meta.invoiceNatureLabel + '.'
+                : 'Series can default this value for GST billing.');
+        }
+        updateInvoiceKindUI();
+    }
+
+    function applySelectedInvoiceSeries(meta) {
+        if (!meta) {
+            $('#invoiceSeriesId').val('');
+            $('#invoiceNo').val('');
+            $('#requestedInvoiceNumber').val('');
+            $('#invoiceSeries .text').text('Select Series');
+            $('#invoiceChipWrap').empty();
+            applyInvoiceSeriesRule(null);
+            return;
+        }
+        $('#invoiceSeriesId').val(meta.id);
+        $('#invoiceNo').val(meta.invoiceNumber || '');
+        $('#requestedInvoiceNumber').val((meta.upcomingNumbers && meta.upcomingNumbers[0] && meta.upcomingNumbers[0].sequenceNumber) || '');
+        $('#invoiceSeries .text').text(meta.seriesCode || 'Series');
+        applyInvoiceSeriesRule(meta);
+        renderInvoiceChips(meta);
+    }
+
+    function renderInvoiceChips(meta) {
+        const wrap = $('#invoiceChipWrap');
+        wrap.empty();
+        (meta.upcomingNumbers || []).slice(0, 60).forEach(function (row) {
+            const chip = $('<button type="button" class="proforma-chip"></button>');
+            chip.text(row.displayNumber || row.invoiceNumber);
+            chip.attr('data-sequence', row.sequenceNumber);
+            chip.attr('data-invoice', row.invoiceNumber);
+            if (String(row.sequenceNumber) === String($('#requestedInvoiceNumber').val())) {
+                chip.addClass('active');
+            }
+            chip.on('click', function () {
+                $('#requestedInvoiceNumber').val(row.sequenceNumber);
+                $('#invoiceNo').val(row.invoiceNumber);
+                $('#invoiceChipWrap .proforma-chip').removeClass('active');
+                chip.addClass('active');
+            });
+            wrap.append(chip);
+        });
+    }
+
+    function loadInvoiceSeries() {
+        $.get("{% url 'homeApp:invoice_series_suggestions_api' %}", {module: 'proforma'}, function (response) {
+            const menu = $('#invoiceSeries .menu');
+            menu.empty();
+            invoiceSeriesCatalog = {};
+            (response.data || []).forEach(function (item) {
+                invoiceSeriesCatalog[String(item.id)] = item;
+                menu.append(
+                    '<div class="item" data-value="' + item.id + '">' +
+                    '<div><strong>' + item.seriesCode + '</strong><br><small>Next: ' + item.invoiceNumber + '</small></div>' +
+                    '</div>'
+                );
+            });
+            $('#invoiceSeries').dropdown('refresh');
+            const first = (response.data || [])[0];
+            if (first) {
+                $('#invoiceSeries').dropdown('set selected', String(first.id));
+                applySelectedInvoiceSeries(first);
+            }
+        });
+    }
+
+    function loadParties() {
+        $.get("{% url 'homeApp:list_party_api' %}", function (response) {
+            partyCatalog = response.data || [];
+            const select = $('#party');
+            select.html('<option value="">Search By Party Name</option>');
+            partyCatalog.forEach(function (item) {
+                select.append('<option value="' + item.ID + '">' + item.DisplayDetail + '</option>');
+            });
+            select.dropdown('refresh');
+        });
+    }
+
+    function syncPartyInvoiceFields(partyId) {
+        if ($('#advancedInvoicingEnabled').val() !== '1') {
+            return;
+        }
+        const selected = partyCatalog.find(function (row) { return String(row.ID) === String(partyId || ''); });
+        if (!selected) {
+            return;
+        }
+        if (!$('#buyerLegalName').val()) {
+            $('#buyerLegalName').val(selected.LegalName || selected.Name || '');
+        }
+        if (!$('#buyerGstNumber').val()) {
+            $('#buyerGstNumber').val(selected.GSTNumber || '');
+        }
+        if (!$('#buyerBillingAddress').val()) {
+            $('#buyerBillingAddress').val(selected.BillingAddress || selected.Address || '');
+        }
+        if (selected.IsB2B || selected.GSTNumber) {
+            $('#invoiceKind').dropdown('set selected', 'b2b');
+            advancedInvoiceExpanded = true;
+        }
+        updateInvoiceKindUI();
+    }
+
+    function toggleAdvancedInvoiceFields(forceValue) {
+        if ($('#advancedInvoicingEnabled').val() !== '1') {
+            return;
+        }
+        if (typeof forceValue === 'boolean') {
+            advancedInvoiceExpanded = forceValue;
+        } else {
+            advancedInvoiceExpanded = !advancedInvoiceExpanded;
+        }
+        updateInvoiceKindUI();
+    }
+
+    function updateInvoiceKindUI() {
+        if ($('#advancedInvoicingEnabled').val() !== '1') {
+            return;
+        }
+        const invoiceKind = ($('#invoiceKind').val() || 'b2c');
+        if (invoiceKind === 'b2b') {
+            advancedInvoiceExpanded = true;
+        }
+        $('#buyerInvoiceFields').toggle(advancedInvoiceExpanded);
+        $('#advancedInvoiceToggleBtn').text(advancedInvoiceExpanded ? 'Hide Details' : 'Show Details');
+        $('#advancedInvoiceSummary').text(
+            invoiceKind === 'b2b'
+                ? 'B2B selected. Buyer GST details will print on the proforma.'
+                : (advancedInvoiceExpanded
+                    ? 'Optional GST overrides are open. Leave them blank to use party defaults.'
+                    : 'B2C proforma. Expand only when buyer GST details are needed.')
+        );
+    }
+
+    function initProformaInventory() {
+        if (!window.SalesInvoiceLines || !$('#salesLineItemBox').length) {
+            return;
+        }
+        proformaInventoryWidget = window.SalesInvoiceLines.init({
+            containerSelector: '#salesLineItemBox',
+            hiddenInputSelector: '#salesLineItems',
+            catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+            initialRows: [],
+            syncTotals: function (totals) {
+                $('#amount').val((totals.roundedPayable || 0).toFixed(2));
+                toIndianCurrency();
+            }
+        });
+        $('#salesLineItemBox .sales-lines-enable-toggle').on('change', syncInventoryToggle);
+        syncInventoryToggle();
+    }
+
+    function resetProformaForm() {
+        $('#addProformaForm')[0].reset();
+        $('.ui.dropdown').dropdown('clear');
+        $('#colDate').val(todayText());
+        $('#validUntil').val('');
+        $('#money').text('0.0');
+        advancedInvoiceExpanded = false;
+        updateInvoiceKindUI();
+        loadInvoiceSeries();
+        if ($('#salesLineItemBox').length) {
+            $('#salesLineItemBox .sales-lines-enable-toggle').prop('checked', false);
+            syncInventoryToggle();
+        }
+    }
+
+    function setSavingState(active) {
+        $('.saveBtn').toggle(!active);
+        $('.saveBtnLoad').toggle(active);
+        if (active) {
+            showLoading();
+        } else {
+            hideLoading();
+        }
+    }
+
+    function saveProforma() {
+        setSavingState(true);
+        const lineItems = collectSalesLineItemsBeforeSave();
+        if (!$('#invoiceSeriesId').val() || !$('#invoiceNo').val() || !$('#party').val() || !$('#colDate').val()) {
+            $('body').toast({class: 'orange', message: '* fields are required !'});
+            setSavingState(false);
+            return;
+        }
+        if ($('#salesLineItemBox').length && $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked') && !lineItems.length) {
+            $('body').toast({class: 'orange', message: 'Add at least one valid GST item row before saving.'});
+            setSavingState(false);
+            return;
+        }
+        if (!lineItems.length && !$('#amount').val()) {
+            $('body').toast({class: 'orange', message: 'Amount is required.'});
+            setSavingState(false);
+            return;
+        }
+        const data = new FormData();
+        ['invoiceSeriesId', 'requestedInvoiceNumber', 'colDate', 'validUntil', 'party', 'amount', 'invoiceKind', 'buyerLegalName', 'buyerGstNumber', 'buyerBillingAddress', 'placeOfSupply', 'terms', 'remark'].forEach(function (id) {
+            data.append(id, $('#' + id).val() || '');
+        });
+        data.append('lineItems', JSON.stringify(lineItems || []));
+        $.ajax({
+            type: 'post',
+            url: "{% url 'homeApp:add_proforma_invoice_api' %}",
+            data: data,
+            contentType: false,
+            cache: false,
+            processData: false,
+            success: function (response) {
+                setSavingState(false);
+                if (response.message === 'success') {
+                    $('body').toast({class: 'success', message: 'Proforma invoice added successfully.'});
+                    location.href = "{% url 'homeApp:proforma_invoice_list' %}";
+                } else {
+                    $('body').toast({class: 'red', message: response.error || 'Unable to save proforma invoice.'});
+                }
+            },
+            error: function () {
+                setSavingState(false);
+                $('body').toast({class: 'red', message: 'Unable to save proforma invoice.'});
+            }
+        });
+    }
+
+    $(function () {
+        $('#colDate').val(todayText());
+        loadInvoiceSeries();
+        loadParties();
+        initProformaInventory();
+        updateInvoiceKindUI();
+        $('#invoiceSeries').dropdown({
+            fullTextSearch: true,
+            onChange: function (value) {
+                applySelectedInvoiceSeries(invoiceSeriesCatalog[String(value)] || null);
+            }
+        });
+        $('#party').dropdown({
+            fullTextSearch: true,
+            onChange: function (value) {
+                syncPartyInvoiceFields(value);
+            }
+        });
+        $('#invoiceKind').dropdown({
+            onChange: function () {
+                updateInvoiceKindUI();
+            }
+        });
+    });
+</script>
+{% endblock %}

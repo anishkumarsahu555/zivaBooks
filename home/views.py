@@ -11,7 +11,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum, F, FloatField, ExpressionWrapper, Window, Count
 from django.db.models.functions import Length, TruncMonth
-from django.http import JsonResponse, HttpResponse
+from django.http import Http404, JsonResponse, HttpResponse
 from django.template.loader import render_to_string
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -26,7 +26,7 @@ from .models import *
 from .books import ensure_books_for_tenant
 from .credential_links import credential_share_token_status, consume_credential_share_token
 from .navigation import build_sidebar_sections, _has_any_perm as _has_tenant_any_perm
-from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_qs
+from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_object_or_superuser, tenant_qs
 from .otp import get_collection_otp_payload, get_collection_status_payload, get_order_delivery_otp_payload, get_order_delivery_status_payload, OTP_TTL_SECONDS
 # def login_or_logout(request, type):
 #     try:
@@ -1009,6 +1009,21 @@ def _sales_capabilities(user):
         'can_edit': can_edit,
         'can_delete': can_delete,
         'can_message': can_message,
+        'can_export': can_export,
+        'can_filter_staff': can_filter_staff,
+    }
+def _proforma_capabilities(user):
+    can_add = _tenant_has_perm(user, 'home.add_proformainvoice') or _tenant_has_perm(user, 'home.can_manage_proforma_invoice')
+    can_edit = _tenant_has_perm(user, 'home.change_proformainvoice') or _tenant_has_perm(user, 'home.can_manage_proforma_invoice')
+    can_delete = _tenant_has_perm(user, 'home.delete_proformainvoice') or _tenant_has_perm(user, 'home.can_manage_proforma_invoice')
+    can_convert = _tenant_has_perm(user, 'home.can_convert_proforma_invoice')
+    can_export = _tenant_has_perm(user, 'home.can_view_proforma_invoice_reports') or _tenant_has_perm(user, 'home.can_view_audit_logs')
+    can_filter_staff = _is_admin_like(user) or _tenant_has_perm(user, 'home.can_manage_proforma_invoice') or _tenant_has_perm(user, 'home.can_view_proforma_invoice_reports')
+    return {
+        'can_add': can_add,
+        'can_edit': can_edit,
+        'can_delete': can_delete,
+        'can_convert': can_convert,
         'can_export': can_export,
         'can_filter_staff': can_filter_staff,
     }
@@ -2825,6 +2840,72 @@ def edit_sales(request, id=None):
         'seller_gst_number': getattr(tenant, 'gstNumber', '') or '',
     }
     return render(request, 'home/sales/editSales.html', context)
+
+
+@permission_required_any('home.add_proformainvoice', 'home.can_manage_proforma_invoice')
+def add_proforma_invoice(request):
+    tenant = get_current_tenant(request)
+    return render(request, 'home/proforma/addProforma.html', {
+        'inventory_enabled': bool(getattr(tenant, 'inventoryEnabled', True)),
+        'advanced_invoicing_enabled': bool(getattr(tenant, 'advancedInvoicingEnabled', True)),
+        'non_gst_shadow_enabled': bool(getattr(tenant, 'nonGstShadowEnabled', False)),
+        'seller_gst_number': getattr(tenant, 'gstNumber', '') or '',
+    })
+
+
+@is_activated()
+@permission_required_any(
+    'home.view_proformainvoice',
+    'home.add_proformainvoice',
+    'home.change_proformainvoice',
+    'home.can_manage_proforma_invoice',
+    'home.can_convert_proforma_invoice',
+    'home.can_view_proforma_invoice_reports',
+)
+def proforma_invoice_list(request):
+    capabilities = _proforma_capabilities(request.user)
+    staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name') if capabilities['can_filter_staff'] else []
+    context = {
+        'staffs': staffs,
+        'proforma_capabilities': capabilities,
+        'proforma_statuses': ProformaInvoice.Status.choices,
+    }
+    return render(request, 'home/proforma/proformaList.html', context)
+
+
+@permission_required_any('home.change_proformainvoice', 'home.can_manage_proforma_invoice', 'home.can_convert_proforma_invoice')
+def edit_proforma_invoice(request, id=None):
+    obj = tenant_object_or_superuser(request, ProformaInvoice.objects.select_related('partyID', 'createdBy', 'tenant'), pk=id, isDeleted=False)
+    if obj is None:
+        raise Http404
+    tenant = get_current_tenant(request)
+    capabilities = _proforma_capabilities(request.user)
+    admin_like = capabilities['can_filter_staff'] or capabilities['can_convert']
+    if not admin_like:
+        if not obj.createdBy_id or getattr(obj.createdBy, 'user_ID_id', None) != request.user.pk:
+            return redirect('homeApp:proforma_invoice_list')
+    can_manage_current = request.user.has_perm('home.can_manage_proforma_invoice')
+    can_edit_current = bool(capabilities['can_edit'] and obj.status != ProformaInvoice.Status.CONVERTED and (can_manage_current or (obj.createdBy_id and getattr(obj.createdBy, 'user_ID_id', None) == request.user.pk)))
+    context = {
+        'obj': obj,
+        'invoice_display': obj.invoiceNumber,
+        'proforma_capabilities': capabilities,
+        'proforma_edit_readonly': not can_edit_current,
+        'proforma_can_edit_current': can_edit_current,
+        'proforma_return_url': reverse('homeApp:proforma_invoice_list'),
+        'proforma_statuses': ProformaInvoice.Status.choices,
+        'proforma_line_items': list(
+            obj.lines.filter(isDeleted=False).select_related('item').values(
+                'item_id', 'item__name', 'item__unitName', 'item__unit__allowsDecimal', 'stockBucket', 'quantity', 'unitPrice',
+                'discountPercent', 'taxableAmount', 'gstRate', 'gstAmount', 'lineTotal', 'remark'
+            )
+        ),
+        'inventory_enabled': bool(getattr(tenant, 'inventoryEnabled', True)),
+        'advanced_invoicing_enabled': bool(getattr(tenant, 'advancedInvoicingEnabled', True)),
+        'non_gst_shadow_enabled': bool(getattr(tenant, 'nonGstShadowEnabled', False)),
+        'seller_gst_number': getattr(tenant, 'gstNumber', '') or '',
+    }
+    return render(request, 'home/proforma/editProforma.html', context)
 
 
 @permission_required_any('home.add_inventoryitem', 'home.change_inventoryitem', 'home.view_inventoryitem', 'home.can_manage_inventory', 'home.can_view_party_credentials')

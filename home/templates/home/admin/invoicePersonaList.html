@@ -1,0 +1,298 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block datatables_css_extra %}
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.12.1/css/dataTables.semanticui.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/fixedcolumns/4.1.0/css/fixedColumns.dataTables.min.css">
+{% endblock %}
+
+{% block datatables_ext_js %}
+<script src="https://cdn.datatables.net/1.12.1/js/jquery.dataTables.min.js"></script>
+<script src="{% static 'js/dataTables.semanticui.js' %}"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.1.0/js/dataTables.fixedColumns.min.js"></script>
+{% endblock %}
+
+{% block title %}
+    <title>Invoice Personas</title>
+{% endblock %}
+
+{% block body %}
+    <style>
+        #PersonaTable_length { left: 20px; position: absolute; }
+        #PersonaTable_filter { width: 50%; float: right; }
+        .dt-buttons { position: absolute; left: 174px; }
+        input[type=search] { width: 100px !important; }
+        .persona-usage-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 8px 0 14px;
+        }
+    </style>
+
+    <div class="ui right aligned basic grid">
+        <div class="sixteen wide column">
+            <div class="ui pointing secondary menu">
+                <div class="item active">Invoice Personas</div>
+                <div style="position: absolute; right: 1.5rem; top: 18px;">
+                    {% if invoice_persona_capabilities.can_add %}
+                        <button class="ui green mini plus button right" onclick="showPersonaModal()">
+                            <i class="plus square outline icon"></i>
+                            Add Invoice Persona
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <h4 class="ui horizontal left aligned divider header">
+                <i class="id badge outline icon"></i>
+                Persona List
+            </h4>
+            <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="PersonaTable" style="margin-top: 5px; width: 100%">
+                <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Legal Name</th>
+                    <th>GST</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                    <th>Default</th>
+                    <th>Added On</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+
+            <div class="ui modal" id="personaModal">
+                <i class="close icon"></i>
+                <div class="header" id="personaModalTitle">Add Invoice Persona</div>
+                <div class="content">
+                    <form class="ui tiny form" id="personaForm">{% csrf_token %}
+                        <input type="hidden" id="EditId">
+                        <div class="persona-usage-strip" id="personaUsageStrip" style="display:none;">
+                            <div class="ui tiny label">Series <span id="usageSeries">0</span></div>
+                            <div class="ui tiny label">Sales <span id="usageSales">0</span></div>
+                            <div class="ui tiny label">Cash Counter <span id="usageCash">0</span></div>
+                        </div>
+                        <div class="two required fields">
+                            <div class="field">
+                                <label>Persona Name</label>
+                                <input type="text" id="name" placeholder="Example: Retail GST">
+                            </div>
+                            <div class="field">
+                                <label>Legal Name</label>
+                                <input type="text" id="legalName" placeholder="Shown on invoice">
+                            </div>
+                        </div>
+                        <div class="two fields">
+                            <div class="field">
+                                <label>GST Number</label>
+                                <input type="text" id="gstNumber" maxlength="20">
+                            </div>
+                            <div class="field">
+                                <label>Phone</label>
+                                <input type="text" id="phone">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>Email</label>
+                            <input type="email" id="email">
+                        </div>
+                        <div class="field">
+                            <label>Billing Address</label>
+                            <textarea id="billingAddress" rows="3"></textarea>
+                        </div>
+                        <div class="inline fields">
+                            <div class="field">
+                                <div class="ui checkbox">
+                                    <input type="checkbox" id="isActive" checked>
+                                    <label>Active</label>
+                                </div>
+                            </div>
+                            <div class="field">
+                                <div class="ui checkbox">
+                                    <input type="checkbox" id="isDefault">
+                                    <label>Default persona</label>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    <div class="actions" style="padding-top: 20px; padding-bottom: 20px; float: right">
+                        <div class="ui cancel button">Cancel</div>
+                        <button class="ui right labeled icon button green saveBtn" onclick="savePersona()">Submit<i class="checkmark icon"></i></button>
+                        <button class="ui right labeled icon button teal js-view-close-btn" type="button" style="display:none" onclick="$('#personaModal').modal('hide')">Close<i class="check icon"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ui basic modal custom" id="deletePersonaModal">
+                <div class="ui icon header"><i class="archive icon"></i>Invoice persona will be deleted</div>
+                <div class="content"><p style="text-align: center">Only unused personas can be deleted. Continue?</p></div>
+                <div class="actions">
+                    <div class="ui red basic cancel inverted button"><i class="remove icon"></i>No</div>
+                    <input type="hidden" id="PersonaID">
+                    <div class="ui green ok inverted button" onclick="deletePersona()"><i class="checkmark icon"></i>Yes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block js %}
+    <script>
+        $('.ui.dropdown').dropdown({fullTextSearch: true});
+        $('.ui.checkbox').checkbox();
+
+        function showError(response) {
+            $('body').toast({class: 'error', message: (response && response.error) || 'An error occurred !'});
+        }
+
+        function resetPersonaForm() {
+            $('#personaForm').trigger('reset');
+            $('#EditId').val('');
+            $('#isActive').prop('checked', true);
+            $('#isDefault').prop('checked', false);
+            $('#personaUsageStrip').hide();
+            $('#personaForm input, #personaForm textarea').prop('disabled', false);
+            $('#personaModal .saveBtn').show();
+            $('#personaModal .js-view-close-btn').hide();
+            $('.ui.checkbox').checkbox('refresh');
+        }
+
+        function showPersonaModal() {
+            resetPersonaForm();
+            $('#personaModalTitle').text('Add Invoice Persona');
+            $('#personaModal').modal('show');
+        }
+
+        function formPayload(isEdit) {
+            const data = new FormData();
+            data.append('name', $('#name').val());
+            data.append('legalName', $('#legalName').val());
+            data.append('gstNumber', $('#gstNumber').val());
+            data.append('phone', $('#phone').val());
+            data.append('email', $('#email').val());
+            data.append('billingAddress', $('#billingAddress').val());
+            data.append('isActive', $('#isActive').is(':checked'));
+            data.append('isDefault', $('#isDefault').is(':checked'));
+            if (isEdit) {
+                data.append('EditId', $('#EditId').val());
+            }
+            return data;
+        }
+
+        function savePersona() {
+            const isEdit = Boolean($('#EditId').val());
+            $.ajax({
+                type: 'post',
+                url: isEdit ? '{% url "homeApp:edit_invoice_persona_api" %}' : '{% url "homeApp:add_invoice_persona_api" %}',
+                data: formPayload(isEdit),
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: isEdit ? 'Invoice persona updated successfully.' : 'Invoice persona added successfully.'});
+                        personaTable.ajax.reload(null, false);
+                        $('#personaModal').modal('hide');
+                    } else {
+                        showError(response);
+                    }
+                },
+                error: function (xhr) { showError(xhr.responseJSON || {}); }
+            });
+        }
+
+        const personaTable = $('#PersonaTable').DataTable({
+            dom: 'Blfrtip',
+            scrollY: '350px',
+            scrollX: true,
+            stateSave: true,
+            fixedColumns: {left: 1, right: 1},
+            buttons: [{extend: 'excel', exportOptions: {columns: [0,1,2,3,4,5,6]}}],
+            columnDefs: [
+                {name: 'name', targets: 0, orderable: true},
+                {name: 'legalName', targets: 1, orderable: true},
+                {name: 'gstNumber', targets: 2, orderable: true},
+                {name: 'phone', targets: 3, orderable: true},
+                {name: 'isActive', targets: 4, orderable: true},
+                {name: 'isDefault', targets: 5, orderable: true},
+                {name: 'datetime', targets: 6, orderable: true},
+                {name: 'action', targets: 7, orderable: false}
+            ],
+            aaSorting: [[5, 'desc'], [0, 'asc']],
+            lengthMenu: [[10,25,50,100,-1], [10,25,50,100,'All']],
+            pageLength: 10,
+            processing: true,
+            serverSide: true,
+            ajax: "{% url 'homeApp:InvoicePersonaListJson' %}"
+        });
+
+        function GetPersonaDetails(id, mode) {
+            const viewOnly = mode === 'view';
+            resetPersonaForm();
+            $('#personaModalTitle').text(viewOnly ? 'View Invoice Persona' : 'Edit Invoice Persona');
+            $('#personaModal').modal('show');
+            $('#personaForm input, #personaForm textarea').prop('disabled', viewOnly);
+            $('#personaModal .saveBtn').toggle(!viewOnly);
+            $('#personaModal .js-view-close-btn').toggle(viewOnly);
+            $.ajax({
+                type: 'get',
+                url: '{% url "homeApp:get_invoice_persona_detail" %}?id=' + id,
+                success: function (response) {
+                    const data = response.data;
+                    $('#EditId').val(data.ID);
+                    $('#name').val(data.Name);
+                    $('#legalName').val(data.LegalName);
+                    $('#gstNumber').val(data.GSTNumber);
+                    $('#phone').val(data.Phone);
+                    $('#email').val(data.Email);
+                    $('#billingAddress').val(data.BillingAddress);
+                    $('#isActive').prop('checked', data.IsActive);
+                    $('#isDefault').prop('checked', data.IsDefault);
+                    $('#usageSeries').text(data.SeriesCount || 0);
+                    $('#usageSales').text(data.SalesCount || 0);
+                    $('#usageCash').text(data.CashCounterCount || 0);
+                    $('#personaUsageStrip').show();
+                    $('.ui.checkbox').checkbox('refresh');
+                },
+                error: function () { showError({}); }
+            });
+        }
+
+        function delPersona(id) {
+            $('#PersonaID').val(id);
+            $('#deletePersonaModal').modal('show');
+        }
+
+        function deletePersona() {
+            const data = new FormData();
+            data.append('userID', $('#PersonaID').val());
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:delete_invoice_persona_api" %}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData: false,
+                success: function (response) {
+                    if (response.message === 'success') {
+                        $('body').toast({class: 'success', message: 'Invoice persona deleted successfully.'});
+                        personaTable.ajax.reload(null, false);
+                    } else {
+                        showError(response);
+                    }
+                },
+                error: function (xhr) { showError(xhr.responseJSON || {}); }
+            });
+        }
+    </script>
+{% endblock %}
