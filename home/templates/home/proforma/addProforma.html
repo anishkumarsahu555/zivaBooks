@@ -129,6 +129,96 @@
             margin: 0 !important;
         }
 
+        .proforma-add-page.ui.grid,
+        .proforma-add-page.ui.grid > .column {
+            width: 100% !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+        }
+
+        html[data-theme="dark"] #addProformaForm.ui.form {
+            color: #d7e3f4;
+        }
+
+        html[data-theme="dark"] .proforma-mode-panel {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.84)) !important;
+            border-color: rgba(45, 212, 191, 0.18) !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] .proforma-section-card,
+        html[data-theme="dark"] .proforma-advanced-card {
+            background: rgba(15, 23, 42, 0.88) !important;
+            border-color: rgba(45, 212, 191, 0.16) !important;
+            box-shadow: none !important;
+        }
+
+        html[data-theme="dark"] .proforma-advanced-card {
+            border-color: rgba(45, 212, 191, 0.22) !important;
+        }
+
+        html[data-theme="dark"] .proforma-section-help,
+        html[data-theme="dark"] .proforma-gst-summary,
+        html[data-theme="dark"] #invoiceNatureHelp,
+        html[data-theme="dark"] #addProformaForm small,
+        html[data-theme="dark"] #addProformaForm p {
+            color: #93a4bd !important;
+        }
+
+        html[data-theme="dark"] #addProformaForm .field > label,
+        html[data-theme="dark"] #addProformaForm .ui.divider.header,
+        html[data-theme="dark"] #addProformaForm .ui.header {
+            color: #dce8f7 !important;
+        }
+
+        html[data-theme="dark"] #addProformaForm .ui.horizontal.divider::before,
+        html[data-theme="dark"] #addProformaForm .ui.horizontal.divider::after {
+            background-color: rgba(148, 163, 184, 0.18) !important;
+        }
+
+        html[data-theme="dark"] .proforma-invoice-picker #invoiceNo {
+            background: rgba(15, 23, 42, 0.86) !important;
+            border-color: rgba(45, 212, 191, 0.18) !important;
+            color: #e5edf7 !important;
+        }
+
+        html[data-theme="dark"] .proforma-invoice-picker .ui.selection.dropdown {
+            background: linear-gradient(135deg, #0f766e, rgba(45, 212, 191, 0.28)) !important;
+            border-color: rgba(45, 212, 191, 0.34) !important;
+            color: #effffc !important;
+        }
+
+        html[data-theme="dark"] .proforma-chip {
+            background: rgba(15, 23, 42, 0.84) !important;
+            border-color: rgba(45, 212, 191, 0.24) !important;
+            color: #99f6e4 !important;
+        }
+
+        html[data-theme="dark"] .proforma-chip.active {
+            background: linear-gradient(135deg, #0f766e, rgba(45, 212, 191, 0.28)) !important;
+            border-color: rgba(45, 212, 191, 0.38) !important;
+            color: #effffc !important;
+        }
+
+        html[data-theme="dark"] #addProformaForm .ui.label {
+            background: rgba(15, 23, 42, 0.82) !important;
+            border: 1px solid rgba(45, 212, 191, 0.16) !important;
+            color: #dce8f7 !important;
+        }
+
+        html[data-theme="dark"] #addProformaForm .ui.violet.label {
+            background: rgba(91, 33, 182, 0.28) !important;
+            border-color: rgba(167, 139, 250, 0.24) !important;
+            color: #ddd6fe !important;
+        }
+
+        html[data-theme="dark"] #advancedInvoiceToggleBtn.ui.basic.teal.button {
+            background: rgba(15, 23, 42, 0.86) !important;
+            border-color: rgba(45, 212, 191, 0.26) !important;
+            color: #8fe5dc !important;
+            box-shadow: none !important;
+        }
+
         @media only screen and (max-width: 767px) {
             .proforma-mode-panel,
             .proforma-section-card,
@@ -148,14 +238,21 @@
             }
 
             .proforma-form-actions {
-                flex-direction: column;
+                flex-direction: row;
+            }
+
+            .proforma-form-actions .saveBtn,
+            .proforma-form-actions .saveBtnLoad,
+            .proforma-form-actions .proforma-reset-btn {
+                flex: 1 1 0;
+                width: auto;
             }
         }
     </style>
 {% endblock %}
 
 {% block body %}
-    <div class="ui aligned basic grid">
+    <div class="ui aligned basic grid proforma-add-page">
         <div class="sixteen wide column">
             <div class="ui pointing secondary menu">
                 <div style="cursor: pointer;" class="item active" data-tab="user">Add Proforma Invoice</div>
@@ -320,7 +417,7 @@
                         <div class="row" style="padding-left:5px; padding-right:5px;">
                             <div class="sixteen wide column center aligned">
                                 <div class="proforma-form-actions">
-                                    <button class="ui teal double button" type="button" onclick="resetProformaForm()">Reset</button>
+                                    <button class="ui teal double button proforma-reset-btn" type="button" onclick="resetProformaForm()">Reset</button>
                                     <button class="ui green button saveBtn" type="button" onclick="saveProforma()">
                                         Submit Detail
                                     </button>

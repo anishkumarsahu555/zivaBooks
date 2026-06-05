@@ -10,8 +10,25 @@
     <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
     <link rel="stylesheet" href="{% static 'css/app-loader.css' %}">
+    <link rel="stylesheet" href="{% static 'css/ui-polish.css' %}">
     <title>Login</title>
     {% progressive_web_app_meta %}
+    <script>
+        (function () {
+            var theme = 'dark';
+            try {
+                theme = localStorage.getItem('ziva-theme') || '';
+            } catch (e) {}
+            if (!theme) {
+                try {
+                    theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                } catch (e) {
+                    theme = 'dark';
+                }
+            }
+            document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : 'dark');
+        })();
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"
             integrity="sha512-894YE6QWD5I59HgZOGReFYm4dnWc1Qt5NtvYSaNcOP+u1T9qYdvdihz0PPSiiqn/+/3e7Jo4EaG7TubfWGUrMQ=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -58,6 +75,14 @@
             position: relative;
         }
 
+        html[data-theme="light"] body {
+            color: #172033;
+            background:
+                radial-gradient(circle at 10% 14%, rgba(13, 148, 136, 0.14), transparent 25%),
+                radial-gradient(circle at 88% 16%, rgba(37, 99, 235, 0.12), transparent 25%),
+                linear-gradient(140deg, #edf7f5 0%, #f8fbff 45%, #eef4ff 100%);
+        }
+
         body::before {
             content: "";
             position: fixed;
@@ -68,6 +93,12 @@
                 linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
             background-size: 62px 62px;
             mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 92%);
+        }
+
+        html[data-theme="light"] body::before {
+            background:
+                linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
         }
 
         fieldset {
@@ -102,6 +133,12 @@
             flex-wrap: wrap;
         }
 
+        html[data-theme="light"] .login-panel {
+            background: rgba(255, 255, 255, 0.64);
+            border-color: rgba(14, 116, 144, 0.14);
+            box-shadow: 0 30px 70px rgba(15, 23, 42, 0.13);
+        }
+
         .column_1,
         .column_2 {
             width: 100%;
@@ -122,6 +159,11 @@
             background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
         }
 
+        html[data-theme="light"] .column_2 {
+            color: #172033;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(236, 253, 245, 0.34));
+        }
+
         .hero-tag {
             display: inline-block;
             padding: 8px 14px;
@@ -136,6 +178,13 @@
             align-self: center;
         }
 
+        html[data-theme="light"] .hero-tag,
+        html[data-theme="light"] .hero-pill {
+            background: rgba(255, 255, 255, 0.62);
+            border-color: rgba(14, 116, 144, 0.12);
+            color: rgba(15, 23, 42, 0.66);
+        }
+
         .hero-title {
             margin: 14px 0 10px;
             font-size: clamp(38px, 5vw, 60px);
@@ -145,6 +194,10 @@
             color: #fbf5ed;
         }
 
+        html[data-theme="light"] .hero-title {
+            color: #0f172a;
+        }
+
         .hero-copy {
             max-width: 360px;
             margin: 0;
@@ -152,6 +205,10 @@
             font-size: 14px;
             line-height: 1.6;
             align-self: flex-start;
+        }
+
+        html[data-theme="light"] .hero-copy {
+            color: rgba(15, 23, 42, 0.68);
         }
 
         .hero-list {
@@ -182,6 +239,12 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
+        html[data-theme="light"] .hero-visual {
+            background: rgba(255, 255, 255, 0.58);
+            border-color: rgba(14, 116, 144, 0.12);
+            box-shadow: 0 18px 36px rgba(14, 116, 144, 0.08);
+        }
+
         .hero-visual svg {
             display: block;
             width: 100%;
@@ -196,6 +259,12 @@
             background: var(--card);
             box-shadow: 0 18px 50px rgba(7, 11, 22, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.58);
+        }
+
+        html[data-theme="light"] .login-form-container {
+            background: rgba(255, 255, 255, 0.94);
+            border-color: rgba(14, 116, 144, 0.12);
+            box-shadow: 0 20px 52px rgba(15, 23, 42, 0.12);
         }
 
         .form-badge {
@@ -343,6 +412,45 @@
             transition: transform .14s ease, filter .14s ease;
         }
 
+        .login-theme-toggle {
+            position: fixed;
+            right: 18px;
+            top: 18px;
+            z-index: 2;
+            width: auto;
+            min-width: 44px;
+            min-height: 40px;
+            margin: 0;
+            padding: 0 13px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #fbf5ed;
+            box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            letter-spacing: 0;
+            text-transform: none;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .login-theme-toggle svg {
+            width: 17px;
+            height: 17px;
+        }
+
+        html[data-theme="light"] .login-theme-toggle {
+            background: rgba(255, 255, 255, 0.74);
+            border-color: rgba(14, 116, 144, 0.14);
+            color: #0f172a;
+            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
+        }
+
         .form-footer {
             margin-top: 16px;
             display: flex;
@@ -396,9 +504,17 @@
             font-size: 12px;
         }
 
+        html[data-theme="light"] .credit {
+            color: rgba(15, 23, 42, 0.62);
+        }
+
         .credit a {
             color: #ffd7c5;
             font-weight: 700;
+        }
+
+        html[data-theme="light"] .credit a {
+            color: #0f766e;
         }
 
         @media (min-width: 768px) {
@@ -511,6 +627,14 @@
                 font-size: 12px;
             }
 
+            .login-theme-toggle {
+                right: 14px;
+                top: 14px;
+                min-height: 36px;
+                min-width: 40px;
+                padding: 0 10px;
+            }
+
             .form-footer {
                 margin-top: 12px;
                 display: block;
@@ -545,6 +669,13 @@
     </style>
 </head>
 <body>
+<button class="login-theme-toggle" type="button" id="loginThemeToggle" aria-label="Switch theme">
+    <svg id="loginThemeIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3.5V5.5M12 18.5V20.5M4.93 4.93L6.34 6.34M17.66 17.66L19.07 19.07M3.5 12H5.5M18.5 12H20.5M4.93 19.07L6.34 17.66M17.66 6.34L19.07 4.93" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/>
+    </svg>
+    <span id="loginThemeLabel">Light</span>
+</button>
 <div class="app-loader" data-app-loader>
     <div class="app-loader__panel">
         <div class="app-loader__logo-wrap">
@@ -682,7 +813,34 @@
 </div>
 <p class="credit" style="">Developed by <a href="http://zivainfotech.com" target="_blank">Ziva Infotech</a></p>
 <script src="{% static 'js/app-loader.js' %}"></script>
+<script src="{% static 'js/ui-polish.js' %}"></script>
 <script>
+    function applyLoginTheme(theme, persist) {
+        var normalized = theme === 'light' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', normalized);
+        if (persist !== false) {
+            try {
+                localStorage.setItem('ziva-theme', normalized);
+            } catch (e) {}
+        }
+        var label = document.getElementById('loginThemeLabel');
+        var button = document.getElementById('loginThemeToggle');
+        if (label) {
+            label.textContent = normalized === 'dark' ? 'Light' : 'Dark';
+        }
+        if (button) {
+            button.setAttribute('aria-label', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+            button.setAttribute('title', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+        }
+    }
+
+    $('#loginThemeToggle').on('click', function () {
+        var nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        applyLoginTheme(nextTheme, true);
+    });
+
+    applyLoginTheme(document.documentElement.getAttribute('data-theme'), false);
+
     function getCookie(name) {
         var cookieValue = null;
         if (document.cookie && document.cookie !== '') {
