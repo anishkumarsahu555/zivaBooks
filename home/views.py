@@ -15,6 +15,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.core.mail import EmailMultiAlternatives
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum, F, FloatField, ExpressionWrapper, Window, Count
 from django.db.models.functions import Length, TruncMonth
@@ -1742,6 +1743,31 @@ def my_profile_collection(request):
     }
     context.update(_profile_role_context(request, instance))
     return render(request, 'home/profileCommon.html', context)
+
+
+def save_recovery_email(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if request.method != 'POST':
+        return JsonResponse({'message': 'method_not_allowed'}, status=405, safe=False)
+    email = (request.POST.get('email') or '').strip()
+    try:
+        validate_email(email)
+    except ValidationError:
+        return JsonResponse({'message': 'invalid_email'}, status=400, safe=False)
+
+    request.user.email = email
+    request.user.save(update_fields=['email'])
+    try:
+        staff = getattr(request.user, 'staff_profile', None)
+        if staff is not None:
+            staff.email = email
+            staff.save(update_fields=['email'])
+    except Exception:
+        pass
+    return JsonResponse({'message': 'success', 'email': email}, safe=False)
+
+
 def postLogin(request):
     if request.method == 'POST':
         username = request.POST.get('userName')
