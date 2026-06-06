@@ -461,6 +461,26 @@
             font-size: 12px;
         }
 
+        .forgot-password-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin: 4px 0 0;
+            color: var(--accent-deep);
+            font-size: 12px;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .forgot-password-link:hover {
+            color: var(--accent);
+            text-decoration: underline;
+        }
+
+        html[data-theme="light"] .forgot-password-link {
+            color: #0f766e;
+        }
+
         .form-status {
             display: inline-flex;
             align-items: center;
@@ -785,6 +805,7 @@
                                         <input type="password" placeholder="Password" name="password" id="password"/>
                                     </div>
                                 </div>
+                                <a class="forgot-password-link" href="{% url 'homeApp:forgot_password' %}">Forgot password?</a>
                                 <button style="cursor: pointer" id="continue" type="button" onclick="UserLogin()">
                                     Sign In
                                 </button>

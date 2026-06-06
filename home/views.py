@@ -1,20 +1,31 @@
 import csv
 import os
+from threading import Thread
 from datetime import datetime, timedelta
+from email.utils import formataddr, parseaddr
 from functools import wraps
 from types import SimpleNamespace
-from django.contrib.auth import logout, authenticate, login, update_session_auth_hash
+from django.conf import settings
+from django.contrib.auth import logout, authenticate, login, update_session_auth_hash, get_user_model
+from django.contrib.auth import password_validation
+from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
+from django.core.mail import EmailMultiAlternatives
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum, F, FloatField, ExpressionWrapper, Window, Count
 from django.db.models.functions import Length, TruncMonth
 from django.http import Http404, JsonResponse, HttpResponse
+from django.templatetags.static import static
 from django.template.loader import render_to_string
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
 from django.utils import timezone
 from weasyprint import CSS, HTML
 # Create your views here.
@@ -1143,6 +1154,258 @@ def preview_500(request):
 def loginPage(request):
     # if not request.user.is_authenticated:
     return render(request, 'home/login.html')
+
+
+PASSWORD_RESET_SUCCESS_MESSAGE = 'If an account exists, reset instructions have been sent.'
+PASSWORD_RESET_CACHE_TTL = 300
+PASSWORD_RESET_CACHE_LIMIT = 3
+password_reset_token_generator = PasswordResetTokenGenerator()
+
+
+def _password_reset_client_ip(request):
+    forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', '')
+
+
+def _password_reset_rate_limited(request, identifier):
+    normalized_identifier = (identifier or '').strip().lower()
+    ip = _password_reset_client_ip(request)
+    cache_key = 'password-reset:{}:{}'.format(ip, normalized_identifier)
+    count = cache.get(cache_key, 0)
+    if count >= PASSWORD_RESET_CACHE_LIMIT:
+        return True
+    cache.set(cache_key, count + 1, PASSWORD_RESET_CACHE_TTL)
+    return False
+
+
+def _find_password_reset_user(identifier):
+    value = (identifier or '').strip()
+    if not value:
+        return None
+    user_model = get_user_model()
+    user = (
+        user_model.objects
+        .filter(username__iexact=value, is_active=True)
+        .order_by('id')
+        .first()
+    )
+    if user is not None:
+        return user
+
+    staff_queryset = (
+        StaffUser.objects
+        .select_related('user_ID')
+        .filter(
+            isDeleted=False,
+            user_ID__isnull=False,
+            user_ID__is_active=True,
+        )
+        .filter(Q(isActive__iexact='Active') | Q(isActive__isnull=True) | Q(isActive=''))
+    )
+    staff = staff_queryset.filter(username__iexact=value).order_by('-id').first()
+    if staff is not None:
+        print('[Password Reset Email] Matched StaffUser {} for {}'.format(staff.pk, value))
+        return staff.user_ID
+    return None
+
+
+def _password_reset_recipient_email(user):
+    if not user:
+        return ''
+    if getattr(user, 'email', ''):
+        return user.email
+    try:
+        staff = getattr(user, 'staff_profile', None)
+        if staff is not None and getattr(staff, 'email', ''):
+            return staff.email
+    except Exception:
+        pass
+    return ''
+
+
+def _password_reset_from_email():
+    configured_from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', '') or getattr(settings, 'EMAIL_HOST_USER', '')
+    _display_name, email_address = parseaddr(configured_from_email)
+    if not email_address:
+        email_address = getattr(settings, 'EMAIL_HOST_USER', '') or configured_from_email
+    return formataddr(('zivaBooks', email_address))
+
+
+def _password_reset_url(request, user):
+    uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+    token = password_reset_token_generator.make_token(user)
+    path = reverse('homeApp:reset_password', kwargs={'uidb64': uidb64, 'token': token})
+    return request.build_absolute_uri(path)
+
+
+def _build_password_reset_email_payload(request, user):
+    recipient_email = _password_reset_recipient_email(user)
+    if not user or not recipient_email:
+        print('[Password Reset Email] Failed: user or email missing')
+        return None
+    reset_url = _password_reset_url(request, user)
+    context = {
+        'user': user,
+        'reset_url': reset_url,
+        'logo_url': request.build_absolute_uri(static('sw/images/icon-192.png')),
+        'timeout_minutes': int(getattr(settings, 'PASSWORD_RESET_TIMEOUT', 3600) / 60),
+    }
+    subject = render_to_string('home/emails/password_reset_subject.txt', context).strip()
+    body = render_to_string('home/emails/password_reset_email.txt', context)
+    html_body = render_to_string('home/emails/password_reset_email.html', context)
+    return {
+        'subject': subject,
+        'body': body,
+        'html_body': html_body,
+        'from_email': _password_reset_from_email(),
+        'recipient_email': recipient_email,
+    }
+
+
+def _send_password_reset_email_payload(payload):
+    message = EmailMultiAlternatives(
+        payload['subject'],
+        payload['body'],
+        payload['from_email'],
+        [payload['recipient_email']],
+    )
+    message.attach_alternative(payload['html_body'], 'text/html')
+    sent_count = message.send(fail_silently=False)
+    if sent_count:
+        print('[Password Reset Email] Success: reset email sent to {}'.format(payload['recipient_email']))
+    else:
+        print('[Password Reset Email] Failed: send_mail returned 0 for {}'.format(payload['recipient_email']))
+    return bool(sent_count)
+
+
+def _send_password_reset_email_payload_async(payload):
+    recipient_email = payload['recipient_email']
+
+    def worker():
+        try:
+            _send_password_reset_email_payload(payload)
+        except Exception as exc:
+            print('[Password Reset Email] Failed: {} for {}'.format(exc, recipient_email))
+
+    Thread(target=worker, daemon=True).start()
+    print('[Password Reset Email] Queued: reset email send started for {}'.format(recipient_email))
+    return True
+
+
+def _send_password_reset_email(request, user):
+    payload = _build_password_reset_email_payload(request, user)
+    if payload is None:
+        return False
+    if getattr(settings, 'PASSWORD_RESET_EMAIL_ASYNC', True):
+        return _send_password_reset_email_payload_async(payload)
+    return _send_password_reset_email_payload(payload)
+
+
+def _password_reset_user_from_token(uidb64, token):
+    user_model = get_user_model()
+    try:
+        user_id = force_str(urlsafe_base64_decode(uidb64))
+        user = user_model.objects.get(pk=user_id, is_active=True)
+    except (TypeError, ValueError, OverflowError, user_model.DoesNotExist, ValidationError):
+        return None
+    if not password_reset_token_generator.check_token(user, token):
+        return None
+    return user
+
+
+def _sync_legacy_password_fields(user, raw_password):
+    try:
+        staff = getattr(user, 'staff_profile', None)
+        if staff is not None:
+            staff.userPassword = raw_password
+            staff.save(update_fields=['userPassword'])
+    except Exception:
+        pass
+    try:
+        party = getattr(user, 'party_profile', None)
+        if party is not None:
+            party.password = raw_password
+            party.save(update_fields=['password'])
+    except Exception:
+        pass
+
+
+def _log_password_reset_completed(user, request):
+    try:
+        AuditLog.objects.create(
+            content_type=ContentType.objects.get_for_model(user.__class__),
+            object_id=user.pk,
+            actor=None,
+            action=AuditLog.Action.PASSWORD_CHANGE,
+            object_repr=user.username,
+            changes={'password': {'from': '***', 'to': '***'}, 'source': 'forgot_password'},
+            snapshot={'username': user.username, 'ip': _password_reset_client_ip(request)},
+        )
+    except Exception:
+        pass
+
+
+def forgot_password(request):
+    context = {
+        'message': '',
+        'submitted': False,
+        'identifier': '',
+    }
+    if request.method == 'POST':
+        identifier = (request.POST.get('identifier') or '').strip()
+        context['identifier'] = identifier
+        context['submitted'] = True
+        context['message'] = PASSWORD_RESET_SUCCESS_MESSAGE
+        if identifier and not _password_reset_rate_limited(request, identifier):
+            user = _find_password_reset_user(identifier)
+            if user is not None:
+                try:
+                    _send_password_reset_email(request, user)
+                except Exception as exc:
+                    print('[Password Reset Email] Failed: {} for {}'.format(exc, identifier))
+            else:
+                print('[Password Reset Email] Skipped: no active user found for {}'.format(identifier))
+        elif identifier:
+            print('[Password Reset Email] Skipped: rate limited for {}'.format(identifier))
+        return render(request, 'home/forgotPassword.html', context)
+    return render(request, 'home/forgotPassword.html', context)
+
+
+def reset_password(request, uidb64, token):
+    user = _password_reset_user_from_token(uidb64, token)
+    context = {
+        'valid_link': user is not None,
+        'errors': [],
+        'success': False,
+    }
+    if user is None:
+        return render(request, 'home/resetPassword.html', context)
+
+    if request.method == 'POST':
+        new_password = request.POST.get('new_password') or ''
+        confirm_password = request.POST.get('confirm_password') or ''
+        errors = []
+        if new_password != confirm_password:
+            errors.append('New password and confirm password do not match.')
+        try:
+            password_validation.validate_password(new_password, user=user)
+        except ValidationError as exc:
+            errors.extend(exc.messages)
+        if errors:
+            context['errors'] = errors
+            return render(request, 'home/resetPassword.html', context)
+
+        user.set_password(new_password)
+        user.save(update_fields=['password'])
+        _sync_legacy_password_fields(user, new_password)
+        _log_password_reset_completed(user, request)
+        context['success'] = True
+        context['valid_link'] = False
+        return render(request, 'home/resetPassword.html', context)
+
+    return render(request, 'home/resetPassword.html', context)
     # else:
     #     return redirect('/admin_home/')
 

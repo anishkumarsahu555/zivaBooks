@@ -73,6 +73,8 @@ urlpatterns = [
     path('home/', homepage, name='homepage'),
     path('', loginPage, name='loginPage'),
     path('claim-access/<str:token>/', claim_access, name='claim_access'),
+    path('forgot_password/', forgot_password, name='forgot_password'),
+    path('reset_password/<str:uidb64>/<str:token>/', reset_password, name='reset_password'),
     path('logout/', user_logout, name='logout'),
     path('postLogin/', postLogin, name='UserLogin'),
 

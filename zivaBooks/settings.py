@@ -247,6 +247,16 @@ PWA_APP_SPLASH_SCREEN = [
 
 PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'home', '../static/sw/serviceworker.js')
 
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_SSL = _env_flag('EMAIL_USE_TLS', True)
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'dummy-email@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'dummy-app-password')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', f'zivaBooks <{EMAIL_HOST_USER}>')
+PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', '3600'))
+PASSWORD_RESET_EMAIL_ASYNC = _env_flag('PASSWORD_RESET_EMAIL_ASYNC', True)
+
 if _env_flag('USE_REDIS_CACHE', True):
     CACHES = {
         "default": {
