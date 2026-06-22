@@ -2862,6 +2862,20 @@
 </script>
 {% block datatables_ext_js %}{% endblock %}
 
+{% if staff_location_autotrack_enabled %}
+<script>
+    window.ZivaStaffLocationAutoTrack = {
+        enabled: true,
+        pingUrl: "{% url 'homeApp:add_staff_location_ping_api' %}",
+        bulkUrl: "{% url 'homeApp:bulk_staff_location_sync_api' %}",
+        csrfToken: "{{ csrf_token }}",
+        intervalMs: 300000,
+        minPageLoadGapMs: 60000
+    };
+</script>
+<script src="{% static 'js/staff-location-autotrack.js' %}"></script>
+{% endif %}
+
 <script>
     if ($.fn.DataTable) {
         $.fn.DataTable.ext.pager.numbers_length = 4;

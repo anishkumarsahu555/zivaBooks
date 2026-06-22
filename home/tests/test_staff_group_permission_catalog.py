@@ -78,6 +78,33 @@ class StaffGroupPermissionCatalogTests(SeededTenantMixin, TestCase):
         self.assertNotContains(response, 'can_view_audit_logs')
         self.assertNotContains(response, 'Enable Audit')
 
+    def test_location_permissions_are_assignable_to_staff_groups(self):
+        manage_groups_perm = Permission.objects.get(content_type__app_label='home', codename='can_manage_staff_groups')
+        tracker_perm = Permission.objects.get(content_type__app_label='home', codename='can_track_staff_location')
+        viewer_perm = Permission.objects.get(content_type__app_label='home', codename='can_view_staff_locations')
+        self._set_tenant_scope(manage_groups_perm)
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse('homeApp:staff_group_create'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'can_track_staff_location')
+        self.assertContains(response, 'can_view_staff_locations')
+        self.assertContains(response, 'Location Tracker')
+        self.assertContains(response, 'Staff Location Viewer')
+
+        create = self.client.post(
+            reverse('homeApp:add_staff_group_api'),
+            data={
+                'groupName': 'Location Enabled Group',
+                'description': 'Can track and view staff locations',
+                'permission_ids[]': [str(tracker_perm.pk), str(viewer_perm.pk)],
+            },
+        )
+
+        self.assertEqual(create.status_code, 200)
+        self.assertEqual(create.json().get('message'), 'success')
+
     def test_api_rejects_permissions_outside_tenant_admin_scope(self):
         limited_admin = User.objects.create_user(
             username='limited.staffgroups.api',

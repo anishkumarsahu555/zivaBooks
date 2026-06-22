@@ -3,6 +3,16 @@ from .navigation import build_sidebar_sections
 from .tenancy import get_current_tenant, get_staff_user_for_request
 
 
+STAFF_LOCATION_ADMIN_PERMS = (
+    'home.can_manage_staff',
+    'home.can_manage_staff_groups',
+    'home.can_view_party_credentials',
+    'home.can_view_staff_locations',
+    'home.can_view_all_attendance',
+    'home.can_view_attendance_reports',
+)
+
+
 def app_navigation(request):
     if hasattr(request, '_app_navigation_context_cache'):
         return request._app_navigation_context_cache
@@ -11,10 +21,15 @@ def app_navigation(request):
     tenant = get_current_tenant(request) if is_authenticated else None
     sidebar_sections = build_sidebar_sections(request)
     staff_user = get_staff_user_for_request(request) if is_authenticated else None
+    is_staff_location_admin = bool(
+        user and any(user.has_perm(perm_name) for perm_name in STAFF_LOCATION_ADMIN_PERMS)
+    )
     dashboard_state = build_dashboard_state(request, sidebar_sections, tenant=tenant, staff_user=staff_user)
     context = {
         'sidebar_sections': sidebar_sections,
         'current_tenant': tenant,
+        'current_staff_user': staff_user,
+        'staff_location_autotrack_enabled': bool(staff_user and not is_staff_location_admin),
         'dashboard_state': dashboard_state,
     }
     request._app_navigation_context_cache = context

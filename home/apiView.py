@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 import json
 import requests
+from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
@@ -22,7 +23,7 @@ from django.urls import reverse
 from django.utils.crypto import get_random_string
 from django.utils.html import escape
 from django.utils import timezone
-from django.utils.dateparse import parse_date
+from django.utils.dateparse import parse_date, parse_datetime
 from django.views.decorators.cache import cache_page
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django_datatables_view.base_datatable_view import BaseDatatableView
@@ -101,6 +102,7 @@ DEFAULT_GROUP_PERMISSION_MAP = {
         'home.can_view_sales_reports',
         'home.can_view_cash_counter_reports',
         'home.can_view_audit_logs',
+        'home.can_view_staff_locations',
     ],
     'Collection': [
         'home.add_collection',
@@ -108,6 +110,7 @@ DEFAULT_GROUP_PERMISSION_MAP = {
         'home.view_collection',
         'home.view_party',
         'home.view_attendance',
+        'home.can_track_staff_location',
     ],
     'SalesAdmin': [
         'home.add_sales',
@@ -131,6 +134,7 @@ DEFAULT_GROUP_PERMISSION_MAP = {
         'home.view_attendance',
         'home.add_attendance',
         'home.change_attendance',
+        'home.can_track_staff_location',
     ],
     'Customer': [
         'home.view_party',
@@ -804,6 +808,14 @@ def _decimal_from_request(value, default='0'):
 def _tenant_admin_group_name(tenant):
     tenant_slug = getattr(tenant, 'slug', 'tenant')
     return f'{tenant_slug}:Tenant Admin'
+
+
+LOCATION_ASSIGNABLE_PERMISSION_CODENAMES = {
+    'can_track_staff_location',
+    'can_view_staff_locations',
+}
+
+
 def _assignable_permissions(request_or_user=None):
     user = getattr(request_or_user, 'user', request_or_user)
     queryset = Permission.objects.select_related('content_type').exclude(
@@ -814,6 +826,13 @@ def _assignable_permissions(request_or_user=None):
         tenant_admin_group = Group.objects.filter(name=_tenant_admin_group_name(tenant)).first()
         if tenant_admin_group is not None:
             allowed_ids = set(tenant_admin_group.permissions.values_list('id', flat=True))
+            if getattr(user, 'is_authenticated', False) and user.has_perm('home.can_manage_staff_groups'):
+                allowed_ids.update(
+                    Permission.objects.filter(
+                        content_type__app_label='home',
+                        codename__in=LOCATION_ASSIGNABLE_PERMISSION_CODENAMES,
+                    ).values_list('id', flat=True)
+                )
             return [permission for permission in queryset if permission.id in allowed_ids]
         return []
     if not getattr(user, 'is_authenticated', False):
@@ -4883,6 +4902,213 @@ def add_attendance_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except Exception as exc:
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def _staff_location_can_view_all(request):
+    return (
+        request.user.has_perm('home.can_view_staff_locations') or
+        request.user.has_perm('home.can_view_all_attendance') or
+        request.user.has_perm('home.can_view_attendance_reports') or
+        request.user.has_perm('home.can_manage_staff') or
+        request.user.has_perm('home.can_view_party_credentials')
+    )
+
+
+def _staff_location_staff_for_request(request):
+    staff = get_staff_user_for_request(request)
+    if staff is None:
+        raise PermissionError('Staff profile is required for location tracking.')
+    return staff
+
+
+def _staff_location_decimal(value, label, min_value, max_value):
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError(f'{label} is invalid.')
+    if parsed < Decimal(str(min_value)) or parsed > Decimal(str(max_value)):
+        raise ValueError(f'{label} is out of range.')
+    return parsed
+
+
+def _staff_location_float(value):
+    if value in (None, ''):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _staff_location_bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _staff_location_recorded_at(value):
+    parsed = parse_datetime(str(value)) if value else None
+    if parsed is None:
+        return timezone.now()
+    if settings.USE_TZ and timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    if not settings.USE_TZ and timezone.is_aware(parsed):
+        parsed = timezone.make_naive(parsed, timezone.get_current_timezone())
+    return parsed
+
+
+def _staff_location_payload(request):
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            return json.loads(request.body.decode('utf-8') or '{}')
+        except json.JSONDecodeError:
+            return {}
+    return request.POST
+
+
+def _save_staff_location_sample(request, staff, sample):
+    lat = _staff_location_decimal(sample.get('latitude') or sample.get('lat'), 'Latitude', -90, 90)
+    lng = _staff_location_decimal(sample.get('longitude') or sample.get('lng'), 'Longitude', -180, 180)
+    client_sample_id = (sample.get('client_sample_id') or sample.get('clientSampleId') or '').strip()[:80] or None
+    if client_sample_id:
+        existing = tenant_qs(request, StaffLocationLog).filter(
+            staff=staff,
+            client_sample_id=client_sample_id,
+            isDeleted=False,
+        ).first()
+        if existing:
+            return existing, False
+    obj = StaffLocationLog(
+        staff=staff,
+        latitude=lat,
+        longitude=lng,
+        accuracy=_staff_location_float(sample.get('accuracy')),
+        speed=_staff_location_float(sample.get('speed')),
+        heading=_staff_location_float(sample.get('heading')),
+        battery_percent=_staff_location_float(sample.get('battery_percent') or sample.get('batteryPercent')),
+        is_mock_location=_staff_location_bool(sample.get('is_mock_location') or sample.get('isMockLocation')),
+        source=(sample.get('source') or 'pwa')[:30],
+        client_sample_id=client_sample_id,
+        recorded_at=_staff_location_recorded_at(sample.get('recorded_at') or sample.get('recordedAt')),
+    )
+    assign_tenant(obj, request)
+    obj.save()
+    return obj, True
+
+
+@transaction.atomic
+def add_staff_location_ping_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'POST is required.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    try:
+        staff = _staff_location_staff_for_request(request)
+        obj, created = _save_staff_location_sample(request, staff, _staff_location_payload(request))
+        return JsonResponse({
+            'message': 'success',
+            'created': created,
+            'id': obj.pk,
+            'recorded_at': obj.recorded_at.isoformat(),
+        })
+    except PermissionError as exc:
+        return JsonResponse({'message': 'forbidden', 'error': str(exc)}, status=403)
+    except ValueError as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=400)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
+
+@transaction.atomic
+def bulk_staff_location_sync_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'POST is required.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    try:
+        staff = _staff_location_staff_for_request(request)
+        payload = _staff_location_payload(request)
+        samples = payload.get('locations') or payload.get('samples') or []
+        if not isinstance(samples, list):
+            return JsonResponse({'message': 'error', 'error': 'locations must be a list.'}, status=400)
+        created = 0
+        skipped = 0
+        errors = []
+        for index, sample in enumerate(samples[:500]):
+            try:
+                _, was_created = _save_staff_location_sample(request, staff, sample or {})
+                created += 1 if was_created else 0
+                skipped += 0 if was_created else 1
+            except ValueError as exc:
+                errors.append({'index': index, 'error': str(exc)})
+        return JsonResponse({'message': 'success', 'created': created, 'skipped': skipped, 'errors': errors})
+    except PermissionError as exc:
+        return JsonResponse({'message': 'forbidden', 'error': str(exc)}, status=403)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
+
+def staff_location_daily_route_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    staff = get_staff_user_for_request(request)
+    can_view_all = _staff_location_can_view_all(request)
+    staff_id = request.GET.get('staff_id') or request.GET.get('staffID')
+    if staff_id and can_view_all:
+        selected_staff = tenant_qs(request, StaffUser).filter(pk=staff_id, isDeleted=False).first()
+    else:
+        selected_staff = staff
+    if selected_staff is None:
+        return JsonResponse({'message': 'forbidden', 'error': 'Staff profile is required.'}, status=403)
+    route_date = parse_date(request.GET.get('date') or '') or datetime.today().date()
+    start_at = datetime.combine(route_date, datetime.min.time())
+    if settings.USE_TZ:
+        start_at = timezone.make_aware(start_at, timezone.get_current_timezone())
+    end_at = start_at + timedelta(days=1)
+    logs = tenant_qs(request, StaffLocationLog).filter(
+        staff=selected_staff,
+        isDeleted=False,
+        recorded_at__gte=start_at,
+        recorded_at__lt=end_at,
+    ).order_by('recorded_at')
+    points = [
+        {
+            'id': log.pk,
+            'latitude': float(log.latitude),
+            'longitude': float(log.longitude),
+            'accuracy': log.accuracy,
+            'speed': log.speed,
+            'heading': log.heading,
+            'battery_percent': log.battery_percent,
+            'is_mock_location': log.is_mock_location,
+            'recorded_at': (
+                timezone.localtime(log.recorded_at).isoformat()
+                if settings.USE_TZ else log.recorded_at.isoformat()
+            ),
+        }
+        for log in logs[:2000]
+    ]
+    return JsonResponse({
+        'message': 'success',
+        'staff': {'id': selected_staff.pk, 'name': selected_staff.name or '-'},
+        'date': route_date.isoformat(),
+        'count': len(points),
+        'points': points,
+    })
+
+
+def staff_location_staff_options_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _staff_location_can_view_all(request):
+        staff = get_staff_user_for_request(request)
+        rows = [{'id': staff.pk, 'name': staff.name or '-'}] if staff else []
+    else:
+        rows = [
+            {'id': item.pk, 'name': item.name or '-'}
+            for item in tenant_qs(request, StaffUser).filter(isDeleted=False).order_by('name')
+        ]
+    return JsonResponse({'message': 'success', 'staff': rows})
 class StaffAttendanceListJson(BaseDatatableView):
     order_columns = ['datetime', 'loginDateTime', 'loginPhoto', 'login_location', 'login_remark', 'logoutDateTime', 'logoutPhoto', 'logout_location',
                      'logout_remark',

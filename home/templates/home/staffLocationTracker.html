@@ -1,0 +1,336 @@
+{% extends 'home/baseIndex.html' %}
+
+{% block title %}
+    <title>Staff Location Tracker</title>
+{% endblock %}
+
+{% block body %}
+<style>
+    .tracker-shell {
+        max-width: 860px;
+        margin: 0 auto;
+    }
+
+    .tracker-panel {
+        background: var(--app-surface);
+        border: 1px solid var(--app-line);
+        border-radius: 8px;
+        box-shadow: var(--app-shadow);
+        padding: 18px;
+    }
+
+    .tracker-status {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin: 16px 0;
+    }
+
+    .tracker-stat {
+        border: 1px solid var(--app-line);
+        border-radius: 8px;
+        padding: 12px;
+        background: var(--app-surface-soft);
+        min-height: 82px;
+    }
+
+    .tracker-stat span {
+        display: block;
+        color: var(--app-muted);
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .tracker-stat strong {
+        display: block;
+        margin-top: 8px;
+        color: var(--app-text);
+        font-size: 1rem;
+        word-break: break-word;
+    }
+
+    .tracker-note {
+        color: var(--app-muted);
+        line-height: 1.55;
+        margin-top: 12px;
+    }
+
+    @media (max-width: 720px) {
+        .tracker-status {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="tracker-shell">
+    <div class="ui pointing secondary menu">
+        <div class="item active">Location Tracker</div>
+    </div>
+
+    <div class="tracker-panel">
+        <h3 class="ui header">
+            <i class="map marker alternate icon"></i>
+            <div class="content">
+                {{ staff.name|default:"Staff" }}
+                <div class="sub header">Track duty movement while this PWA remains open.</div>
+            </div>
+        </h3>
+
+        <div class="ui form">
+            <div class="fields">
+                <div class="six wide field">
+                    <label>Push interval</label>
+                    <select class="ui dropdown" id="trackingInterval">
+                        <option value="300000">Every 5 minutes</option>
+                        <option value="120000">Every 2 minutes</option>
+                    </select>
+                </div>
+                <div class="ten wide field">
+                    <label>Action</label>
+                    <button type="button" class="ui green labeled icon button" id="startTrackingBtn">
+                        <i class="play icon"></i>
+                        Start Tracking
+                    </button>
+                    <button type="button" class="ui red labeled icon button" id="stopTrackingBtn" disabled>
+                        <i class="stop icon"></i>
+                        Stop Tracking
+                    </button>
+                    <button type="button" class="ui teal icon button" id="syncTrackingBtn" title="Sync pending locations">
+                        <i class="sync icon"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tracker-status">
+            <div class="tracker-stat">
+                <span>Status</span>
+                <strong id="trackerStatus">Stopped</strong>
+            </div>
+            <div class="tracker-stat">
+                <span>Last Push</span>
+                <strong id="lastPush">-</strong>
+            </div>
+            <div class="tracker-stat">
+                <span>Pending Sync</span>
+                <strong id="pendingCount">0</strong>
+            </div>
+        </div>
+
+        <div class="ui message" id="trackerMessage">
+            Browser location permission is required. Tracking stops when this PWA/browser tab is closed by the phone.
+        </div>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var pingUrl = "{% url 'homeApp:add_staff_location_ping_api' %}";
+        var bulkUrl = "{% url 'homeApp:bulk_staff_location_sync_api' %}";
+        var csrfToken = "{{ csrf_token }}";
+        var dbName = "zivaStaffLocation";
+        var storeName = "pendingLocations";
+        var trackingTimer = null;
+        var isTracking = false;
+
+        var statusEl = document.getElementById("trackerStatus");
+        var lastPushEl = document.getElementById("lastPush");
+        var pendingCountEl = document.getElementById("pendingCount");
+        var messageEl = document.getElementById("trackerMessage");
+        var startBtn = document.getElementById("startTrackingBtn");
+        var stopBtn = document.getElementById("stopTrackingBtn");
+        var syncBtn = document.getElementById("syncTrackingBtn");
+        var intervalEl = document.getElementById("trackingInterval");
+
+        function setMessage(text, type) {
+            messageEl.className = "ui message" + (type ? " " + type : "");
+            messageEl.textContent = text;
+        }
+
+        function openDb() {
+            return new Promise(function (resolve, reject) {
+                var request = indexedDB.open(dbName, 1);
+                request.onupgradeneeded = function () {
+                    request.result.createObjectStore(storeName, {keyPath: "client_sample_id"});
+                };
+                request.onsuccess = function () { resolve(request.result); };
+                request.onerror = function () { reject(request.error); };
+            });
+        }
+
+        function withStore(mode, callback) {
+            return openDb().then(function (db) {
+                return new Promise(function (resolve, reject) {
+                    var tx = db.transaction(storeName, mode);
+                    var store = tx.objectStore(storeName);
+                    var result = callback(store);
+                    tx.oncomplete = function () { resolve(result); };
+                    tx.onerror = function () { reject(tx.error); };
+                });
+            });
+        }
+
+        function queueLocation(sample) {
+            return withStore("readwrite", function (store) {
+                store.put(sample);
+            }).then(updatePendingCount);
+        }
+
+        function getQueuedLocations() {
+            return openDb().then(function (db) {
+                return new Promise(function (resolve, reject) {
+                    var tx = db.transaction(storeName, "readonly");
+                    var request = tx.objectStore(storeName).getAll();
+                    request.onsuccess = function () { resolve(request.result || []); };
+                    request.onerror = function () { reject(request.error); };
+                });
+            });
+        }
+
+        function deleteQueuedLocations(samples) {
+            return withStore("readwrite", function (store) {
+                samples.forEach(function (sample) {
+                    store.delete(sample.client_sample_id);
+                });
+            }).then(updatePendingCount);
+        }
+
+        function updatePendingCount() {
+            return getQueuedLocations().then(function (items) {
+                pendingCountEl.textContent = items.length;
+            }).catch(function () {
+                pendingCountEl.textContent = "-";
+            });
+        }
+
+        function getBatteryPercent() {
+            if (!navigator.getBattery) {
+                return Promise.resolve(null);
+            }
+            return navigator.getBattery().then(function (battery) {
+                return Math.round((battery.level || 0) * 100);
+            }).catch(function () {
+                return null;
+            });
+        }
+
+        function buildSample(position, batteryPercent) {
+            var coords = position.coords || {};
+            return {
+                client_sample_id: Date.now() + "-" + Math.random().toString(36).slice(2),
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                accuracy: coords.accuracy,
+                speed: coords.speed,
+                heading: coords.heading,
+                battery_percent: batteryPercent,
+                recorded_at: new Date(position.timestamp || Date.now()).toISOString(),
+                source: "pwa"
+            };
+        }
+
+        function postJson(url, payload) {
+            return fetch(url, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest"
+                },
+                body: JSON.stringify(payload)
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Server rejected the location update.");
+                }
+                return response.json();
+            });
+        }
+
+        function pushCurrentLocation() {
+            if (!navigator.geolocation) {
+                setMessage("This browser does not support location tracking.", "negative");
+                stopTracking();
+                return;
+            }
+            statusEl.textContent = "Getting GPS fix...";
+            navigator.geolocation.getCurrentPosition(function (position) {
+                getBatteryPercent().then(function (batteryPercent) {
+                    var sample = buildSample(position, batteryPercent);
+                    postJson(pingUrl, sample).then(function () {
+                        lastPushEl.textContent = new Date().toLocaleString();
+                        statusEl.textContent = "Tracking";
+                        setMessage("Location pushed successfully.", "positive");
+                        syncQueuedLocations();
+                    }).catch(function () {
+                        queueLocation(sample);
+                        statusEl.textContent = "Tracking, pending sync";
+                        setMessage("Network issue. Location saved on this device for sync.", "warning");
+                    });
+                });
+            }, function (error) {
+                statusEl.textContent = isTracking ? "Tracking paused" : "Stopped";
+                setMessage(error.message || "Unable to get current location.", "negative");
+            }, {
+                enableHighAccuracy: true,
+                timeout: 20000,
+                maximumAge: 30000
+            });
+        }
+
+        function syncQueuedLocations() {
+            return getQueuedLocations().then(function (items) {
+                if (!items.length) {
+                    updatePendingCount();
+                    return;
+                }
+                return postJson(bulkUrl, {locations: items}).then(function (response) {
+                    if (response.message === "success") {
+                        return deleteQueuedLocations(items);
+                    }
+                });
+            }).catch(function () {
+                updatePendingCount();
+            });
+        }
+
+        function startTracking() {
+            if (isTracking) {
+                return;
+            }
+            isTracking = true;
+            localStorage.setItem("zivaStaffLocationTracking", "1");
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            intervalEl.disabled = true;
+            statusEl.textContent = "Starting";
+            pushCurrentLocation();
+            trackingTimer = setInterval(pushCurrentLocation, parseInt(intervalEl.value, 10));
+        }
+
+        function stopTracking() {
+            isTracking = false;
+            localStorage.removeItem("zivaStaffLocationTracking");
+            if (trackingTimer) {
+                clearInterval(trackingTimer);
+                trackingTimer = null;
+            }
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            intervalEl.disabled = false;
+            statusEl.textContent = "Stopped";
+        }
+
+        startBtn.addEventListener("click", startTracking);
+        stopBtn.addEventListener("click", stopTracking);
+        syncBtn.addEventListener("click", syncQueuedLocations);
+        window.addEventListener("online", syncQueuedLocations);
+
+        updatePendingCount();
+        if (localStorage.getItem("zivaStaffLocationTracking") === "1") {
+            startTracking();
+        }
+    })();
+</script>
+{% endblock %}

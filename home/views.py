@@ -134,6 +134,14 @@ def _ensure_party_portal_permissions(user):
 def _tenant_admin_group_name(tenant):
     tenant_slug = getattr(tenant, 'slug', 'tenant')
     return f'{tenant_slug}:Tenant Admin'
+
+
+LOCATION_ASSIGNABLE_PERMISSION_CODENAMES = {
+    'can_track_staff_location',
+    'can_view_staff_locations',
+}
+
+
 def _assignable_permissions(request_or_user=None):
     user = getattr(request_or_user, 'user', request_or_user)
     queryset = Permission.objects.select_related('content_type').exclude(
@@ -144,6 +152,13 @@ def _assignable_permissions(request_or_user=None):
         tenant_admin_group = Group.objects.filter(name=_tenant_admin_group_name(tenant)).first()
         if tenant_admin_group is not None:
             allowed_ids = set(tenant_admin_group.permissions.values_list('id', flat=True))
+            if getattr(user, 'is_authenticated', False) and user.has_perm('home.can_manage_staff_groups'):
+                allowed_ids.update(
+                    Permission.objects.filter(
+                        content_type__app_label='home',
+                        codename__in=LOCATION_ASSIGNABLE_PERMISSION_CODENAMES,
+                    ).values_list('id', flat=True)
+                )
             return [permission for permission in queryset if permission.id in allowed_ids]
         return []
     if not getattr(user, 'is_authenticated', False):
@@ -714,6 +729,22 @@ STAFF_GROUP_PRESET_DEFS = [
         'description': 'Read-only access to your own attendance records.',
         'permissions': [
             'home.view_attendance',
+        ],
+    },
+    {
+        'key': 'staff_location_tracker',
+        'label': 'Location Tracker',
+        'description': 'Allow staff to open the location tracker and share their route while using the PWA.',
+        'permissions': [
+            'home.can_track_staff_location',
+        ],
+    },
+    {
+        'key': 'staff_location_viewer',
+        'label': 'Staff Location Viewer',
+        'description': 'Allow admins to open the staff route map and review daily staff paths.',
+        'permissions': [
+            'home.can_view_staff_locations',
         ],
     },
     {
@@ -3061,6 +3092,23 @@ def attendance_report(request):
 @permission_required_any('home.can_view_all_attendance', 'home.can_view_attendance_reports')
 def attendance_report_admin(request):
     return redirect('homeApp:attendance_list')
+
+
+@permission_required_any('home.can_track_staff_location')
+def staff_location_tracker(request):
+    staff = get_object_or_404(tenant_qs(request, StaffUser), user_ID__pk=request.user.pk)
+    return render(request, 'home/staffLocationTracker.html', {'staff': staff})
+
+
+@permission_required_any(
+    'home.can_view_staff_locations',
+)
+def staff_location_map(request):
+    context = {
+        'staffs': tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name'),
+        'today': datetime.today().date(),
+    }
+    return render(request, 'home/staffLocationMap.html', context)
 # ----------------------------- Sales ----------------------
 @permission_required_any('home.add_sales')
 def add_sales(request):

@@ -14,6 +14,11 @@ ADMIN_LIKE_PERMS = {
     'home.can_view_audit_logs',
 }
 
+LOCATION_PERMISSION_NAMES = {
+    'home.can_track_staff_location',
+    'home.can_view_staff_locations',
+}
+
 
 def _tenant_admin_group_name(tenant):
     tenant_slug = getattr(tenant, 'slug', 'tenant')
@@ -69,6 +74,7 @@ def _tenant_permission_names(request_or_user, tenant):
             f'{permission.content_type.app_label}.{permission.codename}'
             for permission in tenant_admin_group.permissions.all()
         }
+    permissions.update(LOCATION_PERMISSION_NAMES)
     tenant._tenant_permission_names_cache = permissions
     if request is not None:
         request._tenant_permission_names_cache = permissions
@@ -288,6 +294,10 @@ def _admin_sections(user):
                 _nav_item('Attendance List', 'homeApp:attendance_list', 'calendar alternate', (
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
+                )),
+                _nav_item('Location Tracker', 'homeApp:staff_location_tracker', 'map marker alternate', 'home.can_track_staff_location'),
+                _nav_item('Staff Route Map', 'homeApp:staff_location_map', 'map outline', (
+                    'home.can_view_staff_locations',
                 )),
             ]),
         },
@@ -905,6 +915,10 @@ def build_sidebar_sections(request_or_user):
                     'home.change_attendance',
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
+                )),
+                _nav_item('Location Tracker', 'homeApp:staff_location_tracker', 'map marker alternate', 'home.can_track_staff_location'),
+                _nav_item('Staff Route Map', 'homeApp:staff_location_map', 'map outline', (
+                    'home.can_view_staff_locations',
                 )),
             ]),
         },

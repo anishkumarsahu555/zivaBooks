@@ -472,6 +472,38 @@ class Attendance(TenantOwnedModel):
         ]
 
 
+class StaffLocationLog(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='staff_location_logs')
+    staff = models.ForeignKey(StaffUser, blank=True, null=True, on_delete=models.SET_NULL, related_name='location_logs')
+    latitude = models.DecimalField(max_digits=10, decimal_places=7)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7)
+    accuracy = models.FloatField(blank=True, null=True)
+    speed = models.FloatField(blank=True, null=True)
+    heading = models.FloatField(blank=True, null=True)
+    battery_percent = models.FloatField(blank=True, null=True)
+    is_mock_location = models.BooleanField(default=False)
+    source = models.CharField(max_length=30, default='pwa')
+    client_sample_id = models.CharField(max_length=80, blank=True, null=True)
+    recorded_at = models.DateTimeField()
+
+    def __str__(self):
+        staff_name = self.staff.name if self.staff_id else 'Unknown staff'
+        return f'{staff_name} @ {self.recorded_at}'
+
+    class Meta:
+        verbose_name_plural = 'i.1) Staff Location Logs'
+        ordering = ['-recorded_at']
+        indexes = [
+            models.Index(fields=['tenant', 'isDeleted', 'staff', 'recorded_at'], name='staffloc_tenant_staff_dt_idx'),
+            models.Index(fields=['tenant', 'isDeleted', 'recorded_at'], name='staffloc_tenant_dt_idx'),
+            models.Index(fields=['tenant', 'staff', 'client_sample_id'], name='staffloc_client_sample_idx'),
+        ]
+        permissions = [
+            ('can_view_staff_locations', 'Can view staff locations'),
+            ('can_track_staff_location', 'Can track own staff location'),
+        ]
+
+
 class WhatsappMessageStatus(TenantOwnedModel):
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='whatsapp_message_statuses')
     message = models.TextField(blank=True, null=True)
