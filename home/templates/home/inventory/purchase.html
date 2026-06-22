@@ -132,6 +132,8 @@
     .purchase-lines-table th:nth-child(7) { width: 9%; }
     .purchase-lines-table th:nth-child(8) { width: 8%; }
     .purchase-lines-table th:nth-child(9) { width: 7%; }
+    .purchase-lines-table th:nth-child(10) { width: 8%; }
+    .purchase-lines-table th:nth-child(11) { width: 7%; }
 
     .purchase-lines-table .ui.dropdown > .text {
         white-space: nowrap;
@@ -351,6 +353,10 @@
                                     <th>Item</th>
                                     <th>Bucket</th>
                                     <th>Qty</th>
+                                    <th>Batch</th>
+                                    <th>Mfg</th>
+                                    <th>Expiry</th>
+                                    <th>MRP</th>
                                     <th>Unit Cost</th>
                                     <th>Taxable</th>
                                     <th>GST %</th>
@@ -450,6 +456,7 @@
                 ' data-non-gst-stock="' + (item.NonGSTStock || 0) + '"' +
                 ' data-purchase-price="' + (item.DefaultPurchasePrice || 0) + '"' +
                 ' data-sales-price="' + (item.DefaultSalesPrice || 0) + '"' +
+                ' data-requires-batch="' + (item.RequiresBatchTracking ? 1 : 0) + '"' +
                 ' data-default-bucket="' + (item.DefaultStockBucket || 'gst') + '"' +
                 '>' + item.Name + (item.SKU ? ' [' + item.SKU + ']' : '') +
                 ' | GST ' + (item.GSTStock || 0) +
@@ -465,6 +472,7 @@
         const purchasePrice = Number($selected.data('purchase-price') || 0).toFixed(2);
         const salesPrice = Number($selected.data('sales-price') || 0).toFixed(2);
         const gstRate = Number($selected.data('gst-rate') || 0).toFixed(2);
+        const requiresBatch = String($selected.data('requires-batch') || '0') === '1';
         const bucket = currentPurchaseIsNonGst()
             ? 'non_gst'
             : ($row.find('.purchase-bucket').dropdown('get value') || $row.find('.purchase-bucket').val() || 'gst');
@@ -474,7 +482,7 @@
         if (nonGstShadowEnabled) {
             metaHtml += ' | Non-GST Stock: ' + nonGstStock;
         }
-        metaHtml += ' | Purchase Rate: ₹ ' + purchasePrice + ' | Sales Rate: ₹ ' + salesPrice + ' | GST %: ' + gstRate;
+        metaHtml += ' | Purchase Rate: ₹ ' + purchasePrice + ' | Sales Rate: ₹ ' + salesPrice + ' | GST %: ' + gstRate + (requiresBatch ? ' | Batch required' : '');
         $row.find('.purchase-line-item-hint').html(
             'Selected bucket: <strong>' + bucketLabel + '</strong> | Available: <strong>' + activeStock + '</strong>' +
             ' <span style="color:#98a2b3;">' + metaHtml + '</span>'
@@ -520,6 +528,10 @@
             '<td><div class="field"><select class="ui fluid search selection dropdown purchase-item"><option value="">Select item</option>' + purchaseOptionsHtml() + '</select><div class="purchase-line-item-hint">Selected bucket: <strong>GST</strong> | Available: <strong>0</strong> <span style="color:#98a2b3;">| GST Stock: 0' + (nonGstShadowEnabled ? ' | Non-GST Stock: 0' : '') + ' | Purchase Rate: ₹ 0.00 | Sales Rate: ₹ 0.00 | GST %: 0.00</span></div></div></td>' +
             '<td><div class="field"><select class="ui fluid selection dropdown purchase-bucket">' + bucketOptions + '</select></div></td>' +
             '<td><div class="ui fluid input"><input type="number" class="purchase-qty" step="0.01" value="' + (row.quantity || '') + '"></div></td>' +
+            '<td><input type="hidden" class="purchase-batch-id" value="' + (row.batchId || '') + '"><div class="ui fluid input"><input type="text" class="purchase-batch-number" maxlength="120" value="' + (row.batchNumber || '') + '" placeholder="Batch no"></div></td>' +
+            '<td><div class="ui fluid input"><input type="text" class="purchase-mfg-date" value="' + (row.manufactureDate || '') + '" placeholder="DD/MM/YYYY"></div></td>' +
+            '<td><div class="ui fluid input"><input type="text" class="purchase-expiry-date" value="' + (row.expiryDate || '') + '" placeholder="DD/MM/YYYY"></div></td>' +
+            '<td><div class="ui fluid input"><input type="number" class="purchase-batch-mrp" step="0.01" value="' + (row.batchMrp || '') + '"></div></td>' +
             '<td><div class="ui fluid input"><input type="number" class="purchase-unit-cost" step="0.01" value="' + (row.unitCost || '') + '"></div></td>' +
             '<td><div class="ui fluid input"><input type="number" class="purchase-taxable" step="0.01" value="' + (row.taxableAmount || '') + '" readonly></div></td>' +
             '<td><div class="ui fluid input"><input type="number" class="purchase-gst-rate" step="0.01" value="' + (row.gstRate || '') + '"></div></td>' +
@@ -606,6 +618,11 @@
             if (!itemId || quantity <= 0) return;
             lines.push({
                 itemId: itemId,
+                batchId: $row.find('.purchase-batch-id').val() || '',
+                batchNumber: $row.find('.purchase-batch-number').val() || '',
+                manufactureDate: $row.find('.purchase-mfg-date').val() || '',
+                expiryDate: $row.find('.purchase-expiry-date').val() || '',
+                batchMrp: parseFloat($row.find('.purchase-batch-mrp').val()) || 0,
                 stockBucket: nonGstMode ? 'non_gst' : ($row.find('.purchase-bucket').dropdown('get value') || $row.find('.purchase-bucket').val()),
                 quantity: quantity,
                 unitCost: parseFloat($row.find('.purchase-unit-cost').val()) || 0,
@@ -616,6 +633,46 @@
             });
         });
         return lines;
+    }
+
+    function parsePurchaseDate(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        const parts = raw.indexOf('/') >= 0 ? raw.split('/') : raw.split('-');
+        if (parts.length !== 3) return null;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        const date = new Date(year < 100 ? 2000 + year : year, month, day);
+        return isNaN(date.getTime()) ? null : date;
+    }
+
+    function validatePurchaseLines(lines) {
+        const catalogById = {};
+        purchaseCatalog.forEach(function (item) { catalogById[String(item.ID)] = item; });
+        for (let index = 0; index < lines.length; index += 1) {
+            const line = lines[index];
+            const item = catalogById[String(line.itemId)] || {};
+            const itemName = item.Name || ('line ' + (index + 1));
+            if (item.RequiresBatchTracking && !String(line.batchNumber || '').trim()) {
+                return {valid: false, message: 'Batch number is required for ' + itemName + '.'};
+            }
+            if (item.RequiresBatchTracking && !String(line.expiryDate || '').trim()) {
+                return {valid: false, message: 'Expiry date is required for ' + itemName + '.'};
+            }
+            const mfgDate = parsePurchaseDate(line.manufactureDate);
+            const expiryDate = parsePurchaseDate(line.expiryDate);
+            if (line.manufactureDate && !mfgDate) {
+                return {valid: false, message: 'Use DD/MM/YYYY manufacture date for ' + itemName + '.'};
+            }
+            if (line.expiryDate && !expiryDate) {
+                return {valid: false, message: 'Use DD/MM/YYYY expiry date for ' + itemName + '.'};
+            }
+            if (mfgDate && expiryDate && expiryDate < mfgDate) {
+                return {valid: false, message: 'Expiry cannot be before manufacture date for ' + itemName + '.'};
+            }
+        }
+        return {valid: true, message: ''};
     }
 
     function renderRevisionList(rows) {
@@ -731,6 +788,11 @@
         const lines = collectPurchaseLines();
         if (!$('#purchaseInvoiceNumber').val() || !$('#purchaseInvoiceDate').val() || !$('#purchaseParty').val() || !lines.length) {
             $('body').toast({class: 'orange', message: 'Invoice number, date, party, and at least one line are required.'});
+            return;
+        }
+        const validation = validatePurchaseLines(lines);
+        if (!validation.valid) {
+            $('body').toast({class: 'orange', message: validation.message || 'Fix purchase batch details before saving.'});
             return;
         }
         const data = new FormData();

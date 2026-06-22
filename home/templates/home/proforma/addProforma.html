@@ -666,6 +666,7 @@
             containerSelector: '#salesLineItemBox',
             hiddenInputSelector: '#salesLineItems',
             catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+            batchUrl: '{% url "homeApp:list_inventory_batches_api" %}',
             initialRows: [],
             syncTotals: function (totals) {
                 $('#amount').val((totals.roundedPayable || 0).toFixed(2));

@@ -26,9 +26,10 @@
     #inventoryItemTable_length,
     #inventoryCategoryTable_length,
     #inventoryUnitTable_length,
-    #inventoryTaxTable_length,
-    #inventoryWarehouseTable_length,
-    #inventoryLedgerTable_length,
+        #inventoryTaxTable_length,
+        #inventoryWarehouseTable_length,
+        #inventoryBatchReportTable_length,
+        #inventoryLedgerTable_length,
     #inventoryAdjustmentTable_length,
     #inventoryTransferTable_length,
     #purchaseReturnTable_length,
@@ -40,9 +41,10 @@
     #inventoryItemTable_filter,
     #inventoryCategoryTable_filter,
     #inventoryUnitTable_filter,
-    #inventoryTaxTable_filter,
-    #inventoryWarehouseTable_filter,
-    #inventoryLedgerTable_filter,
+        #inventoryTaxTable_filter,
+        #inventoryWarehouseTable_filter,
+        #inventoryBatchReportTable_filter,
+        #inventoryLedgerTable_filter,
     #inventoryAdjustmentTable_filter,
     #inventoryTransferTable_filter,
     #purchaseReturnTable_filter,
@@ -68,6 +70,39 @@
         margin-top: 3px;
         font-size: 12px;
         color: #64748b;
+    }
+
+    .inventory-batch-alert {
+        display: none;
+        align-items: center;
+        gap: 12px;
+        margin: 0 0 10px 0;
+        padding: 10px 12px;
+        border: 1px solid #fed7aa;
+        background: #fff7ed;
+        color: #9a3412;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .inventory-batch-alert.danger {
+        border-color: #fecaca;
+        background: #fef2f2;
+        color: #991b1b;
+    }
+
+    .inventory-batch-alert .label {
+        margin-left: auto;
+    }
+
+    .inventory-batch-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
     }
 
     .inventory-stock-badge {
@@ -626,6 +661,41 @@
         <div class="row" style="padding-left: 5px; padding-right: 5px">
             <div class="wide">
                 <h4 class="ui horizontal left aligned divider header inventory-section-divider">
+                    <i class="hourglass half icon"></i>
+                    Batch Expiry
+                </h4>
+                <div class="inventory-batch-alert" id="inventoryBatchAlert">
+                    <i class="exclamation triangle icon"></i>
+                    <span id="inventoryBatchAlertText"></span>
+                    <span class="ui tiny basic label" id="inventoryBatchAlertWindow"></span>
+                </div>
+                <div class="inventory-batch-toolbar">
+                    <div class="ui tiny basic buttons" id="inventoryBatchStatusFilters">
+                        <button type="button" class="ui active button" data-status="">All</button>
+                        <button type="button" class="ui button" data-status="Expired">Expired</button>
+                        <button type="button" class="ui button" data-status="Expiring Soon">Expiring Soon</button>
+                        <button type="button" class="ui button" data-status="Healthy">Healthy</button>
+                    </div>
+                    <div>
+                        <button type="button" class="ui tiny teal basic button" onclick="exportBatchExpiryReport()">
+                            <i class="file excel outline icon"></i>
+                            Export Expiry
+                        </button>
+                        <button type="button" class="ui tiny orange basic button" onclick="deactivateExpiredZeroStockBatches()">
+                            <i class="archive icon"></i>
+                            Mark Zero-Stock Expired Inactive
+                        </button>
+                    </div>
+                </div>
+                <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="inventoryBatchReportTable" style="margin-top: 5px; width: 100%">
+                    <thead><tr><th>Item / Batch</th><th>Warehouse</th><th>Qty</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div class="wide">
+                <h4 class="ui horizontal left aligned divider header inventory-section-divider">
                     <i class="left align icon"></i>
                     Stock Ledger
                 </h4>
@@ -687,6 +757,31 @@
             </div>
         </div>
         {% endif %}
+    </div>
+</div>
+
+<div class="ui large modal inventory-modal" id="batchLedgerModal">
+    <i class="close icon"></i>
+    <div class="header">Batch Detail</div>
+    <div class="content">
+        <div id="batchLedgerSummary" class="ui tiny info message"></div>
+        <div class="ui stackable two column grid">
+            <div class="column">
+                <h5 class="ui header">Warehouse Stock</h5>
+                <div class="ui relaxed divided list" id="batchWarehouseStockList"></div>
+            </div>
+            <div class="column">
+                <h5 class="ui header">Purchase Sources</h5>
+                <div class="ui relaxed divided list" id="batchPurchaseSourceList"></div>
+            </div>
+        </div>
+        <table class="ui unstackable tiny sortable celled very compact table" id="batchLedgerTable" style="width: 100%">
+            <thead><tr><th>Date</th><th>Source</th><th>Warehouse</th><th>Qty</th><th>Balance</th><th>Reference</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Close</div>
     </div>
 </div>
 
@@ -828,6 +923,12 @@
                             <div class="ui checkbox" style="margin-top: 24px;">
                                 <input type="checkbox" id="itemSaleBlocked">
                                 <label>Block sale for this item</label>
+                            </div>
+                        </div>
+                        <div class="field inventory-item-toggle-field">
+                            <div class="ui checkbox" style="margin-top: 24px;">
+                                <input type="checkbox" id="itemBatchTracking">
+                                <label>Track batches and expiry</label>
                             </div>
                         </div>
                     </div>
@@ -1180,7 +1281,9 @@
     var inventoryUnitTable = null;
     var inventoryTaxTable = null;
     var inventoryWarehouseTable = null;
+    var inventoryBatchReportTable = null;
     var inventoryLedgerTable = null;
+    var batchLedgerTable = null;
     var inventoryAdjustmentTable = null;
     var inventoryTransferTable = null;
     var purchaseReturnTable = null;
@@ -1197,6 +1300,8 @@
         units: [],
         taxProfiles: [],
         warehouses: [],
+        batchRows: [],
+        batchSummary: {},
         ledgerRows: [],
         adjustments: [],
         transfers: [],
@@ -1300,6 +1405,29 @@
             warehouseTableConfig.fixedColumns = {left: 0, right: 1};
             inventoryWarehouseTable = $('#inventoryWarehouseTable').DataTable(warehouseTableConfig);
         }
+        if ($('#inventoryBatchReportTable').length) {
+            var batchReportConfig = dataTableConfig([
+                {data: 'itemBatchHtml'},
+                {data: 'warehouse'},
+                {data: 'quantity'},
+                {data: 'expiry', render: function (data, type) { return type === 'sort' ? ((data && data.sort) || '') : ((data && data.display) || '-'); }},
+                {data: 'statusHtml'},
+                {data: 'actionHtml'}
+            ], [[3, 'asc']], [0,1,2,3,4]);
+            batchReportConfig.fixedColumns = {left: 0, right: 1};
+            inventoryBatchReportTable = $('#inventoryBatchReportTable').DataTable(batchReportConfig);
+        }
+        if ($('#batchLedgerTable').length) {
+            batchLedgerTable = $('#batchLedgerTable').DataTable({
+                data: [],
+                paging: false,
+                searching: false,
+                info: false,
+                ordering: true,
+                columns: [{data: 'date'}, {data: 'source'}, {data: 'warehouse'}, {data: 'qtyHtml'}, {data: 'balance'}, {data: 'referenceHtml'}],
+                aaSorting: [[0, 'asc']]
+            });
+        }
         if ($('#inventoryAdjustmentTable').length) {
             var adjustmentTableConfig = dataTableConfig([{data: 'voucher'}, {data: 'date'}, {data: 'remark'}, {data: 'lineCount'}, {data: 'actionHtml'}], [[1, 'desc']], [0,1,2,3]);
             adjustmentTableConfig.fixedColumns = {left: 0, right: 1};
@@ -1340,8 +1468,12 @@
             stockHtml += '<span class="inventory-stock-badge non-gst">Non GST ' + (item.NonGSTStock || 0) + '</span>';
         }
         stockHtml += '<div class="inventory-cell-meta">Total: ' + totalStock + '</div>';
+        var batchHtml = item.RequiresBatchTracking ? '<div class="inventory-cell-meta">Batches: ' + (item.BatchCount || 0) + (item.NearestExpiryDate ? ' | Nearest exp: ' + item.NearestExpiryDate : '') + '</div>' : '';
+        if (item.ExpiredBatchCount || item.ExpiringBatchCount) {
+            batchHtml += '<div class="inventory-cell-meta">' + (item.ExpiredBatchCount ? 'Expired: ' + item.ExpiredBatchCount + ' ' : '') + (item.ExpiringBatchCount ? 'Expiring: ' + item.ExpiringBatchCount : '') + '</div>';
+        }
         return {
-            itemHtml: '<div class="inventory-cell-title">' + item.Name + '</div><div class="inventory-cell-meta">SKU: ' + (item.SKU || '-') + ' | Barcode: ' + (item.Barcode || '-') + '</div><div class="inventory-cell-meta">Brand: ' + (item.BrandName || '-') + ' | Unit: ' + (item.UnitName || 'pcs') + '</div>',
+            itemHtml: '<div class="inventory-cell-title">' + item.Name + '</div><div class="inventory-cell-meta">SKU: ' + (item.SKU || '-') + ' | Barcode: ' + (item.Barcode || '-') + '</div><div class="inventory-cell-meta">Brand: ' + (item.BrandName || '-') + ' | Unit: ' + (item.UnitName || 'pcs') + '</div>' + batchHtml,
             categoryTaxHtml: '<div>Category: <strong>' + (item.CategoryName || '-') + '</strong></div><div class="inventory-cell-meta">HSN: ' + (item.HSN || '-') + ' | GST: ' + (item.GSTRate || 0) + '%</div>',
             priceHtml: '<div>Purchase: ' + (item.DefaultPurchasePrice || 0) + '</div><div class="inventory-cell-meta">Sales: ' + (item.DefaultSalesPrice || 0) + ' | MRP: ' + (item.MRP || 0) + '</div>',
             stockHtml: stockHtml,
@@ -1354,6 +1486,46 @@
     function unitRow(row) { return {name: row.Name, symbol: row.Symbol, allowsDecimal: row.AllowsDecimal ? 'Yes' : 'No', itemCount: row.ItemCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editUnit(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteUnit(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
     function taxRow(row) { return {name: row.Name, hsn: row.HSNCode, gst: row.GSTRate, cess: row.CessRate, itemCount: row.ItemCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editTaxProfile(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteTaxProfile(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
     function warehouseRow(row) { return {nameHtml: '<div class="inventory-cell-title">' + row.Name + '</div>', code: row.Code || '-', address: row.Address || '-', defaultHtml: row.IsDefault ? '<div class="ui tiny teal label">Default</div>' : '-', actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editWarehouse(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteWarehouse(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function batchReportRow(row) {
+        var statusClass = row.Status === 'Expired' ? 'red' : (row.Status === 'Expiring Soon' ? 'orange' : 'green');
+        var daysText = row.DaysToExpiry === null || row.DaysToExpiry === undefined ? '-' : row.DaysToExpiry + ' days';
+        return {
+            itemBatchHtml: '<div class="inventory-cell-title">' + (row.ItemName || '-') + '</div><div class="inventory-cell-meta">Batch: ' + (row.BatchNumber || '-') + ' | ' + (row.StockBucket || '-') + '</div>',
+            warehouse: row.WarehouseName || '-',
+            quantity: row.QuantityOnHand || 0,
+            expiry: {display: (row.ExpiryDate || '-') + '<div class="inventory-cell-meta">' + daysText + '</div>', sort: row.ExpiryDateSort || ''},
+            statusHtml: '<div class="ui tiny ' + statusClass + ' label">' + row.Status + '</div>',
+            actionHtml: '<div class="inventory-action-buttons"><button type="button" data-tooltip="View Batch Ledger" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="showBatchLedger(' + row.BatchID + ')" class="ui circular teal icon button"><i class="history icon"></i></button></div>'
+        };
+    }
+
+    window.exportBatchExpiryReport = function () {
+        if (inventoryBatchReportTable && typeof inventoryBatchReportTable.button === 'function') {
+            inventoryBatchReportTable.button('.buttons-excel').trigger();
+        }
+    };
+
+    window.deactivateExpiredZeroStockBatches = function () {
+        var data = new FormData();
+        $.ajax({
+            type: 'post',
+            url: '{% url "homeApp:deactivate_expired_zero_stock_batches_api" %}',
+            data: data,
+            contentType: false,
+            processData: false,
+            success: function (response) {
+                if (response.message === 'success') {
+                    toastMessage('success', (response.deactivatedCount || 0) + ' expired zero-stock batch(es) marked inactive.');
+                    loadAllMasters();
+                } else {
+                    toastMessage('error', response.error || 'Unable to update batches.');
+                }
+            },
+            error: function (xhr) {
+                toastMessage('error', (xhr.responseJSON && xhr.responseJSON.error) || 'Unable to update batches.');
+            }
+        });
+    };
     function adjustmentRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, remark: row.Remark || '-', lineCount: row.LineCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editAdjustmentVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteAdjustmentVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
     function transferRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, route: '<div>' + (row.FromWarehouse || '-') + '</div><div class="inventory-cell-meta">to ' + (row.ToWarehouse || '-') + '</div>', lineCount: row.LineCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editTransferVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteTransferVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
     function purchaseReturnRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, party: '<div>' + (row.Party || '-') + '</div><div class="inventory-cell-meta">Purchase: ' + (row.PurchaseInvoice || '-') + ' | Lines: ' + (row.LineCount || 0) + '</div>', amount: row.TotalAmount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editPurchaseReturnVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deletePurchaseReturnVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
@@ -1387,7 +1559,99 @@
         };
     }
 
+    function batchLedgerRow(row) {
+        var positive = row.QuantityDelta >= 0;
+        return {
+            date: row.EntryDate || '-',
+            source: row.SourceType || '-',
+            warehouse: row.WarehouseName || '-',
+            qtyHtml: '<span style="font-weight:700; color:' + (positive ? '#166534' : '#b91c1c') + ';">' + (positive ? '+' : '') + row.QuantityDelta + '</span>',
+            balance: row.RunningBalance,
+            referenceHtml: '<div>' + (row.ReferenceNumber || '-') + '</div><div class="inventory-cell-meta">' + (row.Remark || '-') + '</div>'
+        };
+    }
+
+    function renderBatchDetailLists(data) {
+        var warehouseRows = data.WarehouseStocks || [];
+        var sourceRows = data.PurchaseSources || [];
+        $('#batchWarehouseStockList').html('');
+        $('#batchPurchaseSourceList').html('');
+        if (!warehouseRows.length) {
+            $('#batchWarehouseStockList').html('<div class="item"><div class="content"><div class="description">No warehouse stock currently available.</div></div></div>');
+        }
+        warehouseRows.forEach(function (row) {
+            $('#batchWarehouseStockList').append(
+                '<div class="item"><div class="content">' +
+                '<div class="header">' + (row.WarehouseName || '-') + '</div>' +
+                '<div class="description">' + (row.StockBucket || '-') + ' | Qty: ' + (row.QuantityOnHand || 0) + '</div>' +
+                '</div></div>'
+            );
+        });
+        if (!sourceRows.length) {
+            $('#batchPurchaseSourceList').html('<div class="item"><div class="content"><div class="description">No purchase source linked yet.</div></div></div>');
+        }
+        sourceRows.forEach(function (row) {
+            $('#batchPurchaseSourceList').append(
+                '<div class="item"><div class="content">' +
+                '<div class="header">' + (row.PurchaseDisplayID || row.InvoiceNumber || '-') + '</div>' +
+                '<div class="description">' + (row.InvoiceDate || '-') + ' | ' + (row.Party || '-') + '</div>' +
+                '<div class="description">Qty: ' + (row.Quantity || 0) + ' | Rate: ' + (row.UnitCost || 0) + ' | Total: ' + (row.LineTotal || 0) + '</div>' +
+                '</div></div>'
+            );
+        });
+    }
+
+    window.showBatchLedger = function (batchId) {
+        $.get('{% url "homeApp:list_inventory_batch_ledger_api" %}', {batchId: batchId}, function (response) {
+            if (response.message !== 'success') {
+                toastMessage('error', response.error || 'Unable to load batch ledger.');
+                return;
+            }
+            var data = response.data || {};
+            var daysText = data.DaysToExpiry === null || data.DaysToExpiry === undefined ? '-' : data.DaysToExpiry + ' days';
+            $('#batchLedgerSummary').html(
+                '<strong>' + (data.ItemName || '-') + '</strong>' +
+                ' | Batch: ' + (data.BatchNumber || '-') +
+                ' | Status: ' + (data.Status || '-') +
+                ' | Mfg: ' + (data.ManufactureDate || '-') +
+                ' | Expiry: ' + (data.ExpiryDate || '-') +
+                ' | Days: ' + daysText +
+                ' | Current Qty: ' + (data.QuantityOnHand || 0) +
+                ' | Rate: ' + (data.PurchaseRate || 0) +
+                ' | MRP: ' + (data.MRP || 0)
+            );
+            renderBatchDetailLists(data);
+            setDataTableData(batchLedgerTable, (data.Rows || []).map(batchLedgerRow));
+            $('#batchLedgerModal').modal('show');
+        });
+    };
+
     function updateMetrics() {}
+
+    function updateBatchAlert(summary) {
+        summary = summary || {};
+        var expired = Number(summary.ExpiredBatchRows || 0);
+        var expiring = Number(summary.ExpiringBatchRows || 0);
+        var warningDays = Number(summary.WarningDays || 30);
+        var $alert = $('#inventoryBatchAlert');
+        if (!$alert.length) {
+            return;
+        }
+        if (!expired && !expiring) {
+            $alert.hide().removeClass('danger');
+            return;
+        }
+        var parts = [];
+        if (expired) {
+            parts.push(expired + ' expired batch' + (expired === 1 ? '' : 'es') + ' with ' + (summary.ExpiredQuantity || 0) + ' qty');
+        }
+        if (expiring) {
+            parts.push(expiring + ' batch' + (expiring === 1 ? '' : 'es') + ' expiring soon with ' + (summary.ExpiringQuantity || 0) + ' qty');
+        }
+        $('#inventoryBatchAlertText').text(parts.join(' | '));
+        $('#inventoryBatchAlertWindow').text('Window: ' + warningDays + ' days');
+        $alert.toggleClass('danger', expired > 0).css('display', 'flex');
+    }
 
     function refreshDropdown($element) {
         if ($.fn.dropdown) $element.dropdown('refresh');
@@ -1431,6 +1695,12 @@
             setDataTableData(inventoryWarehouseTable, inventoryState.warehouses.map(warehouseRow));
             populateMasterDropdowns();
             updateMetrics();
+        });
+        $.get('{% url "homeApp:list_inventory_batch_report_api" %}', function (response) {
+            inventoryState.batchRows = response.data || [];
+            inventoryState.batchSummary = response.summary || {};
+            setDataTableData(inventoryBatchReportTable, inventoryState.batchRows.map(batchReportRow));
+            updateBatchAlert(inventoryState.batchSummary);
         });
         $.get('{% url "homeApp:list_inventory_categories_api" %}', function (response) {
             inventoryState.categories = response.data || [];
@@ -1513,6 +1783,10 @@
             }
             rows.push({
                 itemId: itemId,
+                batchId: $row.find('.inventory-batch-id').val() || '',
+                batchNumber: $row.find('.inventory-batch-number').val() || '',
+                manufactureDate: $row.find('.inventory-mfg-date').val() || '',
+                expiryDate: $row.find('.inventory-expiry-date').val() || '',
                 stockBucket: bucket,
                 quantity: quantity,
                 unitPrice: unitRate,
@@ -1548,7 +1822,16 @@
     function validateLineItems(widgetApi, selector, boxSelector, message) {
         var raw = getLineItemsPayload(widgetApi, selector, boxSelector);
         try {
-            if ((JSON.parse(raw) || []).length) return true;
+            if ((JSON.parse(raw) || []).length) {
+                if (widgetApi && typeof widgetApi.validate === 'function') {
+                    var result = widgetApi.validate();
+                    if (result && result.valid === false) {
+                        toastMessage('orange', result.message || 'Fix the batch details before saving.');
+                        return false;
+                    }
+                }
+                return true;
+            }
         } catch (error) {}
         toastMessage('orange', message);
         return false;
@@ -1584,7 +1867,7 @@
     function resetItemForm() {
         $('#itemId,#itemName,#itemSku,#itemBarcode,#itemBrand,#itemDescription,#itemHsn').val('');
         $('#itemPurchasePrice,#itemPrice,#itemMrp,#itemMinimumStock,#itemReorderLevel,#itemGstRate').val('0');
-        $('#itemSaleBlocked').prop('checked', false);
+        $('#itemSaleBlocked,#itemBatchTracking').prop('checked', false);
         $('#itemActionLabel').text('Save');
         if ($.fn.dropdown) {
             $('#itemBucket').dropdown('set selected', 'gst');
@@ -1691,6 +1974,7 @@
         $('#itemReorderLevel').val(row.ReorderLevel || 0);
         $('#itemGstRate').val(row.GSTRate || 0);
         $('#itemSaleBlocked').prop('checked', !!row.IsSaleBlocked);
+        $('#itemBatchTracking').prop('checked', !!row.RequiresBatchTracking);
         $('#itemActionLabel').text('Update');
         if ($.fn.dropdown) {
             $('#itemBucket').dropdown('set selected', row.DefaultStockBucket || 'gst');
@@ -1898,6 +2182,7 @@
         data.append('mrp', $('#itemMrp').val());
         data.append('minimumStockLevel', $('#itemMinimumStock').val());
         data.append('reorderLevel', $('#itemReorderLevel').val());
+        data.append('requiresBatchTracking', $('#itemBatchTracking').is(':checked') ? '1' : '');
         data.append('isSaleBlocked', $('#itemSaleBlocked').is(':checked') ? '1' : '');
         postFormData($('#itemId').val() ? '{% url "homeApp:update_inventory_item_api" %}' : '{% url "homeApp:add_inventory_item_api" %}', data, 'Inventory item saved', '#itemModal');
     };
@@ -1969,7 +2254,7 @@
         postFormData($('#salesReturnVoucherId').val() ? '{% url "homeApp:update_sales_return_voucher_api" %}' : '{% url "homeApp:add_sales_return_voucher_api" %}', data, 'Sales return saved', '#salesReturnModal');
     };
 
-    function initLineItemWidget(boxSelector, hiddenSelector, helpText) {
+    function initLineItemWidget(boxSelector, hiddenSelector, helpText, warehouseSelector, batchDirection, directionSelector) {
         if (!window.InventoryLineItems || typeof window.InventoryLineItems.init !== 'function') {
             toastMessage('error', 'Inventory line item widget did not load.');
             return null;
@@ -1977,7 +2262,11 @@
         var widgetApi = window.InventoryLineItems.init({
             containerSelector: boxSelector,
             hiddenInputSelector: hiddenSelector,
-            catalogUrl: '{% url "homeApp:list_inventory_items_api" %}'
+            catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+            batchUrl: '{% url "homeApp:list_inventory_batches_api" %}',
+            warehouseSelector: warehouseSelector,
+            batchDirection: batchDirection,
+            directionSelector: directionSelector
         });
         $(boxSelector + ' .inventory-enable-toggle').hide();
         $(boxSelector + ' .inventory-table-wrap').show();
@@ -1987,11 +2276,11 @@
 
     initInventoryUi();
     initTables();
-    openingStockWidget = initLineItemWidget('#openingStockLineItemBox', '#openingStockLineItems', 'Add item rows with quantity, rate, and GST bucket.');
-    adjustmentWidget = initLineItemWidget('#adjustmentLineItemBox', '#adjustmentLineItems', 'Use increase or decrease to correct stock counts.');
-    transferWidget = initLineItemWidget('#transferLineItemBox', '#transferLineItems', 'Move stock from one warehouse to another.');
-    purchaseReturnWidget = initLineItemWidget('#purchaseReturnLineItemBox', '#purchaseReturnLineItems', 'Reduce stock for supplier returns.');
-    salesReturnWidget = initLineItemWidget('#salesReturnLineItemBox', '#salesReturnLineItems', 'Increase stock for goods received back from customers.');
+    openingStockWidget = initLineItemWidget('#openingStockLineItemBox', '#openingStockLineItems', 'Add item rows with quantity, rate, and GST bucket.', '#openingStockWarehouse', 'in');
+    adjustmentWidget = initLineItemWidget('#adjustmentLineItemBox', '#adjustmentLineItems', 'Use increase or decrease to correct stock counts.', '#adjustmentWarehouse', 'auto', '#adjustmentDirection');
+    transferWidget = initLineItemWidget('#transferLineItemBox', '#transferLineItems', 'Move stock from one warehouse to another.', '#transferFromWarehouse', 'out');
+    purchaseReturnWidget = initLineItemWidget('#purchaseReturnLineItemBox', '#purchaseReturnLineItems', 'Reduce stock for supplier returns.', '#purchaseReturnWarehouse', 'out');
+    salesReturnWidget = initLineItemWidget('#salesReturnLineItemBox', '#salesReturnLineItems', 'Increase stock for goods received back from customers.', '#salesReturnWarehouse', 'in');
     $(document).on('click', function (event) {
         if (!$(event.target).closest('#voucherActionDropdown').length) {
             closeVoucherActionMenu();
@@ -2001,6 +2290,14 @@
         }
         if (!$(event.target).closest('#stockActionDropdown').length) {
             closeStockActionMenu();
+        }
+    });
+    $('#inventoryBatchStatusFilters').on('click', 'button', function () {
+        var status = $(this).data('status') || '';
+        $('#inventoryBatchStatusFilters button').removeClass('active');
+        $(this).addClass('active');
+        if (inventoryBatchReportTable) {
+            inventoryBatchReportTable.column(4).search(status).draw();
         }
     });
     loadAllMasters();

@@ -48,6 +48,7 @@ delete_inventory_warehouse_api = _wrap_inventory_api(home_api.delete_inventory_w
 delete_purchase_invoice_api = _wrap_inventory_api(home_api.delete_purchase_invoice_api)
 delete_purchase_return_voucher_api = _wrap_inventory_api(home_api.delete_purchase_return_voucher_api)
 delete_sales_return_voucher_api = _wrap_inventory_api(home_api.delete_sales_return_voucher_api)
+deactivate_expired_zero_stock_batches_api = _wrap_inventory_api(home_api.deactivate_expired_zero_stock_batches_api)
 get_inventory_snapshot_api = _wrap_inventory_api(home_api.get_inventory_snapshot_api)
 get_inventory_adjustment_voucher_detail_api = _wrap_inventory_api(home_api.get_inventory_adjustment_voucher_detail_api)
 get_inventory_transfer_voucher_detail_api = _wrap_inventory_api(home_api.get_inventory_transfer_voucher_detail_api)
@@ -55,6 +56,9 @@ get_purchase_invoice_detail_api = _wrap_inventory_api(home_api.get_purchase_invo
 get_purchase_return_voucher_detail_api = _wrap_inventory_api(home_api.get_purchase_return_voucher_detail_api)
 get_sales_return_voucher_detail_api = _wrap_inventory_api(home_api.get_sales_return_voucher_detail_api)
 list_inventory_adjustment_vouchers_api = _wrap_inventory_api(home_api.list_inventory_adjustment_vouchers_api)
+list_inventory_batch_ledger_api = _wrap_inventory_api(home_api.list_inventory_batch_ledger_api)
+list_inventory_batch_report_api = _wrap_inventory_api(home_api.list_inventory_batch_report_api)
+list_inventory_batches_api = _wrap_inventory_api(home_api.list_inventory_batches_api)
 list_inventory_categories_api = _wrap_inventory_api(home_api.list_inventory_categories_api)
 list_inventory_ledger_entries_api = _wrap_inventory_api(home_api.list_inventory_ledger_entries_api)
 list_inventory_items_api = _wrap_inventory_api(home_api.list_inventory_items_api)
@@ -99,6 +103,7 @@ __all__ = [
     'delete_purchase_invoice_api',
     'delete_purchase_return_voucher_api',
     'delete_sales_return_voucher_api',
+    'deactivate_expired_zero_stock_batches_api',
     'get_inventory_snapshot_api',
     'get_inventory_adjustment_voucher_detail_api',
     'get_inventory_transfer_voucher_detail_api',
@@ -106,6 +111,9 @@ __all__ = [
     'get_purchase_return_voucher_detail_api',
     'get_sales_return_voucher_detail_api',
     'list_inventory_adjustment_vouchers_api',
+    'list_inventory_batch_ledger_api',
+    'list_inventory_batch_report_api',
+    'list_inventory_batches_api',
     'list_inventory_categories_api',
     'list_inventory_ledger_entries_api',
     'list_inventory_items_api',

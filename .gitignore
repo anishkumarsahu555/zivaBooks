@@ -51,3 +51,4 @@ zivabooks_deployment.md
 # Migrations
 **/migrations/*.py
 !**/migrations/__init__.py
+!home/migrations/*.py

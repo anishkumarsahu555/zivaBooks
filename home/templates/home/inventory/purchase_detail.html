@@ -569,6 +569,7 @@
                                     <tr>
                                         <th>Item</th>
                                         <th>Bucket</th>
+                                        <th>Batch</th>
                                         <th>Qty</th>
                                         <th>Unit Cost</th>
                                         <th>Taxable</th>
@@ -583,6 +584,16 @@
                                         <tr>
                                             <td>{{ line.item.name }}{% if line.item.sku %} [{{ line.item.sku }}]{% endif %}</td>
                                             <td>{{ line.get_stockBucket_display|default:line.stockBucket }}</td>
+                                            <td>
+                                                {% if line.batch %}
+                                                    <button type="button" class="ui tiny teal basic button" onclick="showPurchaseBatchTrace({{ line.batch_id }})">
+                                                        <i class="history icon"></i>
+                                                        {{ line.batch.batchNumber|default:"Batch" }}
+                                                    </button>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
                                             <td>{{ line.quantity|floatformat:2 }}</td>
                                             <td>{{ line.unitCost|floatformat:2 }}</td>
                                             <td>{{ line.taxableAmount|floatformat:2 }}</td>
@@ -593,7 +604,7 @@
                                         </tr>
                                     {% empty %}
                                         <tr>
-                                            <td colspan="9" class="center aligned">No purchase lines found.</td>
+                                            <td colspan="10" class="center aligned">No purchase lines found.</td>
                                         </tr>
                                     {% endfor %}
                                     </tbody>
@@ -616,6 +627,16 @@
                                         <div class="invoice-line-field">
                                             <span class="invoice-line-label">Bucket</span>
                                             <span class="invoice-line-value">{{ line.get_stockBucket_display|default:line.stockBucket }}</span>
+                                        </div>
+                                        <div class="invoice-line-field">
+                                            <span class="invoice-line-label">Batch</span>
+                                            <span class="invoice-line-value">
+                                                {% if line.batch %}
+                                                    <button type="button" class="ui mini teal basic button" onclick="showPurchaseBatchTrace({{ line.batch_id }})">{{ line.batch.batchNumber|default:"View" }}</button>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </span>
                                         </div>
                                         <div class="invoice-line-field">
                                             <span class="invoice-line-label">Qty</span>
@@ -680,4 +701,91 @@
         </div>
     </div>
 </div>
+
+<div class="ui large modal" id="purchaseBatchTraceModal">
+    <i class="close icon"></i>
+    <div class="header">Batch Trace</div>
+    <div class="content">
+        <div class="ui tiny info message" id="purchaseBatchTraceSummary"></div>
+        <div class="ui stackable two column grid">
+            <div class="column">
+                <h5 class="ui header">Warehouse Stock</h5>
+                <div class="ui relaxed divided list" id="purchaseBatchTraceWarehouseList"></div>
+            </div>
+            <div class="column">
+                <h5 class="ui header">Purchase Sources</h5>
+                <div class="ui relaxed divided list" id="purchaseBatchTraceSourceList"></div>
+            </div>
+        </div>
+        <table class="ui unstackable tiny celled very compact table">
+            <thead><tr><th>Date</th><th>Source</th><th>Warehouse</th><th>Qty</th><th>Balance</th><th>Reference</th></tr></thead>
+            <tbody id="purchaseBatchTraceLedgerBody"></tbody>
+        </table>
+    </div>
+    <div class="actions">
+        <div class="ui cancel button">Close</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+    function purchaseTraceRows(rows, selector, emptyText, renderer) {
+        var $target = $(selector);
+        $target.html('');
+        if (!rows || !rows.length) {
+            $target.html('<div class="item"><div class="content"><div class="description">' + emptyText + '</div></div></div>');
+            return;
+        }
+        rows.forEach(function (row) {
+            $target.append(renderer(row));
+        });
+    }
+
+    function showPurchaseBatchTrace(batchId) {
+        $.get('{% url "homeApp:list_inventory_batch_ledger_api" %}', {batchId: batchId}, function (response) {
+            if (response.message !== 'success') {
+                $('body').toast({class: 'error', message: response.error || 'Unable to load batch trace.'});
+                return;
+            }
+            var data = response.data || {};
+            var daysText = data.DaysToExpiry === null || data.DaysToExpiry === undefined ? '-' : data.DaysToExpiry + ' days';
+            $('#purchaseBatchTraceSummary').html(
+                '<strong>' + (data.ItemName || '-') + '</strong>' +
+                ' | Batch: ' + (data.BatchNumber || '-') +
+                ' | Status: ' + (data.Status || '-') +
+                ' | Mfg: ' + (data.ManufactureDate || '-') +
+                ' | Expiry: ' + (data.ExpiryDate || '-') +
+                ' | Days: ' + daysText +
+                ' | Qty: ' + (data.QuantityOnHand || 0) +
+                ' | Rate: ' + (data.PurchaseRate || 0) +
+                ' | MRP: ' + (data.MRP || 0)
+            );
+            purchaseTraceRows(data.WarehouseStocks || [], '#purchaseBatchTraceWarehouseList', 'No warehouse stock currently available.', function (row) {
+                return '<div class="item"><div class="content"><div class="header">' + (row.WarehouseName || '-') + '</div><div class="description">' + (row.StockBucket || '-') + ' | Qty: ' + (row.QuantityOnHand || 0) + '</div></div></div>';
+            });
+            purchaseTraceRows(data.PurchaseSources || [], '#purchaseBatchTraceSourceList', 'No purchase source linked yet.', function (row) {
+                return '<div class="item"><div class="content"><div class="header">' + (row.PurchaseDisplayID || row.InvoiceNumber || '-') + '</div><div class="description">' + (row.InvoiceDate || '-') + ' | ' + (row.Party || '-') + '</div><div class="description">Qty: ' + (row.Quantity || 0) + ' | Rate: ' + (row.UnitCost || 0) + ' | Total: ' + (row.LineTotal || 0) + '</div></div></div>';
+            });
+            $('#purchaseBatchTraceLedgerBody').html('');
+            (data.Rows || []).forEach(function (row) {
+                var positive = Number(row.QuantityDelta || 0) >= 0;
+                $('#purchaseBatchTraceLedgerBody').append(
+                    '<tr>' +
+                    '<td>' + (row.EntryDate || '-') + '</td>' +
+                    '<td>' + (row.SourceType || '-') + '</td>' +
+                    '<td>' + (row.WarehouseName || '-') + '</td>' +
+                    '<td style="font-weight:700;color:' + (positive ? '#166534' : '#b91c1c') + ';">' + (positive ? '+' : '') + (row.QuantityDelta || 0) + '</td>' +
+                    '<td>' + (row.RunningBalance || 0) + '</td>' +
+                    '<td>' + (row.ReferenceNumber || '-') + '<div class="inventory-cell-meta">' + (row.Remark || '-') + '</div></td>' +
+                    '</tr>'
+                );
+            });
+            if (!(data.Rows || []).length) {
+                $('#purchaseBatchTraceLedgerBody').html('<tr><td colspan="6" class="center aligned">No movement found.</td></tr>');
+            }
+            $('#purchaseBatchTraceModal').modal('show');
+        });
+    }
+</script>
 {% endblock %}

@@ -784,6 +784,7 @@ class InventoryItem(TenantOwnedModel):
     mrp = models.FloatField(default=0.0)
     minimumStockLevel = models.FloatField(default=0.0)
     reorderLevel = models.FloatField(default=0.0)
+    requiresBatchTracking = models.BooleanField(default=False)
     isActive = models.BooleanField(default=True)
     isSaleBlocked = models.BooleanField(default=False)
 
@@ -948,6 +949,7 @@ class InventoryOpeningLine(TenantOwnedModel):
         related_name='opening_lines',
     )
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='opening_lines')
+    batch = models.ForeignKey('InventoryBatch', blank=True, null=True, on_delete=models.SET_NULL, related_name='opening_lines')
     stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
     quantity = models.FloatField(default=0.0)
     unitCost = models.FloatField(default=0.0)
@@ -981,6 +983,67 @@ class InventoryStock(TenantOwnedModel):
         ]
 
 
+class InventoryBatch(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_batches')
+    item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='batches')
+    warehouse = models.ForeignKey(
+        InventoryWarehouse,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='inventory_batches',
+    )
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    batchNumber = models.CharField(max_length=120, blank=True, null=True)
+    manufactureDate = models.DateField(blank=True, null=True)
+    expiryDate = models.DateField(blank=True, null=True)
+    purchaseRate = models.FloatField(default=0.0)
+    mrp = models.FloatField(default=0.0)
+    quantityOnHand = models.FloatField(default=0.0)
+    isActive = models.BooleanField(default=True)
+
+    def __str__(self):
+        label = self.batchNumber or 'Unbatched'
+        return f'{self.item} [{label}] = {self.quantityOnHand}'
+
+    class Meta:
+        verbose_name_plural = 'Inventory Batches'
+        indexes = [
+            models.Index(fields=['tenant', 'item', 'stockBucket'], name='invbatch_t_item_bkt_idx'),
+            models.Index(fields=['tenant', 'warehouse', 'expiryDate'], name='invbatch_t_wh_exp_idx'),
+            models.Index(fields=['tenant', 'item', 'expiryDate'], name='invbatch_t_item_exp_idx'),
+        ]
+
+
+class InventoryBatchStock(TenantOwnedModel):
+    tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_batch_stocks')
+    batch = models.ForeignKey(InventoryBatch, on_delete=models.CASCADE, related_name='stock_rows')
+    item = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name='batch_stock_rows')
+    warehouse = models.ForeignKey(
+        InventoryWarehouse,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='batch_stock_rows',
+    )
+    stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
+    quantityOnHand = models.FloatField(default=0.0)
+
+    def __str__(self):
+        warehouse = self.warehouse.name if self.warehouse_id else 'Default'
+        return f'{self.batch} @ {warehouse} = {self.quantityOnHand}'
+
+    class Meta:
+        verbose_name_plural = 'Inventory Batch Stock'
+        indexes = [
+            models.Index(fields=['tenant', 'item', 'warehouse', 'stockBucket'], name='invbstock_t_item_wh_idx'),
+            models.Index(fields=['tenant', 'batch', 'warehouse'], name='invbstock_t_batch_wh_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=['tenant', 'batch', 'warehouse'], name='uniq_invbatch_stock_wh'),
+        ]
+
+
 class InventoryLedgerEntry(TenantOwnedModel):
     class SourceType(models.TextChoices):
         OPENING = 'opening', 'Opening Stock'
@@ -997,6 +1060,13 @@ class InventoryLedgerEntry(TenantOwnedModel):
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='ledger_entries')
     warehouse = models.ForeignKey(
         InventoryWarehouse,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='ledger_entries',
+    )
+    batch = models.ForeignKey(
+        InventoryBatch,
         blank=True,
         null=True,
         on_delete=models.SET_NULL,
@@ -1100,6 +1170,7 @@ class PurchaseLine(TenantOwnedModel):
         related_name='purchase_lines',
     )
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='purchase_lines')
+    batch = models.ForeignKey(InventoryBatch, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_lines')
     stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
     quantity = models.FloatField(default=0.0)
     unitCost = models.FloatField(default=0.0)
@@ -1181,6 +1252,7 @@ class SalesLine(TenantOwnedModel):
         related_name='sales_lines',
     )
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='sales_lines')
+    batch = models.ForeignKey(InventoryBatch, blank=True, null=True, on_delete=models.SET_NULL, related_name='sales_lines')
     hsnCode = models.CharField(max_length=40, blank=True, null=True)
     stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
     quantity = models.FloatField(default=0.0)
@@ -1211,6 +1283,7 @@ class ProformaInvoiceLine(TenantOwnedModel):
         related_name='proforma_invoice_lines',
     )
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='proforma_invoice_lines')
+    batch = models.ForeignKey(InventoryBatch, blank=True, null=True, on_delete=models.SET_NULL, related_name='proforma_invoice_lines')
     hsnCode = models.CharField(max_length=40, blank=True, null=True)
     stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
     quantity = models.FloatField(default=0.0)
@@ -1241,6 +1314,7 @@ class CashCounterLine(TenantOwnedModel):
         related_name='cash_counter_lines',
     )
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='cash_counter_lines')
+    batch = models.ForeignKey(InventoryBatch, blank=True, null=True, on_delete=models.SET_NULL, related_name='cash_counter_lines')
     hsnCode = models.CharField(max_length=40, blank=True, null=True)
     stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
     quantity = models.FloatField(default=0.0)
@@ -1281,6 +1355,7 @@ class InventoryAdjustmentLine(TenantOwnedModel):
     voucher = models.ForeignKey(InventoryAdjustmentVoucher, on_delete=models.CASCADE, related_name='lines')
     warehouse = models.ForeignKey(InventoryWarehouse, blank=True, null=True, on_delete=models.SET_NULL, related_name='adjustment_lines')
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='adjustment_lines')
+    batch = models.ForeignKey(InventoryBatch, blank=True, null=True, on_delete=models.SET_NULL, related_name='adjustment_lines')
     stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
     quantityDelta = models.FloatField(default=0.0)
     unitCost = models.FloatField(default=0.0)
@@ -1316,6 +1391,7 @@ class InventoryTransferLine(TenantOwnedModel):
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='inventory_transfer_lines')
     voucher = models.ForeignKey(InventoryTransferVoucher, on_delete=models.CASCADE, related_name='lines')
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='transfer_lines')
+    batch = models.ForeignKey(InventoryBatch, blank=True, null=True, on_delete=models.SET_NULL, related_name='transfer_lines')
     stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
     quantity = models.FloatField(default=0.0)
     unitCost = models.FloatField(default=0.0)
@@ -1353,6 +1429,7 @@ class PurchaseReturnLine(TenantOwnedModel):
     voucher = models.ForeignKey(PurchaseReturnVoucher, on_delete=models.CASCADE, related_name='lines')
     warehouse = models.ForeignKey(InventoryWarehouse, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_return_lines')
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='purchase_return_lines')
+    batch = models.ForeignKey(InventoryBatch, blank=True, null=True, on_delete=models.SET_NULL, related_name='purchase_return_lines')
     stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
     quantity = models.FloatField(default=0.0)
     unitCost = models.FloatField(default=0.0)
@@ -1397,6 +1474,7 @@ class SalesReturnLine(TenantOwnedModel):
     voucher = models.ForeignKey(SalesReturnVoucher, on_delete=models.CASCADE, related_name='lines')
     warehouse = models.ForeignKey(InventoryWarehouse, blank=True, null=True, on_delete=models.SET_NULL, related_name='sales_return_lines')
     item = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name='sales_return_lines')
+    batch = models.ForeignKey(InventoryBatch, blank=True, null=True, on_delete=models.SET_NULL, related_name='sales_return_lines')
     stockBucket = models.CharField(max_length=20, choices=InventoryItem.StockBucket.choices)
     quantity = models.FloatField(default=0.0)
     unitPrice = models.FloatField(default=0.0)

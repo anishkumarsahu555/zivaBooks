@@ -11,6 +11,8 @@ from home.cache_keys import inventory_list_version_cache_key
 from home.models import (
     CashCounterLine,
     InventoryAdjustmentLine,
+    InventoryBatch,
+    InventoryBatchStock,
     InventoryItem,
     InventoryLedgerEntry,
     InventoryOpeningLine,
@@ -105,12 +107,13 @@ def _ledger_content_type(model):
     return ContentType.objects.get_for_model(model)
 
 
-def _append_ledger_entry(entries, *, tenant, item_id, warehouse_id, stock_bucket, source_type, quantity_delta, unit_rate, total_value, entry_date, reference_number, remark, source_ct_id, source_object_id):
+def _append_ledger_entry(entries, *, tenant, item_id, warehouse_id, batch_id, stock_bucket, source_type, quantity_delta, unit_rate, total_value, entry_date, reference_number, remark, source_ct_id, source_object_id):
     entries.append(
         InventoryLedgerEntry(
             tenant=tenant,
             item_id=item_id,
             warehouse_id=warehouse_id,
+            batch_id=batch_id,
             stockBucket=stock_bucket,
             sourceType=source_type,
             quantityDelta=_round_qty(quantity_delta),
@@ -141,6 +144,7 @@ def _ledger_rows_for_items(tenant, item_ids):
             tenant=tenant,
             item_id=line.item_id,
             warehouse_id=_line_warehouse_id(line, fallback_warehouse),
+            batch_id=line.batch_id,
             stock_bucket=line.stockBucket,
             source_type=InventoryLedgerEntry.SourceType.OPENING,
             quantity_delta=line.quantity,
@@ -165,6 +169,7 @@ def _ledger_rows_for_items(tenant, item_ids):
             tenant=tenant,
             item_id=line.item_id,
             warehouse_id=_line_warehouse_id(line, fallback_warehouse),
+            batch_id=line.batch_id,
             stock_bucket=line.stockBucket,
             source_type=InventoryLedgerEntry.SourceType.PURCHASE,
             quantity_delta=line.quantity,
@@ -189,6 +194,7 @@ def _ledger_rows_for_items(tenant, item_ids):
             tenant=tenant,
             item_id=line.item_id,
             warehouse_id=_line_warehouse_id(line, fallback_warehouse),
+            batch_id=line.batch_id,
             stock_bucket=line.stockBucket,
             source_type=InventoryLedgerEntry.SourceType.SALES,
             quantity_delta=-(line.quantity or 0.0),
@@ -229,6 +235,7 @@ def _ledger_rows_for_items(tenant, item_ids):
             tenant=tenant,
             item_id=line.item_id,
             warehouse_id=_line_warehouse_id(line, fallback_warehouse),
+            batch_id=line.batch_id,
             stock_bucket=line.stockBucket,
             source_type=InventoryLedgerEntry.SourceType.CASH_COUNTER,
             quantity_delta=quantity_delta,
@@ -253,6 +260,7 @@ def _ledger_rows_for_items(tenant, item_ids):
             tenant=tenant,
             item_id=line.item_id,
             warehouse_id=_line_warehouse_id(line, fallback_warehouse),
+            batch_id=line.batch_id,
             stock_bucket=line.stockBucket,
             source_type=InventoryLedgerEntry.SourceType.ADJUSTMENT,
             quantity_delta=line.quantityDelta,
@@ -279,6 +287,7 @@ def _ledger_rows_for_items(tenant, item_ids):
             tenant=tenant,
             item_id=line.item_id,
             warehouse_id=from_warehouse_id,
+            batch_id=line.batch_id,
             stock_bucket=line.stockBucket,
             source_type=InventoryLedgerEntry.SourceType.TRANSFER_OUT,
             quantity_delta=-(line.quantity or 0.0),
@@ -295,6 +304,7 @@ def _ledger_rows_for_items(tenant, item_ids):
             tenant=tenant,
             item_id=line.item_id,
             warehouse_id=to_warehouse_id,
+            batch_id=line.batch_id,
             stock_bucket=line.stockBucket,
             source_type=InventoryLedgerEntry.SourceType.TRANSFER_IN,
             quantity_delta=line.quantity or 0.0,
@@ -319,6 +329,7 @@ def _ledger_rows_for_items(tenant, item_ids):
             tenant=tenant,
             item_id=line.item_id,
             warehouse_id=_line_warehouse_id(line, fallback_warehouse),
+            batch_id=line.batch_id,
             stock_bucket=line.stockBucket,
             source_type=InventoryLedgerEntry.SourceType.PURCHASE_RETURN,
             quantity_delta=-(line.quantity or 0.0),
@@ -343,6 +354,7 @@ def _ledger_rows_for_items(tenant, item_ids):
             tenant=tenant,
             item_id=line.item_id,
             warehouse_id=_line_warehouse_id(line, fallback_warehouse),
+            batch_id=line.batch_id,
             stock_bucket=line.stockBucket,
             source_type=InventoryLedgerEntry.SourceType.SALES_RETURN,
             quantity_delta=line.quantity or 0.0,
@@ -376,12 +388,18 @@ def rebuild_inventory_stock(tenant, item_ids=None):
         InventoryLedgerEntry.objects.bulk_create(ledger_entries, batch_size=500)
 
     totals_by_item = {item_id: _bucket_totals() for item_id in item_ids}
+    totals_by_batch = defaultdict(float)
+    totals_by_batch_stock = defaultdict(float)
     for row in InventoryLedgerEntry.objects.filter(
         tenant=tenant,
         item_id__in=item_ids,
         isDeleted=False,
-    ).values('item_id', 'stockBucket', 'quantityDelta'):
-        totals_by_item[row['item_id']][row['stockBucket']] += float(row['quantityDelta'] or 0.0)
+    ).values('item_id', 'warehouse_id', 'stockBucket', 'batch_id', 'quantityDelta'):
+        quantity_delta = float(row['quantityDelta'] or 0.0)
+        totals_by_item[row['item_id']][row['stockBucket']] += quantity_delta
+        if row['batch_id']:
+            totals_by_batch[row['batch_id']] += quantity_delta
+            totals_by_batch_stock[(row['batch_id'], row['warehouse_id'])] += quantity_delta
 
     existing_rows = {
         (stock.item_id, stock.stockBucket): stock
@@ -403,6 +421,43 @@ def rebuild_inventory_stock(tenant, item_ids=None):
                 stock.quantityOnHand = quantity
                 stock.isDeleted = False
                 stock.save(update_fields=['quantityOnHand', 'isDeleted', 'lastUpdatedOn'])
+
+    batch_qs = InventoryBatch.objects.filter(tenant=tenant, item_id__in=item_ids)
+    for batch in batch_qs:
+        batch.quantityOnHand = _round_qty(totals_by_batch.get(batch.pk, 0.0))
+        batch.isDeleted = False
+        batch.save(update_fields=['quantityOnHand', 'isDeleted', 'lastUpdatedOn'])
+
+    existing_batch_stock = {
+        (row.batch_id, row.warehouse_id): row
+        for row in InventoryBatchStock.objects.filter(tenant=tenant, item_id__in=item_ids)
+    }
+    batch_lookup = {batch.pk: batch for batch in batch_qs}
+    for (batch_id, warehouse_id), quantity in totals_by_batch_stock.items():
+        batch = batch_lookup.get(batch_id)
+        if batch is None:
+            continue
+        stock_row = existing_batch_stock.get((batch_id, warehouse_id))
+        quantity = _round_qty(quantity)
+        if stock_row is None:
+            InventoryBatchStock.objects.create(
+                tenant=tenant,
+                batch=batch,
+                item_id=batch.item_id,
+                warehouse_id=warehouse_id,
+                stockBucket=batch.stockBucket,
+                quantityOnHand=quantity,
+            )
+        else:
+            stock_row.quantityOnHand = quantity
+            stock_row.isDeleted = False
+            stock_row.save(update_fields=['quantityOnHand', 'isDeleted', 'lastUpdatedOn'])
+    active_keys = set(totals_by_batch_stock.keys())
+    for key, stock_row in existing_batch_stock.items():
+        if key not in active_keys and not stock_row.isDeleted:
+            stock_row.quantityOnHand = 0.0
+            stock_row.isDeleted = False
+            stock_row.save(update_fields=['quantityOnHand', 'isDeleted', 'lastUpdatedOn'])
     _bump_inventory_list_cache_version('items', tenant=tenant)
 
 
@@ -422,7 +477,22 @@ def validate_non_negative_inventory(tenant, item_ids=None, item_bucket_pairs=Non
             qs = qs.filter(pair_filter)
     negative_row = qs.select_related('item').filter(quantityOnHand__lt=0).order_by('quantityOnHand').first()
     if negative_row is None:
-        return
+        negative_batch_stock = InventoryBatchStock.objects.filter(
+            tenant=tenant,
+            isDeleted=False,
+            quantityOnHand__lt=0,
+        )
+        if item_ids is not None:
+            negative_batch_stock = negative_batch_stock.filter(item_id__in=set(int(item_id) for item_id in item_ids if item_id))
+        negative_batch_row = negative_batch_stock.select_related('item', 'batch', 'warehouse').order_by('quantityOnHand').first()
+        if negative_batch_row is None:
+            return
+        warehouse_label = negative_batch_row.warehouse.name if negative_batch_row.warehouse_id else 'default warehouse'
+        batch_label = negative_batch_row.batch.batchNumber or f'Batch #{negative_batch_row.batch_id}'
+        raise ValueError(
+            f'Insufficient batch stock for {negative_batch_row.item.name}, {batch_label} in {warehouse_label}. '
+            f'Current batch balance is {negative_batch_row.quantityOnHand}.'
+        )
     alternate_note = ''
     if getattr(tenant, 'nonGstShadowEnabled', False) or negative_row.stockBucket == InventoryItem.StockBucket.NON_GST:
         alternate_bucket = (

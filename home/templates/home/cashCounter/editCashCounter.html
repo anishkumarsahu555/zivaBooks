@@ -1371,6 +1371,7 @@
                 containerSelector: '#cashCounterSalesLineItemBox',
                 hiddenInputSelector: '#cashCounterLineItems',
                 catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+                batchUrl: '{% url "homeApp:list_inventory_batches_api" %}',
                 initialRows: cashCounterInitialLineItems,
                 syncTotals: function (totals) {
                     if (mode !== 'Mix' && eligibleInventoryModes.indexOf(mode) >= 0) {
@@ -1482,6 +1483,14 @@
                         $('body').toast({class: 'orange', message: 'Add at least one valid GST item row before saving.'});
                         hideLoading();
                         return;
+                    }
+                    if (cashCounterSalesWidget && typeof cashCounterSalesWidget.validate === 'function') {
+                        const validation = cashCounterSalesWidget.validate();
+                        if (validation && validation.valid === false) {
+                            $('body').toast({class: 'orange', message: validation.message || 'Fix selected batch quantities before saving.'});
+                            hideLoading();
+                            return;
+                        }
                     }
                 } else {
                     $('#cashCounterLineItems').val('[]');

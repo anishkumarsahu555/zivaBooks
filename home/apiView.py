@@ -15,7 +15,7 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q, Sum, Count, Case, When, Value, F, FloatField, ExpressionWrapper, Window, Max
+from django.db.models import Q, Sum, Count, Case, When, Value, F, FloatField, IntegerField, ExpressionWrapper, Window, Max
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
@@ -6336,7 +6336,21 @@ def list_inventory_items_api(request):
     stocks = defaultdict(lambda: {'gst': 0.0, 'non_gst': 0.0})
     for row in InventoryStock.objects.filter(tenant=tenant, isDeleted=False, item__isDeleted=False):
         stocks[row.item_id][row.stockBucket] = float(row.quantityOnHand or 0.0)
+    today = _safe_local_date()
+    expiry_cutoff = today + timedelta(days=30)
+    batch_summary = defaultdict(lambda: {'count': 0, 'expired': 0, 'expiring': 0, 'nearest': None})
+    for batch in InventoryBatch.objects.filter(tenant=tenant, isDeleted=False, item__isDeleted=False, quantityOnHand__gt=0).only('item_id', 'expiryDate'):
+        summary = batch_summary[batch.item_id]
+        summary['count'] += 1
+        if batch.expiryDate:
+            if summary['nearest'] is None or batch.expiryDate < summary['nearest']:
+                summary['nearest'] = batch.expiryDate
+            if batch.expiryDate < today:
+                summary['expired'] += 1
+            elif batch.expiryDate <= expiry_cutoff:
+                summary['expiring'] += 1
     for item in items:
+        item_batch_summary = batch_summary[item.pk]
         payload.append({
             'ID': item.pk,
             'Name': item.name,
@@ -6358,12 +6372,54 @@ def list_inventory_items_api(request):
             'MRP': float(item.mrp or 0.0),
             'MinimumStockLevel': float(item.minimumStockLevel or 0.0),
             'ReorderLevel': float(item.reorderLevel or 0.0),
+            'RequiresBatchTracking': bool(item.requiresBatchTracking),
             'IsSaleBlocked': bool(item.isSaleBlocked),
+            'BatchCount': item_batch_summary['count'],
+            'ExpiredBatchCount': item_batch_summary['expired'],
+            'ExpiringBatchCount': item_batch_summary['expiring'],
+            'NearestExpiryDate': item_batch_summary['nearest'].strftime('%d/%m/%Y') if item_batch_summary['nearest'] else '',
             'GSTStock': stocks[item.pk]['gst'],
             'NonGSTStock': stocks[item.pk]['non_gst'] if non_gst_enabled else 0.0,
             'IsLowStock': (stocks[item.pk]['gst'] + stocks[item.pk]['non_gst']) <= float(item.minimumStockLevel or 0.0),
         })
     cache.set(cache_key, payload, timeout=60 * 10)
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+def list_inventory_batches_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_has_any_permission(
+        request,
+        'home.view_inventoryitem',
+        'home.can_manage_inventory',
+        'home.can_view_party_credentials',
+    ):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    item = _parse_inventory_item(request, request.GET.get('itemId'))
+    stock_bucket = _normalize_stock_bucket(request, request.GET.get('stockBucket'), item)
+    warehouse = _parse_inventory_warehouse(request, request.GET.get('warehouseId'))
+    today = _safe_local_date()
+    stock_rows = _available_batch_stock_queryset(
+        item=item,
+        stock_bucket=stock_bucket,
+        warehouse=warehouse,
+        today=today,
+    ).select_related('batch', 'warehouse')
+    payload = []
+    for row in stock_rows:
+        batch = row.batch
+        payload.append({
+            'ID': batch.pk,
+            'BatchNumber': batch.batchNumber or '',
+            'ManufactureDate': batch.manufactureDate.strftime('%d/%m/%Y') if batch.manufactureDate else '',
+            'ExpiryDate': batch.expiryDate.strftime('%d/%m/%Y') if batch.expiryDate else '',
+            'MRP': float(batch.mrp or 0.0),
+            'PurchaseRate': float(batch.purchaseRate or 0.0),
+            'QuantityOnHand': float(row.quantityOnHand or 0.0),
+            'WarehouseID': row.warehouse_id,
+            'WarehouseName': row.warehouse.name if row.warehouse_id else '',
+        })
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
@@ -6814,6 +6870,196 @@ def list_inventory_ledger_entries_api(request):
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
+def list_inventory_batch_report_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_has_any_permission(
+        request,
+        'home.view_inventoryitem',
+        'home.can_manage_inventory',
+        'home.can_view_party_credentials',
+    ):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    tenant = get_current_tenant(request)
+    today = _safe_local_date()
+    warning_days = int(request.GET.get('days') or 30)
+    warning_cutoff = today + timedelta(days=max(0, warning_days))
+    rows = InventoryBatchStock.objects.filter(
+        tenant=tenant,
+        isDeleted=False,
+        batch__isDeleted=False,
+        item__isDeleted=False,
+        quantityOnHand__gt=0,
+    ).select_related('batch', 'item', 'warehouse').order_by('batch__expiryDate', 'item__name', 'batch__batchNumber')
+    payload = []
+    summary = {
+        'TotalBatchRows': 0,
+        'ExpiredBatchRows': 0,
+        'ExpiringBatchRows': 0,
+        'HealthyBatchRows': 0,
+        'ExpiredQuantity': 0.0,
+        'ExpiringQuantity': 0.0,
+        'HealthyQuantity': 0.0,
+        'WarningDays': max(0, warning_days),
+    }
+    for row in rows:
+        expiry_date = row.batch.expiryDate
+        if expiry_date and expiry_date < today:
+            status = 'Expired'
+        elif expiry_date and expiry_date <= warning_cutoff:
+            status = 'Expiring Soon'
+        else:
+            status = 'Healthy'
+        quantity = float(row.quantityOnHand or 0.0)
+        summary['TotalBatchRows'] += 1
+        if status == 'Expired':
+            summary['ExpiredBatchRows'] += 1
+            summary['ExpiredQuantity'] += quantity
+        elif status == 'Expiring Soon':
+            summary['ExpiringBatchRows'] += 1
+            summary['ExpiringQuantity'] += quantity
+        else:
+            summary['HealthyBatchRows'] += 1
+            summary['HealthyQuantity'] += quantity
+        payload.append({
+            'BatchID': row.batch_id,
+            'ItemID': row.item_id,
+            'ItemName': row.item.name,
+            'BatchNumber': row.batch.batchNumber or '',
+            'WarehouseName': row.warehouse.name if row.warehouse_id else '',
+            'StockBucket': row.stockBucket,
+            'QuantityOnHand': quantity,
+            'ManufactureDate': row.batch.manufactureDate.strftime('%d/%m/%Y') if row.batch.manufactureDate else '',
+            'ExpiryDate': expiry_date.strftime('%d/%m/%Y') if expiry_date else '',
+            'ExpiryDateSort': expiry_date.isoformat() if expiry_date else '',
+            'DaysToExpiry': (expiry_date - today).days if expiry_date else None,
+            'MRP': float(row.batch.mrp or 0.0),
+            'PurchaseRate': float(row.batch.purchaseRate or 0.0),
+            'Status': status,
+        })
+    for key in ('ExpiredQuantity', 'ExpiringQuantity', 'HealthyQuantity'):
+        summary[key] = round(summary[key], 4)
+    return JsonResponse({'message': 'success', 'data': payload, 'summary': summary}, safe=False)
+
+
+def list_inventory_batch_ledger_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_has_any_permission(
+        request,
+        'home.view_inventoryitem',
+        'home.can_manage_inventory',
+        'home.can_view_party_credentials',
+    ):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    raw_batch_id = str(request.GET.get('batchId') or '').strip()
+    if not raw_batch_id.isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Invalid batch selection.'}, status=400)
+    batch = tenant_qs(request, InventoryBatch).filter(pk=int(raw_batch_id), isDeleted=False).select_related('item').first()
+    if batch is None:
+        return JsonResponse({'message': 'error', 'error': 'Batch not found.'}, status=404)
+    rows = list(InventoryLedgerEntry.objects.filter(
+        tenant=batch.tenant,
+        isDeleted=False,
+        batch=batch,
+    ).select_related('warehouse').order_by('entryDate', 'id'))
+    stock_rows = list(InventoryBatchStock.objects.filter(
+        tenant=batch.tenant,
+        isDeleted=False,
+        batch=batch,
+        quantityOnHand__gt=0,
+    ).select_related('warehouse').order_by('warehouse__name', 'stockBucket'))
+    purchase_lines = list(PurchaseLine.objects.filter(
+        tenant=batch.tenant,
+        isDeleted=False,
+        batch=batch,
+        purchaseInvoice__isDeleted=False,
+    ).select_related('purchaseInvoice', 'purchaseInvoice__partyID').order_by('purchaseInvoice__buildDate', 'id')[:10])
+    running = 0.0
+    payload = []
+    for row in rows:
+        running += float(row.quantityDelta or 0.0)
+        payload.append({
+            'ID': row.pk,
+            'EntryDate': row.entryDate.strftime('%d/%m/%Y') if row.entryDate else '',
+            'EntryDateSort': row.entryDate.isoformat() if row.entryDate else '',
+            'WarehouseName': row.warehouse.name if row.warehouse_id else '',
+            'SourceType': row.sourceType,
+            'QuantityDelta': float(row.quantityDelta or 0.0),
+            'RunningBalance': round(running, 4),
+            'UnitRate': float(row.unitRate or 0.0),
+            'TotalValue': float(row.totalValue or 0.0),
+            'ReferenceNumber': row.referenceNumber or '',
+            'Remark': row.remark or '',
+        })
+    warehouse_payload = [{
+        'WarehouseID': row.warehouse_id,
+        'WarehouseName': row.warehouse.name if row.warehouse_id else '',
+        'StockBucket': row.stockBucket,
+        'QuantityOnHand': float(row.quantityOnHand or 0.0),
+    } for row in stock_rows]
+    purchase_payload = [{
+        'PurchaseID': line.purchaseInvoice_id,
+        'PurchaseDisplayID': line.purchaseInvoice.purchaseID or '',
+        'InvoiceNumber': line.purchaseInvoice.invoiceNumber or '',
+        'InvoiceDate': line.purchaseInvoice.buildDate.strftime('%d/%m/%Y') if line.purchaseInvoice.buildDate else '',
+        'Party': line.purchaseInvoice.partyID.name if line.purchaseInvoice.partyID_id else '',
+        'Quantity': float(line.quantity or 0.0),
+        'UnitCost': float(line.unitCost or 0.0),
+        'LineTotal': float(line.lineTotal or 0.0),
+    } for line in purchase_lines]
+    today = _safe_local_date()
+    if batch.expiryDate and batch.expiryDate < today:
+        status = 'Expired'
+    elif batch.expiryDate and batch.expiryDate <= today + timedelta(days=30):
+        status = 'Expiring Soon'
+    else:
+        status = 'Healthy'
+    return JsonResponse({'message': 'success', 'data': {
+        'BatchID': batch.pk,
+        'ItemName': batch.item.name,
+        'BatchNumber': batch.batchNumber or '',
+        'ManufactureDate': batch.manufactureDate.strftime('%d/%m/%Y') if batch.manufactureDate else '',
+        'ExpiryDate': batch.expiryDate.strftime('%d/%m/%Y') if batch.expiryDate else '',
+        'DaysToExpiry': (batch.expiryDate - today).days if batch.expiryDate else None,
+        'Status': status,
+        'QuantityOnHand': float(batch.quantityOnHand or 0.0),
+        'MRP': float(batch.mrp or 0.0),
+        'PurchaseRate': float(batch.purchaseRate or 0.0),
+        'WarehouseStocks': warehouse_payload,
+        'PurchaseSources': purchase_payload,
+        'Rows': payload,
+    }}, safe=False)
+
+
+@transaction.atomic
+def deactivate_expired_zero_stock_batches_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    tenant = get_current_tenant(request)
+    today = _safe_local_date()
+    batch_ids_with_stock = InventoryBatchStock.objects.filter(
+        tenant=tenant,
+        isDeleted=False,
+        quantityOnHand__gt=0,
+    ).values('batch_id')
+    updated = InventoryBatch.objects.filter(
+        tenant=tenant,
+        isDeleted=False,
+        isActive=True,
+        expiryDate__lt=today,
+        quantityOnHand__lte=0,
+    ).exclude(
+        pk__in=batch_ids_with_stock
+    ).update(isActive=False, lastUpdatedOn=timezone.now())
+    _bump_inventory_list_cache_version('items', tenant=tenant)
+    return JsonResponse({'message': 'success', 'deactivatedCount': updated})
+
+
 @transaction.atomic
 def add_inventory_opening_stock_api(request):
     if request.method != 'POST':
@@ -6844,11 +7090,13 @@ def add_inventory_opening_stock_api(request):
             stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
             unit_cost = _safe_sales_float(row.get('unitCost') or row.get('unitPrice'))
             line_total = _safe_sales_float(row.get('lineTotal')) or round(quantity * unit_cost, 2)
+            batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='in')
             InventoryOpeningLine.objects.create(
                 tenant=voucher.tenant,
                 voucher=voucher,
                 warehouse=warehouse,
                 item=item,
+                batch=batch,
                 stockBucket=stock_bucket,
                 quantity=quantity,
                 unitCost=unit_cost,
@@ -6882,7 +7130,7 @@ def list_inventory_opening_vouchers_api(request):
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
-def _voucher_line_rows_from_payload(request, lines_payload, *, quantity_field='quantity', rate_field='unitCost'):
+def _voucher_line_rows_from_payload(request, lines_payload, *, quantity_field='quantity', rate_field='unitCost', batch_direction='in', warehouse=None):
     rows = []
     item_ids = []
     for row in lines_payload:
@@ -6893,8 +7141,10 @@ def _voucher_line_rows_from_payload(request, lines_payload, *, quantity_field='q
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
         unit_rate = _safe_sales_float(row.get(rate_field) or row.get('unitPrice') or row.get('unitCost'))
         line_total = _safe_sales_float(row.get('lineTotal')) or round(quantity * unit_rate, 2)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction=batch_direction)
         rows.append({
             'item': item,
+            'batch': batch,
             'quantity': quantity,
             'stockBucket': stock_bucket,
             'unitRate': unit_rate,
@@ -6907,10 +7157,15 @@ def _voucher_line_rows_from_payload(request, lines_payload, *, quantity_field='q
 
 def _serialize_voucher_lines(lines_qs, *, quantity_field='quantity', rate_field='unitCost'):
     payload = []
-    for line in lines_qs.select_related('item').order_by('id'):
+    for line in lines_qs.select_related('item', 'batch').order_by('id'):
         payload.append({
             'itemId': line.item_id,
             'itemName': line.item.name,
+            'batchId': line.batch_id,
+            'batchNumber': line.batch.batchNumber if line.batch_id else '',
+            'manufactureDate': line.batch.manufactureDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.manufactureDate else '',
+            'expiryDate': line.batch.expiryDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.expiryDate else '',
+            'batchMrp': float(line.batch.mrp or 0.0) if line.batch_id else 0.0,
             'stockBucket': line.stockBucket,
             'quantity': float(getattr(line, quantity_field) or 0.0),
             'unitCost': float(getattr(line, rate_field) or 0.0),
@@ -6942,7 +7197,8 @@ def add_inventory_adjustment_voucher_api(request):
         voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.INVENTORY_ADJUSTMENT)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        batch_direction = 'out' if str(request.POST.get('direction') or 'increase').lower() == 'decrease' else 'in'
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction=batch_direction, warehouse=warehouse)
         for row in rows:
             quantity_delta = row['quantity']
             if str(request.POST.get('direction') or 'increase').lower() == 'decrease':
@@ -6952,6 +7208,7 @@ def add_inventory_adjustment_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantityDelta=quantity_delta,
                 unitCost=row['unitRate'],
@@ -7021,7 +7278,8 @@ def update_inventory_adjustment_voucher_api(request):
         voucher.save(update_fields=['entryDate', 'remark', 'lastUpdatedOn'])
         voucher.lines.filter(isDeleted=False).update(isDeleted=True)
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        batch_direction = 'out' if str(request.POST.get('direction') or 'increase').lower() == 'decrease' else 'in'
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction=batch_direction, warehouse=warehouse)
         for row in rows:
             quantity_delta = row['quantity']
             if str(request.POST.get('direction') or 'increase').lower() == 'decrease':
@@ -7031,6 +7289,7 @@ def update_inventory_adjustment_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantityDelta=quantity_delta,
                 unitCost=row['unitRate'],
@@ -7088,12 +7347,13 @@ def add_inventory_transfer_voucher_api(request):
         voucher.save()
         voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.INVENTORY_TRANSFER)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction='out', warehouse=voucher.fromWarehouse)
         for row in rows:
             InventoryTransferLine.objects.create(
                 tenant=voucher.tenant,
                 voucher=voucher,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitCost=row['unitRate'],
@@ -7165,12 +7425,13 @@ def update_inventory_transfer_voucher_api(request):
         voucher.remark = request.POST.get('remark')
         voucher.save(update_fields=['entryDate', 'fromWarehouse', 'toWarehouse', 'remark', 'lastUpdatedOn'])
         voucher.lines.filter(isDeleted=False).update(isDeleted=True)
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction='out', warehouse=voucher.fromWarehouse)
         for row in rows:
             InventoryTransferLine.objects.create(
                 tenant=voucher.tenant,
                 voucher=voucher,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitCost=row['unitRate'],
@@ -7231,7 +7492,7 @@ def add_purchase_return_voucher_api(request):
         voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.PURCHASE_RETURN)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction='out', warehouse=warehouse)
         voucher.totalAmount = 0.0
         for row in rows:
             PurchaseReturnLine.objects.create(
@@ -7239,6 +7500,7 @@ def add_purchase_return_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitCost=row['unitRate'],
@@ -7316,7 +7578,7 @@ def update_purchase_return_voucher_api(request):
         voucher.save(update_fields=['entryDate', 'purchaseInvoice', 'partyID', 'remark', 'lastUpdatedOn'])
         voucher.lines.filter(isDeleted=False).update(isDeleted=True)
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction='out', warehouse=warehouse)
         voucher.totalAmount = 0.0
         for row in rows:
             PurchaseReturnLine.objects.create(
@@ -7324,6 +7586,7 @@ def update_purchase_return_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitCost=row['unitRate'],
@@ -7390,7 +7653,7 @@ def add_sales_return_voucher_api(request):
         voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES_RETURN)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice', batch_direction='in', warehouse=warehouse)
         voucher.totalAmount = 0.0
         for row in rows:
             SalesReturnLine.objects.create(
@@ -7398,6 +7661,7 @@ def add_sales_return_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitPrice=row['unitRate'],
@@ -7482,7 +7746,7 @@ def update_sales_return_voucher_api(request):
         voucher.save(update_fields=['entryDate', 'sales', 'cashCounter', 'partyID', 'remark', 'lastUpdatedOn'])
         voucher.lines.filter(isDeleted=False).update(isDeleted=True)
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice', batch_direction='in', warehouse=warehouse)
         voucher.totalAmount = 0.0
         for row in rows:
             SalesReturnLine.objects.create(
@@ -7490,6 +7754,7 @@ def update_sales_return_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitPrice=row['unitRate'],
@@ -7558,6 +7823,11 @@ def get_purchase_invoice_detail_api(request):
         lines = [{
             'itemId': line.item_id,
             'itemName': line.item.name,
+            'batchId': line.batch_id,
+            'batchNumber': line.batch.batchNumber if line.batch_id else '',
+            'manufactureDate': line.batch.manufactureDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.manufactureDate else '',
+            'expiryDate': line.batch.expiryDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.expiryDate else '',
+            'batchMrp': float(line.batch.mrp or 0.0) if line.batch_id else 0.0,
             'stockBucket': line.stockBucket,
             'quantity': float(line.quantity or 0.0),
             'unitCost': float(line.unitCost or 0.0),
@@ -7566,7 +7836,7 @@ def get_purchase_invoice_detail_api(request):
             'gstAmount': float(line.gstAmount or 0.0),
             'lineTotal': float(line.lineTotal or 0.0),
             'remark': line.remark or '',
-        } for line in purchase.lines.filter(isDeleted=False).select_related('item').order_by('id')]
+        } for line in purchase.lines.filter(isDeleted=False).select_related('item', 'batch').order_by('id')]
         revisions = [{
             'changedOn': revision.datetime.strftime('%d/%m/%Y %I:%M %p') if revision.datetime else '',
             'previousGstTreatment': revision.previousGstTreatment or '',
@@ -7856,6 +8126,11 @@ def _safe_sales_float(value) -> float:
         return float(value or 0.0)
     except Exception:
         return 0.0
+
+
+def _safe_local_date():
+    now_value = timezone.now()
+    return timezone.localtime(now_value).date() if timezone.is_aware(now_value) else now_value.date()
 
 
 def _normalize_gst_number(raw_value) -> str:
@@ -8153,6 +8428,7 @@ def _apply_inventory_item_payload(request, item):
     item.mrp = _safe_sales_float(request.POST.get('mrp'))
     item.minimumStockLevel = _safe_sales_float(request.POST.get('minimumStockLevel'))
     item.reorderLevel = _safe_sales_float(request.POST.get('reorderLevel'))
+    item.requiresBatchTracking = str(request.POST.get('requiresBatchTracking') or '').lower() in {'1', 'true', 'yes', 'on'}
     item.isSaleBlocked = str(request.POST.get('isSaleBlocked') or '').lower() in {'1', 'true', 'yes', 'on'}
 
 
@@ -8227,6 +8503,170 @@ def _normalize_stock_bucket(request, raw_bucket, item: InventoryItem) -> str:
     if bucket == InventoryItem.StockBucket.NON_GST:
         _assert_non_gst_enabled(request, label='Non-GST stock bucket')
     return bucket
+
+
+def _parse_inventory_batch_date(value):
+    raw = str(value or '').strip()
+    if not raw:
+        return None
+    parsed = parse_date(raw)
+    if parsed:
+        return parsed
+    for fmt in ('%d/%m/%Y', '%d/%m/%y', '%d-%m-%Y'):
+        try:
+            return datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError('Invalid batch date. Use DD/MM/YYYY.')
+
+
+def _available_batch_stock_queryset(*, item, stock_bucket, warehouse=None, today=None):
+    today = today or _safe_local_date()
+    qs = InventoryBatchStock.objects.filter(
+        tenant=item.tenant,
+        isDeleted=False,
+        item=item,
+        stockBucket=stock_bucket,
+        quantityOnHand__gt=0,
+        batch__isDeleted=False,
+        batch__isActive=True,
+    ).filter(
+        Q(batch__expiryDate__isnull=True) | Q(batch__expiryDate__gte=today)
+    ).annotate(
+        expiry_missing=Case(
+            When(batch__expiryDate__isnull=True, then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        )
+    ).order_by('expiry_missing', 'batch__expiryDate', 'batch__batchNumber', 'batch_id')
+    if warehouse is not None:
+        qs = qs.filter(warehouse=warehouse)
+    return qs
+
+
+def _earliest_available_batch_for_fefo(*, item, stock_bucket, warehouse=None, today=None):
+    row = _available_batch_stock_queryset(
+        item=item,
+        stock_bucket=stock_bucket,
+        warehouse=warehouse,
+        today=today,
+    ).select_related('batch').first()
+    return row.batch if row else None
+
+
+def _resolve_inventory_batch(request, row, *, item, stock_bucket, warehouse=None, quantity=0.0, direction='in'):
+    raw_batch_id = str(row.get('batchId') or row.get('batch_id') or '').strip()
+    batch_number = str(row.get('batchNumber') or row.get('batchNo') or row.get('batch') or '').strip()
+    manufacture_date = _parse_inventory_batch_date(row.get('manufactureDate') or row.get('mfgDate'))
+    expiry_date = _parse_inventory_batch_date(row.get('expiryDate') or row.get('expDate'))
+    purchase_rate = _safe_sales_float(row.get('purchaseRate') or row.get('unitCost') or row.get('unitPrice'))
+    mrp = _safe_sales_float(row.get('batchMrp') or row.get('mrp'))
+    if manufacture_date and expiry_date and expiry_date < manufacture_date:
+        raise ValueError(f'Expiry date cannot be before manufacture date for {item.name}.')
+
+    if raw_batch_id:
+        if not raw_batch_id.isdigit():
+            raise ValueError('Invalid batch selection.')
+        batch = tenant_qs(request, InventoryBatch).filter(isDeleted=False, pk=int(raw_batch_id), item=item).first()
+        if batch is None:
+            raise ValueError('Selected batch was not found.')
+        if direction == 'out' and batch.expiryDate and batch.expiryDate < _safe_local_date():
+            raise ValueError(f'Batch {batch.batchNumber or batch.pk} for {item.name} is expired.')
+        if direction == 'out' and warehouse is not None:
+            available = InventoryBatchStock.objects.filter(
+                tenant=item.tenant,
+                isDeleted=False,
+                batch=batch,
+                warehouse=warehouse,
+            ).values_list('quantityOnHand', flat=True).first()
+            if available is None or float(available or 0.0) <= 0:
+                raise ValueError(f'Batch {batch.batchNumber or batch.pk} for {item.name} is not available in {warehouse.name}.')
+        if direction == 'out' and item.requiresBatchTracking:
+            fefo_batch = _earliest_available_batch_for_fefo(item=item, stock_bucket=stock_bucket, warehouse=warehouse)
+            if fefo_batch is not None and fefo_batch.pk != batch.pk:
+                raise ValueError(
+                    f'FEFO requires selling batch {fefo_batch.batchNumber or fefo_batch.pk} for {item.name} before {batch.batchNumber or batch.pk}.'
+                )
+        return batch
+
+    has_batch_details = bool(batch_number or manufacture_date or expiry_date)
+    if direction == 'out':
+        if not has_batch_details and not item.requiresBatchTracking:
+            return None
+        batch_stock_qs = _available_batch_stock_queryset(
+            item=item,
+            stock_bucket=stock_bucket,
+            warehouse=warehouse,
+            today=_safe_local_date(),
+        )
+        if batch_number:
+            batch_stock_qs = batch_stock_qs.filter(batch__batchNumber=batch_number)
+        batch_stock = batch_stock_qs.select_related('batch').first()
+        if batch_stock is None:
+            raise ValueError(f'No available non-expired batch found for {item.name}.')
+        return batch_stock.batch
+
+    if not has_batch_details and not item.requiresBatchTracking:
+        return None
+    if item.requiresBatchTracking and not batch_number:
+        raise ValueError(f'Batch number is required for {item.name}.')
+    if item.requiresBatchTracking and not expiry_date:
+        raise ValueError(f'Expiry date is required for batch-tracked item {item.name}.')
+    if batch_number:
+        existing_batch = InventoryBatch.objects.filter(
+            tenant=item.tenant,
+            item=item,
+            stockBucket=stock_bucket,
+            batchNumber=batch_number,
+            isDeleted=False,
+        ).first()
+        has_date_conflict = existing_batch is not None and (
+            existing_batch.manufactureDate != manufacture_date or existing_batch.expiryDate != expiry_date
+        )
+        has_rate_conflict = (
+            existing_batch is not None
+            and purchase_rate
+            and float(existing_batch.purchaseRate or 0.0)
+            and round(float(existing_batch.purchaseRate or 0.0), 2) != round(purchase_rate, 2)
+        )
+        has_mrp_conflict = (
+            existing_batch is not None
+            and mrp
+            and float(existing_batch.mrp or 0.0)
+            and round(float(existing_batch.mrp or 0.0), 2) != round(mrp, 2)
+        )
+        if has_date_conflict or has_rate_conflict or has_mrp_conflict:
+            raise ValueError(
+                f'Batch {batch_number} already exists for {item.name} with different manufacture, expiry, rate, or MRP details.'
+            )
+    batch, _created = InventoryBatch.objects.get_or_create(
+        tenant=item.tenant,
+        item=item,
+        stockBucket=stock_bucket,
+        batchNumber=batch_number or None,
+        manufactureDate=manufacture_date,
+        expiryDate=expiry_date,
+        defaults={
+            'warehouse': warehouse,
+            'purchaseRate': purchase_rate,
+            'mrp': mrp,
+            'isActive': True,
+        },
+    )
+    update_fields = []
+    if warehouse and batch.warehouse_id is None:
+        batch.warehouse = warehouse
+        update_fields.append('warehouse')
+    if purchase_rate and float(batch.purchaseRate or 0.0) != purchase_rate:
+        batch.purchaseRate = purchase_rate
+        update_fields.append('purchaseRate')
+    if mrp and float(batch.mrp or 0.0) != mrp:
+        batch.mrp = mrp
+        update_fields.append('mrp')
+    if update_fields:
+        update_fields.append('lastUpdatedOn')
+        batch.save(update_fields=update_fields)
+    return batch
 
 
 def _staff_for_request(request):
@@ -8384,7 +8824,7 @@ def get_sales_return_source_detail_api(request):
             if getattr(getattr(source_obj, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
                 return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         return_qs = tenant_qs(request, SalesReturnVoucher).filter(isDeleted=False, cashCounter=source_obj)
-        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item').order_by('id')
+        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item', 'batch').order_by('id')
         if not allow_non_gst:
             line_qs = line_qs.exclude(stockBucket=InventoryItem.StockBucket.NON_GST)
     else:
@@ -8397,7 +8837,7 @@ def get_sales_return_source_detail_api(request):
             if getattr(getattr(source_obj, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
                 return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         return_qs = tenant_qs(request, SalesReturnVoucher).filter(isDeleted=False, sales=source_obj)
-        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item').order_by('id')
+        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item', 'batch').order_by('id')
         if not allow_non_gst:
             line_qs = line_qs.exclude(stockBucket=InventoryItem.StockBucket.NON_GST)
     if exclude_voucher_id and str(exclude_voucher_id).isdigit():
@@ -8421,6 +8861,11 @@ def get_sales_return_source_detail_api(request):
         lines.append({
             'itemId': line.item_id,
             'itemName': line.item.name,
+            'batchId': line.batch_id,
+            'batchNumber': line.batch.batchNumber if line.batch_id else '',
+            'manufactureDate': line.batch.manufactureDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.manufactureDate else '',
+            'expiryDate': line.batch.expiryDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.expiryDate else '',
+            'batchMrp': float(line.batch.mrp or 0.0) if line.batch_id else 0.0,
             'stockBucket': line.stockBucket,
             'quantity': sold_qty,
             'returnedQuantity': already_returned,
@@ -8525,6 +8970,7 @@ def _sync_sales_lines(request, sale: Sales):
             raise ValueError('Sales quantity must be greater than zero.')
         _validate_inventory_quantity_for_unit(item, quantity, label='Sales quantity')
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='out')
         unit_price = _safe_sales_float(row.get('unitPrice'))
         discount_percent = max(0.0, min(100.0, _safe_sales_float(row.get('discountPercent'))))
         gross_amount = round(quantity * unit_price, 2)
@@ -8542,6 +8988,7 @@ def _sync_sales_lines(request, sale: Sales):
             sales=sale,
             warehouse=warehouse,
             item=item,
+            batch=batch,
             hsnCode=item.hsnCode,
             stockBucket=stock_bucket,
             quantity=quantity,
@@ -8620,6 +9067,7 @@ def _sync_proforma_lines(request, proforma: ProformaInvoice):
             raise ValueError('Proforma quantity must be greater than zero.')
         _validate_inventory_quantity_for_unit(item, quantity, label='Proforma quantity')
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='out')
         unit_price = _safe_sales_float(row.get('unitPrice'))
         discount_percent = max(0.0, min(100.0, _safe_sales_float(row.get('discountPercent'))))
         gross_amount = round(quantity * unit_price, 2)
@@ -8636,6 +9084,7 @@ def _sync_proforma_lines(request, proforma: ProformaInvoice):
             proformaInvoice=proforma,
             warehouse=warehouse,
             item=item,
+            batch=batch,
             hsnCode=item.hsnCode,
             stockBucket=stock_bucket,
             quantity=quantity,
@@ -8651,12 +9100,13 @@ def _sync_proforma_lines(request, proforma: ProformaInvoice):
 
 def _copy_proforma_lines_to_sale(proforma: ProformaInvoice, sale: Sales) -> list[int]:
     item_ids = []
-    for line in proforma.lines.filter(isDeleted=False).select_related('item', 'warehouse').order_by('id'):
+    for line in proforma.lines.filter(isDeleted=False).select_related('item', 'warehouse', 'batch').order_by('id'):
         SalesLine.objects.create(
             tenant=sale.tenant,
             sales=sale,
             warehouse=line.warehouse,
             item=line.item,
+            batch=line.batch,
             hsnCode=line.hsnCode,
             stockBucket=line.stockBucket,
             quantity=line.quantity,
@@ -8690,6 +9140,7 @@ def _sync_cash_counter_lines(request, counter: CashCounter):
             raise ValueError('Cash counter quantity must be greater than zero.')
         _validate_inventory_quantity_for_unit(item, quantity, label='Cash counter quantity')
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='out')
         unit_price = _safe_sales_float(row.get('unitPrice'))
         discount_percent = max(0.0, min(100.0, _safe_sales_float(row.get('discountPercent'))))
         gross_amount = round(quantity * unit_price, 2)
@@ -8707,6 +9158,7 @@ def _sync_cash_counter_lines(request, counter: CashCounter):
             cashCounter=counter,
             warehouse=warehouse,
             item=item,
+            batch=batch,
             hsnCode=item.hsnCode,
             stockBucket=stock_bucket,
             quantity=quantity,
@@ -8789,6 +9241,7 @@ def _sync_cash_counter_return_voucher(request, counter: CashCounter):
             voucher=voucher,
             warehouse=line.warehouse,
             item=line.item,
+            batch=line.batch,
             stockBucket=line.stockBucket,
             quantity=line.quantity,
             unitPrice=line.unitPrice,
@@ -8844,6 +9297,11 @@ def _normalize_purchase_lines_for_treatment(gst_treatment, lines):
         normalized.append({
             'itemId': row.get('itemId'),
             'stockBucket': stock_bucket,
+            'batchId': row.get('batchId') or row.get('batch_id') or '',
+            'batchNumber': row.get('batchNumber') or row.get('batchNo') or row.get('batch') or '',
+            'manufactureDate': row.get('manufactureDate') or row.get('mfgDate') or '',
+            'expiryDate': row.get('expiryDate') or row.get('expDate') or '',
+            'batchMrp': row.get('batchMrp') or row.get('mrp') or '',
             'quantity': quantity,
             'unitCost': unit_cost,
             'taxableAmount': round(taxable_amount, 2),
@@ -8875,6 +9333,7 @@ def _sync_purchase_lines(request, purchase: PurchaseInvoice, lines_payload):
         if quantity <= 0:
             raise ValueError('Purchase quantity must be greater than zero.')
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='in')
         unit_cost = _safe_sales_float(row.get('unitCost'))
         taxable_amount = _safe_sales_float(row.get('taxableAmount')) or round(quantity * unit_cost, 2)
         gst_rate = _safe_sales_float(row.get('gstRate'))
@@ -8885,6 +9344,7 @@ def _sync_purchase_lines(request, purchase: PurchaseInvoice, lines_payload):
             purchaseInvoice=purchase,
             warehouse=warehouse,
             item=item,
+            batch=batch,
             stockBucket=stock_bucket,
             quantity=quantity,
             unitCost=unit_cost,

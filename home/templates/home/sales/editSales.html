@@ -614,6 +614,9 @@
             var placeOfSupply = $('#placeOfSupply').val();
             var ID = $('#ID').val();
             var lineItems = collectSalesLineItemsBeforeSave();
+            var salesLineValidation = salesInventoryWidget && typeof salesInventoryWidget.validate === 'function'
+                ? salesInventoryWidget.validate()
+                : {valid: true, message: ''};
 
             if (ID === '' || party === '' || colDate === '') {
                 $('body')
@@ -634,6 +637,9 @@
                 hideLoading();
             } else if ($('#salesLineItemBox').length && $('#salesLineItemBox .sales-lines-enable-toggle').is(':checked') && !lineItems.length) {
                 $('body').toast({class: 'orange', message: 'Add at least one valid GST item row before saving.'});
+                hideLoading();
+            } else if (salesLineValidation && salesLineValidation.valid === false) {
+                $('body').toast({class: 'orange', message: salesLineValidation.message || 'Fix selected batch quantities before saving.'});
                 hideLoading();
             } else {
                 data = new FormData();
@@ -725,6 +731,7 @@
                 containerSelector: '#salesLineItemBox',
                 hiddenInputSelector: '#salesLineItems',
                 catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+                batchUrl: '{% url "homeApp:list_inventory_batches_api" %}',
                 initialRows: salesInitialLineItems,
                 syncTotals: function (totals) {
                     updateLiveSalesTaxBreakup(totals);
