@@ -32,14 +32,14 @@
             '<div class="sales-span-2"><div class="field"><label>Qty</label><div class="ui fluid input"><input type="number" class="sales-qty" min="0" step="0.01" value="' + (row.quantity || '') + '"></div></div></div>' +
             '<div class="sales-span-3"><div class="field"><label>Rate</label><div class="ui fluid input"><input type="number" class="sales-rate" min="0" step="0.01" value="' + (row.unitPrice || '') + '"></div></div></div>' +
             '<div class="sales-span-1"><div class="field"><label>Disc %</label><div class="ui fluid input"><input type="number" class="sales-discount-percent" min="0" max="100" step="0.01" value="' + (row.discountPercent || '') + '"></div></div></div>' +
-            '<div class="sales-span-3"><div class="field"><label>Batch <button type="button" class="ui mini teal basic icon button sales-batch-trace" data-tooltip="View Batch Trace" data-position="top center" data-variation="mini"><i class="history icon"></i></button></label><select class="ui fluid search selection dropdown sales-batch-select"><option value="">Auto FEFO</option></select></div></div>' +
-            '<div class="sales-span-3"><div class="field"><label>Batch No</label><div class="ui fluid input"><input type="text" class="sales-batch-number" maxlength="120" value="' + (row.batchNumber || '') + '" placeholder="Auto FEFO"></div></div></div>' +
-            '<div class="sales-span-2"><div class="field"><label>Expiry</label><div class="ui fluid input"><input type="text" class="sales-expiry-date" value="' + (row.expiryDate || '') + '" placeholder="DD/MM/YYYY"></div></div></div>' +
+            '<input type="hidden" class="sales-batch-number" value="' + (row.batchNumber || '') + '">' +
+            '<input type="hidden" class="sales-expiry-date" value="' + (row.expiryDate || '') + '">' +
+            '<div class="sales-span-5"><div class="field sales-batch-field"><label>Batch / FEFO</label><div class="sales-batch-panel"><div class="sales-batch-select-row"><select class="ui fluid search selection dropdown sales-batch-select"><option value="">Auto FEFO</option></select><button type="button" class="ui teal basic icon button sales-batch-trace" data-tooltip="View Batch Trace" data-position="top center" data-variation="mini"><i class="history icon"></i></button></div><div class="sales-batch-meta"><span class="sales-batch-pill muted">Auto FEFO</span><span class="sales-batch-meta-text">Earliest eligible batch will be picked on save.</span></div></div></div></div>' +
             '<div class="sales-span-2"><div class="field"><label>Taxable</label><div class="ui fluid input"><input type="number" class="sales-taxable" min="0" step="0.01" value="' + (row.taxableAmount || '') + '" readonly></div></div></div>' +
             '<div class="sales-span-1"><div class="field"><label>GST %</label><div class="ui fluid input"><input type="number" class="sales-gst-rate" min="0" step="0.01" value="' + (row.gstRate || '') + '"></div></div></div>' +
             '<div class="sales-span-2"><div class="field"><label>GST Amt</label><div class="ui fluid input"><input type="number" class="sales-gst-amount" min="0" step="0.01" value="' + (row.gstAmount || '') + '" readonly></div></div></div>' +
             '<div class="sales-span-2"><div class="field"><label>Total</label><div class="ui fluid input"><input type="number" class="sales-total" min="0" step="0.01" value="' + (row.lineTotal || '') + '" readonly></div></div></div>' +
-            '<div class="sales-span-4"><div class="field sales-remark-input"><label>Remark</label><div class="ui fluid input"><input type="text" class="sales-remark" maxlength="120" value="' + (row.remark || '') + '" placeholder="Optional"></div></div></div>' +
+            '<div class="sales-span-12"><div class="field sales-remark-input"><label>Remark</label><div class="ui fluid input"><input type="text" class="sales-remark" maxlength="120" value="' + (row.remark || '') + '" placeholder="Optional"></div></div></div>' +
             '</div>' +
             '<div class="sales-line-summary">' +
             '<div class="sales-line-summary-pills">' +
@@ -181,6 +181,55 @@
         }
         $row.find('.sales-unit-name').text(unitName);
         $row.find('.sales-stock-hint').text(hint + (requiresBatch ? ' | Batch required' : ''));
+        updateBatchMeta($row);
+    }
+
+    function updateBatchMeta($row) {
+        var $selectedItem = selectedItemOption($row);
+        var requiresBatch = String($selectedItem.data('requires-batch') || '0') === '1';
+        var batchId = dropdownValue($row.find('.sales-batch-select')) || $row.find('.sales-batch-id').val() || '';
+        var $selectedBatch = batchId ? $row.find('.sales-batch-select option[value="' + batchId + '"]') : $();
+        var $firstBatch = $row.find('.sales-batch-select option').filter(function () { return String($(this).val() || '').trim() !== ''; }).first();
+        var $pill = $row.find('.sales-batch-pill');
+        var $text = $row.find('.sales-batch-meta-text');
+        var $trace = $row.find('.sales-batch-trace');
+
+        $trace.toggleClass('disabled', !batchId);
+        if (!$selectedItem.length) {
+            $pill.attr('class', 'sales-batch-pill muted').text('No item');
+            $text.text('Select an item to load eligible batches.');
+            return;
+        }
+        if (batchId && $selectedBatch.length) {
+            $pill.attr('class', 'sales-batch-pill selected').text($selectedBatch.data('batch-number') || ('Batch #' + batchId));
+            $text.text('Exp ' + ($selectedBatch.data('expiry-date') || '-') + ' | Available ' + ($selectedBatch.data('quantity-on-hand') || 0));
+            return;
+        }
+        if ($firstBatch.length) {
+            $pill.attr('class', 'sales-batch-pill fefo').text('Auto FEFO');
+            $text.text('Will pick ' + ($firstBatch.data('batch-number') || 'earliest batch') + ' | Exp ' + ($firstBatch.data('expiry-date') || '-') + ' | Available ' + ($firstBatch.data('quantity-on-hand') || 0));
+            return;
+        }
+        if (requiresBatch) {
+            $pill.attr('class', 'sales-batch-pill warning').text('Batch required');
+            $text.text('No eligible batch stock is available for this item and bucket.');
+            return;
+        }
+        $pill.attr('class', 'sales-batch-pill muted').text('No batch');
+        $text.text('This item does not require batch selection.');
+    }
+
+    function resetBatchSelection($row) {
+        var $select = $row.find('.sales-batch-select');
+        $row.find('.sales-batch-id').val('');
+        $row.find('.sales-batch-number').val('');
+        $row.find('.sales-expiry-date').val('');
+        try {
+            $select.dropdown('clear');
+        } catch (e) {
+            $select.val('');
+        }
+        updateBatchMeta($row);
     }
 
     function warehouseIdForRow($row) {
@@ -225,6 +274,7 @@
             } catch (e) {
                 $select.val(selectedBatchId);
             }
+            updateBatchMeta($row);
         });
     }
 
@@ -454,6 +504,9 @@
                     $row.find('.sales-item').dropdown({
                         fullTextSearch: true,
                         onChange: function () {
+                            if (!$row.data('loadingInitialRow')) {
+                                resetBatchSelection($row);
+                            }
                             applySelectedDefaults($row, {forceItemDefaults: !$row.data('loadingInitialRow')});
                             applyQuantityStep($row);
                             loadBatchOptions($row);
@@ -463,6 +516,9 @@
                     });
                     $row.find('.sales-bucket').dropdown({
                         onChange: function () {
+                            if (!$row.data('loadingInitialRow')) {
+                                resetBatchSelection($row);
+                            }
                             updateHint($row);
                             loadBatchOptions($row);
                             collect($box, config.hiddenInputSelector, config.syncTotals);
@@ -476,18 +532,23 @@
                             if (value) {
                                 $row.find('.sales-batch-number').val($selected.data('batch-number') || '');
                                 $row.find('.sales-expiry-date').val($selected.data('expiry-date') || '');
+                            } else {
+                                $row.find('.sales-batch-number').val('');
+                                $row.find('.sales-expiry-date').val('');
                             }
+                            updateBatchMeta($row);
                             collect($box, config.hiddenInputSelector, config.syncTotals);
                         }
                     });
                     if (row && row.itemId) {
                         $row.data('loadingInitialRow', true);
                         $row.find('.sales-item').dropdown('set selected', String(row.itemId));
-                        $row.data('loadingInitialRow', false);
                         $row.find('.sales-bucket').dropdown('set selected', row.stockBucket || 'gst');
+                        $row.data('loadingInitialRow', false);
                     }
                     applySelectedDefaults($row);
                     applyQuantityStep($row);
+                    updateBatchMeta($row);
                     loadBatchOptions($row);
                     recalcRow($row);
                     collect($box, config.hiddenInputSelector, config.syncTotals);

@@ -88,6 +88,93 @@
             white-space: nowrap;
         }
 
+        .sales-gst-box .sales-batch-panel {
+            display: grid;
+            gap: 5px;
+            padding: 6px;
+            border: 1px solid rgba(15, 118, 110, 0.14);
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+
+        .sales-gst-box .sales-batch-select-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 34px;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .sales-gst-box .sales-batch-select-row .ui.dropdown {
+            min-width: 0;
+        }
+
+        .sales-gst-box .sales-batch-trace.ui.icon.button {
+            width: 34px;
+            height: 34px;
+            min-height: 34px;
+            padding: 0 !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: none !important;
+        }
+
+        .sales-gst-box .sales-batch-trace.disabled {
+            opacity: 0.45;
+        }
+
+        .sales-gst-box .sales-batch-meta {
+            min-height: 18px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-wrap: wrap;
+            color: #64748b;
+            font-size: 10px;
+            line-height: 1.25;
+        }
+
+        .sales-gst-box .sales-batch-pill {
+            display: inline-flex;
+            align-items: center;
+            max-width: 100%;
+            padding: 2px 7px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.25;
+            white-space: nowrap;
+        }
+
+        .sales-gst-box .sales-batch-pill.muted {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid rgba(71, 85, 105, 0.14);
+        }
+
+        .sales-gst-box .sales-batch-pill.fefo {
+            background: #ecfdf5;
+            color: #047857;
+            border: 1px solid rgba(5, 150, 105, 0.18);
+        }
+
+        .sales-gst-box .sales-batch-pill.selected {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border: 1px solid rgba(59, 130, 246, 0.20);
+        }
+
+        .sales-gst-box .sales-batch-pill.warning {
+            background: #fff7ed;
+            color: #c2410c;
+            border: 1px solid rgba(234, 88, 12, 0.20);
+        }
+
+        .sales-gst-box .sales-batch-meta-text {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
         .sales-gst-box .sales-line-summary {
             margin-top: 4px;
             display: flex;
@@ -200,6 +287,39 @@
             background: rgba(22, 120, 194, 0.18) !important;
             border-color: rgba(56, 189, 248, 0.26) !important;
             color: #bfefff !important;
+        }
+
+        html[data-theme="dark"] .sales-gst-box .sales-batch-panel {
+            background: rgba(15, 23, 42, 0.74) !important;
+            border-color: rgba(56, 189, 248, 0.16) !important;
+        }
+
+        html[data-theme="dark"] .sales-gst-box .sales-batch-meta {
+            color: #93a4bd !important;
+        }
+
+        html[data-theme="dark"] .sales-gst-box .sales-batch-pill.muted {
+            background: rgba(51, 65, 85, 0.62) !important;
+            border-color: rgba(148, 163, 184, 0.18) !important;
+            color: #cbd5e1 !important;
+        }
+
+        html[data-theme="dark"] .sales-gst-box .sales-batch-pill.fefo {
+            background: rgba(4, 120, 87, 0.20) !important;
+            border-color: rgba(52, 211, 153, 0.22) !important;
+            color: #a7f3d0 !important;
+        }
+
+        html[data-theme="dark"] .sales-gst-box .sales-batch-pill.selected {
+            background: rgba(29, 78, 216, 0.24) !important;
+            border-color: rgba(96, 165, 250, 0.26) !important;
+            color: #bfdbfe !important;
+        }
+
+        html[data-theme="dark"] .sales-gst-box .sales-batch-pill.warning {
+            background: rgba(194, 65, 12, 0.20) !important;
+            border-color: rgba(251, 146, 60, 0.25) !important;
+            color: #fed7aa !important;
         }
 
         html[data-theme="dark"] .sales-gst-box .sales-summary-pill {
