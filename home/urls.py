@@ -178,6 +178,7 @@ urlpatterns = [
     path('api/generate_party_users_api/', generate_party_users_api, name='generate_party_users_api'),
     path('api/generate_party_access_link_api/', generate_party_access_link_api, name='generate_party_access_link_api'),
     path('api/PartyListJson/', PartyListJson.as_view(), name='PartyListJson'),
+    path('api/party_balance_summary/', party_balance_summary_api, name='party_balance_summary_api'),
     path('api/PartyLedgerListJson/', PartyLedgerListJson.as_view(), name='PartyLedgerListJson'),
     path('api/generate_party_ledger_pdf/<int:party_id>/', generate_party_ledger_pdf, name='generate_party_ledger_pdf'),
     path('api/generate_party_ledger_excel/<int:party_id>/', generate_party_ledger_excel, name='generate_party_ledger_excel'),

@@ -1686,9 +1686,10 @@ def party_list(request):
     party_groups = tenant_qs(request, PartyGroup).filter(isDeleted__exact=False).order_by('name')
     staffs = tenant_qs(request, StaffUser).filter(isDeleted__exact=False).order_by('name')
     can_view_credentials = request.user.has_perm('home.can_view_party_credentials')
-    can_add = request.user.has_perm('home.add_party') or can_view_credentials
-    can_edit = request.user.has_perm('home.change_party') or can_view_credentials
-    can_delete = request.user.has_perm('home.delete_party') or can_view_credentials
+    can_manage_parties = request.user.has_perm('home.can_manage_parties')
+    can_add = request.user.has_perm('home.add_party') or can_manage_parties
+    can_edit = request.user.has_perm('home.change_party') or can_manage_parties
+    can_delete = request.user.has_perm('home.delete_party') or can_manage_parties
     context = {
         'party_groups': party_groups,
         'staffs': staffs,

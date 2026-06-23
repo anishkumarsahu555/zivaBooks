@@ -16,6 +16,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q, Sum, Count, Case, When, Value, F, FloatField, IntegerField, ExpressionWrapper, Window, Max
+from django.db.models.functions import Cast, Coalesce
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
@@ -450,6 +451,33 @@ def _money(value):
     return f'Rs. {formatINR(format(float(value or 0.0), ".0f"))}'
 
 
+def _party_balance_label(balance):
+    amount = float(balance or 0.0)
+    display = f'₹ {formatINR(format(abs(amount), ".2f"))}'
+    if amount > 0:
+        return f'<span class="ui tiny orange label">Due {display}</span>'
+    if amount < 0:
+        return f'<span class="ui tiny teal label">Advance {display}</span>'
+    return '<span class="ui tiny grey label">Settled</span>'
+
+
+def _filter_party_balance_queryset(request, qs):
+    party_group = str(request.GET.get('partyGroup') or '').strip()
+    staff = str(request.GET.get('staffID') or '').strip()
+    balance_type = str(request.GET.get('balanceType') or '').strip()
+    if party_group.isdigit():
+        qs = qs.filter(partyGroupID_id=int(party_group))
+    if staff.isdigit():
+        qs = qs.filter(assignTo_id=int(staff))
+    if balance_type == 'due':
+        qs = qs.filter(current_balance__gt=0)
+    elif balance_type == 'advance':
+        qs = qs.filter(current_balance__lt=0)
+    elif balance_type == 'settled':
+        qs = qs.filter(current_balance=0)
+    return qs
+
+
 def _report_date(value, default):
     if not value:
         return default
@@ -805,6 +833,13 @@ def _decimal_from_request(value, default='0'):
         return Decimal(str(value).strip())
     except (InvalidOperation, AttributeError):
         return Decimal(default)
+
+
+def _required_decimal_from_request(value, field_label):
+    try:
+        return Decimal(str(value if value is not None else '0').strip())
+    except (InvalidOperation, AttributeError):
+        raise ValueError(f'{field_label} must be a valid number.')
 def _tenant_admin_group_name(tenant):
     tenant_slug = getattr(tenant, 'slug', 'tenant')
     return f'{tenant_slug}:Tenant Admin'
@@ -956,12 +991,67 @@ def _normalize_purchase_claim_status(treatment: str, raw_claim_status: str | Non
     if treatment == PurchaseInvoice.GstTreatment.GST:
         return PurchaseInvoice.ClaimStatus.NOT_APPLICABLE
     return status
+def _can_manage_party_master_data(user):
+    return user.has_perm('home.can_manage_parties')
 def _can_add_party(user):
-    return user.has_perm('home.add_party') or _can_view_party_credentials(user)
+    return user.has_perm('home.add_party') or _can_manage_party_master_data(user)
 def _can_edit_party(user):
-    return user.has_perm('home.change_party') or _can_view_party_credentials(user)
+    return user.has_perm('home.change_party') or _can_manage_party_master_data(user)
 def _can_delete_party(user):
-    return user.has_perm('home.delete_party') or _can_view_party_credentials(user)
+    return user.has_perm('home.delete_party') or _can_manage_party_master_data(user)
+
+
+def _validate_party_payload(request, *, is_edit=False):
+    party_name = str(request.POST.get("partyName") or '').strip()
+    phone_number = str(request.POST.get("phoneNumber") or '').strip()
+    legal_name = str(request.POST.get("legalName") or '').strip() or None
+    gst_number = _normalize_gst_number(request.POST.get("gstNumber")) or None
+    billing_address = str(request.POST.get("billingAddress") or '').strip() or None
+    address = str(request.POST.get("address") or '').strip() or None
+    is_b2b = str(request.POST.get("isB2B") or '').lower() in {'1', 'true', 'yes', 'on'}
+    opening_balance = _required_decimal_from_request(request.POST.get("openingBalance"), 'Opening balance')
+    party_group_id = str(request.POST.get("partyGroup") or '').strip()
+    staff_id = str(request.POST.get("staffID") or '').strip()
+
+    if not party_name:
+        raise ValueError('Party name is required.')
+    if not phone_number:
+        raise ValueError('Phone number is required.')
+    if len(phone_number) > 20:
+        raise ValueError('Phone number must be 20 characters or fewer.')
+    if gst_number and len(gst_number) > 20:
+        raise ValueError('GST number must be 20 characters or fewer.')
+    if not party_group_id.isdigit():
+        raise ValueError('Party group/station is required.')
+    party_group = tenant_qs(request, PartyGroup).filter(pk=int(party_group_id), isDeleted=False).first()
+    if party_group is None:
+        raise ValueError('Selected party group/station was not found.')
+    if not staff_id.isdigit():
+        raise ValueError('Assigned staff is required.')
+    staff = tenant_qs(request, StaffUser).filter(pk=int(staff_id), isDeleted=False).first()
+    if staff is None:
+        raise ValueError('Selected assigned staff was not found.')
+
+    payload = {
+        'party_name': party_name,
+        'phone_number': phone_number,
+        'legal_name': legal_name,
+        'gst_number': gst_number,
+        'is_b2b': is_b2b,
+        'billing_address': billing_address,
+        'address': address,
+        'opening_balance': opening_balance,
+        'party_group': party_group,
+        'staff': staff,
+    }
+    if is_edit:
+        edit_id = str(request.POST.get("EditId") or '').strip()
+        if not edit_id.isdigit():
+            raise ValueError('Valid party id is required.')
+        payload['party'] = tenant_qs(request, Party).filter(id=int(edit_id), isDeleted=False).first()
+        if payload['party'] is None:
+            raise ValueError('Party was not found.')
+    return payload
 def _tenant_audit_log_queryset(request):
     tenant = get_current_tenant(request)
     if tenant is None:
@@ -2120,65 +2210,53 @@ def delete_bank(request):
 # ----------------------------- Party ---------------------
 @transaction.atomic
 def add_party_api(request):
-    if request.method == 'POST':
-        if not request.user.is_authenticated:
-            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-        if not _can_add_party(request.user):
-            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-        try:
-            partyName = request.POST.get("partyName")
-            phoneNumber = request.POST.get("phoneNumber")
-            openingBalance = request.POST.get("openingBalance")
-            partyGroup = request.POST.get("partyGroup")
-            address = request.POST.get("address")
-            legalName = request.POST.get("legalName")
-            gstNumber = request.POST.get("gstNumber")
-            isB2B = str(request.POST.get("isB2B") or '').lower() in {'1', 'true', 'yes', 'on'}
-            billingAddress = request.POST.get("billingAddress")
-            staffID = request.POST.get("staffID")
-            obj = Party()
-            assign_tenant(obj, request)
-            obj.name = partyName
-            obj.legalName = (legalName or '').strip() or None
-            obj.phone = phoneNumber
-            obj.gstNumber = _normalize_gst_number(gstNumber) or None
-            obj.isB2B = isB2B
-            obj.openingBalance = _decimal_from_request(openingBalance)
-            try:
-                obj.assignTo = tenant_qs(request, StaffUser).get(pk=int(staffID))
-            except:
-                pass
-            obj.address = (address or '').strip() or None
-            obj.billingAddress = (billingAddress or '').strip() or None
-            try:
-                obj.partyGroupID_id = int(partyGroup)
-            except:
-                pass
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_add_party(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        payload = _validate_party_payload(request)
+        obj = Party()
+        assign_tenant(obj, request)
+        obj.name = payload['party_name']
+        obj.legalName = payload['legal_name']
+        obj.phone = payload['phone_number']
+        obj.gstNumber = payload['gst_number']
+        obj.isB2B = payload['is_b2b']
+        obj.openingBalance = payload['opening_balance']
+        obj.assignTo = payload['staff']
+        obj.address = payload['address']
+        obj.billingAddress = payload['billing_address']
+        obj.partyGroupID = payload['party_group']
+        username = get_random_string(length=7, allowed_chars='0123456789')
+        while User.objects.filter(username__exact=username).exists():
             username = get_random_string(length=7, allowed_chars='0123456789')
-            while User.objects.filter(username__exact=username).exists():
-                username = get_random_string(length=7, allowed_chars='0123456789')
-            password = get_random_string(length=6, allowed_chars='0123456789')
-            new_user = User()
-            new_user.username = username
-            new_user.set_password(password)
-            new_user.save()
-            group, _ = Group.objects.get_or_create(name='Customer')
-            group.user_set.add(new_user.pk)
-            obj.username = username
-            obj.password = password
-            obj.userID_id = new_user.pk
-            obj.save()
-            ensure_membership(new_user, obj.tenant, TenantMembership.Role.PARTY)
-            _bump_party_cache_version(request)
-            return JsonResponse({'message': 'success'}, safe=False)
-        except:
-            return JsonResponse({'message': 'error'}, safe=False)
+        password = get_random_string(length=6, allowed_chars='0123456789')
+        new_user = User()
+        new_user.username = username
+        new_user.set_password(password)
+        new_user.save()
+        group, _ = Group.objects.get_or_create(name='Customer')
+        group.user_set.add(new_user.pk)
+        obj.username = username
+        obj.password = password
+        obj.userID_id = new_user.pk
+        obj.save()
+        ensure_membership(new_user, obj.tenant, TenantMembership.Role.PARTY)
+        _bump_party_cache_version(request)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except ValueError as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=400, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error', 'error': 'Unable to add party.'}, status=500, safe=False)
 @transaction.atomic
 def generate_party_users_api(request):
     if request.method == 'GET':
         if not request.user.is_authenticated:
             return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-        if not _can_manage_party_records(request.user):
+        if not _can_manage_party_master_data(request.user):
             return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             customer_group, _ = Group.objects.get_or_create(name='Customer')
@@ -2240,13 +2318,30 @@ def generate_party_access_link_api(request):
 
 
 class PartyListJson(BaseDatatableView):
-    order_columns = ['name', 'phone', 'gstNumber', 'openingBalance', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
+    order_columns = ['name', 'phone', 'gstNumber', 'openingBalance', 'current_balance', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
     def get_initial_queryset(self):
         return tenant_qs(self.request, Party).select_related('partyGroupID', 'assignTo').filter(isDeleted__exact=False).only(
             'id', 'name', 'legalName', 'phone', 'gstNumber', 'isB2B', 'openingBalance', 'username', 'password', 'address', 'billingAddress', 'datetime',
             'partyGroupID__name', 'assignTo__name'
+        ).annotate(
+            ledger_debit=Coalesce(
+                Sum('ledger_entries__debit', filter=Q(ledger_entries__isDeleted=False)),
+                Value(0.0),
+                output_field=FloatField(),
+            ),
+            ledger_credit=Coalesce(
+                Sum('ledger_entries__credit', filter=Q(ledger_entries__isDeleted=False)),
+                Value(0.0),
+                output_field=FloatField(),
+            ),
+        ).annotate(
+            current_balance=ExpressionWrapper(
+                Cast(F('openingBalance'), FloatField()) + F('ledger_debit') - F('ledger_credit'),
+                output_field=FloatField(),
+            )
         )
     def filter_queryset(self, qs):
+        qs = _filter_party_balance_queryset(self.request, qs)
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
@@ -2313,6 +2408,7 @@ class PartyListJson(BaseDatatableView):
                 escape(item.phone),
                 escape(item.gstNumber or ('B2B' if item.isB2B else '-')),
                 formatINR(format(item.openingBalance, '.2f')),
+                _party_balance_label(getattr(item, 'current_balance', item.openingBalance)),
                 username,
                 password,
                 party,
@@ -2321,6 +2417,59 @@ class PartyListJson(BaseDatatableView):
                 action,
             ])
         return json_data
+
+
+def party_balance_summary_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _can_manage_party_records(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    rows = tenant_qs(request, Party).filter(isDeleted=False).annotate(
+        ledger_debit=Coalesce(
+            Sum('ledger_entries__debit', filter=Q(ledger_entries__isDeleted=False)),
+            Value(0.0),
+            output_field=FloatField(),
+        ),
+        ledger_credit=Coalesce(
+            Sum('ledger_entries__credit', filter=Q(ledger_entries__isDeleted=False)),
+            Value(0.0),
+            output_field=FloatField(),
+        ),
+    ).annotate(
+        current_balance=ExpressionWrapper(
+            Cast(F('openingBalance'), FloatField()) + F('ledger_debit') - F('ledger_credit'),
+            output_field=FloatField(),
+        )
+    )
+    rows = _filter_party_balance_queryset(request, rows).values_list('current_balance', flat=True)
+    receivable = 0.0
+    advance = 0.0
+    settled = 0
+    party_count = 0
+    for balance in rows:
+        party_count += 1
+        amount = float(balance or 0.0)
+        if amount > 0:
+            receivable += amount
+        elif amount < 0:
+            advance += abs(amount)
+        else:
+            settled += 1
+    net = receivable - advance
+    return JsonResponse({
+        'message': 'success',
+        'partyCount': party_count,
+        'settledCount': settled,
+        'receivable': receivable,
+        'advance': advance,
+        'net': net,
+        'receivableDisplay': f'₹ {formatINR(format(receivable, ".2f"))}',
+        'advanceDisplay': f'₹ {formatINR(format(advance, ".2f"))}',
+        'netDisplay': f'₹ {formatINR(format(abs(net), ".2f"))}',
+        'netType': 'receivable' if net > 0 else ('advance' if net < 0 else 'settled'),
+    })
+
+
 def get_party_detail(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized', 'error': 'Login required.'}, status=401)
@@ -2353,45 +2502,32 @@ def get_party_detail(request):
     return JsonResponse({'data': data}, safe=False)
 @transaction.atomic
 def edit_party_api(request):
-    if request.method == 'POST':
-        if not request.user.is_authenticated:
-            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-        if not _can_edit_party(request.user):
-            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-        try:
-            Id = request.POST.get("EditId")
-            name = request.POST.get("partyName")
-            phoneNumber = request.POST.get("phoneNumber")
-            openingBalance = request.POST.get("openingBalance")
-            address = request.POST.get("address")
-            legalName = request.POST.get("legalName")
-            gstNumber = request.POST.get("gstNumber")
-            isB2B = str(request.POST.get("isB2B") or '').lower() in {'1', 'true', 'yes', 'on'}
-            billingAddress = request.POST.get("billingAddress")
-            partyGroup = request.POST.get("partyGroup")
-            staffID = request.POST.get("staffID")
-            obj = tenant_qs(request, Party).select_related().get(id=int(Id))
-            obj.name = name
-            obj.legalName = (legalName or '').strip() or None
-            obj.phone = phoneNumber
-            obj.gstNumber = _normalize_gst_number(gstNumber) or None
-            obj.isB2B = isB2B
-            obj.openingBalance = _decimal_from_request(openingBalance)
-            obj.address = (address or '').strip() or None
-            obj.billingAddress = (billingAddress or '').strip() or None
-            try:
-                obj.partyGroupID_id = int(partyGroup)
-            except:
-                pass
-            try:
-                obj.assignTo_id = int(staffID)
-            except:
-                pass
-            obj.save()
-            _bump_party_cache_version(request)
-            return JsonResponse({'message': 'success'}, safe=False)
-        except:
-            return JsonResponse({'message': 'error'}, safe=False)
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_edit_party(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        payload = _validate_party_payload(request, is_edit=True)
+        obj = payload['party']
+        obj.name = payload['party_name']
+        obj.legalName = payload['legal_name']
+        obj.phone = payload['phone_number']
+        obj.gstNumber = payload['gst_number']
+        obj.isB2B = payload['is_b2b']
+        obj.openingBalance = payload['opening_balance']
+        obj.address = payload['address']
+        obj.billingAddress = payload['billing_address']
+        obj.partyGroupID = payload['party_group']
+        obj.assignTo = payload['staff']
+        obj.save()
+        _bump_party_cache_version(request)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except ValueError as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=400, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error', 'error': 'Unable to update party.'}, status=500, safe=False)
 @transaction.atomic
 def delete_party(request):
     if request.method == 'POST':
