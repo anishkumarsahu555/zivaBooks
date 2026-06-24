@@ -391,6 +391,7 @@
                 containerSelector: '#salesLineItemBox',
                 hiddenInputSelector: '#salesLineItems',
                 catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',
+                batchUrl: '{% url "homeApp:list_inventory_batches_api" %}',
                 initialRows: proformaInitialLineItems || [],
                 syncTotals: function (totals) {
                     if (!hasInitialLineItems && !$('#salesLineItemBox .sales-lines-enable-toggle').is(':checked')) {

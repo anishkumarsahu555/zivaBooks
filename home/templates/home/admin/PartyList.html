@@ -48,6 +48,103 @@
             width: 100px !important;
         }
 
+        .party-balance-summary {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(150px, 1fr));
+            gap: .75rem;
+            margin: .75rem 0 1rem;
+            text-align: left;
+        }
+
+        .party-balance-summary .summary-item {
+            border: 1px solid rgba(34, 36, 38, .08);
+            border-radius: .5rem;
+            padding: .85rem 1rem;
+            background: rgba(255, 255, 255, .85);
+        }
+
+        .party-balance-summary .summary-label {
+            color: rgba(0, 0, 0, .55);
+            font-size: .78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .party-balance-summary .summary-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-top: .25rem;
+        }
+
+        .party-balance-summary .summary-value.receivable {
+            color: #b45309;
+        }
+
+        .party-balance-summary .summary-value.advance {
+            color: #047857;
+        }
+
+        .party-list-filters {
+            margin: 0 0 1rem;
+            text-align: left;
+        }
+
+        .party-list-filter-grid {
+            display: grid;
+            grid-template-columns: minmax(180px, 1.2fr) minmax(180px, 1.2fr) minmax(150px, .9fr) minmax(130px, .75fr);
+            gap: .75rem;
+            align-items: end;
+        }
+
+        .party-list-filter-grid .field {
+            margin: 0 !important;
+        }
+
+        #partyListClearFilters {
+            background: #fff7ed !important;
+            color: #c2410c !important;
+            border-color: #fed7aa !important;
+            box-shadow: 0 0 0 1px #fed7aa inset !important;
+            font-weight: 700;
+        }
+
+        #partyListClearFilters:hover,
+        #partyListClearFilters:focus {
+            background: #ffedd5 !important;
+            color: #9a3412 !important;
+            border-color: #fdba74 !important;
+            box-shadow: 0 0 0 1px #fdba74 inset !important;
+        }
+
+        @media only screen and (max-width: 767px) {
+            .party-balance-summary {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .party-list-filters {
+                margin-top: -.25rem;
+            }
+
+            .party-list-filter-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: .65rem;
+            }
+
+            .party-list-filter-grid .field label {
+                font-size: .78rem !important;
+                margin-bottom: .25rem !important;
+            }
+
+            .party-list-filter-grid .ui.dropdown,
+            .party-list-filter-grid .ui.button {
+                min-height: 38px;
+            }
+
+            .party-list-filter-clear {
+                grid-column: 1 / -1;
+            }
+        }
+
 
         #myModalUser,
         #userModal {
@@ -144,6 +241,16 @@
             background: var(--app-surface-soft) !important;
         }
 
+        html[data-theme="dark"] .party-balance-summary .summary-item {
+            background: var(--app-surface-soft) !important;
+            border-color: var(--app-line) !important;
+            color: var(--app-text) !important;
+        }
+
+        html[data-theme="dark"] .party-balance-summary .summary-label {
+            color: var(--app-muted) !important;
+        }
+
         html[data-theme="dark"] #myModalUser .actions,
         html[data-theme="dark"] #userModal .actions {
             background: transparent !important;
@@ -174,6 +281,62 @@
                             <i class="left align icon"></i>
                             Party List
                         </h4>
+                        <div class="party-balance-summary" id="partyBalanceSummary">
+                            <div class="summary-item">
+                                <div class="summary-label">Total Receivable</div>
+                                <div class="summary-value receivable" id="partyReceivableTotal">-</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">Total Advance</div>
+                                <div class="summary-value advance" id="partyAdvanceTotal">-</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">Net Balance</div>
+                                <div class="summary-value" id="partyNetBalance">-</div>
+                            </div>
+                            <div class="summary-item">
+                                <div class="summary-label">Parties / Settled</div>
+                                <div class="summary-value" id="partySettledCount">-</div>
+                            </div>
+                        </div>
+                        <div class="ui tiny form party-list-filters" id="partyListFilters">
+                            <div class="party-list-filter-grid">
+                                <div class="field">
+                                    <label>Station</label>
+                                    <select class="ui fluid search clearable dropdown" id="partyListGroupFilter">
+                                        <option value="">All Stations</option>
+                                        {% for group in party_groups %}
+                                            <option value="{{ group.id }}">{{ group.name|capfirst }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Assigned Staff</label>
+                                    <select class="ui fluid search clearable dropdown" id="partyListStaffFilter">
+                                        <option value="">All Staff</option>
+                                        {% for staff in staffs %}
+                                            <option value="{{ staff.id }}">{{ staff.name|capfirst }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label>Balance Type</label>
+                                    <select class="ui fluid clearable dropdown" id="partyListBalanceFilter">
+                                        <option value="">All Balances</option>
+                                        <option value="due">Due</option>
+                                        <option value="advance">Advance</option>
+                                        <option value="settled">Settled</option>
+                                    </select>
+                                </div>
+                                <div class="field party-list-filter-clear">
+                                    <label>&nbsp;</label>
+                                    <button type="button" class="ui fluid button" id="partyListClearFilters">
+                                        <i class="filter icon"></i>
+                                        Clear Filters
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                         <table class="ui unstackable tiny sortable celled very nowrap very compact table" id="UserTable"
                                style="margin-top: 5px;width: 100%">
                             <thead>
@@ -182,6 +345,7 @@
                                 <th>PhoneNumber</th>
                                 <th>GST / Type</th>
                                 <th>Opening Balance</th>
+                                <th>Current Balance</th>
                                 <th>Username</th>
                                 <th>Password</th>
                                 <th>PartyGroup/Station</th>
@@ -485,8 +649,24 @@
     <script>
         var partyCaps = JSON.parse(document.getElementById('party-capabilities-data').textContent);
         $('.ui.checkbox').checkbox();
+        $('#partyListFilters .ui.dropdown').dropdown();
 
         var userTab;
+
+        function partyFilterData() {
+            return {
+                partyGroup: $('#partyListGroupFilter').val() || '',
+                staffID: $('#partyListStaffFilter').val() || '',
+                balanceType: $('#partyListBalanceFilter').val() || ''
+            };
+        }
+
+        function reloadPartyList() {
+            if (userTab) {
+                userTab.ajax.reload(null, false);
+            }
+            refreshPartyBalanceSummary();
+        }
 
         function resetPartyFormState(modalSelector, formSelector) {
             $(formSelector).trigger('reset');
@@ -505,6 +685,26 @@
                 return false;
             }
             return true;
+        }
+
+        function refreshPartyBalanceSummary() {
+            $.ajax({
+                type: 'get',
+                url: "{% url 'homeApp:party_balance_summary_api' %}",
+                data: partyFilterData(),
+                success: function (response) {
+                    if (response.message !== 'success') {
+                        return;
+                    }
+                    $('#partyReceivableTotal').text(response.receivableDisplay || '-');
+                    $('#partyAdvanceTotal').text(response.advanceDisplay || '-');
+                    $('#partyNetBalance')
+                        .text((response.netType === 'advance' ? 'Advance ' : response.netType === 'receivable' ? 'Due ' : '') + (response.netDisplay || '-'))
+                        .removeClass('receivable advance')
+                        .addClass(response.netType === 'advance' ? 'advance' : response.netType === 'receivable' ? 'receivable' : '');
+                    $('#partySettledCount').text((response.partyCount || 0) + ' / ' + (response.settledCount || 0));
+                }
+            });
         }
 
         function showUserModal() {
@@ -576,7 +776,7 @@
                             ;
 
 
-                            userTab.ajax.reload(null, false);
+                            reloadPartyList();
                             $('#addForm').trigger('reset');
                             $('#myModalUser').modal('toggle');
                             hideLoading();
@@ -624,7 +824,7 @@
             buttons: [{
                 extend: 'excel',
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
                 }
             }
                 {% comment %}      , {
@@ -639,12 +839,13 @@
                 {"name": "phone", "targets": 1, "orderable": true},
                 {"name": "gstNumber", "targets": 2, "orderable": true},
                 {"name": "openingBalance", "targets": 3, "orderable": true},
-                {"name": "username", "targets": 4, "orderable": true},
-                {"name": "password", "targets": 5, "orderable": true},
-                {"name": "partyGroupID.name", "targets": 6, "orderable": true},
-                {"name": "assignTo.name", "targets": 7, "orderable": true},
-                {"name": "datetime", "targets": 8, "orderable": true},
-                {"name": "action", "targets": 9, "orderable": false}
+                {"name": "current_balance", "targets": 4, "orderable": true},
+                {"name": "username", "targets": 5, "orderable": true},
+                {"name": "password", "targets": 6, "orderable": true},
+                {"name": "partyGroupID.name", "targets": 7, "orderable": true},
+                {"name": "assignTo.name", "targets": 8, "orderable": true},
+                {"name": "datetime", "targets": 9, "orderable": true},
+                {"name": "action", "targets": 10, "orderable": false}
 
             ],
             aaSorting: [[0, 'asc']],
@@ -652,7 +853,25 @@
             "pageLength": 10,
             "processing": true,
             "serverSide": true,
-            "ajax": "{% url 'homeApp:PartyListJson' %}"
+            "ajax": {
+                "url": "{% url 'homeApp:PartyListJson' %}",
+                "data": function (data) {
+                    var filters = partyFilterData();
+                    data.partyGroup = filters.partyGroup;
+                    data.staffID = filters.staffID;
+                    data.balanceType = filters.balanceType;
+                }
+            }
+        });
+        refreshPartyBalanceSummary();
+
+        $('#partyListGroupFilter, #partyListStaffFilter, #partyListBalanceFilter').on('change', function () {
+            reloadPartyList();
+        });
+
+        $('#partyListClearFilters').on('click', function () {
+            $('#partyListFilters .ui.dropdown').dropdown('clear');
+            reloadPartyList();
         });
 
         function copyToClipboard(text) {
@@ -776,7 +995,7 @@
                         ;
 
 
-                        userTab.ajax.reload(null, false);
+                        reloadPartyList();
                     } else {
                         $('body')
                             .toast({
@@ -901,7 +1120,7 @@
                             ;
 
 
-                            userTab.ajax.reload(null, false);
+                            reloadPartyList();
                             $('#EditForm').trigger('reset');
                             $('#userModal').modal('toggle');
                             hideLoading();

@@ -650,7 +650,7 @@ def purchase_detail(request, id):
     )
     context = {
         'purchase': purchase,
-        'purchase_lines': purchase.lines.filter(isDeleted=False).select_related('item').order_by('id'),
+        'purchase_lines': purchase.lines.filter(isDeleted=False).select_related('item', 'batch').order_by('id'),
         'purchase_revisions': purchase.revisions.filter(isDeleted=False).select_related('changedBy').order_by('-datetime'),
         'inventory_enabled': bool(getattr(tenant, 'inventoryEnabled', True)),
         'advanced_invoicing_enabled': bool(getattr(tenant, 'advancedInvoicingEnabled', True)),

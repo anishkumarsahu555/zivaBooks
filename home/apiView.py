@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 import json
 import requests
+from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import check_password
@@ -14,7 +15,8 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Q, Sum, Count, Case, When, Value, F, FloatField, ExpressionWrapper, Window, Max
+from django.db.models import Q, Sum, Count, Case, When, Value, F, FloatField, IntegerField, ExpressionWrapper, Window, Max
+from django.db.models.functions import Cast, Coalesce
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
@@ -22,7 +24,7 @@ from django.urls import reverse
 from django.utils.crypto import get_random_string
 from django.utils.html import escape
 from django.utils import timezone
-from django.utils.dateparse import parse_date
+from django.utils.dateparse import parse_date, parse_datetime
 from django.views.decorators.cache import cache_page
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django_datatables_view.base_datatable_view import BaseDatatableView
@@ -101,6 +103,7 @@ DEFAULT_GROUP_PERMISSION_MAP = {
         'home.can_view_sales_reports',
         'home.can_view_cash_counter_reports',
         'home.can_view_audit_logs',
+        'home.can_view_staff_locations',
     ],
     'Collection': [
         'home.add_collection',
@@ -108,6 +111,7 @@ DEFAULT_GROUP_PERMISSION_MAP = {
         'home.view_collection',
         'home.view_party',
         'home.view_attendance',
+        'home.can_track_staff_location',
     ],
     'SalesAdmin': [
         'home.add_sales',
@@ -131,6 +135,7 @@ DEFAULT_GROUP_PERMISSION_MAP = {
         'home.view_attendance',
         'home.add_attendance',
         'home.change_attendance',
+        'home.can_track_staff_location',
     ],
     'Customer': [
         'home.view_party',
@@ -444,6 +449,33 @@ def formatINR(number):
 
 def _money(value):
     return f'Rs. {formatINR(format(float(value or 0.0), ".0f"))}'
+
+
+def _party_balance_label(balance):
+    amount = float(balance or 0.0)
+    display = f'₹ {formatINR(format(abs(amount), ".2f"))}'
+    if amount > 0:
+        return f'<span class="ui tiny orange label">Due {display}</span>'
+    if amount < 0:
+        return f'<span class="ui tiny teal label">Advance {display}</span>'
+    return '<span class="ui tiny grey label">Settled</span>'
+
+
+def _filter_party_balance_queryset(request, qs):
+    party_group = str(request.GET.get('partyGroup') or '').strip()
+    staff = str(request.GET.get('staffID') or '').strip()
+    balance_type = str(request.GET.get('balanceType') or '').strip()
+    if party_group.isdigit():
+        qs = qs.filter(partyGroupID_id=int(party_group))
+    if staff.isdigit():
+        qs = qs.filter(assignTo_id=int(staff))
+    if balance_type == 'due':
+        qs = qs.filter(current_balance__gt=0)
+    elif balance_type == 'advance':
+        qs = qs.filter(current_balance__lt=0)
+    elif balance_type == 'settled':
+        qs = qs.filter(current_balance=0)
+    return qs
 
 
 def _report_date(value, default):
@@ -801,9 +833,24 @@ def _decimal_from_request(value, default='0'):
         return Decimal(str(value).strip())
     except (InvalidOperation, AttributeError):
         return Decimal(default)
+
+
+def _required_decimal_from_request(value, field_label):
+    try:
+        return Decimal(str(value if value is not None else '0').strip())
+    except (InvalidOperation, AttributeError):
+        raise ValueError(f'{field_label} must be a valid number.')
 def _tenant_admin_group_name(tenant):
     tenant_slug = getattr(tenant, 'slug', 'tenant')
     return f'{tenant_slug}:Tenant Admin'
+
+
+LOCATION_ASSIGNABLE_PERMISSION_CODENAMES = {
+    'can_track_staff_location',
+    'can_view_staff_locations',
+}
+
+
 def _assignable_permissions(request_or_user=None):
     user = getattr(request_or_user, 'user', request_or_user)
     queryset = Permission.objects.select_related('content_type').exclude(
@@ -814,6 +861,13 @@ def _assignable_permissions(request_or_user=None):
         tenant_admin_group = Group.objects.filter(name=_tenant_admin_group_name(tenant)).first()
         if tenant_admin_group is not None:
             allowed_ids = set(tenant_admin_group.permissions.values_list('id', flat=True))
+            if getattr(user, 'is_authenticated', False) and user.has_perm('home.can_manage_staff_groups'):
+                allowed_ids.update(
+                    Permission.objects.filter(
+                        content_type__app_label='home',
+                        codename__in=LOCATION_ASSIGNABLE_PERMISSION_CODENAMES,
+                    ).values_list('id', flat=True)
+                )
             return [permission for permission in queryset if permission.id in allowed_ids]
         return []
     if not getattr(user, 'is_authenticated', False):
@@ -937,12 +991,67 @@ def _normalize_purchase_claim_status(treatment: str, raw_claim_status: str | Non
     if treatment == PurchaseInvoice.GstTreatment.GST:
         return PurchaseInvoice.ClaimStatus.NOT_APPLICABLE
     return status
+def _can_manage_party_master_data(user):
+    return user.has_perm('home.can_manage_parties')
 def _can_add_party(user):
-    return user.has_perm('home.add_party') or _can_view_party_credentials(user)
+    return user.has_perm('home.add_party') or _can_manage_party_master_data(user)
 def _can_edit_party(user):
-    return user.has_perm('home.change_party') or _can_view_party_credentials(user)
+    return user.has_perm('home.change_party') or _can_manage_party_master_data(user)
 def _can_delete_party(user):
-    return user.has_perm('home.delete_party') or _can_view_party_credentials(user)
+    return user.has_perm('home.delete_party') or _can_manage_party_master_data(user)
+
+
+def _validate_party_payload(request, *, is_edit=False):
+    party_name = str(request.POST.get("partyName") or '').strip()
+    phone_number = str(request.POST.get("phoneNumber") or '').strip()
+    legal_name = str(request.POST.get("legalName") or '').strip() or None
+    gst_number = _normalize_gst_number(request.POST.get("gstNumber")) or None
+    billing_address = str(request.POST.get("billingAddress") or '').strip() or None
+    address = str(request.POST.get("address") or '').strip() or None
+    is_b2b = str(request.POST.get("isB2B") or '').lower() in {'1', 'true', 'yes', 'on'}
+    opening_balance = _required_decimal_from_request(request.POST.get("openingBalance"), 'Opening balance')
+    party_group_id = str(request.POST.get("partyGroup") or '').strip()
+    staff_id = str(request.POST.get("staffID") or '').strip()
+
+    if not party_name:
+        raise ValueError('Party name is required.')
+    if not phone_number:
+        raise ValueError('Phone number is required.')
+    if len(phone_number) > 20:
+        raise ValueError('Phone number must be 20 characters or fewer.')
+    if gst_number and len(gst_number) > 20:
+        raise ValueError('GST number must be 20 characters or fewer.')
+    if not party_group_id.isdigit():
+        raise ValueError('Party group/station is required.')
+    party_group = tenant_qs(request, PartyGroup).filter(pk=int(party_group_id), isDeleted=False).first()
+    if party_group is None:
+        raise ValueError('Selected party group/station was not found.')
+    if not staff_id.isdigit():
+        raise ValueError('Assigned staff is required.')
+    staff = tenant_qs(request, StaffUser).filter(pk=int(staff_id), isDeleted=False).first()
+    if staff is None:
+        raise ValueError('Selected assigned staff was not found.')
+
+    payload = {
+        'party_name': party_name,
+        'phone_number': phone_number,
+        'legal_name': legal_name,
+        'gst_number': gst_number,
+        'is_b2b': is_b2b,
+        'billing_address': billing_address,
+        'address': address,
+        'opening_balance': opening_balance,
+        'party_group': party_group,
+        'staff': staff,
+    }
+    if is_edit:
+        edit_id = str(request.POST.get("EditId") or '').strip()
+        if not edit_id.isdigit():
+            raise ValueError('Valid party id is required.')
+        payload['party'] = tenant_qs(request, Party).filter(id=int(edit_id), isDeleted=False).first()
+        if payload['party'] is None:
+            raise ValueError('Party was not found.')
+    return payload
 def _tenant_audit_log_queryset(request):
     tenant = get_current_tenant(request)
     if tenant is None:
@@ -2101,65 +2210,53 @@ def delete_bank(request):
 # ----------------------------- Party ---------------------
 @transaction.atomic
 def add_party_api(request):
-    if request.method == 'POST':
-        if not request.user.is_authenticated:
-            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-        if not _can_add_party(request.user):
-            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-        try:
-            partyName = request.POST.get("partyName")
-            phoneNumber = request.POST.get("phoneNumber")
-            openingBalance = request.POST.get("openingBalance")
-            partyGroup = request.POST.get("partyGroup")
-            address = request.POST.get("address")
-            legalName = request.POST.get("legalName")
-            gstNumber = request.POST.get("gstNumber")
-            isB2B = str(request.POST.get("isB2B") or '').lower() in {'1', 'true', 'yes', 'on'}
-            billingAddress = request.POST.get("billingAddress")
-            staffID = request.POST.get("staffID")
-            obj = Party()
-            assign_tenant(obj, request)
-            obj.name = partyName
-            obj.legalName = (legalName or '').strip() or None
-            obj.phone = phoneNumber
-            obj.gstNumber = _normalize_gst_number(gstNumber) or None
-            obj.isB2B = isB2B
-            obj.openingBalance = _decimal_from_request(openingBalance)
-            try:
-                obj.assignTo = tenant_qs(request, StaffUser).get(pk=int(staffID))
-            except:
-                pass
-            obj.address = (address or '').strip() or None
-            obj.billingAddress = (billingAddress or '').strip() or None
-            try:
-                obj.partyGroupID_id = int(partyGroup)
-            except:
-                pass
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_add_party(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        payload = _validate_party_payload(request)
+        obj = Party()
+        assign_tenant(obj, request)
+        obj.name = payload['party_name']
+        obj.legalName = payload['legal_name']
+        obj.phone = payload['phone_number']
+        obj.gstNumber = payload['gst_number']
+        obj.isB2B = payload['is_b2b']
+        obj.openingBalance = payload['opening_balance']
+        obj.assignTo = payload['staff']
+        obj.address = payload['address']
+        obj.billingAddress = payload['billing_address']
+        obj.partyGroupID = payload['party_group']
+        username = get_random_string(length=7, allowed_chars='0123456789')
+        while User.objects.filter(username__exact=username).exists():
             username = get_random_string(length=7, allowed_chars='0123456789')
-            while User.objects.filter(username__exact=username).exists():
-                username = get_random_string(length=7, allowed_chars='0123456789')
-            password = get_random_string(length=6, allowed_chars='0123456789')
-            new_user = User()
-            new_user.username = username
-            new_user.set_password(password)
-            new_user.save()
-            group, _ = Group.objects.get_or_create(name='Customer')
-            group.user_set.add(new_user.pk)
-            obj.username = username
-            obj.password = password
-            obj.userID_id = new_user.pk
-            obj.save()
-            ensure_membership(new_user, obj.tenant, TenantMembership.Role.PARTY)
-            _bump_party_cache_version(request)
-            return JsonResponse({'message': 'success'}, safe=False)
-        except:
-            return JsonResponse({'message': 'error'}, safe=False)
+        password = get_random_string(length=6, allowed_chars='0123456789')
+        new_user = User()
+        new_user.username = username
+        new_user.set_password(password)
+        new_user.save()
+        group, _ = Group.objects.get_or_create(name='Customer')
+        group.user_set.add(new_user.pk)
+        obj.username = username
+        obj.password = password
+        obj.userID_id = new_user.pk
+        obj.save()
+        ensure_membership(new_user, obj.tenant, TenantMembership.Role.PARTY)
+        _bump_party_cache_version(request)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except ValueError as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=400, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error', 'error': 'Unable to add party.'}, status=500, safe=False)
 @transaction.atomic
 def generate_party_users_api(request):
     if request.method == 'GET':
         if not request.user.is_authenticated:
             return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-        if not _can_manage_party_records(request.user):
+        if not _can_manage_party_master_data(request.user):
             return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         try:
             customer_group, _ = Group.objects.get_or_create(name='Customer')
@@ -2221,13 +2318,30 @@ def generate_party_access_link_api(request):
 
 
 class PartyListJson(BaseDatatableView):
-    order_columns = ['name', 'phone', 'gstNumber', 'openingBalance', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
+    order_columns = ['name', 'phone', 'gstNumber', 'openingBalance', 'current_balance', 'username', 'password', 'partyGroupID.name', 'assignTo.name', 'datetime']
     def get_initial_queryset(self):
         return tenant_qs(self.request, Party).select_related('partyGroupID', 'assignTo').filter(isDeleted__exact=False).only(
             'id', 'name', 'legalName', 'phone', 'gstNumber', 'isB2B', 'openingBalance', 'username', 'password', 'address', 'billingAddress', 'datetime',
             'partyGroupID__name', 'assignTo__name'
+        ).annotate(
+            ledger_debit=Coalesce(
+                Sum('ledger_entries__debit', filter=Q(ledger_entries__isDeleted=False)),
+                Value(0.0),
+                output_field=FloatField(),
+            ),
+            ledger_credit=Coalesce(
+                Sum('ledger_entries__credit', filter=Q(ledger_entries__isDeleted=False)),
+                Value(0.0),
+                output_field=FloatField(),
+            ),
+        ).annotate(
+            current_balance=ExpressionWrapper(
+                Cast(F('openingBalance'), FloatField()) + F('ledger_debit') - F('ledger_credit'),
+                output_field=FloatField(),
+            )
         )
     def filter_queryset(self, qs):
+        qs = _filter_party_balance_queryset(self.request, qs)
         search = self.request.GET.get('search[value]', None)
         if search:
             qs = qs.filter(
@@ -2294,6 +2408,7 @@ class PartyListJson(BaseDatatableView):
                 escape(item.phone),
                 escape(item.gstNumber or ('B2B' if item.isB2B else '-')),
                 formatINR(format(item.openingBalance, '.2f')),
+                _party_balance_label(getattr(item, 'current_balance', item.openingBalance)),
                 username,
                 password,
                 party,
@@ -2302,6 +2417,59 @@ class PartyListJson(BaseDatatableView):
                 action,
             ])
         return json_data
+
+
+def party_balance_summary_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _can_manage_party_records(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    rows = tenant_qs(request, Party).filter(isDeleted=False).annotate(
+        ledger_debit=Coalesce(
+            Sum('ledger_entries__debit', filter=Q(ledger_entries__isDeleted=False)),
+            Value(0.0),
+            output_field=FloatField(),
+        ),
+        ledger_credit=Coalesce(
+            Sum('ledger_entries__credit', filter=Q(ledger_entries__isDeleted=False)),
+            Value(0.0),
+            output_field=FloatField(),
+        ),
+    ).annotate(
+        current_balance=ExpressionWrapper(
+            Cast(F('openingBalance'), FloatField()) + F('ledger_debit') - F('ledger_credit'),
+            output_field=FloatField(),
+        )
+    )
+    rows = _filter_party_balance_queryset(request, rows).values_list('current_balance', flat=True)
+    receivable = 0.0
+    advance = 0.0
+    settled = 0
+    party_count = 0
+    for balance in rows:
+        party_count += 1
+        amount = float(balance or 0.0)
+        if amount > 0:
+            receivable += amount
+        elif amount < 0:
+            advance += abs(amount)
+        else:
+            settled += 1
+    net = receivable - advance
+    return JsonResponse({
+        'message': 'success',
+        'partyCount': party_count,
+        'settledCount': settled,
+        'receivable': receivable,
+        'advance': advance,
+        'net': net,
+        'receivableDisplay': f'₹ {formatINR(format(receivable, ".2f"))}',
+        'advanceDisplay': f'₹ {formatINR(format(advance, ".2f"))}',
+        'netDisplay': f'₹ {formatINR(format(abs(net), ".2f"))}',
+        'netType': 'receivable' if net > 0 else ('advance' if net < 0 else 'settled'),
+    })
+
+
 def get_party_detail(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized', 'error': 'Login required.'}, status=401)
@@ -2334,45 +2502,32 @@ def get_party_detail(request):
     return JsonResponse({'data': data}, safe=False)
 @transaction.atomic
 def edit_party_api(request):
-    if request.method == 'POST':
-        if not request.user.is_authenticated:
-            return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
-        if not _can_edit_party(request.user):
-            return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
-        try:
-            Id = request.POST.get("EditId")
-            name = request.POST.get("partyName")
-            phoneNumber = request.POST.get("phoneNumber")
-            openingBalance = request.POST.get("openingBalance")
-            address = request.POST.get("address")
-            legalName = request.POST.get("legalName")
-            gstNumber = request.POST.get("gstNumber")
-            isB2B = str(request.POST.get("isB2B") or '').lower() in {'1', 'true', 'yes', 'on'}
-            billingAddress = request.POST.get("billingAddress")
-            partyGroup = request.POST.get("partyGroup")
-            staffID = request.POST.get("staffID")
-            obj = tenant_qs(request, Party).select_related().get(id=int(Id))
-            obj.name = name
-            obj.legalName = (legalName or '').strip() or None
-            obj.phone = phoneNumber
-            obj.gstNumber = _normalize_gst_number(gstNumber) or None
-            obj.isB2B = isB2B
-            obj.openingBalance = _decimal_from_request(openingBalance)
-            obj.address = (address or '').strip() or None
-            obj.billingAddress = (billingAddress or '').strip() or None
-            try:
-                obj.partyGroupID_id = int(partyGroup)
-            except:
-                pass
-            try:
-                obj.assignTo_id = int(staffID)
-            except:
-                pass
-            obj.save()
-            _bump_party_cache_version(request)
-            return JsonResponse({'message': 'success'}, safe=False)
-        except:
-            return JsonResponse({'message': 'error'}, safe=False)
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405, safe=False)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    if not _can_edit_party(request.user):
+        return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
+    try:
+        payload = _validate_party_payload(request, is_edit=True)
+        obj = payload['party']
+        obj.name = payload['party_name']
+        obj.legalName = payload['legal_name']
+        obj.phone = payload['phone_number']
+        obj.gstNumber = payload['gst_number']
+        obj.isB2B = payload['is_b2b']
+        obj.openingBalance = payload['opening_balance']
+        obj.address = payload['address']
+        obj.billingAddress = payload['billing_address']
+        obj.partyGroupID = payload['party_group']
+        obj.assignTo = payload['staff']
+        obj.save()
+        _bump_party_cache_version(request)
+        return JsonResponse({'message': 'success'}, safe=False)
+    except ValueError as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=400, safe=False)
+    except Exception:
+        return JsonResponse({'message': 'error', 'error': 'Unable to update party.'}, status=500, safe=False)
 @transaction.atomic
 def delete_party(request):
     if request.method == 'POST':
@@ -4883,6 +5038,213 @@ def add_attendance_api(request):
             return JsonResponse({'message': 'success'}, safe=False)
         except Exception as exc:
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
+
+
+def _staff_location_can_view_all(request):
+    return (
+        request.user.has_perm('home.can_view_staff_locations') or
+        request.user.has_perm('home.can_view_all_attendance') or
+        request.user.has_perm('home.can_view_attendance_reports') or
+        request.user.has_perm('home.can_manage_staff') or
+        request.user.has_perm('home.can_view_party_credentials')
+    )
+
+
+def _staff_location_staff_for_request(request):
+    staff = get_staff_user_for_request(request)
+    if staff is None:
+        raise PermissionError('Staff profile is required for location tracking.')
+    return staff
+
+
+def _staff_location_decimal(value, label, min_value, max_value):
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError(f'{label} is invalid.')
+    if parsed < Decimal(str(min_value)) or parsed > Decimal(str(max_value)):
+        raise ValueError(f'{label} is out of range.')
+    return parsed
+
+
+def _staff_location_float(value):
+    if value in (None, ''):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _staff_location_bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value or '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def _staff_location_recorded_at(value):
+    parsed = parse_datetime(str(value)) if value else None
+    if parsed is None:
+        return timezone.now()
+    if settings.USE_TZ and timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    if not settings.USE_TZ and timezone.is_aware(parsed):
+        parsed = timezone.make_naive(parsed, timezone.get_current_timezone())
+    return parsed
+
+
+def _staff_location_payload(request):
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            return json.loads(request.body.decode('utf-8') or '{}')
+        except json.JSONDecodeError:
+            return {}
+    return request.POST
+
+
+def _save_staff_location_sample(request, staff, sample):
+    lat = _staff_location_decimal(sample.get('latitude') or sample.get('lat'), 'Latitude', -90, 90)
+    lng = _staff_location_decimal(sample.get('longitude') or sample.get('lng'), 'Longitude', -180, 180)
+    client_sample_id = (sample.get('client_sample_id') or sample.get('clientSampleId') or '').strip()[:80] or None
+    if client_sample_id:
+        existing = tenant_qs(request, StaffLocationLog).filter(
+            staff=staff,
+            client_sample_id=client_sample_id,
+            isDeleted=False,
+        ).first()
+        if existing:
+            return existing, False
+    obj = StaffLocationLog(
+        staff=staff,
+        latitude=lat,
+        longitude=lng,
+        accuracy=_staff_location_float(sample.get('accuracy')),
+        speed=_staff_location_float(sample.get('speed')),
+        heading=_staff_location_float(sample.get('heading')),
+        battery_percent=_staff_location_float(sample.get('battery_percent') or sample.get('batteryPercent')),
+        is_mock_location=_staff_location_bool(sample.get('is_mock_location') or sample.get('isMockLocation')),
+        source=(sample.get('source') or 'pwa')[:30],
+        client_sample_id=client_sample_id,
+        recorded_at=_staff_location_recorded_at(sample.get('recorded_at') or sample.get('recordedAt')),
+    )
+    assign_tenant(obj, request)
+    obj.save()
+    return obj, True
+
+
+@transaction.atomic
+def add_staff_location_ping_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'POST is required.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    try:
+        staff = _staff_location_staff_for_request(request)
+        obj, created = _save_staff_location_sample(request, staff, _staff_location_payload(request))
+        return JsonResponse({
+            'message': 'success',
+            'created': created,
+            'id': obj.pk,
+            'recorded_at': obj.recorded_at.isoformat(),
+        })
+    except PermissionError as exc:
+        return JsonResponse({'message': 'forbidden', 'error': str(exc)}, status=403)
+    except ValueError as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=400)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
+
+@transaction.atomic
+def bulk_staff_location_sync_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'POST is required.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    try:
+        staff = _staff_location_staff_for_request(request)
+        payload = _staff_location_payload(request)
+        samples = payload.get('locations') or payload.get('samples') or []
+        if not isinstance(samples, list):
+            return JsonResponse({'message': 'error', 'error': 'locations must be a list.'}, status=400)
+        created = 0
+        skipped = 0
+        errors = []
+        for index, sample in enumerate(samples[:500]):
+            try:
+                _, was_created = _save_staff_location_sample(request, staff, sample or {})
+                created += 1 if was_created else 0
+                skipped += 0 if was_created else 1
+            except ValueError as exc:
+                errors.append({'index': index, 'error': str(exc)})
+        return JsonResponse({'message': 'success', 'created': created, 'skipped': skipped, 'errors': errors})
+    except PermissionError as exc:
+        return JsonResponse({'message': 'forbidden', 'error': str(exc)}, status=403)
+    except Exception as exc:
+        return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
+
+def staff_location_daily_route_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    staff = get_staff_user_for_request(request)
+    can_view_all = _staff_location_can_view_all(request)
+    staff_id = request.GET.get('staff_id') or request.GET.get('staffID')
+    if staff_id and can_view_all:
+        selected_staff = tenant_qs(request, StaffUser).filter(pk=staff_id, isDeleted=False).first()
+    else:
+        selected_staff = staff
+    if selected_staff is None:
+        return JsonResponse({'message': 'forbidden', 'error': 'Staff profile is required.'}, status=403)
+    route_date = parse_date(request.GET.get('date') or '') or datetime.today().date()
+    start_at = datetime.combine(route_date, datetime.min.time())
+    if settings.USE_TZ:
+        start_at = timezone.make_aware(start_at, timezone.get_current_timezone())
+    end_at = start_at + timedelta(days=1)
+    logs = tenant_qs(request, StaffLocationLog).filter(
+        staff=selected_staff,
+        isDeleted=False,
+        recorded_at__gte=start_at,
+        recorded_at__lt=end_at,
+    ).order_by('recorded_at')
+    points = [
+        {
+            'id': log.pk,
+            'latitude': float(log.latitude),
+            'longitude': float(log.longitude),
+            'accuracy': log.accuracy,
+            'speed': log.speed,
+            'heading': log.heading,
+            'battery_percent': log.battery_percent,
+            'is_mock_location': log.is_mock_location,
+            'recorded_at': (
+                timezone.localtime(log.recorded_at).isoformat()
+                if settings.USE_TZ else log.recorded_at.isoformat()
+            ),
+        }
+        for log in logs[:2000]
+    ]
+    return JsonResponse({
+        'message': 'success',
+        'staff': {'id': selected_staff.pk, 'name': selected_staff.name or '-'},
+        'date': route_date.isoformat(),
+        'count': len(points),
+        'points': points,
+    })
+
+
+def staff_location_staff_options_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _staff_location_can_view_all(request):
+        staff = get_staff_user_for_request(request)
+        rows = [{'id': staff.pk, 'name': staff.name or '-'}] if staff else []
+    else:
+        rows = [
+            {'id': item.pk, 'name': item.name or '-'}
+            for item in tenant_qs(request, StaffUser).filter(isDeleted=False).order_by('name')
+        ]
+    return JsonResponse({'message': 'success', 'staff': rows})
 class StaffAttendanceListJson(BaseDatatableView):
     order_columns = ['datetime', 'loginDateTime', 'loginPhoto', 'login_location', 'login_remark', 'logoutDateTime', 'logoutPhoto', 'logout_location',
                      'logout_remark',
@@ -6110,7 +6472,21 @@ def list_inventory_items_api(request):
     stocks = defaultdict(lambda: {'gst': 0.0, 'non_gst': 0.0})
     for row in InventoryStock.objects.filter(tenant=tenant, isDeleted=False, item__isDeleted=False):
         stocks[row.item_id][row.stockBucket] = float(row.quantityOnHand or 0.0)
+    today = _safe_local_date()
+    expiry_cutoff = today + timedelta(days=30)
+    batch_summary = defaultdict(lambda: {'count': 0, 'expired': 0, 'expiring': 0, 'nearest': None})
+    for batch in InventoryBatch.objects.filter(tenant=tenant, isDeleted=False, item__isDeleted=False, quantityOnHand__gt=0).only('item_id', 'expiryDate'):
+        summary = batch_summary[batch.item_id]
+        summary['count'] += 1
+        if batch.expiryDate:
+            if summary['nearest'] is None or batch.expiryDate < summary['nearest']:
+                summary['nearest'] = batch.expiryDate
+            if batch.expiryDate < today:
+                summary['expired'] += 1
+            elif batch.expiryDate <= expiry_cutoff:
+                summary['expiring'] += 1
     for item in items:
+        item_batch_summary = batch_summary[item.pk]
         payload.append({
             'ID': item.pk,
             'Name': item.name,
@@ -6132,12 +6508,54 @@ def list_inventory_items_api(request):
             'MRP': float(item.mrp or 0.0),
             'MinimumStockLevel': float(item.minimumStockLevel or 0.0),
             'ReorderLevel': float(item.reorderLevel or 0.0),
+            'RequiresBatchTracking': bool(item.requiresBatchTracking),
             'IsSaleBlocked': bool(item.isSaleBlocked),
+            'BatchCount': item_batch_summary['count'],
+            'ExpiredBatchCount': item_batch_summary['expired'],
+            'ExpiringBatchCount': item_batch_summary['expiring'],
+            'NearestExpiryDate': item_batch_summary['nearest'].strftime('%d/%m/%Y') if item_batch_summary['nearest'] else '',
             'GSTStock': stocks[item.pk]['gst'],
             'NonGSTStock': stocks[item.pk]['non_gst'] if non_gst_enabled else 0.0,
             'IsLowStock': (stocks[item.pk]['gst'] + stocks[item.pk]['non_gst']) <= float(item.minimumStockLevel or 0.0),
         })
     cache.set(cache_key, payload, timeout=60 * 10)
+    return JsonResponse({'message': 'success', 'data': payload}, safe=False)
+
+
+def list_inventory_batches_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_has_any_permission(
+        request,
+        'home.view_inventoryitem',
+        'home.can_manage_inventory',
+        'home.can_view_party_credentials',
+    ):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    item = _parse_inventory_item(request, request.GET.get('itemId'))
+    stock_bucket = _normalize_stock_bucket(request, request.GET.get('stockBucket'), item)
+    warehouse = _parse_inventory_warehouse(request, request.GET.get('warehouseId'))
+    today = _safe_local_date()
+    stock_rows = _available_batch_stock_queryset(
+        item=item,
+        stock_bucket=stock_bucket,
+        warehouse=warehouse,
+        today=today,
+    ).select_related('batch', 'warehouse')
+    payload = []
+    for row in stock_rows:
+        batch = row.batch
+        payload.append({
+            'ID': batch.pk,
+            'BatchNumber': batch.batchNumber or '',
+            'ManufactureDate': batch.manufactureDate.strftime('%d/%m/%Y') if batch.manufactureDate else '',
+            'ExpiryDate': batch.expiryDate.strftime('%d/%m/%Y') if batch.expiryDate else '',
+            'MRP': float(batch.mrp or 0.0),
+            'PurchaseRate': float(batch.purchaseRate or 0.0),
+            'QuantityOnHand': float(row.quantityOnHand or 0.0),
+            'WarehouseID': row.warehouse_id,
+            'WarehouseName': row.warehouse.name if row.warehouse_id else '',
+        })
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
@@ -6588,6 +7006,196 @@ def list_inventory_ledger_entries_api(request):
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
+def list_inventory_batch_report_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_has_any_permission(
+        request,
+        'home.view_inventoryitem',
+        'home.can_manage_inventory',
+        'home.can_view_party_credentials',
+    ):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    tenant = get_current_tenant(request)
+    today = _safe_local_date()
+    warning_days = int(request.GET.get('days') or 30)
+    warning_cutoff = today + timedelta(days=max(0, warning_days))
+    rows = InventoryBatchStock.objects.filter(
+        tenant=tenant,
+        isDeleted=False,
+        batch__isDeleted=False,
+        item__isDeleted=False,
+        quantityOnHand__gt=0,
+    ).select_related('batch', 'item', 'warehouse').order_by('batch__expiryDate', 'item__name', 'batch__batchNumber')
+    payload = []
+    summary = {
+        'TotalBatchRows': 0,
+        'ExpiredBatchRows': 0,
+        'ExpiringBatchRows': 0,
+        'HealthyBatchRows': 0,
+        'ExpiredQuantity': 0.0,
+        'ExpiringQuantity': 0.0,
+        'HealthyQuantity': 0.0,
+        'WarningDays': max(0, warning_days),
+    }
+    for row in rows:
+        expiry_date = row.batch.expiryDate
+        if expiry_date and expiry_date < today:
+            status = 'Expired'
+        elif expiry_date and expiry_date <= warning_cutoff:
+            status = 'Expiring Soon'
+        else:
+            status = 'Healthy'
+        quantity = float(row.quantityOnHand or 0.0)
+        summary['TotalBatchRows'] += 1
+        if status == 'Expired':
+            summary['ExpiredBatchRows'] += 1
+            summary['ExpiredQuantity'] += quantity
+        elif status == 'Expiring Soon':
+            summary['ExpiringBatchRows'] += 1
+            summary['ExpiringQuantity'] += quantity
+        else:
+            summary['HealthyBatchRows'] += 1
+            summary['HealthyQuantity'] += quantity
+        payload.append({
+            'BatchID': row.batch_id,
+            'ItemID': row.item_id,
+            'ItemName': row.item.name,
+            'BatchNumber': row.batch.batchNumber or '',
+            'WarehouseName': row.warehouse.name if row.warehouse_id else '',
+            'StockBucket': row.stockBucket,
+            'QuantityOnHand': quantity,
+            'ManufactureDate': row.batch.manufactureDate.strftime('%d/%m/%Y') if row.batch.manufactureDate else '',
+            'ExpiryDate': expiry_date.strftime('%d/%m/%Y') if expiry_date else '',
+            'ExpiryDateSort': expiry_date.isoformat() if expiry_date else '',
+            'DaysToExpiry': (expiry_date - today).days if expiry_date else None,
+            'MRP': float(row.batch.mrp or 0.0),
+            'PurchaseRate': float(row.batch.purchaseRate or 0.0),
+            'Status': status,
+        })
+    for key in ('ExpiredQuantity', 'ExpiringQuantity', 'HealthyQuantity'):
+        summary[key] = round(summary[key], 4)
+    return JsonResponse({'message': 'success', 'data': payload, 'summary': summary}, safe=False)
+
+
+def list_inventory_batch_ledger_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_has_any_permission(
+        request,
+        'home.view_inventoryitem',
+        'home.can_manage_inventory',
+        'home.can_view_party_credentials',
+    ):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    raw_batch_id = str(request.GET.get('batchId') or '').strip()
+    if not raw_batch_id.isdigit():
+        return JsonResponse({'message': 'error', 'error': 'Invalid batch selection.'}, status=400)
+    batch = tenant_qs(request, InventoryBatch).filter(pk=int(raw_batch_id), isDeleted=False).select_related('item').first()
+    if batch is None:
+        return JsonResponse({'message': 'error', 'error': 'Batch not found.'}, status=404)
+    rows = list(InventoryLedgerEntry.objects.filter(
+        tenant=batch.tenant,
+        isDeleted=False,
+        batch=batch,
+    ).select_related('warehouse').order_by('entryDate', 'id'))
+    stock_rows = list(InventoryBatchStock.objects.filter(
+        tenant=batch.tenant,
+        isDeleted=False,
+        batch=batch,
+        quantityOnHand__gt=0,
+    ).select_related('warehouse').order_by('warehouse__name', 'stockBucket'))
+    purchase_lines = list(PurchaseLine.objects.filter(
+        tenant=batch.tenant,
+        isDeleted=False,
+        batch=batch,
+        purchaseInvoice__isDeleted=False,
+    ).select_related('purchaseInvoice', 'purchaseInvoice__partyID').order_by('purchaseInvoice__buildDate', 'id')[:10])
+    running = 0.0
+    payload = []
+    for row in rows:
+        running += float(row.quantityDelta or 0.0)
+        payload.append({
+            'ID': row.pk,
+            'EntryDate': row.entryDate.strftime('%d/%m/%Y') if row.entryDate else '',
+            'EntryDateSort': row.entryDate.isoformat() if row.entryDate else '',
+            'WarehouseName': row.warehouse.name if row.warehouse_id else '',
+            'SourceType': row.sourceType,
+            'QuantityDelta': float(row.quantityDelta or 0.0),
+            'RunningBalance': round(running, 4),
+            'UnitRate': float(row.unitRate or 0.0),
+            'TotalValue': float(row.totalValue or 0.0),
+            'ReferenceNumber': row.referenceNumber or '',
+            'Remark': row.remark or '',
+        })
+    warehouse_payload = [{
+        'WarehouseID': row.warehouse_id,
+        'WarehouseName': row.warehouse.name if row.warehouse_id else '',
+        'StockBucket': row.stockBucket,
+        'QuantityOnHand': float(row.quantityOnHand or 0.0),
+    } for row in stock_rows]
+    purchase_payload = [{
+        'PurchaseID': line.purchaseInvoice_id,
+        'PurchaseDisplayID': line.purchaseInvoice.purchaseID or '',
+        'InvoiceNumber': line.purchaseInvoice.invoiceNumber or '',
+        'InvoiceDate': line.purchaseInvoice.buildDate.strftime('%d/%m/%Y') if line.purchaseInvoice.buildDate else '',
+        'Party': line.purchaseInvoice.partyID.name if line.purchaseInvoice.partyID_id else '',
+        'Quantity': float(line.quantity or 0.0),
+        'UnitCost': float(line.unitCost or 0.0),
+        'LineTotal': float(line.lineTotal or 0.0),
+    } for line in purchase_lines]
+    today = _safe_local_date()
+    if batch.expiryDate and batch.expiryDate < today:
+        status = 'Expired'
+    elif batch.expiryDate and batch.expiryDate <= today + timedelta(days=30):
+        status = 'Expiring Soon'
+    else:
+        status = 'Healthy'
+    return JsonResponse({'message': 'success', 'data': {
+        'BatchID': batch.pk,
+        'ItemName': batch.item.name,
+        'BatchNumber': batch.batchNumber or '',
+        'ManufactureDate': batch.manufactureDate.strftime('%d/%m/%Y') if batch.manufactureDate else '',
+        'ExpiryDate': batch.expiryDate.strftime('%d/%m/%Y') if batch.expiryDate else '',
+        'DaysToExpiry': (batch.expiryDate - today).days if batch.expiryDate else None,
+        'Status': status,
+        'QuantityOnHand': float(batch.quantityOnHand or 0.0),
+        'MRP': float(batch.mrp or 0.0),
+        'PurchaseRate': float(batch.purchaseRate or 0.0),
+        'WarehouseStocks': warehouse_payload,
+        'PurchaseSources': purchase_payload,
+        'Rows': payload,
+    }}, safe=False)
+
+
+@transaction.atomic
+def deactivate_expired_zero_stock_batches_api(request):
+    if request.method != 'POST':
+        return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401)
+    if not _request_can_manage_inventory_records(request):
+        return JsonResponse({'message': 'forbidden'}, status=403)
+    tenant = get_current_tenant(request)
+    today = _safe_local_date()
+    batch_ids_with_stock = InventoryBatchStock.objects.filter(
+        tenant=tenant,
+        isDeleted=False,
+        quantityOnHand__gt=0,
+    ).values('batch_id')
+    updated = InventoryBatch.objects.filter(
+        tenant=tenant,
+        isDeleted=False,
+        isActive=True,
+        expiryDate__lt=today,
+        quantityOnHand__lte=0,
+    ).exclude(
+        pk__in=batch_ids_with_stock
+    ).update(isActive=False, lastUpdatedOn=timezone.now())
+    _bump_inventory_list_cache_version('items', tenant=tenant)
+    return JsonResponse({'message': 'success', 'deactivatedCount': updated})
+
+
 @transaction.atomic
 def add_inventory_opening_stock_api(request):
     if request.method != 'POST':
@@ -6618,11 +7226,13 @@ def add_inventory_opening_stock_api(request):
             stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
             unit_cost = _safe_sales_float(row.get('unitCost') or row.get('unitPrice'))
             line_total = _safe_sales_float(row.get('lineTotal')) or round(quantity * unit_cost, 2)
+            batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='in')
             InventoryOpeningLine.objects.create(
                 tenant=voucher.tenant,
                 voucher=voucher,
                 warehouse=warehouse,
                 item=item,
+                batch=batch,
                 stockBucket=stock_bucket,
                 quantity=quantity,
                 unitCost=unit_cost,
@@ -6656,7 +7266,7 @@ def list_inventory_opening_vouchers_api(request):
     return JsonResponse({'message': 'success', 'data': payload}, safe=False)
 
 
-def _voucher_line_rows_from_payload(request, lines_payload, *, quantity_field='quantity', rate_field='unitCost'):
+def _voucher_line_rows_from_payload(request, lines_payload, *, quantity_field='quantity', rate_field='unitCost', batch_direction='in', warehouse=None):
     rows = []
     item_ids = []
     for row in lines_payload:
@@ -6667,8 +7277,10 @@ def _voucher_line_rows_from_payload(request, lines_payload, *, quantity_field='q
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
         unit_rate = _safe_sales_float(row.get(rate_field) or row.get('unitPrice') or row.get('unitCost'))
         line_total = _safe_sales_float(row.get('lineTotal')) or round(quantity * unit_rate, 2)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction=batch_direction)
         rows.append({
             'item': item,
+            'batch': batch,
             'quantity': quantity,
             'stockBucket': stock_bucket,
             'unitRate': unit_rate,
@@ -6681,10 +7293,15 @@ def _voucher_line_rows_from_payload(request, lines_payload, *, quantity_field='q
 
 def _serialize_voucher_lines(lines_qs, *, quantity_field='quantity', rate_field='unitCost'):
     payload = []
-    for line in lines_qs.select_related('item').order_by('id'):
+    for line in lines_qs.select_related('item', 'batch').order_by('id'):
         payload.append({
             'itemId': line.item_id,
             'itemName': line.item.name,
+            'batchId': line.batch_id,
+            'batchNumber': line.batch.batchNumber if line.batch_id else '',
+            'manufactureDate': line.batch.manufactureDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.manufactureDate else '',
+            'expiryDate': line.batch.expiryDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.expiryDate else '',
+            'batchMrp': float(line.batch.mrp or 0.0) if line.batch_id else 0.0,
             'stockBucket': line.stockBucket,
             'quantity': float(getattr(line, quantity_field) or 0.0),
             'unitCost': float(getattr(line, rate_field) or 0.0),
@@ -6716,7 +7333,8 @@ def add_inventory_adjustment_voucher_api(request):
         voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.INVENTORY_ADJUSTMENT)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        batch_direction = 'out' if str(request.POST.get('direction') or 'increase').lower() == 'decrease' else 'in'
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction=batch_direction, warehouse=warehouse)
         for row in rows:
             quantity_delta = row['quantity']
             if str(request.POST.get('direction') or 'increase').lower() == 'decrease':
@@ -6726,6 +7344,7 @@ def add_inventory_adjustment_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantityDelta=quantity_delta,
                 unitCost=row['unitRate'],
@@ -6795,7 +7414,8 @@ def update_inventory_adjustment_voucher_api(request):
         voucher.save(update_fields=['entryDate', 'remark', 'lastUpdatedOn'])
         voucher.lines.filter(isDeleted=False).update(isDeleted=True)
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        batch_direction = 'out' if str(request.POST.get('direction') or 'increase').lower() == 'decrease' else 'in'
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction=batch_direction, warehouse=warehouse)
         for row in rows:
             quantity_delta = row['quantity']
             if str(request.POST.get('direction') or 'increase').lower() == 'decrease':
@@ -6805,6 +7425,7 @@ def update_inventory_adjustment_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantityDelta=quantity_delta,
                 unitCost=row['unitRate'],
@@ -6862,12 +7483,13 @@ def add_inventory_transfer_voucher_api(request):
         voucher.save()
         voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.INVENTORY_TRANSFER)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction='out', warehouse=voucher.fromWarehouse)
         for row in rows:
             InventoryTransferLine.objects.create(
                 tenant=voucher.tenant,
                 voucher=voucher,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitCost=row['unitRate'],
@@ -6939,12 +7561,13 @@ def update_inventory_transfer_voucher_api(request):
         voucher.remark = request.POST.get('remark')
         voucher.save(update_fields=['entryDate', 'fromWarehouse', 'toWarehouse', 'remark', 'lastUpdatedOn'])
         voucher.lines.filter(isDeleted=False).update(isDeleted=True)
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction='out', warehouse=voucher.fromWarehouse)
         for row in rows:
             InventoryTransferLine.objects.create(
                 tenant=voucher.tenant,
                 voucher=voucher,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitCost=row['unitRate'],
@@ -7005,7 +7628,7 @@ def add_purchase_return_voucher_api(request):
         voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.PURCHASE_RETURN)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction='out', warehouse=warehouse)
         voucher.totalAmount = 0.0
         for row in rows:
             PurchaseReturnLine.objects.create(
@@ -7013,6 +7636,7 @@ def add_purchase_return_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitCost=row['unitRate'],
@@ -7090,7 +7714,7 @@ def update_purchase_return_voucher_api(request):
         voucher.save(update_fields=['entryDate', 'purchaseInvoice', 'partyID', 'remark', 'lastUpdatedOn'])
         voucher.lines.filter(isDeleted=False).update(isDeleted=True)
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitCost', batch_direction='out', warehouse=warehouse)
         voucher.totalAmount = 0.0
         for row in rows:
             PurchaseReturnLine.objects.create(
@@ -7098,6 +7722,7 @@ def update_purchase_return_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitCost=row['unitRate'],
@@ -7164,7 +7789,7 @@ def add_sales_return_voucher_api(request):
         voucher.voucherNumber = _next_tenant_sequence_value(request, TenantSequence.Scope.SALES_RETURN)
         voucher.save(update_fields=['voucherNumber', 'lastUpdatedOn'])
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice', batch_direction='in', warehouse=warehouse)
         voucher.totalAmount = 0.0
         for row in rows:
             SalesReturnLine.objects.create(
@@ -7172,6 +7797,7 @@ def add_sales_return_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitPrice=row['unitRate'],
@@ -7256,7 +7882,7 @@ def update_sales_return_voucher_api(request):
         voucher.save(update_fields=['entryDate', 'sales', 'cashCounter', 'partyID', 'remark', 'lastUpdatedOn'])
         voucher.lines.filter(isDeleted=False).update(isDeleted=True)
         warehouse = _parse_inventory_warehouse(request, request.POST.get('warehouseId'))
-        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice')
+        rows, item_ids = _voucher_line_rows_from_payload(request, lines_payload, rate_field='unitPrice', batch_direction='in', warehouse=warehouse)
         voucher.totalAmount = 0.0
         for row in rows:
             SalesReturnLine.objects.create(
@@ -7264,6 +7890,7 @@ def update_sales_return_voucher_api(request):
                 voucher=voucher,
                 warehouse=warehouse,
                 item=row['item'],
+                batch=row['batch'],
                 stockBucket=row['stockBucket'],
                 quantity=row['quantity'],
                 unitPrice=row['unitRate'],
@@ -7332,6 +7959,11 @@ def get_purchase_invoice_detail_api(request):
         lines = [{
             'itemId': line.item_id,
             'itemName': line.item.name,
+            'batchId': line.batch_id,
+            'batchNumber': line.batch.batchNumber if line.batch_id else '',
+            'manufactureDate': line.batch.manufactureDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.manufactureDate else '',
+            'expiryDate': line.batch.expiryDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.expiryDate else '',
+            'batchMrp': float(line.batch.mrp or 0.0) if line.batch_id else 0.0,
             'stockBucket': line.stockBucket,
             'quantity': float(line.quantity or 0.0),
             'unitCost': float(line.unitCost or 0.0),
@@ -7340,7 +7972,7 @@ def get_purchase_invoice_detail_api(request):
             'gstAmount': float(line.gstAmount or 0.0),
             'lineTotal': float(line.lineTotal or 0.0),
             'remark': line.remark or '',
-        } for line in purchase.lines.filter(isDeleted=False).select_related('item').order_by('id')]
+        } for line in purchase.lines.filter(isDeleted=False).select_related('item', 'batch').order_by('id')]
         revisions = [{
             'changedOn': revision.datetime.strftime('%d/%m/%Y %I:%M %p') if revision.datetime else '',
             'previousGstTreatment': revision.previousGstTreatment or '',
@@ -7630,6 +8262,11 @@ def _safe_sales_float(value) -> float:
         return float(value or 0.0)
     except Exception:
         return 0.0
+
+
+def _safe_local_date():
+    now_value = timezone.now()
+    return timezone.localtime(now_value).date() if timezone.is_aware(now_value) else now_value.date()
 
 
 def _normalize_gst_number(raw_value) -> str:
@@ -7927,6 +8564,7 @@ def _apply_inventory_item_payload(request, item):
     item.mrp = _safe_sales_float(request.POST.get('mrp'))
     item.minimumStockLevel = _safe_sales_float(request.POST.get('minimumStockLevel'))
     item.reorderLevel = _safe_sales_float(request.POST.get('reorderLevel'))
+    item.requiresBatchTracking = str(request.POST.get('requiresBatchTracking') or '').lower() in {'1', 'true', 'yes', 'on'}
     item.isSaleBlocked = str(request.POST.get('isSaleBlocked') or '').lower() in {'1', 'true', 'yes', 'on'}
 
 
@@ -8001,6 +8639,170 @@ def _normalize_stock_bucket(request, raw_bucket, item: InventoryItem) -> str:
     if bucket == InventoryItem.StockBucket.NON_GST:
         _assert_non_gst_enabled(request, label='Non-GST stock bucket')
     return bucket
+
+
+def _parse_inventory_batch_date(value):
+    raw = str(value or '').strip()
+    if not raw:
+        return None
+    parsed = parse_date(raw)
+    if parsed:
+        return parsed
+    for fmt in ('%d/%m/%Y', '%d/%m/%y', '%d-%m-%Y'):
+        try:
+            return datetime.strptime(raw, fmt).date()
+        except ValueError:
+            continue
+    raise ValueError('Invalid batch date. Use DD/MM/YYYY.')
+
+
+def _available_batch_stock_queryset(*, item, stock_bucket, warehouse=None, today=None):
+    today = today or _safe_local_date()
+    qs = InventoryBatchStock.objects.filter(
+        tenant=item.tenant,
+        isDeleted=False,
+        item=item,
+        stockBucket=stock_bucket,
+        quantityOnHand__gt=0,
+        batch__isDeleted=False,
+        batch__isActive=True,
+    ).filter(
+        Q(batch__expiryDate__isnull=True) | Q(batch__expiryDate__gte=today)
+    ).annotate(
+        expiry_missing=Case(
+            When(batch__expiryDate__isnull=True, then=Value(1)),
+            default=Value(0),
+            output_field=IntegerField(),
+        )
+    ).order_by('expiry_missing', 'batch__expiryDate', 'batch__batchNumber', 'batch_id')
+    if warehouse is not None:
+        qs = qs.filter(warehouse=warehouse)
+    return qs
+
+
+def _earliest_available_batch_for_fefo(*, item, stock_bucket, warehouse=None, today=None):
+    row = _available_batch_stock_queryset(
+        item=item,
+        stock_bucket=stock_bucket,
+        warehouse=warehouse,
+        today=today,
+    ).select_related('batch').first()
+    return row.batch if row else None
+
+
+def _resolve_inventory_batch(request, row, *, item, stock_bucket, warehouse=None, quantity=0.0, direction='in'):
+    raw_batch_id = str(row.get('batchId') or row.get('batch_id') or '').strip()
+    batch_number = str(row.get('batchNumber') or row.get('batchNo') or row.get('batch') or '').strip()
+    manufacture_date = _parse_inventory_batch_date(row.get('manufactureDate') or row.get('mfgDate'))
+    expiry_date = _parse_inventory_batch_date(row.get('expiryDate') or row.get('expDate'))
+    purchase_rate = _safe_sales_float(row.get('purchaseRate') or row.get('unitCost') or row.get('unitPrice'))
+    mrp = _safe_sales_float(row.get('batchMrp') or row.get('mrp'))
+    if manufacture_date and expiry_date and expiry_date < manufacture_date:
+        raise ValueError(f'Expiry date cannot be before manufacture date for {item.name}.')
+
+    if raw_batch_id:
+        if not raw_batch_id.isdigit():
+            raise ValueError('Invalid batch selection.')
+        batch = tenant_qs(request, InventoryBatch).filter(isDeleted=False, pk=int(raw_batch_id), item=item).first()
+        if batch is None:
+            raise ValueError('Selected batch was not found.')
+        if direction == 'out' and batch.expiryDate and batch.expiryDate < _safe_local_date():
+            raise ValueError(f'Batch {batch.batchNumber or batch.pk} for {item.name} is expired.')
+        if direction == 'out' and warehouse is not None:
+            available = InventoryBatchStock.objects.filter(
+                tenant=item.tenant,
+                isDeleted=False,
+                batch=batch,
+                warehouse=warehouse,
+            ).values_list('quantityOnHand', flat=True).first()
+            if available is None or float(available or 0.0) <= 0:
+                raise ValueError(f'Batch {batch.batchNumber or batch.pk} for {item.name} is not available in {warehouse.name}.')
+        if direction == 'out' and item.requiresBatchTracking:
+            fefo_batch = _earliest_available_batch_for_fefo(item=item, stock_bucket=stock_bucket, warehouse=warehouse)
+            if fefo_batch is not None and fefo_batch.pk != batch.pk:
+                raise ValueError(
+                    f'FEFO requires selling batch {fefo_batch.batchNumber or fefo_batch.pk} for {item.name} before {batch.batchNumber or batch.pk}.'
+                )
+        return batch
+
+    has_batch_details = bool(batch_number or manufacture_date or expiry_date)
+    if direction == 'out':
+        if not has_batch_details and not item.requiresBatchTracking:
+            return None
+        batch_stock_qs = _available_batch_stock_queryset(
+            item=item,
+            stock_bucket=stock_bucket,
+            warehouse=warehouse,
+            today=_safe_local_date(),
+        )
+        if batch_number:
+            batch_stock_qs = batch_stock_qs.filter(batch__batchNumber=batch_number)
+        batch_stock = batch_stock_qs.select_related('batch').first()
+        if batch_stock is None:
+            raise ValueError(f'No available non-expired batch found for {item.name}.')
+        return batch_stock.batch
+
+    if not has_batch_details and not item.requiresBatchTracking:
+        return None
+    if item.requiresBatchTracking and not batch_number:
+        raise ValueError(f'Batch number is required for {item.name}.')
+    if item.requiresBatchTracking and not expiry_date:
+        raise ValueError(f'Expiry date is required for batch-tracked item {item.name}.')
+    if batch_number:
+        existing_batch = InventoryBatch.objects.filter(
+            tenant=item.tenant,
+            item=item,
+            stockBucket=stock_bucket,
+            batchNumber=batch_number,
+            isDeleted=False,
+        ).first()
+        has_date_conflict = existing_batch is not None and (
+            existing_batch.manufactureDate != manufacture_date or existing_batch.expiryDate != expiry_date
+        )
+        has_rate_conflict = (
+            existing_batch is not None
+            and purchase_rate
+            and float(existing_batch.purchaseRate or 0.0)
+            and round(float(existing_batch.purchaseRate or 0.0), 2) != round(purchase_rate, 2)
+        )
+        has_mrp_conflict = (
+            existing_batch is not None
+            and mrp
+            and float(existing_batch.mrp or 0.0)
+            and round(float(existing_batch.mrp or 0.0), 2) != round(mrp, 2)
+        )
+        if has_date_conflict or has_rate_conflict or has_mrp_conflict:
+            raise ValueError(
+                f'Batch {batch_number} already exists for {item.name} with different manufacture, expiry, rate, or MRP details.'
+            )
+    batch, _created = InventoryBatch.objects.get_or_create(
+        tenant=item.tenant,
+        item=item,
+        stockBucket=stock_bucket,
+        batchNumber=batch_number or None,
+        manufactureDate=manufacture_date,
+        expiryDate=expiry_date,
+        defaults={
+            'warehouse': warehouse,
+            'purchaseRate': purchase_rate,
+            'mrp': mrp,
+            'isActive': True,
+        },
+    )
+    update_fields = []
+    if warehouse and batch.warehouse_id is None:
+        batch.warehouse = warehouse
+        update_fields.append('warehouse')
+    if purchase_rate and float(batch.purchaseRate or 0.0) != purchase_rate:
+        batch.purchaseRate = purchase_rate
+        update_fields.append('purchaseRate')
+    if mrp and float(batch.mrp or 0.0) != mrp:
+        batch.mrp = mrp
+        update_fields.append('mrp')
+    if update_fields:
+        update_fields.append('lastUpdatedOn')
+        batch.save(update_fields=update_fields)
+    return batch
 
 
 def _staff_for_request(request):
@@ -8158,7 +8960,7 @@ def get_sales_return_source_detail_api(request):
             if getattr(getattr(source_obj, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
                 return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         return_qs = tenant_qs(request, SalesReturnVoucher).filter(isDeleted=False, cashCounter=source_obj)
-        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item').order_by('id')
+        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item', 'batch').order_by('id')
         if not allow_non_gst:
             line_qs = line_qs.exclude(stockBucket=InventoryItem.StockBucket.NON_GST)
     else:
@@ -8171,7 +8973,7 @@ def get_sales_return_source_detail_api(request):
             if getattr(getattr(source_obj, 'createdBy', None), 'user_ID_id', None) != request.user.pk:
                 return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
         return_qs = tenant_qs(request, SalesReturnVoucher).filter(isDeleted=False, sales=source_obj)
-        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item').order_by('id')
+        line_qs = source_obj.lines.filter(isDeleted=False).select_related('item', 'batch').order_by('id')
         if not allow_non_gst:
             line_qs = line_qs.exclude(stockBucket=InventoryItem.StockBucket.NON_GST)
     if exclude_voucher_id and str(exclude_voucher_id).isdigit():
@@ -8195,6 +8997,11 @@ def get_sales_return_source_detail_api(request):
         lines.append({
             'itemId': line.item_id,
             'itemName': line.item.name,
+            'batchId': line.batch_id,
+            'batchNumber': line.batch.batchNumber if line.batch_id else '',
+            'manufactureDate': line.batch.manufactureDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.manufactureDate else '',
+            'expiryDate': line.batch.expiryDate.strftime('%d/%m/%Y') if line.batch_id and line.batch.expiryDate else '',
+            'batchMrp': float(line.batch.mrp or 0.0) if line.batch_id else 0.0,
             'stockBucket': line.stockBucket,
             'quantity': sold_qty,
             'returnedQuantity': already_returned,
@@ -8299,6 +9106,7 @@ def _sync_sales_lines(request, sale: Sales):
             raise ValueError('Sales quantity must be greater than zero.')
         _validate_inventory_quantity_for_unit(item, quantity, label='Sales quantity')
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='out')
         unit_price = _safe_sales_float(row.get('unitPrice'))
         discount_percent = max(0.0, min(100.0, _safe_sales_float(row.get('discountPercent'))))
         gross_amount = round(quantity * unit_price, 2)
@@ -8316,6 +9124,7 @@ def _sync_sales_lines(request, sale: Sales):
             sales=sale,
             warehouse=warehouse,
             item=item,
+            batch=batch,
             hsnCode=item.hsnCode,
             stockBucket=stock_bucket,
             quantity=quantity,
@@ -8394,6 +9203,7 @@ def _sync_proforma_lines(request, proforma: ProformaInvoice):
             raise ValueError('Proforma quantity must be greater than zero.')
         _validate_inventory_quantity_for_unit(item, quantity, label='Proforma quantity')
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='out')
         unit_price = _safe_sales_float(row.get('unitPrice'))
         discount_percent = max(0.0, min(100.0, _safe_sales_float(row.get('discountPercent'))))
         gross_amount = round(quantity * unit_price, 2)
@@ -8410,6 +9220,7 @@ def _sync_proforma_lines(request, proforma: ProformaInvoice):
             proformaInvoice=proforma,
             warehouse=warehouse,
             item=item,
+            batch=batch,
             hsnCode=item.hsnCode,
             stockBucket=stock_bucket,
             quantity=quantity,
@@ -8425,12 +9236,13 @@ def _sync_proforma_lines(request, proforma: ProformaInvoice):
 
 def _copy_proforma_lines_to_sale(proforma: ProformaInvoice, sale: Sales) -> list[int]:
     item_ids = []
-    for line in proforma.lines.filter(isDeleted=False).select_related('item', 'warehouse').order_by('id'):
+    for line in proforma.lines.filter(isDeleted=False).select_related('item', 'warehouse', 'batch').order_by('id'):
         SalesLine.objects.create(
             tenant=sale.tenant,
             sales=sale,
             warehouse=line.warehouse,
             item=line.item,
+            batch=line.batch,
             hsnCode=line.hsnCode,
             stockBucket=line.stockBucket,
             quantity=line.quantity,
@@ -8464,6 +9276,7 @@ def _sync_cash_counter_lines(request, counter: CashCounter):
             raise ValueError('Cash counter quantity must be greater than zero.')
         _validate_inventory_quantity_for_unit(item, quantity, label='Cash counter quantity')
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='out')
         unit_price = _safe_sales_float(row.get('unitPrice'))
         discount_percent = max(0.0, min(100.0, _safe_sales_float(row.get('discountPercent'))))
         gross_amount = round(quantity * unit_price, 2)
@@ -8481,6 +9294,7 @@ def _sync_cash_counter_lines(request, counter: CashCounter):
             cashCounter=counter,
             warehouse=warehouse,
             item=item,
+            batch=batch,
             hsnCode=item.hsnCode,
             stockBucket=stock_bucket,
             quantity=quantity,
@@ -8563,6 +9377,7 @@ def _sync_cash_counter_return_voucher(request, counter: CashCounter):
             voucher=voucher,
             warehouse=line.warehouse,
             item=line.item,
+            batch=line.batch,
             stockBucket=line.stockBucket,
             quantity=line.quantity,
             unitPrice=line.unitPrice,
@@ -8618,6 +9433,11 @@ def _normalize_purchase_lines_for_treatment(gst_treatment, lines):
         normalized.append({
             'itemId': row.get('itemId'),
             'stockBucket': stock_bucket,
+            'batchId': row.get('batchId') or row.get('batch_id') or '',
+            'batchNumber': row.get('batchNumber') or row.get('batchNo') or row.get('batch') or '',
+            'manufactureDate': row.get('manufactureDate') or row.get('mfgDate') or '',
+            'expiryDate': row.get('expiryDate') or row.get('expDate') or '',
+            'batchMrp': row.get('batchMrp') or row.get('mrp') or '',
             'quantity': quantity,
             'unitCost': unit_cost,
             'taxableAmount': round(taxable_amount, 2),
@@ -8649,6 +9469,7 @@ def _sync_purchase_lines(request, purchase: PurchaseInvoice, lines_payload):
         if quantity <= 0:
             raise ValueError('Purchase quantity must be greater than zero.')
         stock_bucket = _normalize_stock_bucket(request, row.get('stockBucket'), item)
+        batch = _resolve_inventory_batch(request, row, item=item, stock_bucket=stock_bucket, warehouse=warehouse, quantity=quantity, direction='in')
         unit_cost = _safe_sales_float(row.get('unitCost'))
         taxable_amount = _safe_sales_float(row.get('taxableAmount')) or round(quantity * unit_cost, 2)
         gst_rate = _safe_sales_float(row.get('gstRate'))
@@ -8659,6 +9480,7 @@ def _sync_purchase_lines(request, purchase: PurchaseInvoice, lines_payload):
             purchaseInvoice=purchase,
             warehouse=warehouse,
             item=item,
+            batch=batch,
             stockBucket=stock_bucket,
             quantity=quantity,
             unitCost=unit_cost,

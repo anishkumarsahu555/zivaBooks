@@ -50,21 +50,88 @@
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
     }
 
-    .purchase-lines-table td .field {
+    .purchase-lines-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .purchase-row {
+        position: relative;
+        border: 1px solid rgba(15, 118, 110, 0.12);
+        border-radius: 10px;
+        padding: 12px;
+        background: #ffffff;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .purchase-line-grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 10px 12px;
+        align-items: end;
+    }
+
+    .purchase-line-grid .field {
         margin-bottom: 0;
     }
 
-    .purchase-lines-table .ui.dropdown,
-    .purchase-lines-table input {
+    .purchase-line-grid .field > label {
+        margin-bottom: 4px;
+        font-size: 12px;
+        color: #475467;
+    }
+
+    .purchase-line-grid .ui.dropdown,
+    .purchase-line-grid input {
+        min-height: 38px;
         width: 100%;
     }
 
-    .purchase-lines-table .purchase-remove {
-        width: 32px;
-        height: 32px;
-        min-width: 32px;
+    .purchase-span-1 { grid-column: span 1; }
+    .purchase-span-2 { grid-column: span 2; }
+    .purchase-span-3 { grid-column: span 3; }
+    .purchase-span-4 { grid-column: span 4; }
+    .purchase-span-5 { grid-column: span 5; }
+    .purchase-span-6 { grid-column: span 6; }
+    .purchase-span-8 { grid-column: span 8; }
+    .purchase-span-12 { grid-column: span 12; }
+
+    .purchase-item-field {
+        align-self: stretch;
+    }
+
+    .purchase-line-section-label {
+        grid-column: span 12;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 2px 0 -2px;
+        color: #64748b;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .purchase-line-section-label:after {
+        content: "";
+        height: 1px;
+        flex: 1;
+        background: rgba(15, 23, 42, 0.08);
+    }
+
+    .purchase-total-field input[readonly],
+    .purchase-tax-field input[readonly] {
+        background: #f8fafc !important;
+        font-weight: 700;
+    }
+
+    .purchase-remove {
+        width: 38px;
+        height: 38px;
+        min-width: 38px;
         padding: 0;
-        margin: 0 auto;
+        margin: 0 0 0 auto;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -115,25 +182,7 @@
         margin: 0;
     }
 
-    .purchase-lines-table th {
-        background: #f8fafc;
-    }
-
-    .purchase-lines-table td {
-        vertical-align: middle;
-    }
-
-    .purchase-lines-table th:nth-child(1) { width: 32%; }
-    .purchase-lines-table th:nth-child(2) { width: 12%; }
-    .purchase-lines-table th:nth-child(3) { width: 7%; }
-    .purchase-lines-table th:nth-child(4) { width: 9%; }
-    .purchase-lines-table th:nth-child(5) { width: 9%; }
-    .purchase-lines-table th:nth-child(6) { width: 7%; }
-    .purchase-lines-table th:nth-child(7) { width: 9%; }
-    .purchase-lines-table th:nth-child(8) { width: 8%; }
-    .purchase-lines-table th:nth-child(9) { width: 7%; }
-
-    .purchase-lines-table .ui.dropdown > .text {
+    .purchase-line-grid .ui.dropdown > .text {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -145,6 +194,39 @@
         line-height: 1.35;
         color: #667085;
         white-space: normal;
+    }
+
+    .purchase-line-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 7px;
+    }
+
+    .purchase-line-meta-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #f8fafc;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        color: #475467;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.25;
+    }
+
+    .purchase-line-meta-pill.strong {
+        background: #ecfdf5;
+        border-color: rgba(5, 150, 105, 0.18);
+        color: #047857;
+    }
+
+    .purchase-line-meta-pill.warning {
+        background: #fff7ed;
+        border-color: rgba(234, 88, 12, 0.18);
+        color: #c2410c;
     }
 
     .purchase-history-list {
@@ -166,6 +248,27 @@
         box-shadow: none;
     }
 
+    html[data-theme="dark"] .purchase-row {
+        background: rgba(15, 23, 42, 0.92);
+        border-color: rgba(56, 189, 248, 0.16);
+        box-shadow: none;
+    }
+
+    html[data-theme="dark"] .purchase-line-grid .field > label,
+    html[data-theme="dark"] .purchase-line-section-label {
+        color: #93a4bd !important;
+    }
+
+    html[data-theme="dark"] .purchase-line-section-label:after {
+        background: rgba(56, 189, 248, 0.12);
+    }
+
+    html[data-theme="dark"] .purchase-total-field input[readonly],
+    html[data-theme="dark"] .purchase-tax-field input[readonly] {
+        background: rgba(15, 23, 42, 0.72) !important;
+        color: #e6eef8 !important;
+    }
+
     html[data-theme="dark"] .purchase-form-section {
         background: rgba(15, 23, 42, 0.9);
         border-color: rgba(56, 189, 248, 0.12);
@@ -184,14 +287,22 @@
         color: #93a4bd !important;
     }
 
-    html[data-theme="dark"] .purchase-lines-table th {
-        background: rgba(15, 23, 42, 0.92) !important;
-        color: #dce8f7 !important;
-        border-color: rgba(56, 189, 248, 0.12) !important;
+    html[data-theme="dark"] .purchase-line-meta-pill {
+        background: rgba(15, 23, 42, 0.74);
+        border-color: rgba(56, 189, 248, 0.14);
+        color: #dce8f7;
     }
 
-    html[data-theme="dark"] .purchase-lines-table td {
-        border-color: rgba(56, 189, 248, 0.1) !important;
+    html[data-theme="dark"] .purchase-line-meta-pill.strong {
+        background: rgba(4, 120, 87, 0.20);
+        border-color: rgba(52, 211, 153, 0.22);
+        color: #a7f3d0;
+    }
+
+    html[data-theme="dark"] .purchase-line-meta-pill.warning {
+        background: rgba(194, 65, 12, 0.20);
+        border-color: rgba(251, 146, 60, 0.25);
+        color: #fed7aa;
     }
 
     html[data-theme="dark"] .purchase-lines-footer {
@@ -229,6 +340,75 @@
         background: rgba(22, 120, 194, 0.14) !important;
         border-color: rgba(56, 189, 248, 0.2) !important;
         color: #d7e9fb !important;
+    }
+
+    @media only screen and (max-width: 1199px) {
+        .purchase-line-grid {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+        }
+
+        .purchase-span-8,
+        .purchase-span-6,
+        .purchase-span-5,
+        .purchase-span-4 {
+            grid-column: span 6;
+        }
+
+        .purchase-span-3,
+        .purchase-span-2 {
+            grid-column: span 3;
+        }
+
+        .purchase-span-1 {
+            grid-column: span 2;
+        }
+
+        .purchase-span-12,
+        .purchase-line-section-label {
+            grid-column: span 6;
+        }
+    }
+
+    @media only screen and (max-width: 767px) {
+        .purchase-lines-shell,
+        .purchase-form-section {
+            padding: 12px;
+        }
+
+        .purchase-line-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 9px;
+        }
+
+        .purchase-span-1,
+        .purchase-span-2 {
+            grid-column: span 1;
+        }
+
+        .purchase-span-3,
+        .purchase-span-4,
+        .purchase-span-5,
+        .purchase-span-6,
+        .purchase-span-8,
+        .purchase-span-12,
+        .purchase-line-section-label {
+            grid-column: span 2;
+        }
+
+        .purchase-remove {
+            width: 100%;
+            margin: 0;
+            border-radius: 8px !important;
+        }
+
+        .purchase-lines-footer {
+            align-items: stretch;
+        }
+
+        .purchase-lines-totals {
+            width: 100%;
+            margin-left: 0;
+        }
     }
 </style>
 
@@ -345,22 +525,7 @@
                                 <button type="button" class="ui right floated teal basic small button" onclick="addPurchaseRow()">Add Row</button>
                             </div>
                             <p class="purchase-form-caption">Add item-wise inward stock with bucket, quantity, cost, and tax values.</p>
-                            <table class="ui celled compact small table purchase-lines-table">
-                                <thead>
-                                <tr>
-                                    <th>Item</th>
-                                    <th>Bucket</th>
-                                    <th>Qty</th>
-                                    <th>Unit Cost</th>
-                                    <th>Taxable</th>
-                                    <th>GST %</th>
-                                    <th>GST Amt</th>
-                                    <th>Total</th>
-                                    <th></th>
-                                </tr>
-                                </thead>
-                                <tbody id="purchaseLinesBody"></tbody>
-                            </table>
+                            <div class="purchase-lines-list" id="purchaseLinesBody"></div>
                             <div class="purchase-lines-footer">
                                 <div class="purchase-lines-totals">
                                     <span class="ui tiny label">Subtotal: ₹ <span id="purchaseSubtotal">0.00</span></span>
@@ -450,6 +615,7 @@
                 ' data-non-gst-stock="' + (item.NonGSTStock || 0) + '"' +
                 ' data-purchase-price="' + (item.DefaultPurchasePrice || 0) + '"' +
                 ' data-sales-price="' + (item.DefaultSalesPrice || 0) + '"' +
+                ' data-requires-batch="' + (item.RequiresBatchTracking ? 1 : 0) + '"' +
                 ' data-default-bucket="' + (item.DefaultStockBucket || 'gst') + '"' +
                 '>' + item.Name + (item.SKU ? ' [' + item.SKU + ']' : '') +
                 ' | GST ' + (item.GSTStock || 0) +
@@ -465,6 +631,7 @@
         const purchasePrice = Number($selected.data('purchase-price') || 0).toFixed(2);
         const salesPrice = Number($selected.data('sales-price') || 0).toFixed(2);
         const gstRate = Number($selected.data('gst-rate') || 0).toFixed(2);
+        const requiresBatch = String($selected.data('requires-batch') || '0') === '1';
         const bucket = currentPurchaseIsNonGst()
             ? 'non_gst'
             : ($row.find('.purchase-bucket').dropdown('get value') || $row.find('.purchase-bucket').val() || 'gst');
@@ -474,10 +641,17 @@
         if (nonGstShadowEnabled) {
             metaHtml += ' | Non-GST Stock: ' + nonGstStock;
         }
-        metaHtml += ' | Purchase Rate: ₹ ' + purchasePrice + ' | Sales Rate: ₹ ' + salesPrice + ' | GST %: ' + gstRate;
+        metaHtml += ' | Purchase Rate: ₹ ' + purchasePrice + ' | Sales Rate: ₹ ' + salesPrice + ' | GST %: ' + gstRate + (requiresBatch ? ' | Batch required' : '');
+        const batchClass = requiresBatch ? 'purchase-line-meta-pill warning' : 'purchase-line-meta-pill';
+        const batchText = requiresBatch ? 'Batch required' : 'Batch optional';
         $row.find('.purchase-line-item-hint').html(
-            'Selected bucket: <strong>' + bucketLabel + '</strong> | Available: <strong>' + activeStock + '</strong>' +
-            ' <span style="color:#98a2b3;">' + metaHtml + '</span>'
+            '<div class="purchase-line-meta">' +
+            '<span class="purchase-line-meta-pill strong">' + bucketLabel + ' bucket</span>' +
+            '<span class="purchase-line-meta-pill">Available ' + activeStock + '</span>' +
+            '<span class="purchase-line-meta-pill">GST ' + gstRate + '%</span>' +
+            '<span class="' + batchClass + '">' + batchText + '</span>' +
+            '</div>' +
+            '<div style="margin-top:5px;color:#98a2b3;">' + metaHtml.replace(/^\|\s*/, '') + '</div>'
         );
     }
 
@@ -516,17 +690,26 @@
             ? '<option value="gst">GST</option><option value="non_gst">Non GST</option>'
             : '<option value="gst">GST</option>';
         $('#purchaseLinesBody').append(
-            '<tr class="purchase-row">' +
-            '<td><div class="field"><select class="ui fluid search selection dropdown purchase-item"><option value="">Select item</option>' + purchaseOptionsHtml() + '</select><div class="purchase-line-item-hint">Selected bucket: <strong>GST</strong> | Available: <strong>0</strong> <span style="color:#98a2b3;">| GST Stock: 0' + (nonGstShadowEnabled ? ' | Non-GST Stock: 0' : '') + ' | Purchase Rate: ₹ 0.00 | Sales Rate: ₹ 0.00 | GST %: 0.00</span></div></div></td>' +
-            '<td><div class="field"><select class="ui fluid selection dropdown purchase-bucket">' + bucketOptions + '</select></div></td>' +
-            '<td><div class="ui fluid input"><input type="number" class="purchase-qty" step="0.01" value="' + (row.quantity || '') + '"></div></td>' +
-            '<td><div class="ui fluid input"><input type="number" class="purchase-unit-cost" step="0.01" value="' + (row.unitCost || '') + '"></div></td>' +
-            '<td><div class="ui fluid input"><input type="number" class="purchase-taxable" step="0.01" value="' + (row.taxableAmount || '') + '" readonly></div></td>' +
-            '<td><div class="ui fluid input"><input type="number" class="purchase-gst-rate" step="0.01" value="' + (row.gstRate || '') + '"></div></td>' +
-            '<td><div class="ui fluid input"><input type="number" class="purchase-gst-amount" step="0.01" value="' + (row.gstAmount || '') + '" readonly></div></td>' +
-            '<td><div class="ui fluid input"><input type="number" class="purchase-line-total" step="0.01" value="' + (row.lineTotal || '') + '" readonly></div></td>' +
-            '<td><button type="button" class="ui circular youtube icon button purchase-remove" data-tooltip="Remove Row" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="removePurchaseRow(this)"><i class="trash alternate icon"></i></button></td>' +
-            '</tr>'
+            '<div class="purchase-row">' +
+            '<input type="hidden" class="purchase-batch-id" value="' + (row.batchId || '') + '">' +
+            '<div class="purchase-line-grid">' +
+            '<div class="purchase-span-6 field purchase-item-field"><label>Item</label><select class="ui fluid search selection dropdown purchase-item"><option value="">Select item</option>' + purchaseOptionsHtml() + '</select><div class="purchase-line-item-hint"><div class="purchase-line-meta"><span class="purchase-line-meta-pill strong">GST bucket</span><span class="purchase-line-meta-pill">Available 0</span><span class="purchase-line-meta-pill">GST 0.00%</span><span class="purchase-line-meta-pill">Batch optional</span></div><div style="margin-top:5px;color:#98a2b3;">GST Stock: 0' + (nonGstShadowEnabled ? ' | Non-GST Stock: 0' : '') + ' | Purchase Rate: ₹ 0.00 | Sales Rate: ₹ 0.00 | GST %: 0.00</div></div></div>' +
+            '<div class="purchase-span-2 field"><label>Bucket</label><select class="ui fluid selection dropdown purchase-bucket">' + bucketOptions + '</select></div>' +
+            '<div class="purchase-span-2 field"><label>Qty</label><div class="ui fluid input"><input type="number" class="purchase-qty" step="0.01" value="' + (row.quantity || '') + '" placeholder="0.00"></div></div>' +
+            '<div class="purchase-span-2 field"><label>&nbsp;</label><button type="button" class="ui youtube icon button purchase-remove" data-tooltip="Remove Row" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="removePurchaseRow(this)"><i class="trash alternate icon"></i></button></div>' +
+            '<div class="purchase-line-section-label">Batch and pricing</div>' +
+            '<div class="purchase-span-3 field"><label>Batch No</label><div class="ui fluid input"><input type="text" class="purchase-batch-number" maxlength="120" value="' + (row.batchNumber || '') + '" placeholder="Batch no"></div></div>' +
+            '<div class="purchase-span-2 field"><label>Mfg Date</label><div class="ui fluid input"><input type="text" class="purchase-mfg-date" value="' + (row.manufactureDate || '') + '" placeholder="DD/MM/YYYY"></div></div>' +
+            '<div class="purchase-span-2 field"><label>Expiry</label><div class="ui fluid input"><input type="text" class="purchase-expiry-date" value="' + (row.expiryDate || '') + '" placeholder="DD/MM/YYYY"></div></div>' +
+            '<div class="purchase-span-2 field"><label>MRP</label><div class="ui fluid input"><input type="number" class="purchase-batch-mrp" step="0.01" value="' + (row.batchMrp || '') + '" placeholder="0.00"></div></div>' +
+            '<div class="purchase-span-3 field"><label>Unit Cost</label><div class="ui fluid input"><input type="number" class="purchase-unit-cost" step="0.01" value="' + (row.unitCost || '') + '" placeholder="0.00"></div></div>' +
+            '<div class="purchase-line-section-label">Tax calculation</div>' +
+            '<div class="purchase-span-3 field purchase-tax-field"><label>Taxable</label><div class="ui fluid input"><input type="number" class="purchase-taxable" step="0.01" value="' + (row.taxableAmount || '') + '" readonly></div></div>' +
+            '<div class="purchase-span-2 field"><label>GST %</label><div class="ui fluid input"><input type="number" class="purchase-gst-rate" step="0.01" value="' + (row.gstRate || '') + '" placeholder="0.00"></div></div>' +
+            '<div class="purchase-span-3 field purchase-tax-field"><label>GST Amount</label><div class="ui fluid input"><input type="number" class="purchase-gst-amount" step="0.01" value="' + (row.gstAmount || '') + '" readonly></div></div>' +
+            '<div class="purchase-span-4 field purchase-total-field"><label>Line Total</label><div class="ui fluid input"><input type="number" class="purchase-line-total" step="0.01" value="' + (row.lineTotal || '') + '" readonly></div></div>' +
+            '</div>' +
+            '</div>'
         );
         const $row = $('#purchaseLinesBody .purchase-row').last();
         $row.find('.purchase-item').dropdown({
@@ -564,7 +747,7 @@
     }
 
     function removePurchaseRow(button) {
-        $(button).closest('tr').remove();
+        $(button).closest('.purchase-row').remove();
         recalcPurchaseRows();
     }
 
@@ -594,7 +777,7 @@
         $('#purchaseGrandTotal').text(grandTotal.toFixed(2));
     }
 
-    $(document).on('keyup change', '.purchase-row input', recalcPurchaseRows);
+    $(document).on('input keyup change', '.purchase-row input', recalcPurchaseRows);
 
     function collectPurchaseLines() {
         const nonGstMode = currentPurchaseIsNonGst();
@@ -606,6 +789,11 @@
             if (!itemId || quantity <= 0) return;
             lines.push({
                 itemId: itemId,
+                batchId: $row.find('.purchase-batch-id').val() || '',
+                batchNumber: $row.find('.purchase-batch-number').val() || '',
+                manufactureDate: $row.find('.purchase-mfg-date').val() || '',
+                expiryDate: $row.find('.purchase-expiry-date').val() || '',
+                batchMrp: parseFloat($row.find('.purchase-batch-mrp').val()) || 0,
                 stockBucket: nonGstMode ? 'non_gst' : ($row.find('.purchase-bucket').dropdown('get value') || $row.find('.purchase-bucket').val()),
                 quantity: quantity,
                 unitCost: parseFloat($row.find('.purchase-unit-cost').val()) || 0,
@@ -616,6 +804,46 @@
             });
         });
         return lines;
+    }
+
+    function parsePurchaseDate(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        const parts = raw.indexOf('/') >= 0 ? raw.split('/') : raw.split('-');
+        if (parts.length !== 3) return null;
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        const date = new Date(year < 100 ? 2000 + year : year, month, day);
+        return isNaN(date.getTime()) ? null : date;
+    }
+
+    function validatePurchaseLines(lines) {
+        const catalogById = {};
+        purchaseCatalog.forEach(function (item) { catalogById[String(item.ID)] = item; });
+        for (let index = 0; index < lines.length; index += 1) {
+            const line = lines[index];
+            const item = catalogById[String(line.itemId)] || {};
+            const itemName = item.Name || ('line ' + (index + 1));
+            if (item.RequiresBatchTracking && !String(line.batchNumber || '').trim()) {
+                return {valid: false, message: 'Batch number is required for ' + itemName + '.'};
+            }
+            if (item.RequiresBatchTracking && !String(line.expiryDate || '').trim()) {
+                return {valid: false, message: 'Expiry date is required for ' + itemName + '.'};
+            }
+            const mfgDate = parsePurchaseDate(line.manufactureDate);
+            const expiryDate = parsePurchaseDate(line.expiryDate);
+            if (line.manufactureDate && !mfgDate) {
+                return {valid: false, message: 'Use DD/MM/YYYY manufacture date for ' + itemName + '.'};
+            }
+            if (line.expiryDate && !expiryDate) {
+                return {valid: false, message: 'Use DD/MM/YYYY expiry date for ' + itemName + '.'};
+            }
+            if (mfgDate && expiryDate && expiryDate < mfgDate) {
+                return {valid: false, message: 'Expiry cannot be before manufacture date for ' + itemName + '.'};
+            }
+        }
+        return {valid: true, message: ''};
     }
 
     function renderRevisionList(rows) {
@@ -731,6 +959,11 @@
         const lines = collectPurchaseLines();
         if (!$('#purchaseInvoiceNumber').val() || !$('#purchaseInvoiceDate').val() || !$('#purchaseParty').val() || !lines.length) {
             $('body').toast({class: 'orange', message: 'Invoice number, date, party, and at least one line are required.'});
+            return;
+        }
+        const validation = validatePurchaseLines(lines);
+        if (!validation.valid) {
+            $('body').toast({class: 'orange', message: validation.message || 'Fix purchase batch details before saving.'});
             return;
         }
         const data = new FormData();

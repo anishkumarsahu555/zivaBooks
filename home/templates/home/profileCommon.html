@@ -354,6 +354,68 @@
             color: inherit;
         }
 
+        .recovery-card {
+            margin-top: 18px;
+            border-radius: 20px;
+            border: 1px solid var(--profile-line);
+            background: linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(37, 99, 235, 0.06));
+            padding: 16px;
+        }
+
+        html[data-theme="dark"] .recovery-card {
+            background: linear-gradient(135deg, rgba(20, 184, 166, 0.12), rgba(37, 99, 235, 0.10));
+        }
+
+        .recovery-card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .recovery-card-title {
+            color: var(--profile-ink);
+            font-weight: 900;
+            font-size: 1rem;
+        }
+
+        .recovery-card-copy {
+            color: var(--profile-slate);
+            line-height: 1.5;
+            margin-top: 4px;
+            font-size: 0.9rem;
+        }
+
+        .recovery-email-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: start;
+        }
+
+        .recovery-email-row .field {
+            margin: 0 !important;
+        }
+
+        .recovery-email-row .button {
+            height: 40px;
+            min-height: 40px;
+            margin: 23px 0 0 !important;
+            padding: 0 18px !important;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            line-height: 1 !important;
+            white-space: nowrap;
+        }
+
+        .recovery-email-status {
+            display: none;
+            margin-top: 10px !important;
+        }
+
         .doc-frame {
             width: min(100%, 260px);
             margin: 0 auto;
@@ -491,6 +553,15 @@
             .meta-card {
                 border-radius: 16px;
                 padding: 14px;
+            }
+
+            .recovery-email-row {
+                grid-template-columns: 1fr;
+            }
+
+            .recovery-email-row .button {
+                margin-top: 0 !important;
+                width: 100%;
             }
 
             .profile-list {
@@ -706,6 +777,52 @@
                         </div>
                     </div>
 
+                    <div class="recovery-card">
+                        <div class="recovery-card-head">
+                            <div>
+                                <div class="recovery-card-title">
+                                    <i class="envelope outline icon"></i>
+                                    Account Recovery
+                                </div>
+                                <div class="recovery-card-copy">
+                                    Keep an email on your account so forgot password can send reset instructions.
+                                </div>
+                            </div>
+                            {% if request.user.email or instance.email %}
+                                <span class="profile-chip is-accent">
+                                    <i class="check icon"></i>
+                                    Email added
+                                </span>
+                            {% else %}
+                                <span class="profile-chip is-warm">
+                                    <i class="warning sign icon"></i>
+                                    Missing email
+                                </span>
+                            {% endif %}
+                        </div>
+                        <form class="ui form" id="profileRecoveryEmailForm">
+                            {% csrf_token %}
+                            <div class="recovery-email-row">
+                                <div class="field">
+                                    <label>Recovery email</label>
+                                    <input
+                                        type="email"
+                                        name="email"
+                                        autocomplete="email"
+                                        placeholder="name@example.com"
+                                        value="{% if request.user.email %}{{ request.user.email }}{% else %}{{ instance.email|default:'' }}{% endif %}"
+                                        required
+                                    >
+                                </div>
+                                <button class="ui teal button" id="profileRecoveryEmailSaveBtn" type="button">
+                                    <i class="save outline icon"></i>
+                                    Update Email
+                                </button>
+                            </div>
+                            <div class="ui tiny message recovery-email-status" id="profileRecoveryEmailStatus"></div>
+                        </form>
+                    </div>
+
                     <div class="profile-card-header" style="padding-left: 0; padding-right: 0; margin-top: 18px;">
                         <div class="profile-card-title">Identity Proof</div>
                     </div>
@@ -830,5 +947,38 @@
                 }
             });
         }
+
+        $('#profileRecoveryEmailSaveBtn').on('click', function () {
+            var $button = $(this);
+            var $form = $('#profileRecoveryEmailForm');
+            var $status = $('#profileRecoveryEmailStatus');
+            var email = $.trim($form.find('input[name="email"]').val() || '');
+            var csrfmiddlewaretoken = $form.find('input[name="csrfmiddlewaretoken"]').val();
+
+            $status.removeClass('positive negative').hide().text('');
+            if (!email) {
+                $status.addClass('negative').text('Please enter an email address.').show();
+                return;
+            }
+
+            $button.addClass('loading disabled');
+            $.ajax({
+                type: 'post',
+                url: '{% url "homeApp:save_recovery_email" %}',
+                data: {
+                    email: email,
+                    csrfmiddlewaretoken: csrfmiddlewaretoken
+                },
+                success: function () {
+                    $status.addClass('positive').text('Recovery email updated successfully.').show();
+                },
+                error: function () {
+                    $status.addClass('negative').text('Please enter a valid email address.').show();
+                },
+                complete: function () {
+                    $button.removeClass('loading disabled');
+                }
+            });
+        });
     </script>
 {% endblock %}

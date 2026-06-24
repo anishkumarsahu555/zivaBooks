@@ -430,6 +430,46 @@
             border-color: var(--line) !important;
         }
 
+        .recovery-email-modal .recovery-email-icon {
+            width: 48px;
+            height: 48px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            background: rgba(15, 118, 110, 0.12);
+            color: #0f766e;
+            margin-bottom: 10px;
+        }
+
+        .recovery-email-modal .recovery-email-copy {
+            color: #64748b;
+            line-height: 1.55;
+            margin-bottom: 16px;
+        }
+
+        .recovery-email-modal .recovery-email-status {
+            display: none;
+            margin-top: 10px;
+        }
+
+        html[data-theme="dark"] .recovery-email-modal .recovery-email-copy {
+            color: var(--muted);
+        }
+
+        @media (max-width: 520px) {
+            .recovery-email-modal .actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .recovery-email-modal .actions .button {
+                margin: 0 !important;
+                width: 100%;
+            }
+        }
+
         html[data-theme="dark"] .cust-otp-banner {
             border-color: rgba(56, 189, 248, 0.22);
             background:
@@ -1348,6 +1388,35 @@
     </footer>
 </div>
 
+{% if request.user.is_authenticated and not request.user.email %}
+<div class="ui tiny modal recovery-email-modal" id="recoveryEmailModal" data-user-id="{{ request.user.pk }}">
+    <div class="header">Add recovery email</div>
+    <div class="content">
+        <div class="recovery-email-icon">
+            <i class="envelope outline icon"></i>
+        </div>
+        <p class="recovery-email-copy">
+            Add an email address so you can recover your account and reset your password if you ever forget it.
+        </p>
+        <form class="ui form" id="recoveryEmailForm">
+            {% csrf_token %}
+            <div class="field">
+                <label>Email address</label>
+                <input type="email" name="email" autocomplete="email" placeholder="name@example.com" required>
+            </div>
+            <div class="ui tiny message recovery-email-status" id="recoveryEmailStatus"></div>
+        </form>
+    </div>
+    <div class="actions cust-modal-actions">
+        <button class="ui basic button" type="button" id="recoveryEmailLaterBtn">Later</button>
+        <button class="ui teal button" type="button" id="recoveryEmailSaveBtn">
+            <i class="check icon"></i>
+            Save email
+        </button>
+    </div>
+</div>
+{% endif %}
+
 <div class="ui tiny modal" id="pwdModal">
     <i class="close icon"></i>
     <div class="header">Change Password</div>
@@ -1438,6 +1507,66 @@
         $('.ui.dropdown').dropdown();
         $('#pwdModal').modal({ autofocus: false, observeChanges: true });
         $('#custSidebar').sidebar({ transition: 'overlay' });
+
+        var $recoveryModal = $('#recoveryEmailModal');
+        if ($recoveryModal.length) {
+            var recoveryUserId = $recoveryModal.data('user-id') || 'current';
+            var recoveryDismissKey = 'ziva-recovery-email-dismissed-' + recoveryUserId;
+            var wasDismissed = false;
+            try {
+                wasDismissed = sessionStorage.getItem(recoveryDismissKey) === '1';
+            } catch (e) {}
+            if (!wasDismissed) {
+                setTimeout(function () {
+                    $recoveryModal.modal({
+                        autofocus: false,
+                        observeChanges: true,
+                        closable: false
+                    }).modal('show');
+                }, 650);
+            }
+
+            $('#recoveryEmailLaterBtn').on('click', function () {
+                try {
+                    sessionStorage.setItem(recoveryDismissKey, '1');
+                } catch (e) {}
+                $recoveryModal.modal('hide');
+            });
+
+            $('#recoveryEmailSaveBtn').on('click', function () {
+                var $button = $(this);
+                var $status = $('#recoveryEmailStatus');
+                var email = $.trim($('#recoveryEmailForm input[name="email"]').val() || '');
+                var csrfToken = $('#recoveryEmailForm input[name="csrfmiddlewaretoken"]').val();
+                $status.removeClass('positive negative').hide().text('');
+                if (!email) {
+                    $status.addClass('negative').text('Please enter an email address.').show();
+                    return;
+                }
+                $button.addClass('loading disabled');
+                $.ajax({
+                    url: "{% url 'homeApp:save_recovery_email' %}",
+                    type: 'POST',
+                    headers: {'X-CSRFToken': csrfToken},
+                    data: {email: email},
+                    success: function () {
+                        $status.addClass('positive').text('Recovery email saved. You can now use forgot password if needed.').show();
+                        try {
+                            sessionStorage.setItem(recoveryDismissKey, '1');
+                        } catch (e) {}
+                        setTimeout(function () {
+                            $recoveryModal.modal('hide');
+                        }, 900);
+                    },
+                    error: function () {
+                        $status.addClass('negative').text('Please enter a valid email address.').show();
+                    },
+                    complete: function () {
+                        $button.removeClass('loading disabled');
+                    }
+                });
+            });
+        }
 
         function initCalendar(selector) {
             $(selector).calendar({

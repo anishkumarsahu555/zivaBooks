@@ -50,6 +50,7 @@ DEFAULT_STAFF_GROUPS = {
         "home.can_view_party_credentials",
         "home.can_approve_collection",
         "home.can_view_audit_logs",
+        "home.can_view_staff_locations",
         "home.view_collection",
         "home.view_sales",
         "home.view_cashcounter",
@@ -61,6 +62,7 @@ DEFAULT_STAFF_GROUPS = {
         "home.view_collection",
         "home.view_party",
         "home.view_attendance",
+        "home.can_track_staff_location",
     ],
     "Sales Desk": [
         "home.add_sales",

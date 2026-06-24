@@ -11,7 +11,7 @@
         if (allowNonGst) {
             availableStock += ' / ' + Number(item.NonGSTStock || 0).toFixed(2).replace(/\.00$/, '');
         }
-        return '<option value="' + item.ID + '" data-default-bucket="' + (item.DefaultStockBucket || 'gst') + '" data-price="' + (item.DefaultSalesPrice || 0) + '" data-gst-rate="' + (item.GSTRate || 0) + '" data-hsn="' + (item.HSN || '') + '" data-unit-name="' + (item.UnitName || '') + '" data-unit-allows-decimal="' + (item.UnitAllowsDecimal ? 1 : 0) + '" data-gst-stock="' + (item.GSTStock || 0) + '" data-non-gst-stock="' + (item.NonGSTStock || 0) + '">' + item.Name + sku + ' | GST ' + gstRate + '% | Avl ' + availableStock + '</option>';
+        return '<option value="' + item.ID + '" data-default-bucket="' + (item.DefaultStockBucket || 'gst') + '" data-price="' + (item.DefaultSalesPrice || 0) + '" data-gst-rate="' + (item.GSTRate || 0) + '" data-hsn="' + (item.HSN || '') + '" data-unit-name="' + (item.UnitName || '') + '" data-unit-allows-decimal="' + (item.UnitAllowsDecimal ? 1 : 0) + '" data-gst-stock="' + (item.GSTStock || 0) + '" data-non-gst-stock="' + (item.NonGSTStock || 0) + '" data-requires-batch="' + (item.RequiresBatchTracking ? 1 : 0) + '">' + item.Name + sku + ' | GST ' + gstRate + '% | Avl ' + availableStock + '</option>';
     }
 
     function rowHtml(optionsHtml, allowNonGst, row) {
@@ -25,17 +25,21 @@
             '<div class="sales-line-card-header">' +
             '<button type="button" class="ui circular youtube icon button sales-remove" data-tooltip="Remove Row" data-position="left center" data-variation="mini" style="font-size:10px;"><i class="trash alternate icon"></i></button>' +
             '</div>' +
+            '<input type="hidden" class="sales-batch-id" value="' + (row.batchId || '') + '">' +
             '<div class="sales-line-grid">' +
             '<div class="sales-span-5"><div class="field"><label>Item</label><select class="ui fluid search selection dropdown sales-item"><option value="">Select item</option>' + optionsHtml + '</select><div class="sales-inline-meta"><span class="sales-unit-badge">Unit: <span class="sales-unit-name">-</span></span><span class="sales-stock-hint">GST: 0' + (allowNonGst ? ' | Non-GST: 0' : '') + '</span></div></div></div>' +
             '<div class="sales-span-2"><div class="field"><label>Bucket</label><select class="ui fluid selection dropdown sales-bucket">' + bucketOptions + '</select></div></div>' +
             '<div class="sales-span-2"><div class="field"><label>Qty</label><div class="ui fluid input"><input type="number" class="sales-qty" min="0" step="0.01" value="' + (row.quantity || '') + '"></div></div></div>' +
             '<div class="sales-span-3"><div class="field"><label>Rate</label><div class="ui fluid input"><input type="number" class="sales-rate" min="0" step="0.01" value="' + (row.unitPrice || '') + '"></div></div></div>' +
             '<div class="sales-span-1"><div class="field"><label>Disc %</label><div class="ui fluid input"><input type="number" class="sales-discount-percent" min="0" max="100" step="0.01" value="' + (row.discountPercent || '') + '"></div></div></div>' +
+            '<input type="hidden" class="sales-batch-number" value="' + (row.batchNumber || '') + '">' +
+            '<input type="hidden" class="sales-expiry-date" value="' + (row.expiryDate || '') + '">' +
+            '<div class="sales-span-5"><div class="field sales-batch-field"><label>Batch / FEFO</label><div class="sales-batch-panel"><div class="sales-batch-select-row"><select class="ui fluid search selection dropdown sales-batch-select"><option value="">Auto FEFO</option></select><button type="button" class="ui teal basic icon button sales-batch-trace" data-tooltip="View Batch Trace" data-position="top center" data-variation="mini"><i class="history icon"></i></button></div><div class="sales-batch-meta"><span class="sales-batch-pill muted">Auto FEFO</span><span class="sales-batch-meta-text">Earliest eligible batch will be picked on save.</span></div></div></div></div>' +
             '<div class="sales-span-2"><div class="field"><label>Taxable</label><div class="ui fluid input"><input type="number" class="sales-taxable" min="0" step="0.01" value="' + (row.taxableAmount || '') + '" readonly></div></div></div>' +
             '<div class="sales-span-1"><div class="field"><label>GST %</label><div class="ui fluid input"><input type="number" class="sales-gst-rate" min="0" step="0.01" value="' + (row.gstRate || '') + '"></div></div></div>' +
             '<div class="sales-span-2"><div class="field"><label>GST Amt</label><div class="ui fluid input"><input type="number" class="sales-gst-amount" min="0" step="0.01" value="' + (row.gstAmount || '') + '" readonly></div></div></div>' +
             '<div class="sales-span-2"><div class="field"><label>Total</label><div class="ui fluid input"><input type="number" class="sales-total" min="0" step="0.01" value="' + (row.lineTotal || '') + '" readonly></div></div></div>' +
-            '<div class="sales-span-4"><div class="field sales-remark-input"><label>Remark</label><div class="ui fluid input"><input type="text" class="sales-remark" maxlength="120" value="' + (row.remark || '') + '" placeholder="Optional"></div></div></div>' +
+            '<div class="sales-span-12"><div class="field sales-remark-input"><label>Remark</label><div class="ui fluid input"><input type="text" class="sales-remark" maxlength="120" value="' + (row.remark || '') + '" placeholder="Optional"></div></div></div>' +
             '</div>' +
             '<div class="sales-line-summary">' +
             '<div class="sales-line-summary-pills">' +
@@ -149,6 +153,9 @@
         }
         return {
             itemId: itemId,
+            batchId: dropdownValue($row.find('.sales-batch-select')) || $row.find('.sales-batch-id').val() || '',
+            batchNumber: $row.find('.sales-batch-number').val() || '',
+            expiryDate: $row.find('.sales-expiry-date').val() || '',
             stockBucket: bucket,
             quantity: qty,
             unitPrice: num($row.find('.sales-rate').val()),
@@ -166,13 +173,197 @@
         var gstStock = Number($selected.data('gst-stock') || 0);
         var nonGstStock = Number($selected.data('non-gst-stock') || 0);
         var unitName = $selected.data('unit-name') || '-';
+        var requiresBatch = String($selected.data('requires-batch') || '0') === '1';
         var allowNonGst = $row.closest('.sales-gst-box').data('allowNonGst') === 1 || $row.closest('.sales-gst-box').attr('data-allow-non-gst') === '1';
         var hint = 'GST: ' + gstStock;
         if (allowNonGst) {
             hint += ' | Non-GST: ' + nonGstStock;
         }
         $row.find('.sales-unit-name').text(unitName);
-        $row.find('.sales-stock-hint').text(hint);
+        $row.find('.sales-stock-hint').text(hint + (requiresBatch ? ' | Batch required' : ''));
+        updateBatchMeta($row);
+    }
+
+    function updateBatchMeta($row) {
+        var $selectedItem = selectedItemOption($row);
+        var requiresBatch = String($selectedItem.data('requires-batch') || '0') === '1';
+        var batchId = dropdownValue($row.find('.sales-batch-select')) || $row.find('.sales-batch-id').val() || '';
+        var $selectedBatch = batchId ? $row.find('.sales-batch-select option[value="' + batchId + '"]') : $();
+        var $firstBatch = $row.find('.sales-batch-select option').filter(function () { return String($(this).val() || '').trim() !== ''; }).first();
+        var $pill = $row.find('.sales-batch-pill');
+        var $text = $row.find('.sales-batch-meta-text');
+        var $trace = $row.find('.sales-batch-trace');
+
+        $trace.toggleClass('disabled', !batchId);
+        if (!$selectedItem.length) {
+            $pill.attr('class', 'sales-batch-pill muted').text('No item');
+            $text.text('Select an item to load eligible batches.');
+            return;
+        }
+        if (batchId && $selectedBatch.length) {
+            $pill.attr('class', 'sales-batch-pill selected').text($selectedBatch.data('batch-number') || ('Batch #' + batchId));
+            $text.text('Exp ' + ($selectedBatch.data('expiry-date') || '-') + ' | Available ' + ($selectedBatch.data('quantity-on-hand') || 0));
+            return;
+        }
+        if ($firstBatch.length) {
+            $pill.attr('class', 'sales-batch-pill fefo').text('Auto FEFO');
+            $text.text('Will pick ' + ($firstBatch.data('batch-number') || 'earliest batch') + ' | Exp ' + ($firstBatch.data('expiry-date') || '-') + ' | Available ' + ($firstBatch.data('quantity-on-hand') || 0));
+            return;
+        }
+        if (requiresBatch) {
+            $pill.attr('class', 'sales-batch-pill warning').text('Batch required');
+            $text.text('No eligible batch stock is available for this item and bucket.');
+            return;
+        }
+        $pill.attr('class', 'sales-batch-pill muted').text('No batch');
+        $text.text('This item does not require batch selection.');
+    }
+
+    function resetBatchSelection($row) {
+        var $select = $row.find('.sales-batch-select');
+        $row.find('.sales-batch-id').val('');
+        $row.find('.sales-batch-number').val('');
+        $row.find('.sales-expiry-date').val('');
+        try {
+            $select.dropdown('clear');
+        } catch (e) {
+            $select.val('');
+        }
+        updateBatchMeta($row);
+    }
+
+    function warehouseIdForRow($row) {
+        var config = $row.closest('.sales-gst-box').data('salesLineConfig') || {};
+        if (typeof config.warehouseSelector === 'function') {
+            return config.warehouseSelector($row) || '';
+        }
+        if (config.warehouseSelector) {
+            return $(config.warehouseSelector).val() || '';
+        }
+        return '';
+    }
+
+    function loadBatchOptions($row) {
+        var $box = $row.closest('.sales-gst-box');
+        var config = $box.data('salesLineConfig') || {};
+        if (!config.batchUrl) {
+            return;
+        }
+        var itemId = dropdownValue($row.find('.sales-item'));
+        if (!itemId) {
+            return;
+        }
+        $.get(config.batchUrl, {
+            itemId: itemId,
+            stockBucket: dropdownValue($row.find('.sales-bucket')) || 'gst',
+            warehouseId: warehouseIdForRow($row)
+        }, function (response) {
+            var selectedBatchId = $row.find('.sales-batch-id').val() || '';
+            var html = '<option value="">Auto FEFO</option>';
+            (response.data || []).forEach(function (batch, index) {
+                var label = (index === 0 ? 'FEFO | ' : '') + (batch.BatchNumber || ('Batch #' + batch.ID)) + ' | Exp ' + (batch.ExpiryDate || '-') + ' | Qty ' + (batch.QuantityOnHand || 0) + ' | MRP ' + (batch.MRP || 0);
+                html += '<option value="' + batch.ID + '" data-batch-number="' + (batch.BatchNumber || '') + '" data-expiry-date="' + (batch.ExpiryDate || '') + '" data-quantity-on-hand="' + (batch.QuantityOnHand || 0) + '">' + label + '</option>';
+            });
+            var $select = $row.find('.sales-batch-select');
+            $select.html(html);
+            try {
+                $select.dropdown('refresh');
+                if (selectedBatchId) {
+                    $select.dropdown('set selected', selectedBatchId);
+                }
+            } catch (e) {
+                $select.val(selectedBatchId);
+            }
+            updateBatchMeta($row);
+        });
+    }
+
+    function batchLedgerUrl(config) {
+        if (config.batchLedgerUrl) {
+            return config.batchLedgerUrl;
+        }
+        return String(config.batchUrl || '').replace('list_inventory_batches_api', 'list_inventory_batch_ledger_api');
+    }
+
+    function ensureBatchTraceModal() {
+        if ($('#salesBatchTraceModal').length) {
+            return;
+        }
+        $('body').append(
+            '<div class="ui large modal" id="salesBatchTraceModal">' +
+            '<i class="close icon"></i>' +
+            '<div class="header">Batch Trace</div>' +
+            '<div class="content">' +
+            '<div class="ui tiny info message" id="salesBatchTraceSummary"></div>' +
+            '<div class="ui stackable two column grid">' +
+            '<div class="column"><h5 class="ui header">Warehouse Stock</h5><div class="ui relaxed divided list" id="salesBatchTraceWarehouseList"></div></div>' +
+            '<div class="column"><h5 class="ui header">Purchase Sources</h5><div class="ui relaxed divided list" id="salesBatchTraceSourceList"></div></div>' +
+            '</div>' +
+            '<table class="ui unstackable tiny celled very compact table"><thead><tr><th>Date</th><th>Source</th><th>Warehouse</th><th>Qty</th><th>Balance</th><th>Reference</th></tr></thead><tbody id="salesBatchTraceLedgerBody"></tbody></table>' +
+            '</div><div class="actions"><div class="ui cancel button">Close</div></div></div>'
+        );
+    }
+
+    function renderTraceList(rows, selector, emptyText, renderer) {
+        var $target = $(selector);
+        $target.html('');
+        if (!rows || !rows.length) {
+            $target.html('<div class="item"><div class="content"><div class="description">' + emptyText + '</div></div></div>');
+            return;
+        }
+        rows.forEach(function (row) { $target.append(renderer(row)); });
+    }
+
+    function showBatchTrace($row) {
+        var $box = $row.closest('.sales-gst-box');
+        var config = $box.data('salesLineConfig') || {};
+        var batchId = dropdownValue($row.find('.sales-batch-select')) || $row.find('.sales-batch-id').val() || '';
+        var url = batchLedgerUrl(config);
+        if (!batchId) {
+            $('body').toast({class: 'orange', message: 'Select a batch first to view trace.'});
+            return;
+        }
+        if (!url) {
+            $('body').toast({class: 'error', message: 'Batch trace endpoint is unavailable.'});
+            return;
+        }
+        $.get(url, {batchId: batchId}, function (response) {
+            if (response.message !== 'success') {
+                $('body').toast({class: 'error', message: response.error || 'Unable to load batch trace.'});
+                return;
+            }
+            ensureBatchTraceModal();
+            var data = response.data || {};
+            var daysText = data.DaysToExpiry === null || data.DaysToExpiry === undefined ? '-' : data.DaysToExpiry + ' days';
+            $('#salesBatchTraceSummary').html(
+                '<strong>' + (data.ItemName || '-') + '</strong>' +
+                ' | Batch: ' + (data.BatchNumber || '-') +
+                ' | Status: ' + (data.Status || '-') +
+                ' | Mfg: ' + (data.ManufactureDate || '-') +
+                ' | Expiry: ' + (data.ExpiryDate || '-') +
+                ' | Days: ' + daysText +
+                ' | Qty: ' + (data.QuantityOnHand || 0) +
+                ' | Rate: ' + (data.PurchaseRate || 0) +
+                ' | MRP: ' + (data.MRP || 0)
+            );
+            renderTraceList(data.WarehouseStocks || [], '#salesBatchTraceWarehouseList', 'No warehouse stock currently available.', function (row) {
+                return '<div class="item"><div class="content"><div class="header">' + (row.WarehouseName || '-') + '</div><div class="description">' + (row.StockBucket || '-') + ' | Qty: ' + (row.QuantityOnHand || 0) + '</div></div></div>';
+            });
+            renderTraceList(data.PurchaseSources || [], '#salesBatchTraceSourceList', 'No purchase source linked yet.', function (row) {
+                return '<div class="item"><div class="content"><div class="header">' + (row.PurchaseDisplayID || row.InvoiceNumber || '-') + '</div><div class="description">' + (row.InvoiceDate || '-') + ' | ' + (row.Party || '-') + '</div><div class="description">Qty: ' + (row.Quantity || 0) + ' | Rate: ' + (row.UnitCost || 0) + ' | Total: ' + (row.LineTotal || 0) + '</div></div></div>';
+            });
+            $('#salesBatchTraceLedgerBody').html('');
+            (data.Rows || []).forEach(function (row) {
+                var positive = Number(row.QuantityDelta || 0) >= 0;
+                $('#salesBatchTraceLedgerBody').append(
+                    '<tr><td>' + (row.EntryDate || '-') + '</td><td>' + (row.SourceType || '-') + '</td><td>' + (row.WarehouseName || '-') + '</td><td style="font-weight:700;color:' + (positive ? '#166534' : '#b91c1c') + ';">' + (positive ? '+' : '') + (row.QuantityDelta || 0) + '</td><td>' + (row.RunningBalance || 0) + '</td><td>' + (row.ReferenceNumber || '-') + '<div class="sales-stock-hint">' + (row.Remark || '-') + '</div></td></tr>'
+                );
+            });
+            if (!(data.Rows || []).length) {
+                $('#salesBatchTraceLedgerBody').html('<tr><td colspan="6" class="center aligned">No movement found.</td></tr>');
+            }
+            $('#salesBatchTraceModal').modal('show');
+        });
     }
 
     function applyQuantityStep($row) {
@@ -188,6 +379,32 @@
                 $qty.val(String(Math.trunc(num(currentValue))));
             }
         }
+    }
+
+    function validateRows($box) {
+        var result = {valid: true, message: ''};
+        $box.find('.sales-line-list .sales-gst-row').each(function () {
+            if (!result.valid) {
+                return;
+            }
+            var $row = $(this);
+            var $selectedItem = selectedItemOption($row);
+            var itemName = $selectedItem.text() || 'selected item';
+            var itemId = dropdownValue($row.find('.sales-item'));
+            var qty = num($row.find('.sales-qty').val());
+            if (!itemId || qty <= 0) {
+                return;
+            }
+            var batchId = dropdownValue($row.find('.sales-batch-select')) || $row.find('.sales-batch-id').val() || '';
+            if (batchId) {
+                var $selectedBatch = $row.find('.sales-batch-select option[value="' + batchId + '"]');
+                var available = num($selectedBatch.data('quantity-on-hand'));
+                if (available > 0 && qty > available) {
+                    result = {valid: false, message: 'Quantity for ' + itemName + ' exceeds selected batch stock (' + available + ').'};
+                }
+            }
+        });
+        return result;
     }
 
     function sanitizeQuantityInput($input) {
@@ -277,6 +494,7 @@
                 return null;
             }
             var allowNonGst = String($box.data('allowNonGst') || $box.attr('data-allow-non-gst') || '1') !== '0';
+            $box.data('salesLineConfig', config);
             $.get(config.catalogUrl, function (response) {
                 var optionsHtml = (response.data || []).map(function (item) { return itemOption(item, allowNonGst); }).join('');
 
@@ -286,26 +504,52 @@
                     $row.find('.sales-item').dropdown({
                         fullTextSearch: true,
                         onChange: function () {
+                            if (!$row.data('loadingInitialRow')) {
+                                resetBatchSelection($row);
+                            }
                             applySelectedDefaults($row, {forceItemDefaults: !$row.data('loadingInitialRow')});
                             applyQuantityStep($row);
+                            loadBatchOptions($row);
                             recalcRow($row, 'sales-item');
                             collect($box, config.hiddenInputSelector, config.syncTotals);
                         }
                     });
                     $row.find('.sales-bucket').dropdown({
                         onChange: function () {
+                            if (!$row.data('loadingInitialRow')) {
+                                resetBatchSelection($row);
+                            }
                             updateHint($row);
+                            loadBatchOptions($row);
+                            collect($box, config.hiddenInputSelector, config.syncTotals);
+                        }
+                    });
+                    $row.find('.sales-batch-select').dropdown({
+                        fullTextSearch: true,
+                        onChange: function (value) {
+                            var $selected = $row.find('.sales-batch-select option[value="' + value + '"]');
+                            $row.find('.sales-batch-id').val(value || '');
+                            if (value) {
+                                $row.find('.sales-batch-number').val($selected.data('batch-number') || '');
+                                $row.find('.sales-expiry-date').val($selected.data('expiry-date') || '');
+                            } else {
+                                $row.find('.sales-batch-number').val('');
+                                $row.find('.sales-expiry-date').val('');
+                            }
+                            updateBatchMeta($row);
                             collect($box, config.hiddenInputSelector, config.syncTotals);
                         }
                     });
                     if (row && row.itemId) {
                         $row.data('loadingInitialRow', true);
                         $row.find('.sales-item').dropdown('set selected', String(row.itemId));
-                        $row.data('loadingInitialRow', false);
                         $row.find('.sales-bucket').dropdown('set selected', row.stockBucket || 'gst');
+                        $row.data('loadingInitialRow', false);
                     }
                     applySelectedDefaults($row);
                     applyQuantityStep($row);
+                    updateBatchMeta($row);
+                    loadBatchOptions($row);
                     recalcRow($row);
                     collect($box, config.hiddenInputSelector, config.syncTotals);
                 }
@@ -326,7 +570,10 @@
                     $(this).closest('.sales-gst-row').remove();
                     collect($box, config.hiddenInputSelector, config.syncTotals);
                 });
-                $box.on('input change', '.sales-qty, .sales-rate, .sales-discount-percent, .sales-taxable, .sales-gst-rate, .sales-gst-amount, .sales-remark', function () {
+                $box.on('click', '.sales-batch-trace', function () {
+                    showBatchTrace($(this).closest('.sales-gst-row'));
+                });
+                $box.on('input change', '.sales-qty, .sales-rate, .sales-discount-percent, .sales-taxable, .sales-gst-rate, .sales-gst-amount, .sales-remark, .sales-batch-number, .sales-expiry-date', function () {
                     var $row = $(this).closest('.sales-gst-row');
                     if ($(this).hasClass('sales-qty')) {
                         sanitizeQuantityInput($(this));
@@ -343,7 +590,8 @@
                 setRows(config.initialRows || []);
                 $box.data('salesInvoiceLinesApi', {
                     collect: function () { return collect($box, config.hiddenInputSelector, config.syncTotals); },
-                    setRows: setRows
+                    setRows: setRows,
+                    validate: function () { return validateRows($box); }
                 });
             });
             return {
@@ -354,6 +602,10 @@
                 setRows: function (rows) {
                     var api = $box.data('salesInvoiceLinesApi');
                     if (api) api.setRows(rows || []);
+                },
+                validate: function () {
+                    var api = $box.data('salesInvoiceLinesApi');
+                    return api && typeof api.validate === 'function' ? api.validate() : {valid: true, message: ''};
                 }
             };
         }

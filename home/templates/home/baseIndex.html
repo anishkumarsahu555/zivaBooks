@@ -1239,6 +1239,46 @@
             box-shadow: var(--app-shadow) !important;
         }
 
+        .recovery-email-modal .recovery-email-icon {
+            width: 48px;
+            height: 48px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            background: rgba(15, 118, 110, 0.12);
+            color: #0f766e;
+            margin-bottom: 10px;
+        }
+
+        .recovery-email-modal .recovery-email-copy {
+            color: #64748b;
+            line-height: 1.55;
+            margin-bottom: 16px;
+        }
+
+        .recovery-email-modal .recovery-email-status {
+            display: none;
+            margin-top: 10px;
+        }
+
+        html[data-theme="dark"] .recovery-email-modal .recovery-email-copy {
+            color: #94a3b8;
+        }
+
+        @media (max-width: 520px) {
+            .recovery-email-modal .actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .recovery-email-modal .actions .button {
+                margin: 0 !important;
+                width: 100%;
+            }
+        }
+
         html[data-theme="dark"] .ui.form input:not([type]),
         html[data-theme="dark"] .ui.form input[type="text"],
         html[data-theme="dark"] .ui.form input[type="number"],
@@ -2266,6 +2306,34 @@
     </div>
 </div>
 
+{% if request.user.is_authenticated and not request.user.email and not request.user.staff_profile.email %}
+<div class="ui tiny modal recovery-email-modal" id="recoveryEmailModal" data-user-id="{{ request.user.pk }}">
+    <div class="header">Add recovery email</div>
+    <div class="content">
+        <div class="recovery-email-icon">
+            <i class="envelope outline icon"></i>
+        </div>
+        <p class="recovery-email-copy">
+            Add an email address so you can recover your account and reset your password if you ever forget it.
+        </p>
+        <form class="ui form" id="recoveryEmailForm">
+            <div class="field">
+                <label>Email address</label>
+                <input type="email" name="email" autocomplete="email" placeholder="name@example.com" required>
+            </div>
+            <div class="ui tiny message recovery-email-status" id="recoveryEmailStatus"></div>
+        </form>
+    </div>
+    <div class="actions">
+        <button class="ui basic button" type="button" id="recoveryEmailLaterBtn">Later</button>
+        <button class="ui teal button" type="button" id="recoveryEmailSaveBtn">
+            <i class="check icon"></i>
+            Save email
+        </button>
+    </div>
+</div>
+{% endif %}
+
 
 <script src="https://frontendfunn.github.io/semantic-ui-admin-dashboard-template/js/script.js"></script>
 <script src="{% static 'js/app-loader.js' %}"></script>
@@ -2359,6 +2427,64 @@
         $(function () {
             applyThemeUi(getPreferredTheme(), false);
             $('#themeToggleBtn').on('click', toggleTheme);
+
+            var $recoveryModal = $('#recoveryEmailModal');
+            if ($recoveryModal.length) {
+                var recoveryUserId = $recoveryModal.data('user-id') || 'current';
+                var recoveryDismissKey = 'ziva-recovery-email-dismissed-' + recoveryUserId;
+                var wasDismissed = false;
+                try {
+                    wasDismissed = sessionStorage.getItem(recoveryDismissKey) === '1';
+                } catch (e) {}
+                if (!wasDismissed) {
+                    setTimeout(function () {
+                        $recoveryModal.modal({
+                            autofocus: false,
+                            observeChanges: true,
+                            closable: false
+                        }).modal('show');
+                    }, 650);
+                }
+
+                $('#recoveryEmailLaterBtn').on('click', function () {
+                    try {
+                        sessionStorage.setItem(recoveryDismissKey, '1');
+                    } catch (e) {}
+                    $recoveryModal.modal('hide');
+                });
+
+                $('#recoveryEmailSaveBtn').on('click', function () {
+                    var $button = $(this);
+                    var $status = $('#recoveryEmailStatus');
+                    var email = $.trim($('#recoveryEmailForm input[name="email"]').val() || '');
+                    $status.removeClass('positive negative').hide().text('');
+                    if (!email) {
+                        $status.addClass('negative').text('Please enter an email address.').show();
+                        return;
+                    }
+                    $button.addClass('loading disabled');
+                    $.ajax({
+                        url: "{% url 'homeApp:save_recovery_email' %}",
+                        type: 'POST',
+                        data: {email: email},
+                        success: function () {
+                            $status.addClass('positive').text('Recovery email saved. You can now use forgot password if needed.').show();
+                            try {
+                                sessionStorage.setItem(recoveryDismissKey, '1');
+                            } catch (e) {}
+                            setTimeout(function () {
+                                $recoveryModal.modal('hide');
+                            }, 900);
+                        },
+                        error: function () {
+                            $status.addClass('negative').text('Please enter a valid email address.').show();
+                        },
+                        complete: function () {
+                            $button.removeClass('loading disabled');
+                        }
+                    });
+                });
+            }
 
             if (window.matchMedia) {
                 var darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -2735,6 +2861,20 @@
     })();
 </script>
 {% block datatables_ext_js %}{% endblock %}
+
+{% if staff_location_autotrack_enabled %}
+<script>
+    window.ZivaStaffLocationAutoTrack = {
+        enabled: true,
+        pingUrl: "{% url 'homeApp:add_staff_location_ping_api' %}",
+        bulkUrl: "{% url 'homeApp:bulk_staff_location_sync_api' %}",
+        csrfToken: "{{ csrf_token }}",
+        intervalMs: 300000,
+        minPageLoadGapMs: 60000
+    };
+</script>
+<script src="{% static 'js/staff-location-autotrack.js' %}"></script>
+{% endif %}
 
 <script>
     if ($.fn.DataTable) {

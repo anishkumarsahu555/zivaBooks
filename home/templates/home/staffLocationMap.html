@@ -1,0 +1,446 @@
+{% extends 'home/baseIndex.html' %}
+
+{% block title %}
+    <title>Staff Route Map</title>
+{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+
+{% block body %}
+<style>
+    .route-page {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .route-toolbar {
+        background: var(--app-surface);
+        border: 1px solid var(--app-line);
+        border-radius: 8px;
+        box-shadow: var(--app-shadow);
+        padding: 14px;
+        margin-bottom: 14px;
+    }
+
+    .route-toolbar .fields {
+        align-items: flex-end;
+    }
+
+    .route-summary {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        color: var(--app-muted);
+        font-weight: 700;
+        margin-top: 10px;
+    }
+
+    .route-workspace {
+        display: grid;
+        grid-template-columns: minmax(280px, 30%) minmax(0, 70%);
+        gap: 14px;
+        min-height: min(68vh, 680px);
+    }
+
+    .route-list-panel,
+    .route-map-panel {
+        min-height: 0;
+        background: var(--app-surface);
+        border: 1px solid var(--app-line);
+        border-radius: 8px;
+        box-shadow: var(--app-shadow);
+        overflow: hidden;
+    }
+
+    .route-list-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--app-line);
+        background: var(--app-surface-soft);
+    }
+
+    .route-list-title {
+        margin: 0;
+        color: var(--app-text);
+        font-size: 0.98rem;
+        font-weight: 800;
+    }
+
+    .route-list-count {
+        color: var(--app-muted);
+        font-size: 0.78rem;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .route-location-list {
+        height: calc(min(68vh, 680px) - 48px);
+        min-height: 382px;
+        overflow-y: auto;
+        padding: 8px;
+    }
+
+    .route-location-item {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr);
+        gap: 10px;
+        padding: 10px;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+        color: var(--app-text);
+    }
+
+    .route-location-item:hover {
+        background: var(--app-surface-soft);
+        border-color: var(--app-line);
+    }
+
+    .route-location-item.active {
+        background: rgba(37, 99, 235, 0.08);
+        border-color: rgba(37, 99, 235, 0.28);
+    }
+
+    .route-location-index {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #dbeafe;
+        color: #1d4ed8;
+        font-weight: 900;
+        font-size: 0.8rem;
+    }
+
+    .route-location-item.start .route-location-index {
+        background: #dcfce7;
+        color: #15803d;
+    }
+
+    .route-location-item.end .route-location-index {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .route-location-time {
+        display: block;
+        color: var(--app-text);
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    .route-location-meta,
+    .route-location-coords {
+        display: block;
+        margin-top: 4px;
+        color: var(--app-muted);
+        font-size: 0.78rem;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .route-map-panel {
+        position: relative;
+    }
+
+    #staffRouteMap {
+        width: 100%;
+        height: 100%;
+        min-height: 430px;
+        background: #e5e7eb;
+    }
+
+    .route-empty {
+        margin-top: 12px;
+    }
+
+    @media (max-width: 920px) {
+        .route-workspace {
+            grid-template-columns: 1fr;
+        }
+
+        .route-location-list {
+            height: 260px;
+            min-height: 260px;
+        }
+
+        #staffRouteMap {
+            height: 62vh;
+            min-height: 360px;
+        }
+    }
+</style>
+
+<div class="route-page">
+    <div class="ui pointing secondary menu">
+        <div class="item active">Staff Route Map</div>
+    </div>
+
+    <div class="route-toolbar">
+        <div class="ui form">
+            <div class="fields">
+                <div class="six wide field">
+                    <label>Staff</label>
+                    <select class="ui search dropdown" id="routeStaff">
+                        {% for staff in staffs %}
+                            <option value="{{ staff.id }}">{{ staff.name|default:"-" }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="four wide field">
+                    <label>Date</label>
+                    <div class="ui calendar" id="routeDateCalendar">
+                        <div class="ui input left icon">
+                            <i class="calendar alternate outline icon"></i>
+                            <input type="text" id="routeDate" value="{{ today|date:'d/m/Y' }}" placeholder="Date">
+                        </div>
+                    </div>
+                </div>
+                <div class="six wide field">
+                    <label>Action</label>
+                    <button type="button" class="ui teal labeled icon button" id="loadRouteBtn">
+                        <i class="map outline icon"></i>
+                        Load Route
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="route-summary">
+            <span id="routeStaffName">-</span>
+            <span>|</span>
+            <span id="routePointCount">0 points</span>
+            <span>|</span>
+            <span id="routeRange">-</span>
+        </div>
+    </div>
+
+    <div class="route-workspace">
+        <aside class="route-list-panel">
+            <div class="route-list-header">
+                <h3 class="route-list-title">Location List</h3>
+                <span class="route-list-count" id="routeListCount">0 records</span>
+            </div>
+            <div class="route-location-list" id="routeLocationList">
+                <div class="ui small message">Load a route to view recorded locations.</div>
+            </div>
+        </aside>
+
+        <section class="route-map-panel">
+            <div id="staffRouteMap"></div>
+        </section>
+    </div>
+
+    <div class="ui info message route-empty" id="routeMessage">Select staff and date to load the daily path.</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    (function () {
+        var routeUrl = "{% url 'homeApp:staff_location_daily_route_api' %}";
+        var map = L.map("staffRouteMap", {zoomControl: true}).setView([20.2961, 85.8245], 12);
+        var routeLayer = L.layerGroup().addTo(map);
+        var staffEl = document.getElementById("routeStaff");
+        var dateEl = document.getElementById("routeDate");
+        var messageEl = document.getElementById("routeMessage");
+        var staffNameEl = document.getElementById("routeStaffName");
+        var countEl = document.getElementById("routePointCount");
+        var rangeEl = document.getElementById("routeRange");
+        var listEl = document.getElementById("routeLocationList");
+        var listCountEl = document.getElementById("routeListCount");
+        var markerByIndex = {};
+        var currentPoints = [];
+
+        function pad2(value) {
+            return String(value).padStart(2, "0");
+        }
+
+        function formatCalendarDate(date) {
+            if (!date) {
+                return "";
+            }
+            return pad2(date.getDate()) + "/" + pad2(date.getMonth() + 1) + "/" + date.getFullYear();
+        }
+
+        function routeDateToIso(value) {
+            var parts = String(value || "").split("/");
+            if (parts.length === 3) {
+                return parts[2] + "-" + pad2(parts[1]) + "-" + pad2(parts[0]);
+            }
+            return value;
+        }
+
+        $("#routeDateCalendar").calendar({
+            type: "date",
+            monthFirst: false,
+            formatter: {
+                date: formatCalendarDate
+            },
+            onChange: function () {
+                loadRoute();
+            }
+        });
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        function setMessage(text, type) {
+            messageEl.className = "ui route-empty message " + (type || "info");
+            messageEl.textContent = text;
+        }
+
+        function pointPopup(point, label) {
+            var lines = [
+                "<strong>" + label + "</strong>",
+                "Time: " + new Date(point.recorded_at).toLocaleString(),
+                "Accuracy: " + (point.accuracy ? Math.round(point.accuracy) + " m" : "-"),
+                "Battery: " + (point.battery_percent !== null && point.battery_percent !== undefined ? point.battery_percent + "%" : "-")
+            ];
+            return lines.join("<br>");
+        }
+
+        function formatTime(value) {
+            return new Date(value).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+        }
+
+        function formatNumber(value, digits) {
+            if (value === null || value === undefined || value === "") {
+                return "-";
+            }
+            return Number(value).toFixed(digits);
+        }
+
+        function setActiveLocation(index) {
+            Array.prototype.slice.call(listEl.querySelectorAll(".route-location-item")).forEach(function (item) {
+                item.classList.toggle("active", item.dataset.index === String(index));
+            });
+            var point = currentPoints[index];
+            var marker = markerByIndex[index];
+            if (!point || !marker) {
+                return;
+            }
+            map.setView([point.latitude, point.longitude], Math.max(map.getZoom(), 16), {animate: true});
+            marker.openPopup();
+        }
+
+        function renderLocationList(points) {
+            listCountEl.textContent = points.length + (points.length === 1 ? " record" : " records");
+            if (!points.length) {
+                listEl.innerHTML = '<div class="ui small warning message">No location points found for this date.</div>';
+                return;
+            }
+            listEl.innerHTML = points.map(function (point, index) {
+                var isStart = index === 0;
+                var isEnd = index === points.length - 1;
+                var label = isStart ? "Start" : (isEnd ? "End" : "#" + (index + 1));
+                var cssClass = "route-location-item" + (isStart ? " start" : "") + (isEnd ? " end" : "");
+                return '' +
+                    '<button type="button" class="' + cssClass + '" data-index="' + index + '">' +
+                        '<span class="route-location-index">' + label + '</span>' +
+                        '<span>' +
+                            '<span class="route-location-time">' + formatTime(point.recorded_at) + '</span>' +
+                            '<span class="route-location-meta">Accuracy: ' + (point.accuracy ? Math.round(point.accuracy) + ' m' : '-') +
+                                ' | Battery: ' + (point.battery_percent !== null && point.battery_percent !== undefined ? point.battery_percent + '%' : '-') + '</span>' +
+                            '<span class="route-location-coords">' + formatNumber(point.latitude, 6) + ', ' + formatNumber(point.longitude, 6) + '</span>' +
+                        '</span>' +
+                    '</button>';
+            }).join("");
+            Array.prototype.slice.call(listEl.querySelectorAll(".route-location-item")).forEach(function (item) {
+                item.addEventListener("click", function () {
+                    setActiveLocation(parseInt(item.dataset.index, 10));
+                });
+            });
+        }
+
+        function renderRoute(data) {
+            routeLayer.clearLayers();
+            markerByIndex = {};
+            var points = data.points || [];
+            currentPoints = points;
+            staffNameEl.textContent = data.staff ? data.staff.name : "-";
+            countEl.textContent = points.length + " points";
+            rangeEl.textContent = points.length ? (
+                new Date(points[0].recorded_at).toLocaleTimeString() + " - " +
+                new Date(points[points.length - 1].recorded_at).toLocaleTimeString()
+            ) : "-";
+            renderLocationList(points);
+
+            if (!points.length) {
+                setMessage("No location points found for the selected staff and date.", "warning");
+                return;
+            }
+
+            var latLngs = points.map(function (point) {
+                return [point.latitude, point.longitude];
+            });
+            L.polyline(latLngs, {color: "#2563eb", weight: 4, opacity: 0.86}).addTo(routeLayer);
+
+            points.forEach(function (point, index) {
+                var isStart = index === 0;
+                var isEnd = index === points.length - 1;
+                var markerOptions = {
+                    radius: isStart || isEnd ? 8 : 4,
+                    color: isStart ? "#16a34a" : (isEnd ? "#dc2626" : "#2563eb"),
+                    fillColor: isStart ? "#22c55e" : (isEnd ? "#ef4444" : "#60a5fa"),
+                    fillOpacity: 0.9,
+                    weight: 2
+                };
+                var marker = L.circleMarker([point.latitude, point.longitude], markerOptions)
+                    .bindPopup(pointPopup(point, isStart ? "Start" : (isEnd ? "End" : "Location")))
+                    .addTo(routeLayer);
+                marker.on("click", function () {
+                    setActiveLocation(index);
+                });
+                markerByIndex[index] = marker;
+            });
+
+            map.fitBounds(L.latLngBounds(latLngs), {padding: [24, 24], maxZoom: 17});
+            setTimeout(function () {
+                map.invalidateSize();
+            }, 80);
+            setMessage("Route loaded successfully.", "positive");
+        }
+
+        function loadRoute() {
+            var staffId = staffEl.value;
+            var routeDate = routeDateToIso(dateEl.value);
+            if (!staffId || !routeDate) {
+                setMessage("Select both staff and date.", "warning");
+                return;
+            }
+            setMessage("Loading route...", "info");
+            listEl.innerHTML = '<div class="ui small active inline loader"></div>';
+            fetch(routeUrl + "?staff_id=" + encodeURIComponent(staffId) + "&date=" + encodeURIComponent(routeDate), {
+                credentials: "same-origin",
+                headers: {"X-Requested-With": "XMLHttpRequest"}
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Unable to load route.");
+                }
+                return response.json();
+            }).then(renderRoute).catch(function (error) {
+                listEl.innerHTML = '<div class="ui small negative message">Unable to load locations.</div>';
+                setMessage(error.message || "Unable to load route.", "negative");
+            });
+        }
+
+        document.getElementById("loadRouteBtn").addEventListener("click", loadRoute);
+        if (staffEl.value) {
+            loadRoute();
+        }
+    })();
+</script>
+{% endblock %}

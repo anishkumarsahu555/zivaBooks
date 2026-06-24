@@ -1,0 +1,104 @@
+:root {
+    --app-bg: #f3f7fb;
+    --app-text: #0f172a;
+    --app-muted: #64748b;
+    --app-line: rgba(15, 23, 42, 0.10);
+    --app-surface: #ffffff;
+    --app-surface-soft: #f8fbff;
+    --app-accent: #0d9488;
+    --app-radius-sm: 8px;
+    --app-radius-md: 12px;
+    --app-radius-lg: 18px;
+    --app-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --app-focus-ring: 0 0 0 3px rgba(13, 148, 136, 0.16);
+}
+
+html[data-theme="dark"] {
+    --app-bg: #0b1220;
+    --app-text: #e5edf7;
+    --app-muted: #93a4bd;
+    --app-line: rgba(148, 163, 184, 0.18);
+    --app-surface: #111b2e;
+    --app-surface-soft: #162338;
+    --app-accent: #2dd4bf;
+    --app-focus-ring: 0 0 0 3px rgba(45, 212, 191, 0.18);
+}
+
+body,
+.ui.segment,
+.ui.card,
+.ui.form input,
+.ui.form textarea,
+.ui.selection.dropdown,
+.ui.button,
+.ui.message {
+    transition:
+        background-color 0.24s ease,
+        border-color 0.24s ease,
+        box-shadow 0.24s ease,
+        color 0.24s ease,
+        transform 0.24s var(--app-ease);
+}
+
+.ui.button:focus,
+.ui.button:focus-visible,
+.ui.input > input:focus,
+.ui.form input:focus,
+.ui.form textarea:focus,
+.ui.selection.dropdown:focus {
+    box-shadow: var(--app-focus-ring) !important;
+    outline: 0 !important;
+}
+
+.ui.form input,
+.ui.form textarea,
+.ui.selection.dropdown,
+.ui.input > input {
+    border-radius: var(--app-radius-sm) !important;
+}
+
+.ui.message,
+.ui.segment,
+.ui.modal {
+    border-radius: var(--app-radius-md) !important;
+}
+
+html[data-theme="dark"] .ui.form .field > label,
+html[data-theme="dark"] .ui.checkbox label,
+html[data-theme="dark"] .ui.radio.checkbox label,
+html[data-theme="dark"] .ui.toggle.checkbox label {
+    color: #dce8f7 !important;
+}
+
+html[data-theme="dark"] .ui.form input,
+html[data-theme="dark"] .ui.form textarea,
+html[data-theme="dark"] .ui.input > input,
+html[data-theme="dark"] .ui.selection.dropdown {
+    background: var(--app-surface-soft) !important;
+    border-color: var(--app-line) !important;
+    color: var(--app-text) !important;
+}
+
+html[data-theme="dark"] .ui.message {
+    background: var(--app-surface-soft) !important;
+    border-color: var(--app-line) !important;
+    color: var(--app-text) !important;
+}
+
+@media (max-width: 767px) {
+    .ui.button {
+        min-height: 36px;
+        touch-action: manipulation;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}

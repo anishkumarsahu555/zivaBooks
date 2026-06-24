@@ -11,6 +11,8 @@ from home.models import (
     CashCounter,
     InventoryCategory,
     InventoryAdjustmentVoucher,
+    InventoryBatch,
+    InventoryBatchStock,
     InventoryItem,
     InventoryLedgerEntry,
     InventoryOpeningVoucher,
@@ -152,7 +154,7 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
             },
         )
         self.assertEqual(sale_response.status_code, 200, msg=getattr(sale_response, 'content', b''))
-        self.assertEqual(sale_response.json()['message'], 'success')
+        self.assertEqual(sale_response.json()['message'], 'success', msg=sale_response.json())
         sale = Sales.objects.get(remark='inventory sale')
         stock = InventoryStock.objects.get(tenant=self.tenant, item=self.item, stockBucket=InventoryItem.StockBucket.GST)
         self.assertEqual(stock.quantityOnHand, 7.0)
@@ -616,6 +618,370 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
         ledger_response = self.client.get(reverse('homeApp:list_inventory_ledger_entries_api'))
         self.assertEqual(ledger_response.status_code, 200)
         self.assertEqual(len(ledger_response.json()['data']), 2)
+
+    def test_batch_tracked_purchase_creates_batch_and_sale_consumes_it(self):
+        self.item.requiresBatchTracking = True
+        self.item.save(update_fields=['requiresBatchTracking', 'lastUpdatedOn'])
+        purchase_lines = json.dumps([{
+            'itemId': self.item.pk,
+            'stockBucket': InventoryItem.StockBucket.GST,
+            'batchNumber': 'BATCH-25-A',
+            'manufactureDate': '01/01/2026',
+            'expiryDate': '31/12/2026',
+            'quantity': 10,
+            'unitCost': 80.0,
+            'unitPrice': 0.0,
+            'taxableAmount': 800.0,
+            'gstRate': 18.0,
+            'gstAmount': 144.0,
+            'lineTotal': 944.0,
+        }])
+        purchase_response = self.client.post(
+            reverse('homeApp:add_purchase_invoice_api'),
+            data={
+                'party': str(self.party.pk),
+                'invoiceNumber': 'P-BATCH-1',
+                'invoiceDate': '25/03/2026',
+                'gstTreatment': PurchaseInvoice.GstTreatment.GST,
+                'claimStatus': PurchaseInvoice.ClaimStatus.NOT_APPLICABLE,
+                'lineItems': purchase_lines,
+            },
+        )
+        self.assertEqual(purchase_response.status_code, 200, msg=getattr(purchase_response, 'content', b''))
+        self.assertEqual(purchase_response.json()['message'], 'success')
+        batch = InventoryBatch.objects.get(tenant=self.tenant, item=self.item, batchNumber='BATCH-25-A')
+        self.assertEqual(batch.quantityOnHand, 10.0)
+        warehouse = InventoryWarehouse.objects.get(tenant=self.tenant, isDefault=True)
+        batch_stock = InventoryBatchStock.objects.get(tenant=self.tenant, batch=batch, warehouse=warehouse)
+        self.assertEqual(batch_stock.quantityOnHand, 10.0)
+
+        batch_list_response = self.client.get(
+            reverse('homeApp:list_inventory_batches_api'),
+            data={'itemId': str(self.item.pk), 'stockBucket': InventoryItem.StockBucket.GST, 'warehouseId': str(warehouse.pk)},
+        )
+        self.assertEqual(batch_list_response.status_code, 200)
+        self.assertEqual(batch_list_response.json()['data'][0]['BatchNumber'], 'BATCH-25-A')
+        self.assertEqual(batch_list_response.json()['data'][0]['QuantityOnHand'], 10.0)
+
+        report_response = self.client.get(reverse('homeApp:list_inventory_batch_report_api'))
+        self.assertEqual(report_response.status_code, 200)
+        report_rows = report_response.json()['data']
+        self.assertEqual(report_rows[0]['BatchNumber'], 'BATCH-25-A')
+        self.assertEqual(report_rows[0]['Status'], 'Healthy')
+
+        sale_response = self.client.post(
+            reverse('homeApp:add_sales_by_admin_api'),
+            data={
+                'invoiceSeriesId': str(self.sales_series.pk),
+                'paymentMode': 'Cash',
+                'colDate': '25/03/2026',
+                'party': f'{self.party.name} @ {self.party.pk}',
+                'remark': 'batch sale',
+                'lineItems': self._line_items(3, unit_cost=0.0, unit_price=120.0),
+            },
+        )
+        self.assertEqual(sale_response.status_code, 200, msg=getattr(sale_response, 'content', b''))
+        self.assertEqual(sale_response.json()['message'], 'success')
+        batch.refresh_from_db()
+        self.assertEqual(batch.quantityOnHand, 7.0)
+        batch_stock.refresh_from_db()
+        self.assertEqual(batch_stock.quantityOnHand, 7.0)
+        self.assertTrue(InventoryLedgerEntry.objects.filter(
+            tenant=self.tenant,
+            item=self.item,
+            batch=batch,
+            sourceType=InventoryLedgerEntry.SourceType.SALES,
+            quantityDelta=-3.0,
+        ).exists())
+
+        ledger_response = self.client.get(reverse('homeApp:list_inventory_batch_ledger_api'), data={'batchId': str(batch.pk)})
+        self.assertEqual(ledger_response.status_code, 200)
+        ledger_data = ledger_response.json()['data']
+        ledger_rows = ledger_data['Rows']
+        self.assertEqual(len(ledger_rows), 2)
+        self.assertEqual(ledger_rows[-1]['RunningBalance'], 7.0)
+        self.assertEqual(ledger_data['Status'], 'Healthy')
+        self.assertEqual(ledger_data['WarehouseStocks'][0]['QuantityOnHand'], 7.0)
+        self.assertEqual(ledger_data['PurchaseSources'][0]['InvoiceNumber'], 'P-BATCH-1')
+        self.assertEqual(ledger_data['PurchaseSources'][0]['Quantity'], 10.0)
+
+    def test_batch_tracked_purchase_requires_batch_number_and_expiry(self):
+        self.item.requiresBatchTracking = True
+        self.item.save(update_fields=['requiresBatchTracking', 'lastUpdatedOn'])
+        response = self.client.post(
+            reverse('homeApp:add_purchase_invoice_api'),
+            data={
+                'party': str(self.party.pk),
+                'invoiceNumber': 'P-BATCH-VALID-1',
+                'invoiceDate': '25/03/2026',
+                'gstTreatment': PurchaseInvoice.GstTreatment.GST,
+                'claimStatus': PurchaseInvoice.ClaimStatus.NOT_APPLICABLE,
+                'lineItems': json.dumps([{
+                    'itemId': self.item.pk,
+                    'stockBucket': InventoryItem.StockBucket.GST,
+                    'quantity': 2,
+                    'unitCost': 80.0,
+                    'taxableAmount': 160.0,
+                    'gstRate': 18.0,
+                    'gstAmount': 28.8,
+                    'lineTotal': 188.8,
+                }]),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['message'], 'error')
+        self.assertIn('Batch number is required', response.json()['error'])
+
+        response = self.client.post(
+            reverse('homeApp:add_purchase_invoice_api'),
+            data={
+                'party': str(self.party.pk),
+                'invoiceNumber': 'P-BATCH-VALID-2',
+                'invoiceDate': '25/03/2026',
+                'gstTreatment': PurchaseInvoice.GstTreatment.GST,
+                'claimStatus': PurchaseInvoice.ClaimStatus.NOT_APPLICABLE,
+                'lineItems': json.dumps([{
+                    'itemId': self.item.pk,
+                    'stockBucket': InventoryItem.StockBucket.GST,
+                    'batchNumber': 'BATCH-NO-EXP',
+                    'quantity': 2,
+                    'unitCost': 80.0,
+                    'taxableAmount': 160.0,
+                    'gstRate': 18.0,
+                    'gstAmount': 28.8,
+                    'lineTotal': 188.8,
+                }]),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['message'], 'error')
+        self.assertIn('Expiry date is required', response.json()['error'])
+
+    def test_batch_tracked_purchase_rejects_invalid_batch_dates_and_conflicts(self):
+        self.item.requiresBatchTracking = True
+        self.item.save(update_fields=['requiresBatchTracking', 'lastUpdatedOn'])
+        invalid_date_response = self.client.post(
+            reverse('homeApp:add_purchase_invoice_api'),
+            data={
+                'party': str(self.party.pk),
+                'invoiceNumber': 'P-BATCH-DATE-1',
+                'invoiceDate': '25/03/2026',
+                'gstTreatment': PurchaseInvoice.GstTreatment.GST,
+                'claimStatus': PurchaseInvoice.ClaimStatus.NOT_APPLICABLE,
+                'lineItems': json.dumps([{
+                    'itemId': self.item.pk,
+                    'stockBucket': InventoryItem.StockBucket.GST,
+                    'batchNumber': 'BATCH-BAD-DATE',
+                    'manufactureDate': '01/06/2026',
+                    'expiryDate': '01/05/2026',
+                    'quantity': 2,
+                    'unitCost': 80.0,
+                    'taxableAmount': 160.0,
+                    'gstRate': 18.0,
+                    'gstAmount': 28.8,
+                    'lineTotal': 188.8,
+                }]),
+            },
+        )
+        self.assertEqual(invalid_date_response.status_code, 200)
+        self.assertEqual(invalid_date_response.json()['message'], 'error')
+        self.assertIn('Expiry date cannot be before manufacture date', invalid_date_response.json()['error'])
+
+        first_response = self.client.post(
+            reverse('homeApp:add_purchase_invoice_api'),
+            data={
+                'party': str(self.party.pk),
+                'invoiceNumber': 'P-BATCH-CONFLICT-1',
+                'invoiceDate': '25/03/2026',
+                'gstTreatment': PurchaseInvoice.GstTreatment.GST,
+                'claimStatus': PurchaseInvoice.ClaimStatus.NOT_APPLICABLE,
+                'lineItems': json.dumps([{
+                    'itemId': self.item.pk,
+                    'stockBucket': InventoryItem.StockBucket.GST,
+                    'batchNumber': 'BATCH-CONFLICT',
+                    'manufactureDate': '01/01/2026',
+                    'expiryDate': '31/12/2026',
+                    'batchMrp': 140.0,
+                    'quantity': 2,
+                    'unitCost': 80.0,
+                    'taxableAmount': 160.0,
+                    'gstRate': 18.0,
+                    'gstAmount': 28.8,
+                    'lineTotal': 188.8,
+                }]),
+            },
+        )
+        self.assertEqual(first_response.json()['message'], 'success', msg=first_response.json())
+
+        conflict_response = self.client.post(
+            reverse('homeApp:add_purchase_invoice_api'),
+            data={
+                'party': str(self.party.pk),
+                'invoiceNumber': 'P-BATCH-CONFLICT-2',
+                'invoiceDate': '26/03/2026',
+                'gstTreatment': PurchaseInvoice.GstTreatment.GST,
+                'claimStatus': PurchaseInvoice.ClaimStatus.NOT_APPLICABLE,
+                'lineItems': json.dumps([{
+                    'itemId': self.item.pk,
+                    'stockBucket': InventoryItem.StockBucket.GST,
+                    'batchNumber': 'BATCH-CONFLICT',
+                    'manufactureDate': '01/01/2026',
+                    'expiryDate': '31/12/2026',
+                    'batchMrp': 150.0,
+                    'quantity': 2,
+                    'unitCost': 80.0,
+                    'taxableAmount': 160.0,
+                    'gstRate': 18.0,
+                    'gstAmount': 28.8,
+                    'lineTotal': 188.8,
+                }]),
+            },
+        )
+        self.assertEqual(conflict_response.status_code, 200)
+        self.assertEqual(conflict_response.json()['message'], 'error')
+        self.assertIn('already exists', conflict_response.json()['error'])
+
+    def test_batch_report_summary_and_fefo_enforcement(self):
+        self.item.requiresBatchTracking = True
+        self.item.save(update_fields=['requiresBatchTracking', 'lastUpdatedOn'])
+        purchase_response = self.client.post(
+            reverse('homeApp:add_purchase_invoice_api'),
+            data={
+                'party': str(self.party.pk),
+                'invoiceNumber': 'P-BATCH-FEFO-1',
+                'invoiceDate': '25/03/2026',
+                'gstTreatment': PurchaseInvoice.GstTreatment.GST,
+                'claimStatus': PurchaseInvoice.ClaimStatus.NOT_APPLICABLE,
+                'lineItems': json.dumps([
+                    {
+                        'itemId': self.item.pk,
+                        'stockBucket': InventoryItem.StockBucket.GST,
+                        'batchNumber': 'BATCH-EXPIRED',
+                        'manufactureDate': '01/01/2026',
+                        'expiryDate': '01/06/2026',
+                        'quantity': 2,
+                        'unitCost': 80.0,
+                        'taxableAmount': 160.0,
+                        'gstRate': 18.0,
+                        'gstAmount': 28.8,
+                        'lineTotal': 188.8,
+                    },
+                    {
+                        'itemId': self.item.pk,
+                        'stockBucket': InventoryItem.StockBucket.GST,
+                        'batchNumber': 'BATCH-EARLY',
+                        'manufactureDate': '01/02/2026',
+                        'expiryDate': '30/09/2026',
+                        'quantity': 5,
+                        'unitCost': 80.0,
+                        'taxableAmount': 400.0,
+                        'gstRate': 18.0,
+                        'gstAmount': 72.0,
+                        'lineTotal': 472.0,
+                    },
+                    {
+                        'itemId': self.item.pk,
+                        'stockBucket': InventoryItem.StockBucket.GST,
+                        'batchNumber': 'BATCH-LATE',
+                        'manufactureDate': '01/03/2026',
+                        'expiryDate': '31/12/2026',
+                        'quantity': 5,
+                        'unitCost': 80.0,
+                        'taxableAmount': 400.0,
+                        'gstRate': 18.0,
+                        'gstAmount': 72.0,
+                        'lineTotal': 472.0,
+                    },
+                ]),
+            },
+        )
+        self.assertEqual(purchase_response.status_code, 200, msg=getattr(purchase_response, 'content', b''))
+        self.assertEqual(purchase_response.json()['message'], 'success')
+        warehouse = InventoryWarehouse.objects.get(tenant=self.tenant, isDefault=True)
+        early_batch = InventoryBatch.objects.get(tenant=self.tenant, item=self.item, batchNumber='BATCH-EARLY')
+        late_batch = InventoryBatch.objects.get(tenant=self.tenant, item=self.item, batchNumber='BATCH-LATE')
+
+        report_response = self.client.get(reverse('homeApp:list_inventory_batch_report_api'), data={'days': '200'})
+        self.assertEqual(report_response.status_code, 200)
+        summary = report_response.json()['summary']
+        self.assertEqual(summary['ExpiredBatchRows'], 1)
+        self.assertEqual(summary['ExpiringBatchRows'], 2)
+        self.assertEqual(summary['ExpiredQuantity'], 2.0)
+        self.assertEqual(summary['ExpiringQuantity'], 10.0)
+        zero_stock_batch = InventoryBatch.objects.create(
+            tenant=self.tenant,
+            item=self.item,
+            stockBucket=InventoryItem.StockBucket.GST,
+            batchNumber='BATCH-ZERO-EXPIRED',
+            manufactureDate='2026-01-01',
+            expiryDate='2026-06-01',
+            quantityOnHand=0,
+            isActive=True,
+        )
+
+        deactivate_response = self.client.post(reverse('homeApp:deactivate_expired_zero_stock_batches_api'))
+        self.assertEqual(deactivate_response.status_code, 200)
+        self.assertEqual(deactivate_response.json()['deactivatedCount'], 1)
+        zero_stock_batch.refresh_from_db()
+        self.assertFalse(zero_stock_batch.isActive)
+        self.assertTrue(InventoryBatch.objects.get(tenant=self.tenant, item=self.item, batchNumber='BATCH-EXPIRED').isActive)
+
+        batch_list_response = self.client.get(
+            reverse('homeApp:list_inventory_batches_api'),
+            data={'itemId': str(self.item.pk), 'stockBucket': InventoryItem.StockBucket.GST, 'warehouseId': str(warehouse.pk)},
+        )
+        self.assertEqual(batch_list_response.status_code, 200)
+        self.assertEqual([row['BatchNumber'] for row in batch_list_response.json()['data']], ['BATCH-EARLY', 'BATCH-LATE'])
+
+        skip_response = self.client.post(
+            reverse('homeApp:add_sales_by_admin_api'),
+            data={
+                'invoiceSeriesId': str(self.sales_series.pk),
+                'paymentMode': 'Cash',
+                'colDate': '25/06/2026',
+                'party': f'{self.party.name} @ {self.party.pk}',
+                'lineItems': json.dumps([{
+                    'itemId': self.item.pk,
+                    'batchId': late_batch.pk,
+                    'stockBucket': InventoryItem.StockBucket.GST,
+                    'quantity': 2,
+                    'unitPrice': 120.0,
+                    'taxableAmount': 240.0,
+                    'gstRate': 18.0,
+                    'gstAmount': 43.2,
+                    'lineTotal': 283.2,
+                }]),
+            },
+        )
+        self.assertEqual(skip_response.status_code, 200)
+        self.assertEqual(skip_response.json()['message'], 'error')
+        self.assertIn('FEFO requires selling batch BATCH-EARLY', skip_response.json()['error'])
+
+        auto_response = self.client.post(
+            reverse('homeApp:add_sales_by_admin_api'),
+            data={
+                'invoiceSeriesId': str(self.sales_series.pk),
+                'paymentMode': 'Cash',
+                'colDate': '25/06/2026',
+                'party': f'{self.party.name} @ {self.party.pk}',
+                'lineItems': json.dumps([{
+                    'itemId': self.item.pk,
+                    'stockBucket': InventoryItem.StockBucket.GST,
+                    'quantity': 2,
+                    'unitPrice': 120.0,
+                    'taxableAmount': 240.0,
+                    'gstRate': 18.0,
+                    'gstAmount': 43.2,
+                    'lineTotal': 283.2,
+                }]),
+            },
+        )
+        self.assertEqual(auto_response.status_code, 200, msg=getattr(auto_response, 'content', b''))
+        self.assertEqual(auto_response.json()['message'], 'success')
+        early_batch.refresh_from_db()
+        late_batch.refresh_from_db()
+        self.assertEqual(early_batch.quantityOnHand, 3.0)
+        self.assertEqual(late_batch.quantityOnHand, 5.0)
 
     def test_sales_invoice_persists_b2b_gst_fields_and_downloads_pdf(self):
         self.party.isB2B = True

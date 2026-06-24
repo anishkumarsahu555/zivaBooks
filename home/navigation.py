@@ -14,6 +14,11 @@ ADMIN_LIKE_PERMS = {
     'home.can_view_audit_logs',
 }
 
+LOCATION_PERMISSION_NAMES = {
+    'home.can_track_staff_location',
+    'home.can_view_staff_locations',
+}
+
 
 def _tenant_admin_group_name(tenant):
     tenant_slug = getattr(tenant, 'slug', 'tenant')
@@ -119,17 +124,27 @@ def _effective_permission_names(request_or_user):
     tenant_permissions = _tenant_permission_names(request_or_user, tenant)
     membership_role = _tenant_membership_role(request_or_user, tenant)
 
+    legacy_user_location_permissions = (
+        set()
+        if membership_role in {TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN}
+        else user_permissions & LOCATION_PERMISSION_NAMES
+    )
+
     if membership_role in {TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN}:
         owner_admin_permissions = {
             f'{permission.content_type.app_label}.{permission.codename}'
             for permission in Permission.objects.select_related('content_type').filter(content_type__app_label='home')
         }
-        effective_permissions = (user_permissions | owner_admin_permissions) & tenant_permissions
+        effective_permissions = ((user_permissions | owner_admin_permissions) & tenant_permissions) | legacy_user_location_permissions
         if hasattr(request_or_user, 'META'):
             request_or_user._tenant_effective_perm_cache = effective_permissions
         user._tenant_effective_perm_cache = effective_permissions
         return effective_permissions
-    effective_permissions = tenant_permissions if user.is_superuser else user_permissions & tenant_permissions
+    effective_permissions = (
+        tenant_permissions | legacy_user_location_permissions
+        if user.is_superuser
+        else (user_permissions & tenant_permissions) | legacy_user_location_permissions
+    )
     if hasattr(request_or_user, 'META'):
         request_or_user._tenant_effective_perm_cache = effective_permissions
     user._tenant_effective_perm_cache = effective_permissions
@@ -288,6 +303,10 @@ def _admin_sections(user):
                 _nav_item('Attendance List', 'homeApp:attendance_list', 'calendar alternate', (
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
+                )),
+                _nav_item('Location Tracker', 'homeApp:staff_location_tracker', 'map marker alternate', 'home.can_track_staff_location'),
+                _nav_item('Staff Route Map', 'homeApp:staff_location_map', 'map outline', (
+                    'home.can_view_staff_locations',
                 )),
             ]),
         },
@@ -905,6 +924,10 @@ def build_sidebar_sections(request_or_user):
                     'home.change_attendance',
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
+                )),
+                _nav_item('Location Tracker', 'homeApp:staff_location_tracker', 'map marker alternate', 'home.can_track_staff_location'),
+                _nav_item('Staff Route Map', 'homeApp:staff_location_map', 'map outline', (
+                    'home.can_view_staff_locations',
                 )),
             ]),
         },

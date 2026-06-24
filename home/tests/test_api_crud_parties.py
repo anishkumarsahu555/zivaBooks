@@ -1,7 +1,13 @@
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase
+from django.utils import timezone
 
-from home.models import Party, PartyGroup
+from home.models import Party, PartyGroup, PartyLedgerEntry, TenantMembership
 from home.tests.utils import SeededTenantMixin
+
+
+User = get_user_model()
 
 
 class PartyApiCrudTests(SeededTenantMixin, TestCase):
@@ -66,3 +72,112 @@ class PartyApiCrudTests(SeededTenantMixin, TestCase):
 
         party.refresh_from_db()
         self.assertTrue(party.isDeleted)
+
+    def test_party_list_displays_current_balance(self):
+        self.client.force_login(self.owner)
+        self.party.openingBalance = 100
+        self.party.save(update_fields=["openingBalance"])
+        PartyLedgerEntry.objects.create(
+            tenant=self.tenant,
+            party=self.party,
+            txDateTime=timezone.now(),
+            particulars="Balance test sale",
+            debit=250,
+            credit=50,
+            createdBy=self.owner_staff,
+            source=PartyLedgerEntry.Source.SALES,
+            reference="BAL-1",
+        )
+
+        response = self.client.get(
+            "/api/PartyListJson/",
+            data={
+                "draw": "1",
+                "start": "0",
+                "length": "25",
+                "search[value]": self.party.name,
+                "order[0][column]": "4",
+                "order[0][dir]": "desc",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        self.assertTrue(any("Due" in row[4] and "300.00" in row[4] for row in rows))
+
+        summary = self.client.get("/api/party_balance_summary/")
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(summary.json()["message"], "success")
+        self.assertGreaterEqual(summary.json()["receivable"], 300)
+
+    def test_credential_viewer_cannot_mutate_party(self):
+        user = User.objects.create_user(username="credential.viewer", password="pass123")
+        permission = Permission.objects.get(content_type__app_label="home", codename="can_view_party_credentials")
+        user.user_permissions.add(permission)
+        TenantMembership.objects.create(
+            user=user,
+            tenant=self.tenant,
+            role=TenantMembership.Role.STAFF,
+            isDefault=True,
+        )
+        self.client.force_login(user)
+
+        response = self.client.post("/api/add_party_api/", data={})
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.post("/api/edit_party_api/", data={"EditId": str(self.party.pk)})
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.post("/api/delete_party/", data={"userID": str(self.party.pk)})
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.get("/api/party_balance_summary/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_party_create_validation_returns_clear_error(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            "/api/add_party_api/",
+            data={
+                "partyName": "Invalid Party",
+                "phoneNumber": "9000000099",
+                "openingBalance": "not-a-number",
+                "partyGroup": "",
+                "staffID": str(self.owner_staff.pk),
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["message"], "error")
+        self.assertIn("Opening balance", response.json()["error"])
+
+    def test_party_list_filters_by_balance_type(self):
+        self.client.force_login(self.owner)
+        self.party.openingBalance = 0
+        self.party.partyGroupID = PartyGroup.objects.filter(tenant=self.tenant, isDeleted=False).order_by("id").first()
+        self.party.assignTo = self.owner_staff
+        self.party.save(update_fields=["openingBalance", "partyGroupID", "assignTo"])
+        PartyLedgerEntry.objects.create(
+            tenant=self.tenant,
+            party=self.party,
+            txDateTime=timezone.now(),
+            particulars="Filter balance test",
+            debit=400,
+            credit=0,
+            createdBy=self.owner_staff,
+            source=PartyLedgerEntry.Source.SALES,
+            reference="FILTER-BAL",
+        )
+
+        response = self.client.get(
+            "/api/PartyListJson/",
+            data={
+                "draw": "1",
+                "start": "0",
+                "length": "25",
+                "partyGroup": str(self.party.partyGroupID_id),
+                "staffID": str(self.owner_staff.pk),
+                "balanceType": "due",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        rows = response.json()["data"]
+        self.assertTrue(any(row[0] == self.party.name and "Due" in row[4] for row in rows))
