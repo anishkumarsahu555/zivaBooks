@@ -40,6 +40,7 @@ from .credential_links import credential_share_token_status, consume_credential_
 from .navigation import build_sidebar_sections, _has_any_perm as _has_tenant_any_perm
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_object_or_superuser, tenant_qs
 from .otp import get_collection_otp_payload, get_collection_status_payload, get_order_delivery_otp_payload, get_order_delivery_status_payload, OTP_TTL_SECONDS
+from utils.logger import logger
 # def login_or_logout(request, type):
 #     try:
 #         data = LoginAndLogoutStatus()
@@ -1238,7 +1239,7 @@ def _find_password_reset_user(identifier):
     )
     staff = staff_queryset.filter(username__iexact=value).order_by('-id').first()
     if staff is not None:
-        print('[Password Reset Email] Matched StaffUser {} for {}'.format(staff.pk, value))
+        logger.info('[Password Reset Email] Matched StaffUser %s for %s', staff.pk, value)
         return staff.user_ID
     return None
 
@@ -1275,7 +1276,7 @@ def _password_reset_url(request, user):
 def _build_password_reset_email_payload(request, user):
     recipient_email = _password_reset_recipient_email(user)
     if not user or not recipient_email:
-        print('[Password Reset Email] Failed: user or email missing')
+        logger.warning('[Password Reset Email] Failed: user or email missing')
         return None
     reset_url = _password_reset_url(request, user)
     context = {
@@ -1306,9 +1307,9 @@ def _send_password_reset_email_payload(payload):
     message.attach_alternative(payload['html_body'], 'text/html')
     sent_count = message.send(fail_silently=False)
     if sent_count:
-        print('[Password Reset Email] Success: reset email sent to {}'.format(payload['recipient_email']))
+        logger.info('[Password Reset Email] Success: reset email sent to %s', payload['recipient_email'])
     else:
-        print('[Password Reset Email] Failed: send_mail returned 0 for {}'.format(payload['recipient_email']))
+        logger.warning('[Password Reset Email] Failed: send_mail returned 0 for %s', payload['recipient_email'])
     return bool(sent_count)
 
 
@@ -1318,11 +1319,11 @@ def _send_password_reset_email_payload_async(payload):
     def worker():
         try:
             _send_password_reset_email_payload(payload)
-        except Exception as exc:
-            print('[Password Reset Email] Failed: {} for {}'.format(exc, recipient_email))
+        except Exception:
+            logger.exception('[Password Reset Email] Failed for %s', recipient_email)
 
     Thread(target=worker, daemon=True).start()
-    print('[Password Reset Email] Queued: reset email send started for {}'.format(recipient_email))
+    logger.info('[Password Reset Email] Queued: reset email send started for %s', recipient_email)
     return True
 
 
@@ -1395,12 +1396,12 @@ def forgot_password(request):
             if user is not None:
                 try:
                     _send_password_reset_email(request, user)
-                except Exception as exc:
-                    print('[Password Reset Email] Failed: {} for {}'.format(exc, identifier))
+                except Exception:
+                    logger.exception('[Password Reset Email] Failed for %s', identifier)
             else:
-                print('[Password Reset Email] Skipped: no active user found for {}'.format(identifier))
+                logger.info('[Password Reset Email] Skipped: no active user found for %s', identifier)
         elif identifier:
-            print('[Password Reset Email] Skipped: rate limited for {}'.format(identifier))
+            logger.warning('[Password Reset Email] Skipped: rate limited for %s', identifier)
         return render(request, 'home/forgotPassword.html', context)
     return render(request, 'home/forgotPassword.html', context)
 
