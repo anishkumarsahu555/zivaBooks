@@ -74,7 +74,6 @@ def _tenant_permission_names(request_or_user, tenant):
             f'{permission.content_type.app_label}.{permission.codename}'
             for permission in tenant_admin_group.permissions.all()
         }
-    permissions.update(LOCATION_PERMISSION_NAMES)
     tenant._tenant_permission_names_cache = permissions
     if request is not None:
         request._tenant_permission_names_cache = permissions
@@ -125,17 +124,27 @@ def _effective_permission_names(request_or_user):
     tenant_permissions = _tenant_permission_names(request_or_user, tenant)
     membership_role = _tenant_membership_role(request_or_user, tenant)
 
+    legacy_user_location_permissions = (
+        set()
+        if membership_role in {TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN}
+        else user_permissions & LOCATION_PERMISSION_NAMES
+    )
+
     if membership_role in {TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN}:
         owner_admin_permissions = {
             f'{permission.content_type.app_label}.{permission.codename}'
             for permission in Permission.objects.select_related('content_type').filter(content_type__app_label='home')
         }
-        effective_permissions = (user_permissions | owner_admin_permissions) & tenant_permissions
+        effective_permissions = ((user_permissions | owner_admin_permissions) & tenant_permissions) | legacy_user_location_permissions
         if hasattr(request_or_user, 'META'):
             request_or_user._tenant_effective_perm_cache = effective_permissions
         user._tenant_effective_perm_cache = effective_permissions
         return effective_permissions
-    effective_permissions = tenant_permissions if user.is_superuser else user_permissions & tenant_permissions
+    effective_permissions = (
+        tenant_permissions | legacy_user_location_permissions
+        if user.is_superuser
+        else (user_permissions & tenant_permissions) | legacy_user_location_permissions
+    )
     if hasattr(request_or_user, 'META'):
         request_or_user._tenant_effective_perm_cache = effective_permissions
     user._tenant_effective_perm_cache = effective_permissions
