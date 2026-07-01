@@ -1308,6 +1308,8 @@
         purchaseReturns: [],
         salesReturns: []
     };
+    var inventoryUrlParams = new URLSearchParams(window.location.search);
+    var inventoryDrilldownFilter = inventoryUrlParams.get('filter') || '';
     const nonGstShadowEnabled = {{ non_gst_shadow_enabled|yesno:"true,false" }};
 
     function toastMessage(type, message) { $('body').toast({class: type, message: message}); }
@@ -1701,6 +1703,7 @@
             inventoryState.batchSummary = response.summary || {};
             setDataTableData(inventoryBatchReportTable, inventoryState.batchRows.map(batchReportRow));
             updateBatchAlert(inventoryState.batchSummary);
+            applyInventoryDrilldownFilter();
         });
         $.get('{% url "homeApp:list_inventory_categories_api" %}', function (response) {
             inventoryState.categories = response.data || [];
@@ -1723,6 +1726,7 @@
         $.get('{% url "homeApp:list_inventory_items_api" %}', function (response) {
             inventoryState.items = response.data || [];
             setDataTableData(inventoryItemTable, inventoryState.items.map(itemRow));
+            applyInventoryDrilldownFilter();
             updateMetrics();
         });
         $.get('{% url "homeApp:list_inventory_adjustment_vouchers_api" %}', function (response) {
@@ -2300,6 +2304,17 @@
             inventoryBatchReportTable.column(4).search(status).draw();
         }
     });
+
+    function applyInventoryDrilldownFilter() {
+        if (inventoryDrilldownFilter === 'low_stock' && inventoryItemTable) {
+            inventoryItemTable.column(4).search('Low Stock').draw();
+        }
+        if (inventoryDrilldownFilter === 'expiring_30' && inventoryBatchReportTable) {
+            $('#inventoryBatchStatusFilters button').removeClass('active');
+            $('#inventoryBatchStatusFilters button[data-status="Expiring Soon"]').addClass('active');
+            inventoryBatchReportTable.column(4).search('Expiring Soon').draw();
+        }
+    }
     loadAllMasters();
 </script>
 {% endblock %}

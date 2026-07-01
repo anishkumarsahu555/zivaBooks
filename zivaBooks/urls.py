@@ -19,7 +19,10 @@ from django.urls import path, include
 from django.urls import re_path
 from django.views.static import serve as media_serve
 
+from .health import health_check
+
 urlpatterns = [
+    path('health/', health_check, name='health_check'),
     re_path(
         rf'^{settings.MEDIA_URL.lstrip("/")}(?P<path>.*)$',
         media_serve,

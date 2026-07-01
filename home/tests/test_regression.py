@@ -1,4 +1,5 @@
 from io import StringIO
+from datetime import datetime, date
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
@@ -9,7 +10,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 
 from home.apiView import _sync_staff_user_group_membership, send_whatsapp_message
-from home.models import AuditLog, Collection, Party, Sales, StaffGroup, StaffUser, Tenant, TenantMembership, WhatsappMessageStatus
+from home.models import AuditLog, Bank, CashCounter, Collection, InventoryItem, InventoryStock, Order, Party, Sales, StaffGroup, StaffUser, Tenant, TenantMembership, WhatsappMessageStatus
 from home.otp import get_collection_otp_payload
 
 
@@ -193,6 +194,132 @@ class MyListScopeUiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context["cash_counter_capabilities"]["can_filter_staff"])
         self.assertFalse(response.context["cash_counter_capabilities"]["can_delete"])
+
+
+class DashboardChartsApiTests(TestCase):
+    def test_dashboard_charts_api_returns_permission_scoped_chart_payloads(self):
+        tenant = Tenant.objects.create(name="Chart Tenant", slug="chart-tenant")
+        user = User.objects.create_user(username="chart-admin", password="secret123")
+        permission_codenames = [
+            "view_sales",
+            "view_collection",
+            "can_approve_collection",
+            "view_order",
+            "can_approve_orders",
+            "can_manage_parties",
+            "can_manage_inventory",
+            "view_cashcounter",
+            "can_manage_cash_counter",
+            "view_whatsappmessagestatus",
+        ]
+        permissions = list(
+            Permission.objects.filter(
+                codename__in=permission_codenames,
+                content_type__app_label="home",
+            )
+        )
+        tenant_admin_group = Group.objects.create(name=f"{tenant.slug}:Tenant Admin")
+        tenant_admin_group.permissions.set(permissions)
+        django_group = Group.objects.create(name=f"{tenant.slug}:Charts")
+        django_group.permissions.set(permissions)
+        staff_group = StaffGroup.objects.create(
+            tenant=tenant,
+            name="Charts",
+            djangoGroup=django_group,
+        )
+        TenantMembership.objects.create(
+            tenant=tenant,
+            user=user,
+            role=TenantMembership.Role.ADMIN,
+            isDefault=True,
+        )
+        staff = StaffUser.objects.create(
+            tenant=tenant,
+            user_ID=user,
+            name="Chart Admin",
+            phone="9999999996",
+            staffGroup=staff_group,
+            group="Charts",
+            isActive="Active",
+        )
+        user.groups.add(django_group)
+        party = Party.objects.create(tenant=tenant, name="Chart Party", phone="9999999995", assignTo=staff)
+        Party.objects.create(tenant=tenant, name="Open Party", phone="9999999994")
+        Bank.objects.create(tenant=tenant, name="Main Bank", accountNumber="123")
+        Bank.objects.create(tenant=tenant, name="Missing Bank")
+        Sales.objects.create(tenant=tenant, partyID=party, amount=1200, buildDate=date.today(), createdBy=staff)
+        Collection.objects.create(
+            tenant=tenant,
+            partyID=party,
+            paidAmount=500,
+            collectionDateTime=datetime.now(),
+            collectedBy=staff,
+        )
+        Collection.objects.create(
+            tenant=tenant,
+            partyID=party,
+            paidAmount=800,
+            collectionDateTime=datetime.now(),
+            collectedBy=staff,
+            isApproved=True,
+        )
+        Order.objects.create(tenant=tenant, partyID=party, buildDate=date.today(), status=Order.Status.SUBMITTED, createdBy=staff)
+        Order.objects.create(tenant=tenant, partyID=party, buildDate=date.today(), status=Order.Status.APPROVED, createdBy=staff)
+        CashCounter.objects.create(tenant=tenant, partyID=party, mode="Cash", amount=700, entryDate=datetime.now(), createdBy=staff)
+        item = InventoryItem.objects.create(
+            tenant=tenant,
+            name="Low Stock Item",
+            unitName="pcs",
+            reorderLevel=5,
+            minimumStockLevel=2,
+        )
+        InventoryStock.objects.create(
+            tenant=tenant,
+            item=item,
+            stockBucket=InventoryItem.StockBucket.GST,
+            quantityOnHand=3,
+        )
+        WhatsappMessageStatus.objects.create(
+            tenant=tenant,
+            messageTo="Chart Party",
+            phone="9999999995",
+            status="Failed",
+        )
+
+        self.client.force_login(user)
+        response = self.client.get(reverse("homeApp:get_dashboard_charts_api"))
+
+        self.assertEqual(response.status_code, 200)
+        charts = response.json()["charts"]
+        self.assertIn("revenue_trend", charts)
+        self.assertIn("order_status", charts)
+        self.assertIn("party_assignment", charts)
+        self.assertIn("bank_health", charts)
+        self.assertIn("cash_mix", charts)
+        self.assertEqual(charts["party_assignment"]["values"], [1, 1])
+        self.assertEqual(charts["bank_health"]["values"], [1, 1])
+        self.assertIn("Submitted", charts["order_status"]["labels"])
+
+        dashboard_response = self.client.get(reverse("homeApp:homepage"))
+        alerts = {
+            alert["label"]: alert
+            for alert in dashboard_response.context["dashboard_state"]["action_alerts"]
+        }
+        self.assertEqual(alerts["Pending Orders"]["value"], 1)
+        self.assertIn("?status=submitted", alerts["Pending Orders"]["action_url"])
+        self.assertEqual(alerts["Pending Collections"]["value"], 1)
+        self.assertIn("?approval=pending", alerts["Pending Collections"]["action_url"])
+        self.assertEqual(alerts["Failed Messages"]["value"], 1)
+        self.assertEqual(alerts["Low Stock Items"]["value"], 1)
+        self.assertIn("?filter=low_stock", alerts["Low Stock Items"]["action_url"])
+
+        orders_response = self.client.get(reverse("homeApp:OrdersByAdminListJson"), {"status": Order.Status.SUBMITTED})
+        self.assertEqual(orders_response.status_code, 200)
+        self.assertEqual(orders_response.json()["recordsFiltered"], 1)
+
+        collections_response = self.client.get(reverse("homeApp:CollectionByAdminListJson"), {"approval": "pending"})
+        self.assertEqual(collections_response.status_code, 200)
+        self.assertEqual(collections_response.json()["recordsFiltered"], 1)
 
 
 class SalesEditLockTests(TestCase):

@@ -1682,6 +1682,8 @@
         }
 
         .dashboard-metric-group,
+        .dashboard-alert-group,
+        .dashboard-chart-group,
         .dashboard-actions-shell {
             background: #ffffff;
             border: 1px solid #dce7f3;
@@ -1800,6 +1802,170 @@
             opacity: 0.92;
         }
 
+        .dashboard-alert-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            padding: 18px;
+        }
+
+        .dashboard-alert-card {
+            align-items: center;
+            border: 1px solid #e2ebf3;
+            border-radius: 18px;
+            display: grid;
+            gap: 12px;
+            grid-template-columns: 38px minmax(0, 1fr) auto;
+            min-height: 112px;
+            padding: 14px;
+        }
+
+        .dashboard-alert-card.tone-green {
+            background: linear-gradient(180deg, #f0fdf4, #ecfdf5);
+            border-color: rgba(16, 185, 129, 0.22);
+        }
+
+        .dashboard-alert-card.tone-amber {
+            background: linear-gradient(180deg, #fffbeb, #fff7ed);
+            border-color: rgba(245, 158, 11, 0.32);
+        }
+
+        .dashboard-alert-card.tone-red {
+            background: linear-gradient(180deg, #fff1f2, #fff7f7);
+            border-color: rgba(244, 63, 94, 0.28);
+        }
+
+        .dashboard-alert-icon {
+            align-items: center;
+            background: rgba(15, 23, 42, 0.06);
+            border-radius: 14px;
+            color: #0f766e;
+            display: inline-flex;
+            height: 38px;
+            justify-content: center;
+            width: 38px;
+        }
+
+        .dashboard-alert-card.tone-amber .dashboard-alert-icon {
+            color: #b45309;
+        }
+
+        .dashboard-alert-card.tone-red .dashboard-alert-icon {
+            color: #be123c;
+        }
+
+        .dashboard-alert-main {
+            min-width: 0;
+        }
+
+        .dashboard-alert-label {
+            color: #0f172a;
+            font-size: 0.9rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .dashboard-alert-description {
+            color: #64748b;
+            font-size: 0.74rem;
+            line-height: 1.35;
+            margin-top: 4px;
+        }
+
+        .dashboard-alert-value {
+            color: #0f172a;
+            font-size: 1.55rem;
+            font-weight: 900;
+            line-height: 1;
+            text-align: right;
+        }
+
+        .dashboard-alert-link {
+            color: #0f172a;
+            display: inline-flex;
+            font-size: 0.72rem;
+            font-weight: 800;
+            margin-top: 8px;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .dashboard-chart-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            padding: 18px;
+        }
+
+        .dashboard-chart-card {
+            background:
+                radial-gradient(circle at top right, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0) 34%),
+                linear-gradient(180deg, #fbfdff, #f5f9fc);
+            border: 1px solid #e2ebf3;
+            border-radius: 20px;
+            min-width: 0;
+            padding: 14px;
+        }
+
+        .dashboard-chart-card.is-wide {
+            grid-column: span 2;
+        }
+
+        .dashboard-chart-head {
+            align-items: flex-start;
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .dashboard-chart-title {
+            color: #0f172a;
+            font-size: 0.98rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .dashboard-chart-copy {
+            color: #64748b;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            margin-top: 4px;
+        }
+
+        .dashboard-chart-shell {
+            height: 260px;
+            position: relative;
+        }
+
+        .dashboard-chart-shell.is-wide {
+            height: 310px;
+        }
+
+        .dashboard-chart-shell canvas {
+            height: 100% !important;
+            width: 100% !important;
+        }
+
+        .dashboard-chart-empty {
+            align-items: center;
+            background: rgba(248, 250, 252, 0.88);
+            border: 1px dashed rgba(100, 116, 139, 0.28);
+            border-radius: 16px;
+            color: #64748b;
+            display: none;
+            font-size: 0.82rem;
+            font-weight: 800;
+            inset: 0;
+            justify-content: center;
+            position: absolute;
+            text-align: center;
+        }
+
+        .dashboard-chart-empty.is-visible {
+            display: flex;
+        }
+
         html[data-theme="dark"] .dashboard-license-banner {
             background: rgba(120, 53, 15, 0.28) !important;
             color: #f8e3b3 !important;
@@ -1845,6 +2011,8 @@
         }
 
         html[data-theme="dark"] .dashboard-metric-group,
+        html[data-theme="dark"] .dashboard-alert-group,
+        html[data-theme="dark"] .dashboard-chart-group,
         html[data-theme="dark"] .dashboard-actions-shell {
             background: var(--app-surface);
             border-color: var(--app-line);
@@ -1889,6 +2057,70 @@
         html[data-theme="dark"] .dashboard-stat-link {
             background: #1d3653;
             color: #eff6ff;
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card {
+            border-color: rgba(71, 85, 105, 0.4);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-green {
+            background: linear-gradient(180deg, #052e2b, #0f172a);
+            border-color: rgba(16, 185, 129, 0.34);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-amber {
+            background: linear-gradient(180deg, #3a2a08, #111827);
+            border-color: rgba(245, 158, 11, 0.34);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-red {
+            background: linear-gradient(180deg, #3f1220, #111827);
+            border-color: rgba(244, 63, 94, 0.34);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-icon {
+            background: rgba(148, 163, 184, 0.10);
+            color: #5eead4;
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-amber .dashboard-alert-icon {
+            color: #fbbf24;
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-red .dashboard-alert-icon {
+            color: #fb7185;
+        }
+
+        html[data-theme="dark"] .dashboard-alert-label,
+        html[data-theme="dark"] .dashboard-alert-value,
+        html[data-theme="dark"] .dashboard-alert-link {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-description {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .dashboard-chart-card {
+            background:
+                radial-gradient(circle at top right, rgba(148, 163, 184, 0.10), rgba(255, 255, 255, 0) 34%),
+                linear-gradient(180deg, #162338, #111b2e);
+            border-color: var(--app-line);
+            box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
+        }
+
+        html[data-theme="dark"] .dashboard-chart-title {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .dashboard-chart-copy {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .dashboard-chart-empty {
+            background: rgba(17, 27, 46, 0.9);
+            border-color: rgba(148, 163, 184, 0.24);
+            color: var(--app-muted);
         }
 
         .dashboard-action-grid {
@@ -2011,6 +2243,8 @@
             .dashboard-hero,
             .dashboard-group-header,
             .dashboard-stat-grid,
+            .dashboard-alert-grid,
+            .dashboard-chart-grid,
             .dashboard-action-grid {
                 padding-left: 12px;
                 padding-right: 12px;
@@ -2024,6 +2258,8 @@
             }
 
             .dashboard-metric-group,
+            .dashboard-alert-group,
+            .dashboard-chart-group,
             .dashboard-actions-shell {
                 border-radius: 16px;
                 margin-bottom: 12px;
@@ -2106,6 +2342,59 @@
             .dashboard-stat-link {
                 font-size: 0.68rem;
                 padding: 6px 10px;
+            }
+
+            .dashboard-alert-grid {
+                gap: 10px;
+                grid-template-columns: 1fr;
+                padding-top: 12px;
+                padding-bottom: 12px;
+            }
+
+            .dashboard-alert-card {
+                border-radius: 16px;
+                min-height: 96px;
+                padding: 12px;
+            }
+
+            .dashboard-alert-label {
+                font-size: 0.84rem;
+            }
+
+            .dashboard-alert-description,
+            .dashboard-alert-link {
+                font-size: 0.68rem;
+            }
+
+            .dashboard-alert-value {
+                font-size: 1.35rem;
+            }
+
+            .dashboard-chart-grid {
+                gap: 10px;
+                grid-template-columns: 1fr;
+                padding-top: 12px;
+                padding-bottom: 12px;
+            }
+
+            .dashboard-chart-card,
+            .dashboard-chart-card.is-wide {
+                border-radius: 16px;
+                grid-column: auto;
+                padding: 12px;
+            }
+
+            .dashboard-chart-title {
+                font-size: 0.9rem;
+            }
+
+            .dashboard-chart-copy {
+                font-size: 0.72rem;
+            }
+
+            .dashboard-chart-shell,
+            .dashboard-chart-shell.is-wide {
+                height: 220px;
             }
 
             .dashboard-action-grid {
@@ -2905,6 +3194,11 @@
 
 {% block js %}
     {{ dashboard_state.metric_groups|json_script:"dashboard-metric-groups-data" }}
+    {{ dashboard_state.charts|json_script:"dashboard-charts-data" }}
+    {{ dashboard_state.charts_endpoint|json_script:"dashboard-charts-endpoint" }}
+    {% if dashboard_state.charts %}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    {% endif %}
     <script>
         $('.message .close')
             .on('click', function () {
@@ -2936,6 +3230,179 @@
             });
         }
 
+        function dashboardMoneyTick(value) {
+            try {
+                return '₹ ' + Number(value || 0).toLocaleString('en-IN', {maximumFractionDigits: 0});
+            } catch (e) {
+                return '₹ ' + value;
+            }
+        }
+
+        function dashboardHasValues(values) {
+            return (values || []).some(function (value) {
+                return Number(value || 0) !== 0;
+            });
+        }
+
+        function dashboardSetEmpty(canvasId, visible) {
+            $('[data-chart-empty-for="' + canvasId + '"]').toggleClass('is-visible', !!visible);
+            $('#' + canvasId).toggle(!visible);
+        }
+
+        function dashboardChartDefaults() {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            var axisColor = isDark ? '#a7b8cd' : '#64748b';
+            var gridColor = isDark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(148, 163, 184, 0.18)';
+            var tooltipBg = isDark ? 'rgba(15, 23, 42, 0.96)' : 'rgba(255, 255, 255, 0.96)';
+            var tooltipText = isDark ? '#e5edf7' : '#0f172a';
+            Chart.defaults.color = axisColor;
+            Chart.defaults.font.family = 'inherit';
+            Chart.defaults.plugins.legend.labels.boxWidth = 10;
+            Chart.defaults.plugins.legend.labels.usePointStyle = true;
+            Chart.defaults.plugins.tooltip.backgroundColor = tooltipBg;
+            Chart.defaults.plugins.tooltip.titleColor = tooltipText;
+            Chart.defaults.plugins.tooltip.bodyColor = tooltipText;
+            Chart.defaults.plugins.tooltip.borderColor = gridColor;
+            Chart.defaults.plugins.tooltip.borderWidth = 1;
+            return {axisColor: axisColor, gridColor: gridColor};
+        }
+
+        function renderDashboardChart(chart, payload, theme) {
+            var canvas = document.getElementById(chart.id);
+            if (!canvas || !payload) {
+                return;
+            }
+            if (chart.key === 'revenue_trend') {
+                var trendValues = (payload.sales || []).concat(payload.collections || []);
+                if (!dashboardHasValues(trendValues)) {
+                    dashboardSetEmpty(chart.id, true);
+                    return;
+                }
+                dashboardSetEmpty(chart.id, false);
+                new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: payload.labels || [],
+                        datasets: [
+                            {
+                                label: 'Sales',
+                                data: payload.sales || [],
+                                borderColor: '#2563eb',
+                                backgroundColor: 'rgba(37, 99, 235, 0.14)',
+                                fill: true,
+                                tension: 0.36,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#2563eb'
+                            },
+                            {
+                                label: 'Collections',
+                                data: payload.collections || [],
+                                borderColor: '#0f766e',
+                                backgroundColor: 'rgba(15, 118, 110, 0.12)',
+                                fill: true,
+                                tension: 0.36,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#0f766e'
+                            }
+                        ]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        interaction: {mode: 'index', intersect: false},
+                        scales: {
+                            x: {grid: {display: false}, ticks: {color: theme.axisColor}},
+                            y: {grid: {color: theme.gridColor}, ticks: {callback: dashboardMoneyTick}}
+                        }
+                    }
+                });
+                return;
+            }
+
+            if (!dashboardHasValues(payload.values || [])) {
+                dashboardSetEmpty(chart.id, true);
+                return;
+            }
+            dashboardSetEmpty(chart.id, false);
+
+            if (chart.type === 'bar') {
+                new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: payload.labels || [],
+                        datasets: [{
+                            label: chart.title,
+                            data: payload.values || [],
+                            borderRadius: 10,
+                            backgroundColor: ['#0f766e', '#2563eb', '#f59e0b', '#e11d48', '#8b5cf6', '#06b6d4']
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        plugins: {legend: {display: false}},
+                        scales: {
+                            x: {grid: {display: false}, ticks: {color: theme.axisColor}},
+                            y: {beginAtZero: true, grid: {color: theme.gridColor}, ticks: {callback: dashboardMoneyTick}}
+                        }
+                    }
+                });
+                return;
+            }
+
+            new Chart(canvas, {
+                type: chart.type || 'doughnut',
+                data: {
+                    labels: payload.labels || [],
+                    datasets: [{
+                        data: payload.values || [],
+                        backgroundColor: [
+                            '#2563eb',
+                            '#14b8a6',
+                            '#f59e0b',
+                            '#f97316',
+                            '#22c55e',
+                            '#ef4444',
+                            '#8b5cf6'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    cutout: chart.type === 'doughnut' ? '64%' : undefined,
+                    plugins: {legend: {position: 'bottom'}}
+                }
+            });
+        }
+
+        function loadDashboardCharts() {
+            if (typeof Chart === 'undefined') {
+                return;
+            }
+            var chartScript = document.getElementById('dashboard-charts-data');
+            var endpointScript = document.getElementById('dashboard-charts-endpoint');
+            var charts = chartScript ? JSON.parse(chartScript.textContent || '[]') : [];
+            var endpoint = endpointScript ? JSON.parse(endpointScript.textContent || '""') : '';
+            if (!charts.length || !endpoint) {
+                return;
+            }
+            $.ajax({
+                type: 'get',
+                url: endpoint,
+                success: function (response) {
+                    var theme = dashboardChartDefaults();
+                    charts.forEach(function (chart) {
+                        var payload = (response.charts || {})[chart.key];
+                        if (!payload) {
+                            dashboardSetEmpty(chart.id, true);
+                            return;
+                        }
+                        renderDashboardChart(chart, payload, theme);
+                    });
+                },
+                error: showDashboardError
+            });
+        }
+
         if ($('#dashboard-home-root').length) {
             var dashboardMetricGroups = JSON.parse(document.getElementById('dashboard-metric-groups-data').textContent);
             dashboardMetricGroups.forEach(function (group) {
@@ -2951,6 +3418,7 @@
                 });
                 loadDashboardMetrics(group.endpoint, fieldMap);
             });
+            loadDashboardCharts();
         }
 
     </script>

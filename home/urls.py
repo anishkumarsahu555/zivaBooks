@@ -2,6 +2,27 @@ from django.conf import settings
 from django.urls import path
 
 from .apiView import *
+from .apis.admin_master import *
+from .apis.analytics_reports import *
+from .apis.attendance import *
+from .apis.attendance_reports import *
+from .apis.audit import *
+from .apis.book_reports import *
+from .apis.books import *
+from .apis.business_reports import *
+from .apis.cash_counter import *
+from .apis.cash_counter_collections import *
+from .apis.collections import *
+from .apis.dashboard_summaries import *
+from .apis.inventory_returns import *
+from .apis.orders import *
+from .apis.party_ledger_reports import *
+from .apis.messages import *
+from .apis.proforma import *
+from .apis.proforma_reports import *
+from .apis.sales import *
+from .apis.sales_reports import *
+from .apis.tenant_settings import *
 from .views import *
 from inventory.api import (
     add_inventory_category_api as inventory_add_inventory_category_api,
@@ -208,6 +229,7 @@ urlpatterns = [
     path('api/get_staff_dashboard_report_api/', get_staff_dashboard_report_api, name='get_staff_dashboard_report_api'),
     path('api/get_party_dashboard_report_api/', get_party_dashboard_report_api, name='get_party_dashboard_report_api'),
     path('api/get_bank_dashboard_report_api/', get_bank_dashboard_report_api, name='get_bank_dashboard_report_api'),
+    path('api/get_dashboard_charts_api/', get_dashboard_charts_api, name='get_dashboard_charts_api'),
     path('api/get_bank_balances_api/', get_bank_balances_api, name='get_bank_balances_api'),
     path('api/invoice_series_suggestions_api/', invoice_series_suggestions_api, name='invoice_series_suggestions_api'),
     path('api/add_inventory_category_api/', inventory_add_inventory_category_api, name='add_inventory_category_api'),
