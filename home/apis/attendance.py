@@ -457,6 +457,7 @@ class AdminAttendanceListJson(BaseDatatableView):
                 login_location,
                 login_remark,
                 logout_location,
-                logout_remark
+                logout_remark,
+                str(item.staffID.pk)
             ])
         return json_data

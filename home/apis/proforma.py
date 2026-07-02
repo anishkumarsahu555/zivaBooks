@@ -268,19 +268,30 @@ class ProformaInvoiceListJson(BaseDatatableView):
                 ProformaInvoice.Status.CANCELLED: 'red',
             }.get(item.status, 'grey')
             converted_ref = getattr(getattr(item, 'convertedSales', None), 'invoiceNumber', None) or '-'
+            try:
+                party_link = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID.pk}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
+            except:
+                party_link = '-'
             row = [
                 escape(_proforma_public_id(item)),
-                escape(item.partyID.name if item.partyID_id else '-'),
+                party_link,
                 escape(item.invoiceNumber or '-'),
                 f'<div class="ui tiny {status_class} label">{escape(item.get_status_display())}</div>',
                 formatINR(format(item.amount or 0.0, '.0f')),
             ]
             if admin_mode:
                 row.append(''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>')
+            try:
+                if item.createdBy:
+                    created_by_link = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
+                else:
+                    created_by_link = '-'
+            except:
+                created_by_link = '-'
             row.extend([
                 escape(item.buildDate.strftime('%d-%m-%Y') if item.buildDate else '-'),
                 escape(item.validUntil.strftime('%d-%m-%Y') if item.validUntil else '-'),
-                escape(item.createdBy.name if item.createdBy_id else '-'),
+                created_by_link,
                 escape(converted_ref),
                 escape(item.remark or '-'),
             ])

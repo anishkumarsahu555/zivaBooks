@@ -70,6 +70,7 @@ def list_purchase_invoices_api(request):
             'InvoiceNumber': purchase.invoiceNumber,
             'InvoiceDate': purchase.buildDate.strftime('%d/%m/%Y') if purchase.buildDate else '',
             'Party': purchase.partyID.name if purchase.partyID_id else '-',
+            'PartyID': purchase.partyID_id,
             'GSTTreatment': purchase.gstTreatment,
             'ClaimStatus': purchase.claimStatus,
             'TotalAmount': float(purchase.totalAmount or 0.0),

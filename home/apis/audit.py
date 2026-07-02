@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils.html import escape
 from django_datatables_view.base_datatable_view import BaseDatatableView
 
-from home.models import AuditLog
+from home.models import AuditLog, StaffUser
 from home.services.audit_reports import (
     apply_audit_log_filters,
     audit_log_detail_payload,
@@ -39,7 +39,17 @@ class AuditLogListJson(BaseDatatableView):
     def prepare_results(self, qs):
         data = []
         for item in qs:
-            actor = escape(item.actor.username) if item.actor_id else 'System'
+            if item.actor_id:
+                try:
+                    staff_user = StaffUser.objects.filter(user_ID=item.actor_id, isDeleted=False).only('pk').first()
+                    if staff_user:
+                        actor = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{staff_user.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.actor.username)}</span>'''
+                    else:
+                        actor = escape(item.actor.username)
+                except:
+                    actor = escape(item.actor.username)
+            else:
+                actor = 'System'
             model_name = escape(item.content_type.model.replace('_', ' ').title())
             action_label = escape(item.get_action_display())
             changes_count = len(item.changes or {})
@@ -49,12 +59,22 @@ class AuditLogListJson(BaseDatatableView):
                 'onclick="openAuditDetail(\'{}\', {})">'
                 '<i class="eye icon"></i></button>'
             ).format(reverse('homeApp:get_audit_log_detail_api'), item.pk)
+            raw_model = item.content_type.model
+            object_repr = escape(item.object_repr)
+            if raw_model == 'party':
+                object_repr = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.object_id}')" style="cursor: pointer;"><i class="briefcase icon" style="margin-right: 4px; opacity: 0.8;"></i>{object_repr}</span>'''
+            elif raw_model == 'staffuser':
+                object_repr = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.object_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{object_repr}</span>'''
+            elif raw_model == 'bankaccount':
+                object_repr = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('bank', '{item.object_id}')" style="cursor: pointer;"><i class="university icon" style="margin-right: 4px; opacity: 0.8;"></i>{object_repr}</span>'''
+            elif raw_model in ('collection', 'sales', 'cashcounter', 'collectioncashcounter'):
+                object_repr = f'''<span class="lookup-detail-link" onclick="showGenericObjectLookup('{raw_model}', '{item.object_id}')" style="cursor: pointer;"><i class="file alternate outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{object_repr}</span>'''
             data.append([
                 escape(format_audit_datetime(item.datetime)),
                 actor,
                 model_name,
                 action_label,
-                escape(item.object_repr),
+                object_repr,
                 escape(str(item.object_id)),
                 escape(str(changes_count)),
                 detail_btn,

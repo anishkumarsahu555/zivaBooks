@@ -304,6 +304,12 @@ class CashCounterByStaffListJson(BaseDatatableView):
                      'datetime', 'remark'
                      ]
     def get_initial_queryset(self):
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            qs = _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False, mode__iexact="Cash")
+            if not _can_filter_all_cash_counter(self.request.user):
+                qs = qs.filter(createdBy__user_ID_id=self.request.user.pk)
+            return qs
         if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
@@ -339,7 +345,7 @@ class CashCounterByStaffListJson(BaseDatatableView):
         for item in qs:
             action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
-                createdBy = item.createdBy.name
+                createdBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
             except:
                 createdBy = '-'
             json_data.append([
@@ -357,6 +363,12 @@ class CardCounterByStaffListJson(BaseDatatableView):
                      'datetime', 'remark'
                      ]
     def get_initial_queryset(self):
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            qs = _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False, mode__iexact="Card")
+            if not _can_filter_all_cash_counter(self.request.user):
+                qs = qs.filter(createdBy__user_ID_id=self.request.user.pk)
+            return qs
         if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
@@ -392,7 +404,7 @@ class CardCounterByStaffListJson(BaseDatatableView):
         for item in qs:
             action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
-                createdBy = item.createdBy.name
+                createdBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
             except:
                 createdBy = '-'
             try:
@@ -415,6 +427,12 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
                      'datetime', 'remark'
                      ]
     def get_initial_queryset(self):
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            qs = _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False, mode__iexact="Return")
+            if not _can_filter_all_cash_counter(self.request.user):
+                qs = qs.filter(createdBy__user_ID_id=self.request.user.pk)
+            return qs
         if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
@@ -450,7 +468,7 @@ class ReturnCounterByStaffListJson(BaseDatatableView):
         for item in qs:
             action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
-                createdBy = item.createdBy.name
+                createdBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
             except:
                 createdBy = '-'
             json_data.append([
@@ -468,6 +486,12 @@ class CreditCounterByStaffListJson(BaseDatatableView):
                      'datetime', 'remark'
                      ]
     def get_initial_queryset(self):
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            qs = _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False, mode__iexact="Credit")
+            if not _can_filter_all_cash_counter(self.request.user):
+                qs = qs.filter(createdBy__user_ID_id=self.request.user.pk)
+            return qs
         if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
@@ -504,11 +528,11 @@ class CreditCounterByStaffListJson(BaseDatatableView):
         for item in qs:
             action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
-                createdBy = item.createdBy.name
+                createdBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
             except:
                 createdBy = '-'
             try:
-                party = item.partyID.name
+                party = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID_id}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
             except:
                 party = 'N/A'
             json_data.append([
@@ -527,6 +551,12 @@ class MixCounterByStaffListJson(BaseDatatableView):
                      'datetime', 'remark'
                      ]
     def get_initial_queryset(self):
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            qs = _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False, mode__iexact="Mix")
+            if not _can_filter_all_cash_counter(self.request.user):
+                qs = qs.filter(createdBy__user_ID_id=self.request.user.pk)
+            return qs
         if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
@@ -564,7 +594,7 @@ class MixCounterByStaffListJson(BaseDatatableView):
         for item in qs:
             action = _cash_counter_invoice_action_buttons(item, self.request.user)
             try:
-                createdBy = item.createdBy.name
+                createdBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
             except:
                 createdBy = '-'
             try:
@@ -588,6 +618,12 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
                      'datetime', 'remark'
                      ]
     def get_initial_queryset(self):
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            qs = _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False, mode__iexact="Collection")
+            if not _can_filter_all_cash_counter(self.request.user):
+                qs = qs.filter(createdBy__user_ID_id=self.request.user.pk)
+            return qs
         if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
@@ -634,11 +670,11 @@ class CollectionCounterByStaffListJson(BaseDatatableView):
               Denied
             </div>'''
             try:
-                createdBy = item.createdBy.name
+                createdBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
             except:
                 createdBy = '-'
             try:
-                party = item.partyID.name
+                party = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID_id}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
             except:
                 party = 'N/A'
             json_data.append([
@@ -656,6 +692,12 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
                      'datetime', 'remark'
                      ]
     def get_initial_queryset(self):
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            qs = _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False, mode__iexact="Advance")
+            if not _can_filter_all_cash_counter(self.request.user):
+                qs = qs.filter(createdBy__user_ID_id=self.request.user.pk)
+            return qs
         if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
@@ -702,11 +744,11 @@ class AdvanceCounterByStaffListJson(BaseDatatableView):
               Denied
             </div>'''
             try:
-                createdBy = item.createdBy.name
+                createdBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
             except:
                 createdBy = '-'
             try:
-                party = item.partyID.name
+                party = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID_id}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
             except:
                 party = 'N/A'
             json_data.append([
@@ -724,6 +766,12 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
                      'datetime'
                      ]
     def get_initial_queryset(self):
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            qs = _cash_counter_list_base_qs(self.request).filter(isDeleted__exact=False, mode__iexact="Expense")
+            if not _can_filter_all_cash_counter(self.request.user):
+                qs = qs.filter(createdBy__user_ID_id=self.request.user.pk)
+            return qs
         if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
@@ -769,7 +817,7 @@ class ExpenseCounterByStaffListJson(BaseDatatableView):
               Denied
             </div>'''
             try:
-                createdBy = item.createdBy.name
+                createdBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
             except:
                 createdBy = '-'
             json_data.append([

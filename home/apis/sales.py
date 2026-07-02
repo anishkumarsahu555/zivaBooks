@@ -317,6 +317,9 @@ class SalesByAdminListJson(BaseDatatableView):
         queryset = sales_list_base_qs(self.request).filter(isDeleted__exact=False)
         if not can_filter_all_sales(self.request.user):
             queryset = queryset.filter(createdBy__user_ID_id=self.request.user.pk)
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            return queryset
         try:
             start_date_value = self.request.GET.get("startDate")
             end_date_value = self.request.GET.get("endDate")
@@ -354,9 +357,31 @@ class SalesByAdminListJson(BaseDatatableView):
             if can_delete_sales(self.request.user):
                 action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
-            created_by = getattr(getattr(item, 'createdBy', None), 'name', '-') or '-'
-            approved_by = getattr(getattr(item, 'approvedBy', None), 'name', '-') or '-'
-            bank_name = item.bankID.name if getattr(item, 'bankID', None) else '-'
+            try:
+                party = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID.pk}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
+            except:
+                party = '-'
+            try:
+                if item.createdBy:
+                    created_by = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
+                else:
+                    created_by = '-'
+            except:
+                created_by = '-'
+            try:
+                if item.approvedBy:
+                    approved_by = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.approvedBy.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.approvedBy.name)}</span>'''
+                else:
+                    approved_by = '-'
+            except:
+                approved_by = '-'
+            try:
+                if item.bankID:
+                    bank_link = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('bank', '{item.bankID.pk}')" style="cursor: pointer;"><i class="university icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.bankID.name)}</span>'''
+                else:
+                    bank_link = '-'
+            except:
+                bank_link = '-'
             payment_mode = item.modeOfPayment or '-'
             if payment_mode == Sales.Mode.MIX:
                 payment_detail = 'Cash: {} | Online: {}'.format(
@@ -364,7 +389,7 @@ class SalesByAdminListJson(BaseDatatableView):
                     formatINR(format(item.mixOnlineAmount or 0.0, '.0f')),
                 )
             elif payment_mode == Sales.Mode.ONLINE:
-                payment_detail = 'Online via {}'.format(bank_name)
+                payment_detail = f'Online via {bank_link}'
             elif payment_mode == Sales.Mode.CREDIT:
                 payment_detail = 'Credit sale'
             else:
@@ -376,10 +401,10 @@ class SalesByAdminListJson(BaseDatatableView):
                            </div>'''
             json_data.append([
                 escape(_sales_public_id(item)),
-                escape(item.partyID.name),
+                party,
                 escape(item.invoiceNumber),
                 escape(payment_mode),
-                escape(payment_detail),
+                payment_detail,
                 formatINR(format(item.amount, '.0f')),
                 action,
                 escape(item.buildDate.strftime('%d-%m-%Y')),
@@ -402,6 +427,9 @@ class SalesByStaffListJson(BaseDatatableView):
         queryset = sales_list_base_qs(self.request).filter(isDeleted__exact=False)
         if not can_filter_all_sales(self.request.user):
             queryset = queryset.filter(createdBy__user_ID_id=self.request.user.pk)
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            return queryset
         try:
             start_date_value = self.request.GET.get("startDate")
             end_date_value = self.request.GET.get("endDate")
@@ -440,8 +468,24 @@ class SalesByStaffListJson(BaseDatatableView):
             if can_delete_sales(self.request.user):
                 action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
-            created_by = getattr(getattr(item, 'createdBy', None), 'name', '-') or '-'
-            bank_name = item.bankID.name if getattr(item, 'bankID', None) else '-'
+            try:
+                party = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID.pk}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
+            except:
+                party = '-'
+            try:
+                if item.createdBy:
+                    created_by = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
+                else:
+                    created_by = '-'
+            except:
+                created_by = '-'
+            try:
+                if item.bankID:
+                    bank_link = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('bank', '{item.bankID.pk}')" style="cursor: pointer;"><i class="university icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.bankID.name)}</span>'''
+                else:
+                    bank_link = '-'
+            except:
+                bank_link = '-'
             payment_mode = item.modeOfPayment or '-'
             if payment_mode == Sales.Mode.MIX:
                 payment_detail = 'Cash: {} | Online: {}'.format(
@@ -449,17 +493,17 @@ class SalesByStaffListJson(BaseDatatableView):
                     formatINR(format(item.mixOnlineAmount or 0.0, '.0f')),
                 )
             elif payment_mode == Sales.Mode.ONLINE:
-                payment_detail = 'Online via {}'.format(bank_name)
+                payment_detail = f'Online via {bank_link}'
             elif payment_mode == Sales.Mode.CREDIT:
                 payment_detail = 'Credit sale'
             else:
                 payment_detail = 'Cash sale'
             json_data.append([
                 escape(_sales_public_id(item)),
-                escape(item.partyID.name),
+                party,
                 escape(item.invoiceNumber),
                 escape(payment_mode),
-                escape(payment_detail),
+                payment_detail,
                 formatINR(format(item.amount, '.0f')),
                 escape(item.buildDate.strftime('%d-%m-%Y')),
                 created_by,

@@ -164,7 +164,11 @@ class PartyLedgerListJson(BaseDatatableView):
                         escape(ref_label),
                         escape(ref_value),
                     )
-            part_html = '<div class="pl-part">{}</div>{}'.format(escape(particulars), ref_html)
+            if (item.source_content_type_id and item.source_object_id) or (item.source == PartyLedgerEntry.Source.TRANSFER and item.transferId):
+                particulars_html = f'''<span class="lookup-detail-link" onclick="showPartyLedgerSourceLookup('{item.pk}')" style="cursor: pointer;"><i class="file alternate outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(particulars)}</span>'''
+            else:
+                particulars_html = escape(particulars)
+            part_html = '<div class="pl-part">{}</div>{}'.format(particulars_html, ref_html)
             if abs(signed) < 1e-9:
                 amt_html = '-'
             elif signed > 0:
@@ -262,3 +266,93 @@ def generate_party_ledger_excel(request, party_id):
             {'title': 'Ledger Detail', 'headers': ['Date', 'Particulars', 'Voucher Type', 'Voucher No', 'Debit', 'Credit', 'Balance'], 'rows': [[row['date'].strftime('%d/%m/%Y') if row['date'] else '-', row['particulars'], row['voucher_type'], row['voucher_no'], row['debit'], row['credit'], row['balance']] for row in statement['rows']]},
         ],
     }])
+
+
+def get_party_ledger_entry_source_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    entry_id = request.GET.get('id')
+    if not entry_id or not entry_id.isdigit():
+        return JsonResponse({'message': 'invalid'}, safe=False)
+    entry = tenant_qs(request, PartyLedgerEntry).filter(isDeleted=False, pk=int(entry_id)).first()
+    if entry is None:
+        return JsonResponse({'message': 'not_found'}, safe=False)
+
+    title = "Transaction Source Document"
+    details = []
+    detail_url = ""
+
+    if entry.source_content_type and entry.source_object_id:
+        obj = entry.source_object
+        if obj:
+            model_name = entry.source_content_type.model
+            if model_name == 'collection':
+                title = f"Collection Details - {obj.paymentID or ''}"
+                detail_url = f"/collection_list/?search={obj.paymentID or ''}"
+                details = [
+                    ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                    ("Payment ID", obj.paymentID or "-"),
+                    ("Mode of Payment", obj.modeOfPayment),
+                    ("Paid Amount", f"₹ {obj.paidAmount:.2f}"),
+                    ("Collected By", obj.collectedBy.name if obj.collectedBy else "-"),
+                    ("Collection Date/Time", obj.collectionDateTime.strftime('%d-%m-%Y %I:%M %p') if obj.collectionDateTime else "-"),
+                    ("Bank", obj.bankID.name if obj.bankID else "-"),
+                    ("Approved By", obj.approvedBy.name if obj.approvedBy else "-"),
+                    ("Detail", obj.detail or "-"),
+                    ("Remark", obj.remark or "-"),
+                ]
+            elif model_name == 'sales':
+                title = f"Sales Invoice Details - {obj.invoiceNumber or ''}"
+                detail_url = f"/sales_list/?search={obj.invoiceNumber or ''}"
+                details = [
+                    ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                    ("Invoice Number", obj.invoiceNumber or "-"),
+                    ("Payment Mode", obj.modeOfPayment),
+                    ("Total Amount", f"₹ {obj.amount:.2f}"),
+                    ("Taxable Amount", f"₹ {obj.taxableAmount:.2f}"),
+                    ("GST Amount", f"₹ {obj.gstAmount:.2f}"),
+                    ("Created By", obj.createdBy.name if obj.createdBy else "-"),
+                    ("Bank", obj.bankID.name if obj.bankID else "-"),
+                    ("Remark", obj.remark or "-"),
+                ]
+            elif model_name == 'cashcounter':
+                title = f"Counter Sales Details - {obj.invoiceNumber or ''}"
+                detail_url = f"/my_cash_counter_list/?search={obj.invoiceNumber or ''}"
+                details = [
+                    ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                    ("Invoice Number", obj.invoiceNumber or "-"),
+                    ("Payment Mode", obj.mode),
+                    ("Amount", f"₹ {obj.amount:.2f}"),
+                    ("Created By", obj.createdBy.name if obj.createdBy else "-"),
+                    ("Bank", obj.bankID.name if obj.bankID else "-"),
+                    ("Remark", obj.remark or "-"),
+                ]
+            elif model_name == 'cashcountercollection':
+                title = f"Counter Collection Details - {obj.paymentID or ''}"
+                detail_url = f"/my_cash_counter_list/?search={obj.paymentID or ''}"
+                details = [
+                    ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                    ("Payment ID", obj.paymentID or "-"),
+                    ("Mode of Payment", obj.modeOfPayment),
+                    ("Paid Amount", f"₹ {obj.paidAmount:.2f}"),
+                    ("Collected By", obj.collectedBy.name if obj.collectedBy else "-"),
+                    ("Remark", obj.remark or "-"),
+                ]
+    elif entry.source == PartyLedgerEntry.Source.TRANSFER and entry.transferId:
+        title = "Inter-Account Transfer Details"
+        details = [
+            ("Transfer Date", entry.txDateTime.strftime('%d-%m-%Y %I:%M %p')),
+            ("Narration / Remarks", entry.particulars or "-"),
+        ]
+
+    if not details:
+        details = [
+            ("Transaction Date", entry.txDateTime.strftime('%d-%m-%Y %I:%M %p')),
+            ("Debit", f"₹ {entry.debit:.2f}" if entry.debit else "-"),
+            ("Credit", f"₹ {entry.credit:.2f}" if entry.credit else "-"),
+            ("Source", entry.get_source_display()),
+            ("Narration", entry.particulars or "-"),
+        ]
+
+    return JsonResponse({'message': 'success', 'title': title, 'details': details, 'detail_url': detail_url}, safe=False)
+

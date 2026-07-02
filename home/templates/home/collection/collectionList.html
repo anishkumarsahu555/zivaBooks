@@ -124,6 +124,7 @@
         html[data-theme="dark"] .collection-download-menu-item:hover {
             background: rgba(22, 120, 194, 0.16);
         }
+
     </style>
 
     <div class="ui {% if not collection_capabilities.can_filter_staff %}right aligned{% endif %} basic grid">
@@ -334,6 +335,7 @@
             </div>
         </div>
     {% endif %}
+
 {% endblock %}
 
 {% block js %}
@@ -612,6 +614,7 @@
                 }
             });
         }
+
 
         $(ChangeDate());
         {% else %}

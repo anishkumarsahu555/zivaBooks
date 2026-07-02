@@ -967,8 +967,17 @@ def get_staff_user_detail(request):
     # instance = BankDetails.objects.get(companyID_id=company.pk)
     try:
         party = C_User.partyGroupID.id
+        party_name = C_User.partyGroupID.name
     except:
         party = 'N/A'
+        party_name = 'N/A'
+    
+    group_name = 'N/A'
+    if C_User.staffGroup:
+        group_name = C_User.staffGroup.name
+    elif C_User.group:
+        group_name = C_User.group
+
     data = {
         'ID': C_User.pk,
         'UserName': C_User.name,
@@ -977,7 +986,9 @@ def get_staff_user_detail(request):
         'UserEmail': C_User.email,
         'UserPassword': C_User.userPassword,
         'UserGroup': C_User.staffGroup_id,
+        'UserGroupName': group_name,
         'PartyGroup': party,
+        'PartyGroupName': party_name,
         'IsActive': C_User.isActive,
         'ImgUrl': _image_url(C_User.photo, 'medium'),
         'IDUrl': _image_url(C_User.idProof, 'medium')
@@ -1526,7 +1537,10 @@ class PartyListJson(BaseDatatableView):
             except:
                 party = 'N/A'
             try:
-                usr = item.assignTo.name
+                if item.assignTo:
+                    usr = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.assignTo.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.assignTo.name)}</span>'''
+                else:
+                    usr = 'N/A'
             except:
                 usr = 'N/A'
             if can_view_credentials and item.username:

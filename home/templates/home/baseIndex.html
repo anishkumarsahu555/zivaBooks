@@ -2520,6 +2520,51 @@
                 padding: 0 9px;
             }
         }
+
+        /* General Lookup Styles */
+        .lookup-detail-link {
+            color: #2185d0;
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.2s ease, border-bottom 0.2s ease;
+            border-bottom: 1px dashed transparent;
+            display: inline-flex;
+            align-items: center;
+        }
+        .lookup-detail-link:hover {
+            color: #1678c2;
+            border-bottom: 1px dashed #1678c2;
+        }
+        /* Dark mode support */
+        html[data-theme="dark"] .lookup-detail-link {
+            color: #64b5f6;
+        }
+        html[data-theme="dark"] .lookup-detail-link:hover {
+            color: #90caf9;
+            border-bottom-color: #90caf9;
+        }
+
+        /* General Lookup Modal Adjustments */
+        #generalLookupModal {
+            max-width: 650px;
+        }
+        
+        .general-lookup-section {
+            display: none;
+        }
+
+        .lookup-meta-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            display: block;
+            margin-bottom: 2px;
+        }
+        html[data-theme="dark"] .lookup-meta-label {
+            color: #94a3b8;
+        }
     </style>
 
 </head>
@@ -2622,6 +2667,493 @@
     </div>
 </div>
 {% endif %}
+
+    <!-- Unified General Lookup Modal -->
+    <div class="ui modal" id="generalLookupModal">
+        <i class="close icon"></i>
+        <div class="header">
+            <i class="info circle icon" id="lookupModalHeaderIcon"></i>
+            <span id="lookupModalTitle">Entity Details</span>
+            <span class="ui tiny label" id="lookupModalBadge" style="margin-left: 10px; vertical-align: middle;">Details</span>
+        </div>
+        
+        <div class="content">
+            <!-- PANEL A: STAFF PROFILE -->
+            <div id="lookupStaffContent" class="general-lookup-section" style="width: 100%;">
+                <div class="ui grid stackable divided">
+                    <div class="four wide column center aligned">
+                        <img id="modalStaffPhoto" class="ui circular image centered" src="/static/images/default-avatar.svg" style="width: 100px; height: 100px; object-fit: cover; border: 2px solid var(--app-line);">
+                        <div style="margin-top: 1rem;">
+                            <span class="lookup-meta-label">Role Group</span>
+                            <div class="ui blue mini label" id="modalStaffGroup">N/A</div>
+                        </div>
+                    </div>
+                    <div class="twelve wide column">
+                        <div class="ui stackable two column grid">
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="phone icon"></i> Phone Number</span>
+                                            <strong id="modalStaffPhone" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="envelope icon"></i> Email Address</span>
+                                            <strong id="modalStaffEmail" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="users icon"></i> Party Group</span>
+                                            <strong id="modalStaffPartyGroup" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="map marker alternate icon"></i> Address</span>
+                                            <strong id="modalStaffAddress" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="modalStaffIdProofContainer" style="display: none; border-top: 1px dashed var(--app-line); padding-top: 1.5rem; margin-top: 1.5rem; text-align: center;">
+                    <div class="ui tiny header" style="margin-bottom: 0.75rem;"><i class="id card icon"></i> ID Proof Document</div>
+                    <img id="modalStaffIdProof" class="ui rounded centered image" src="" style="max-height: 200px; border: 1px solid var(--app-line); object-fit: contain;">
+                </div>
+            </div>
+
+            <!-- PANEL B: PARTY LEDGER DETAIL -->
+            <div id="lookupPartyContent" class="general-lookup-section" style="width: 100%;">
+                <div class="ui grid stackable divided">
+                    <div class="five wide column">
+                        <div class="ui segment center aligned" style="box-shadow: none !important; border: 1px solid var(--app-line); background: transparent; padding: 1rem;">
+                            <span class="lookup-meta-label">Opening Balance</span>
+                            <div class="ui header" id="modalPartyBalance" style="margin: 5px 0 10px 0; font-size: 1.6rem; font-weight: 700;">₹ 0</div>
+                            <div class="ui divider" style="margin: 10px 0;"></div>
+                            <span class="lookup-meta-label">GST Number</span>
+                            <strong id="modalPartyGST" style="font-family: monospace; font-size: 0.95rem;">N/A</strong>
+                        </div>
+                    </div>
+                    <div class="eleven wide column">
+                        <div class="ui stackable two column grid">
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="building outline icon"></i> Legal Name</span>
+                                            <strong id="modalPartyLegalName" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="phone icon"></i> Phone Number</span>
+                                            <strong id="modalPartyPhone" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="map marker alternate icon"></i> Address</span>
+                                            <strong id="modalPartyAddress" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="truck icon"></i> Billing Address</span>
+                                            <strong id="modalPartyBillingAddress" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL C: BANK DETAILS -->
+            <div id="lookupBankContent" class="general-lookup-section" style="width: 100%;">
+                <div class="ui grid stackable divided">
+                    <div class="five wide column">
+                        <div class="ui segment center aligned" style="box-shadow: none !important; border: 1px solid var(--app-line); background: transparent; padding: 1rem;">
+                            <span class="lookup-meta-label">Available Balance</span>
+                            <div class="ui header" id="modalBankBalance" style="margin: 5px 0 0 0; font-size: 1.6rem; font-weight: 700;">₹ 0</div>
+                        </div>
+                    </div>
+                    <div class="eleven wide column">
+                        <div class="ui stackable two column grid">
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="credit card icon"></i> Account Number</span>
+                                            <strong id="modalBankAccount" style="font-family: monospace; font-size: 1.1rem; color: var(--app-text); font-weight: 600; letter-spacing: 0.5px;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="file alternate outline icon"></i> Description</span>
+                                            <strong id="modalBankDesc" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <a href="" id="lookupDetailLinkBtn" class="ui primary tiny button">
+                View Full Details
+                <i class="external alternate icon"></i>
+            </a>
+            <div class="ui cancel secondary tiny button">Close</div>
+        </div>
+    </div>
+
+    <!-- Source Transaction Lookup Modal -->
+    <div class="ui small modal" id="sourceTxLookupModal">
+        <i class="close icon"></i>
+        <div class="header">
+            <i class="file alternate outline icon" style="margin-right: 5px;"></i>
+            <span id="sourceTxLookupTitle">Source Document Details</span>
+        </div>
+        <div class="content" style="max-height: 400px; overflow-y: auto;">
+            <table class="ui celled definition table small compact" style="margin-bottom: 0;">
+                <tbody id="sourceTxLookupTableBody">
+                    <!-- Dynamic details rows go here -->
+                </tbody>
+            </table>
+        </div>
+        <div class="actions">
+            <a href="" id="sourceTxDetailLinkBtn" class="ui primary tiny button" style="display: none;">
+                View Full Details
+                <i class="external alternate icon"></i>
+            </a>
+            <div class="ui cancel tiny button">Close</div>
+        </div>
+    </div>
+
+    <script>
+        function showGeneralLookup(modelType, id) {
+            showLoading();
+            
+            // Hide all layout sections initially
+            $('.general-lookup-section').hide();
+            
+            var apiUrl = '';
+            if (modelType === 'staff') {
+                apiUrl = "{% url 'homeApp:get_staff_user_detail' %}";
+            } else if (modelType === 'party') {
+                apiUrl = "{% url 'homeApp:get_party_detail' %}";
+            } else if (modelType === 'bank') {
+                apiUrl = "{% url 'homeApp:get_bank_detail' %}";
+            }
+            
+            $.ajax({
+                url: apiUrl,
+                type: "get",
+                data: { 'id': id },
+                success: function (response) {
+                    hideLoading();
+                    if (response.data) {
+                        var data = response.data;
+                        
+                        if (modelType === 'staff') {
+                            // Header customizations
+                            $('#lookupModalHeaderIcon').attr('class', 'user outline icon');
+                            $('#lookupModalTitle').text(data.UserName || 'Staff Profile');
+                            
+                            var badgeEl = $('#lookupModalBadge');
+                            if (data.IsActive === 'Active' || data.IsActive === 'True' || data.IsActive === true) {
+                                badgeEl.text('Active').removeClass('grey red purple teal').addClass('green');
+                            } else {
+                                badgeEl.text('Inactive').removeClass('green red purple teal').addClass('grey');
+                            }
+                            
+                            // Body populate
+                            if (data.UserPhone) {
+                                $('#modalStaffPhone').html('<a href="tel:' + data.UserPhone + '" style="color: inherit;"><i class="phone call icon"></i> ' + data.UserPhone + '</a>');
+                            } else {
+                                $('#modalStaffPhone').text('-');
+                            }
+                            
+                            if (data.UserEmail) {
+                                $('#modalStaffEmail').html('<a href="mailto:' + data.UserEmail + '" style="color: inherit;"><i class="envelope outline icon"></i> ' + data.UserEmail + '</a>');
+                            } else {
+                                $('#modalStaffEmail').text('-');
+                            }
+                            
+                            $('#modalStaffAddress').text(data.UserAddress || '-');
+                            $('#modalStaffGroup').text(data.UserGroupName || 'N/A');
+                            $('#modalStaffPartyGroup').text(data.PartyGroupName || 'N/A');
+                            
+                            var photoUrl = data.ImgUrl || '/static/images/default-avatar.svg';
+                            $('#modalStaffPhoto').attr('src', photoUrl);
+                            
+                            if (data.IDUrl && data.IDUrl !== '/static/images/default-avatar.svg') {
+                                $('#modalStaffIdProof').attr('src', data.IDUrl);
+                                $('#modalStaffIdProofContainer').show();
+                            } else {
+                                $('#modalStaffIdProofContainer').hide();
+                            }
+                            
+                            // Redirection button
+                            $('#lookupDetailLinkBtn').attr('href', "{% url 'homeApp:user_list' %}?search=" + encodeURIComponent(data.UserName || ''));
+                            
+                            // Show panel
+                            $('#lookupStaffContent').show();
+                            
+                        } else if (modelType === 'party') {
+                            // Header customizations
+                            $('#lookupModalHeaderIcon').attr('class', 'briefcase icon');
+                            $('#lookupModalTitle').text(data.Name || 'Party Details');
+                            
+                            var badgeEl = $('#lookupModalBadge');
+                            if (data.IsB2B) {
+                                badgeEl.text('B2B Business').removeClass('grey green red teal').addClass('purple');
+                            } else {
+                                badgeEl.text('Regular Party').removeClass('purple green red teal').addClass('grey');
+                            }
+                            
+                            // Body populate
+                            $('#modalPartyLegalName').text(data.LegalName || '-');
+                            if (data.PhoneNumber) {
+                                $('#modalPartyPhone').html('<a href="tel:' + data.PhoneNumber + '" style="color: inherit;"><i class="phone call icon"></i> ' + data.PhoneNumber + '</a>');
+                            } else {
+                                $('#modalPartyPhone').text('-');
+                            }
+                            $('#modalPartyAddress').text(data.Address || '-');
+                            $('#modalPartyBillingAddress').text(data.BillingAddress || '-');
+                            $('#modalPartyGST').text(data.GSTNumber || 'N/A');
+                            
+                            var balance = parseFloat(data.OpeningBalance || 0);
+                            var balanceText = '₹ ' + balance.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                            $('#modalPartyBalance').text(balanceText);
+                            if (balance >= 0) {
+                                $('#modalPartyBalance').css('color', '');
+                            } else {
+                                $('#modalPartyBalance').css('color', '#dc2626');
+                            }
+                            
+                            // Redirection button
+                            $('#lookupDetailLinkBtn').attr('href', "{% url 'homeApp:party_list' %}?search=" + encodeURIComponent(data.Name || ''));
+                            
+                            // Show panel
+                            $('#lookupPartyContent').show();
+                            
+                        } else if (modelType === 'bank') {
+                            // Header customizations
+                            $('#lookupModalHeaderIcon').attr('class', 'university icon');
+                            $('#lookupModalTitle').text(data.Name || 'Bank Details');
+                            
+                            $('#lookupModalBadge').text('Bank Account').removeClass('purple green red grey').addClass('teal');
+                            
+                            // Body populate
+                            $('#modalBankAccount').text(data.AccountNumber || '-');
+                            $('#modalBankDesc').text(data.Description || '-');
+                            
+                            var balance = parseFloat(data.OpeningBalance || 0);
+                            var balanceText = '₹ ' + balance.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                            $('#modalBankBalance').text(balanceText);
+                            if (balance >= 0) {
+                                $('#modalBankBalance').css('color', '');
+                            } else {
+                                $('#modalBankBalance').css('color', '#dc2626');
+                            }
+                            
+                            // Redirection button
+                            $('#lookupDetailLinkBtn').attr('href', "{% url 'homeApp:bank_list' %}?search=" + encodeURIComponent(data.Name || ''));
+                            
+                            // Show panel
+                            $('#lookupBankContent').show();
+                        }
+                        
+                        // Show unified modal
+                        $('#generalLookupModal').modal('show');
+                    } else {
+                        var msg = response.error || 'Could not fetch lookup details.';
+                        if (response.message === 'forbidden' || response.message === 'unauthorized') {
+                            msg = 'You do not have the required permissions to view these details.';
+                        }
+                        $('body').toast({class: 'error', message: msg});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = 'An error occurred while fetching details.';
+                    if (xhr.status === 403 || xhr.status === 401) {
+                        msg = 'You do not have the required permissions to view these details.';
+                    }
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function showSourceTxLookup(txId) {
+            showLoading();
+            $.ajax({
+                url: "/api/get_book_tx_source_detail_api/",
+                type: "get",
+                data: { 'id': txId },
+                success: function (response) {
+                    hideLoading();
+                    if (response.message === 'success') {
+                        $('#sourceTxLookupTitle').text(response.title);
+                        var html = '';
+                        response.details.forEach(function (item) {
+                            html += '<tr><td class="four wide font-semibold" style="font-weight: 600; color: var(--app-text);">' + escapeHtml(item[0]) + '</td><td style="color: var(--app-text);">' + item[1] + '</td></tr>';
+                        });
+                        $('#sourceTxLookupTableBody').html(html);
+                        
+                        if (response.detail_url) {
+                            $('#sourceTxDetailLinkBtn').attr('href', response.detail_url).show();
+                        } else {
+                            $('#sourceTxDetailLinkBtn').hide();
+                        }
+                        
+                        $('#sourceTxLookupModal').modal('show');
+                    } else {
+                        var msg = response.error || 'Unable to retrieve source details.';
+                        if (response.message === 'forbidden' || response.message === 'unauthorized') {
+                            msg = 'You do not have the required permissions to view these details.';
+                        }
+                        $('body').toast({class: 'error', message: msg});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = 'An error occurred while fetching source details.';
+                    if (xhr.status === 403 || xhr.status === 401) {
+                        msg = 'You do not have the required permissions to view these details.';
+                    }
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function showPartyLedgerSourceLookup(entryId) {
+            showLoading();
+            $.ajax({
+                url: "/api/get_party_ledger_entry_source_detail_api/",
+                type: "get",
+                data: { 'id': entryId },
+                success: function (response) {
+                    hideLoading();
+                    if (response.message === 'success') {
+                        $('#sourceTxLookupTitle').text(response.title);
+                        var html = '';
+                        response.details.forEach(function (item) {
+                            html += '<tr><td class="four wide font-semibold" style="font-weight: 600; color: var(--app-text);">' + escapeHtml(item[0]) + '</td><td style="color: var(--app-text);">' + item[1] + '</td></tr>';
+                        });
+                        $('#sourceTxLookupTableBody').html(html);
+
+                        if (response.detail_url) {
+                            $('#sourceTxDetailLinkBtn').attr('href', response.detail_url).show();
+                        } else {
+                            $('#sourceTxDetailLinkBtn').hide();
+                        }
+
+                        $('#sourceTxLookupModal').modal('show');
+                    } else {
+                        var msg = response.error || 'Unable to retrieve source details.';
+                        if (response.message === 'forbidden' || response.message === 'unauthorized') {
+                            msg = 'You do not have the required permissions to view these details.';
+                        }
+                        $('body').toast({class: 'error', message: msg});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = 'An error occurred while fetching source details.';
+                    if (xhr.status === 403 || xhr.status === 401) {
+                        msg = 'You do not have the required permissions to view these details.';
+                    }
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function showGenericObjectLookup(modelName, objectId) {
+            showLoading();
+            $.ajax({
+                url: "/api/get_generic_object_detail_api/",
+                type: "get",
+                data: { 'model': modelName, 'id': objectId },
+                success: function (response) {
+                    hideLoading();
+                    if (response.message === 'success') {
+                        $('#sourceTxLookupTitle').text(response.title);
+                        var html = '';
+                        response.details.forEach(function (item) {
+                            html += '<tr><td class="four wide font-semibold" style="font-weight: 600; color: var(--app-text);">' + escapeHtml(item[0]) + '</td><td style="color: var(--app-text);">' + item[1] + '</td></tr>';
+                        });
+                        $('#sourceTxLookupTableBody').html(html);
+
+                        if (response.detail_url) {
+                            $('#sourceTxDetailLinkBtn').attr('href', response.detail_url).show();
+                        } else {
+                            $('#sourceTxDetailLinkBtn').hide();
+                        }
+
+                        $('#sourceTxLookupModal').modal('show');
+                    } else {
+                        var msg = response.error || 'Unable to retrieve document details.';
+                        if (response.message === 'forbidden' || response.message === 'unauthorized') {
+                            msg = 'You do not have the required permissions to view these details.';
+                        }
+                        $('body').toast({class: 'error', message: msg});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = 'An error occurred while fetching details.';
+                    if (xhr.status === 403 || xhr.status === 401) {
+                        msg = 'You do not have the required permissions to view these details.';
+                    }
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        $(document).ready(function() {
+            var searchParams = new URLSearchParams(window.location.search);
+            var qSearch = searchParams.get('search');
+            if (qSearch && qSearch.trim()) {
+                $(document).on('init.dt', function(e, settings) {
+                    var api = new $.fn.dataTable.Api(settings);
+                    api.search(qSearch).draw();
+                });
+            }
+        });
+    </script>
 
 
 <script src="https://frontendfunn.github.io/semantic-ui-admin-dashboard-template/js/script.js"></script>

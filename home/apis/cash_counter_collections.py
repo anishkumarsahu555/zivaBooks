@@ -97,6 +97,12 @@ class CashCounterCollectionListJson(BaseDatatableView):
                      'remark', 'action'
                      ]
     def get_initial_queryset(self):
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            qs = _cash_counter_collection_list_base_qs(self.request).filter(isDeleted__exact=False)
+            if not _can_filter_all_cash_counter(self.request.user):
+                qs = qs.filter(collectedBy__user_ID_id=self.request.user.pk)
+            return qs
         if _can_filter_all_cash_counter(self.request.user):
             try:
                 startDateV = self.request.GET.get("startDate")
@@ -152,29 +158,33 @@ class CashCounterCollectionListJson(BaseDatatableView):
             else:
                 chequeDate = '-'
             try:
-                bank = item.bankID.name
+                party = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID_id}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
+            except:
+                party = '-'
+            try:
+                bank = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('bank', '{item.bankID_id}')" style="cursor: pointer;">{escape(item.bankID.name)}</span>'''
             except:
                 bank = '-'
             try:
-                tparty = item.transferredPartyID.name
+                tparty = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.transferredPartyID_id}')" style="cursor: pointer;">{escape(item.transferredPartyID.name)}</span>'''
             except:
                 tparty = '-'
             try:
-                collectedBy = item.collectedBy.name
+                collectedBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.collectedBy_id}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.collectedBy.name)}</span>'''
             except:
                 collectedBy = '-'
             json_data.append([
                 escape(item.paymentID),
-                escape(item.partyID.name),
+                party,
                 formatINR(format(item.paidAmount, '.0f')),
                 escape(item.modeOfPayment),
                 collectedBy,
                 escape(item.collectionDateTime.strftime('%d-%m-%Y')),
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
-                escape(bank),
+                bank,
                 escape(item.detail),
                 escape(chequeDate),
-                escape(tparty),
+                tparty,
                 escape(item.remark),
                 action,
             ])

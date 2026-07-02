@@ -279,7 +279,18 @@
             "columnDefs": [
                 {% if attendance_capabilities.can_filter_staff %}
                     {"name": "datetime", "targets": 0, "orderable": true},
-                    {"name": "staffID.name", "targets": 1, "orderable": true},
+                    {
+                        "name": "staffID.name",
+                        "targets": 1,
+                        "orderable": true,
+                        "render": function(data, type, row, meta) {
+                            var staffId = row[10];
+                            if (staffId) {
+                                return '<span class="lookup-detail-link" onclick="showGeneralLookup(\'staff\', \'' + staffId + '\')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>' + data + '</span>';
+                            }
+                            return data;
+                        }
+                    },
                     {"name": "loginDateTime", "targets": 2, "orderable": true},
                     {"name": "loginPhoto", "targets": 3, "orderable": false},
                     {"name": "logoutDateTime", "targets": 4, "orderable": true},

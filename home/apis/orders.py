@@ -418,20 +418,35 @@ class OrdersByAdminListJson(BaseDatatableView):
                     '''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk)
                 )
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
-            party = item.partyID.name if getattr(item, 'partyID', None) else '-'
-            created_by = item.createdBy.name if getattr(item, 'createdBy', None) else '-'
-            approved_by = item.approvedBy.name if getattr(item, 'approvedBy', None) else '-'
+            try:
+                party = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID.pk}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
+            except:
+                party = '-'
+            try:
+                if item.createdBy:
+                    created_by = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.createdBy.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.createdBy.name)}</span>'''
+                else:
+                    created_by = '-'
+            except:
+                created_by = '-'
+            try:
+                if item.approvedBy:
+                    approved_by = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.approvedBy.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.approvedBy.name)}</span>'''
+                else:
+                    approved_by = '-'
+            except:
+                approved_by = '-'
             approved_on = item.approvedOn.strftime('%d-%m-%Y %I:%M %p') if getattr(item, 'approvedOn', None) else '-'
             status_label = _order_status_label(item.status)
             att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
             json_data.append([
                 escape(_order_public_id(item)),
-                escape(party),
+                party,
                 escape(item.buildDate.strftime('%d-%m-%Y') if item.buildDate else '-'),
                 status_label,
-                escape(approved_by),
+                approved_by,
                 escape(approved_on),
-                escape(created_by),
+                created_by,
                 escape(item.lastUpdatedOn.strftime('%d-%m-%Y %I:%M %p')),
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 escape(str(att_count)),
@@ -493,12 +508,15 @@ class OrdersByStaffListJson(BaseDatatableView):
                     '''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk)
                 )
             action = ''.join(action_parts) or '<div class="ui tiny grey label">View Only</div>'
-            party = item.partyID.name if getattr(item, 'partyID', None) else '-'
+            try:
+                party = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID.pk}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
+            except:
+                party = '-'
             status_label = _order_status_label(item.status)
             att_count = tenant_qs(self.request, OrderAttachment).filter(isDeleted=False, order_id=item.pk).count()
             json_data.append([
                 escape(_order_public_id(item)),
-                escape(party),
+                party,
                 escape(item.buildDate.strftime('%d-%m-%Y') if item.buildDate else '-'),
                 status_label,
                 escape(item.lastUpdatedOn.strftime('%d-%m-%Y %I:%M %p')),

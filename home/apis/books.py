@@ -302,6 +302,180 @@ def get_book_tx_detail_api(request):
     }, safe=False)
 
 
+def get_book_tx_source_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    tx_id = request.GET.get('id')
+    if not tx_id or not tx_id.isdigit():
+        return JsonResponse({'message': 'invalid'}, safe=False)
+    tx = tenant_qs(request, BookTransaction).filter(isDeleted=False, pk=int(tx_id)).first()
+    if tx is None:
+        return JsonResponse({'message': 'not_found'}, safe=False)
+
+    title = "Transaction Source Document"
+    details = []
+    detail_url = ""
+
+    if tx.source_content_type and tx.source_object_id:
+        obj = tx.source_object
+        if obj:
+            model_name = tx.source_content_type.model
+            if model_name == 'collection':
+                title = f"Collection Details - {obj.paymentID or ''}"
+                detail_url = f"/collection_list/?search={obj.paymentID or ''}"
+                details = [
+                    ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                    ("Payment ID", obj.paymentID or "-"),
+                    ("Mode of Payment", obj.modeOfPayment),
+                    ("Paid Amount", f"₹ {obj.paidAmount:.2f}"),
+                    ("Collected By", obj.collectedBy.name if obj.collectedBy else "-"),
+                    ("Collection Date/Time", obj.collectionDateTime.strftime('%d-%m-%Y %I:%M %p') if obj.collectionDateTime else "-"),
+                    ("Bank", obj.bankID.name if obj.bankID else "-"),
+                    ("Approved By", obj.approvedBy.name if obj.approvedBy else "-"),
+                    ("Detail", obj.detail or "-"),
+                    ("Remark", obj.remark or "-"),
+                ]
+            elif model_name == 'sales':
+                title = f"Sales Invoice Details - {obj.invoiceNumber or ''}"
+                detail_url = f"/sales_list/?search={obj.invoiceNumber or ''}"
+                details = [
+                    ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                    ("Invoice Number", obj.invoiceNumber or "-"),
+                    ("Payment Mode", obj.modeOfPayment),
+                    ("Total Amount", f"₹ {obj.amount:.2f}"),
+                    ("Taxable Amount", f"₹ {obj.taxableAmount:.2f}"),
+                    ("GST Amount", f"₹ {obj.gstAmount:.2f}"),
+                    ("Created By", obj.createdBy.name if obj.createdBy else "-"),
+                    ("Bank", obj.bankID.name if obj.bankID else "-"),
+                    ("Remark", obj.remark or "-"),
+                ]
+            elif model_name == 'cashcounter':
+                title = f"Counter Sales Details - {obj.invoiceNumber or ''}"
+                detail_url = f"/my_cash_counter_list/?search={obj.invoiceNumber or ''}"
+                details = [
+                    ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                    ("Invoice Number", obj.invoiceNumber or "-"),
+                    ("Payment Mode", obj.mode),
+                    ("Amount", f"₹ {obj.amount:.2f}"),
+                    ("Created By", obj.createdBy.name if obj.createdBy else "-"),
+                    ("Bank", obj.bankID.name if obj.bankID else "-"),
+                    ("Remark", obj.remark or "-"),
+                ]
+            elif model_name == 'cashcountercollection':
+                title = f"Counter Collection Details - {obj.paymentID or ''}"
+                detail_url = f"/my_cash_counter_list/?search={obj.paymentID or ''}"
+                details = [
+                    ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                    ("Payment ID", obj.paymentID or "-"),
+                    ("Mode of Payment", obj.modeOfPayment),
+                    ("Paid Amount", f"₹ {obj.paidAmount:.2f}"),
+                    ("Collected By", obj.collectedBy.name if obj.collectedBy else "-"),
+                    ("Remark", obj.remark or "-"),
+                ]
+    elif tx.source == BookTransaction.Source.TRANSFER and tx.transferId:
+        title = "Inter-Account Transfer Details"
+        other_tx = tenant_qs(request, BookTransaction).filter(isDeleted=False, transferId=tx.transferId).exclude(pk=tx.pk).first()
+        if other_tx:
+            details = [
+                ("Transfer Date", tx.txDateTime.strftime('%d-%m-%Y %I:%M %p')),
+                ("Amount Transferred", f"₹ {tx.amount:.2f}"),
+                ("From Account", other_tx.account.name if tx.direction == BookTransaction.Direction.IN else tx.account.name),
+                ("To Account", tx.account.name if tx.direction == BookTransaction.Direction.IN else other_tx.account.name),
+                ("Narration / Remarks", tx.narration or "-"),
+            ]
+
+    if not details:
+        details = [
+            ("Transaction Date", tx.txDateTime.strftime('%d-%m-%Y %I:%M %p')),
+            ("Amount", f"₹ {tx.amount:.2f}"),
+            ("Type / Direction", tx.get_direction_display()),
+            ("Source", tx.get_source_display()),
+            ("Narration", tx.narration or "-"),
+        ]
+
+    return JsonResponse({'message': 'success', 'title': title, 'details': details, 'detail_url': detail_url}, safe=False)
+
+
+def get_generic_object_detail_api(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'message': 'unauthorized'}, status=401, safe=False)
+    model_name = request.GET.get('model', '').lower().replace('_', '').replace(' ', '')
+    object_id = request.GET.get('id')
+    if not model_name or not object_id or not object_id.isdigit():
+        return JsonResponse({'message': 'invalid'}, safe=False)
+
+    title = "Document Details"
+    details = []
+    detail_url = ""
+
+    pk = int(object_id)
+    if model_name == 'collection':
+        obj = tenant_qs(request, Collection).filter(isDeleted=False, pk=pk).first()
+        if obj:
+            title = f"Collection Details - {obj.paymentID or ''}"
+            detail_url = f"/collection_list/?search={obj.paymentID or ''}"
+            details = [
+                ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                ("Payment ID", obj.paymentID or "-"),
+                ("Mode of Payment", obj.modeOfPayment),
+                ("Paid Amount", f"₹ {obj.paidAmount:.2f}"),
+                ("Collected By", obj.collectedBy.name if obj.collectedBy else "-"),
+                ("Collection Date/Time", obj.collectionDateTime.strftime('%d-%m-%Y %I:%M %p') if obj.collectionDateTime else "-"),
+                ("Bank", obj.bankID.name if obj.bankID else "-"),
+                ("Approved By", obj.approvedBy.name if obj.approvedBy else "-"),
+                ("Detail", obj.detail or "-"),
+                ("Remark", obj.remark or "-"),
+            ]
+    elif model_name in ('sales', 'salesinvoice'):
+        obj = tenant_qs(request, Sales).filter(isDeleted=False, pk=pk).first()
+        if obj:
+            title = f"Sales Invoice Details - {obj.invoiceNumber or ''}"
+            detail_url = f"/sales_list/?search={obj.invoiceNumber or ''}"
+            details = [
+                ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                ("Invoice Number", obj.invoiceNumber or "-"),
+                ("Payment Mode", obj.modeOfPayment),
+                ("Total Amount", f"₹ {obj.amount:.2f}"),
+                ("Taxable Amount", f"₹ {obj.taxableAmount:.2f}"),
+                ("GST Amount", f"₹ {obj.gstAmount:.2f}"),
+                ("Created By", obj.createdBy.name if obj.createdBy else "-"),
+                ("Bank", obj.bankID.name if obj.bankID else "-"),
+                ("Remark", obj.remark or "-"),
+            ]
+    elif model_name in ('cashcounter', 'cashcounteractivity'):
+        obj = tenant_qs(request, CashCounter).filter(isDeleted=False, pk=pk).first()
+        if obj:
+            title = f"Counter Sales Details - {obj.invoiceNumber or ''}"
+            detail_url = f"/my_cash_counter_list/?search={obj.invoiceNumber or ''}"
+            details = [
+                ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                ("Invoice Number", obj.invoiceNumber or "-"),
+                ("Payment Mode", obj.mode),
+                ("Amount", f"₹ {obj.amount:.2f}"),
+                ("Created By", obj.createdBy.name if obj.createdBy else "-"),
+                ("Bank", obj.bankID.name if obj.bankID else "-"),
+                ("Remark", obj.remark or "-"),
+            ]
+    elif model_name in ('cashcountercollection', 'collectioncashcounter'):
+        obj = tenant_qs(request, CollectionCashCounter).filter(isDeleted=False, pk=pk).first()
+        if obj:
+            title = f"Counter Collection Details - {obj.paymentID or ''}"
+            detail_url = f"/my_cash_counter_list/?search={obj.paymentID or ''}"
+            details = [
+                ("Party Name", obj.partyID.name if obj.partyID else "-"),
+                ("Payment ID", obj.paymentID or "-"),
+                ("Mode of Payment", obj.modeOfPayment),
+                ("Paid Amount", f"₹ {obj.paidAmount:.2f}"),
+                ("Collected By", obj.collectedBy.name if obj.collectedBy else "-"),
+                ("Remark", obj.remark or "-"),
+            ]
+
+    if not details:
+        return JsonResponse({'message': 'not_found'}, safe=False)
+
+    return JsonResponse({'message': 'success', 'title': title, 'details': details, 'detail_url': detail_url}, safe=False)
+
+
 @transaction.atomic
 def edit_book_tx_api(request):
     if request.method != 'POST':
@@ -475,11 +649,22 @@ class BookTransactionListJson(BaseDatatableView):
                   </button>'''
             else:
                 action = '''<div class="ui tiny label">Auto</div>'''
-            party_name = item.party.name if item.party_id else '-'
+            try:
+                if item.party:
+                    party_val = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.party.pk}')" style="cursor: pointer;">{escape(item.party.name)}</span>'''
+                else:
+                    party_val = '-'
+            except:
+                party_val = '-'
+            if (item.source_content_type_id and item.source_object_id) or (item.source == BookTransaction.Source.TRANSFER and item.transferId):
+                narration_val = f'''<span class="lookup-detail-link" onclick="showSourceTxLookup('{item.pk}')" style="cursor: pointer;"><i class="file alternate outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.narration or '-')}</span>'''
+            else:
+                narration_val = escape(item.narration or '-')
+
             json_data.append([
                 escape(item.txDateTime.strftime('%d-%m-%Y %I:%M %p')),
-                escape(item.narration or '-'),
-                escape(party_name),
+                narration_val,
+                party_val,
                 f'₹ {formatINR(format(float(item.in_amount or 0.0), ".0f"))}' if float(item.in_amount or 0.0) else '-',
                 f'₹ {formatINR(format(float(item.out_amount or 0.0), ".0f"))}' if float(item.out_amount or 0.0) else '-',
                 f'₹ {_format_money_compact(item.balance)}',

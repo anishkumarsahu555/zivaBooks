@@ -439,13 +439,14 @@ class CollectionByStaffListJson(BaseDatatableView):
                      'remark',
                      ]
     def get_initial_queryset(self):
-        # user = StaffUser.objects.get(user_ID__id = self.request.pk)
-        # if 'Admin' in group_names:
-        return _collection_list_base_qs(self.request).filter(
+        qs = _collection_list_base_qs(self.request).filter(
             isDeleted__exact=False,
-            collectionDateTime__date=datetime.today().date(),
             collectedBy__user_ID_id=self.request.user.pk
         )
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            return qs
+        return qs.filter(collectionDateTime__date=datetime.today().date())
     def filter_queryset(self, qs):
         search = self.request.GET.get('search[value]', None)
         if search:
@@ -504,6 +505,16 @@ class CollectionByAdminListJson(BaseDatatableView):
                      ]
     def get_initial_queryset(self):
         approval = (self.request.GET.get("approval") or "").strip().lower()
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            queryset = _collection_list_base_qs(self.request).filter(isDeleted__exact=False)
+            if not _can_filter_all_collections(self.request.user):
+                queryset = queryset.filter(collectedBy__user_ID_id=self.request.user.pk)
+            if approval == 'pending':
+                queryset = queryset.filter(isApproved=False)
+            elif approval == 'approved':
+                queryset = queryset.filter(isApproved=True)
+            return queryset
         try:
             startDateV = self.request.GET.get("startDate")
             endDateV = self.request.GET.get("endDate")
@@ -586,19 +597,27 @@ class CollectionByAdminListJson(BaseDatatableView):
             else:
                 chequeDate = '-'
             try:
-                bank = item.bankID.name
+                party_name = item.partyID.name
+                party_html = f'<a href="javascript:void(0)" class="lookup-detail-link" onclick="showGeneralLookup(\'party\', {item.partyID.pk})"><i class="briefcase icon" style="margin-right: 4px;"></i>{escape(party_name)}</a>'
             except:
-                bank = '-'
+                party_html = '-'
+            try:
+                bank_name = item.bankID.name
+                bank_html = f'<a href="javascript:void(0)" class="lookup-detail-link" onclick="showGeneralLookup(\'bank\', {item.bankID.pk})"><i class="university icon" style="margin-right: 4px;"></i>{escape(bank_name)}</a>'
+            except:
+                bank_html = '-'
             try:
                 tparty = item.transferredPartyID.name
             except:
                 tparty = '-'
             try:
-                collectedBy = item.collectedBy.name
+                collectedBy_name = item.collectedBy.name
+                collectedBy = f'<a href="javascript:void(0)" class="lookup-detail-link" onclick="showGeneralLookup(\'staff\', {item.collectedBy.pk})"><i class="user outline icon" style="margin-right: 4px;"></i>{escape(collectedBy_name)}</a>'
             except:
                 collectedBy = '-'
             try:
-                approvedBy = item.approvedBy.name
+                approvedBy_name = item.approvedBy.name
+                approvedBy = f'<a href="javascript:void(0)" class="lookup-detail-link" onclick="showGeneralLookup(\'staff\', {item.approvedBy.pk})"><i class="user outline icon" style="margin-right: 4px;"></i>{escape(approvedBy_name)}</a>'
             except:
                 approvedBy = '-'
             if item.isApproved == True:
@@ -619,7 +638,7 @@ class CollectionByAdminListJson(BaseDatatableView):
                           </div>'''.format(item.pk)
             json_data.append([
                 escape(item.paymentID),
-                escape(item.partyID.name),
+                party_html,
                 formatINR(format(item.paidAmount, '.0f')),
                 action,
                 _collection_verified_label(item.otpVerified),
@@ -629,7 +648,7 @@ class CollectionByAdminListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 isApproved,
                 approvedBy,
-                escape(bank),
+                bank_html,
                 isTallied,
                 escape(item.detail),
                 escape(chequeDate),
@@ -709,6 +728,17 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
                      ]
     def get_initial_queryset(self):
         due = (self.request.GET.get("due") or "").strip().lower()
+        search_value = self.request.GET.get('search[value]', None)
+        if search_value and search_value.strip():
+            queryset = _collection_list_base_qs(self.request).filter(
+                isDeleted__exact=False,
+                modeOfPayment__exact='Cheque'
+            )
+            if due == 'overdue':
+                queryset = queryset.filter(chequeDate__lt=datetime.today().date())
+            if not _can_filter_all_collections(self.request.user):
+                return queryset.filter(collectedBy__user_ID_id=self.request.user.pk)
+            return queryset
         try:
             startDateV = self.request.GET.get("startDate")
             endDateV = self.request.GET.get("endDate")
@@ -784,17 +814,30 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
             else:
                 chequeDate = '-'
             try:
-                bank = item.bankID.name
+                if item.bankID:
+                    bank = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('bank', '{item.bankID.pk}')" style="cursor: pointer;"><i class="university icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.bankID.name)}</span>'''
+                else:
+                    bank = '-'
             except:
                 bank = '-'
             try:
-                collectedBy = item.collectedBy.name
+                if item.collectedBy:
+                    collectedBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.collectedBy.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.collectedBy.name)}</span>'''
+                else:
+                    collectedBy = '-'
             except:
                 collectedBy = '-'
             try:
-                approvedBy = item.approvedBy.name
+                if item.approvedBy:
+                    approvedBy = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('staff', '{item.approvedBy.pk}')" style="cursor: pointer;"><i class="user outline icon" style="margin-right: 4px; opacity: 0.8;"></i>{escape(item.approvedBy.name)}</span>'''
+                else:
+                    approvedBy = '-'
             except:
                 approvedBy = '-'
+            try:
+                party = f'''<span class="lookup-detail-link" onclick="showGeneralLookup('party', '{item.partyID.pk}')" style="cursor: pointer;">{escape(item.partyID.name)}</span>'''
+            except:
+                party = '-'
             if item.isApproved == True:
                 isApproved = '''<div class="ui tiny green label">
                   Yes
@@ -805,7 +848,7 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
                 </div>'''
             json_data.append([
                 escape(item.paymentID),
-                escape(item.partyID.name),
+                party,
                 formatINR(format(item.paidAmount, '.0f')),
                 escape(item.modeOfPayment),
                 collectedBy,
@@ -813,7 +856,7 @@ class ChequeReminderCollectionListJson(BaseDatatableView):
                 escape(item.datetime.strftime('%d-%m-%Y %I:%M %p')),
                 isApproved,
                 approvedBy,
-                escape(bank),
+                bank,
                 escape(item.detail),
                 escape(chequeDate),
                 escape(item.collectionAddress),
