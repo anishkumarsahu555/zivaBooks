@@ -2565,6 +2565,297 @@
         html[data-theme="dark"] .lookup-meta-label {
             color: #94a3b8;
         }
+
+        /* Quick Search Styles with Motion CSS */
+        .nav-search-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            max-width: 440px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1010;
+        }
+
+        .nav-search-wrapper {
+            position: relative;
+            width: 260px;
+            max-width: 100%;
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 99px;
+            padding: 4px 12px;
+            transition: 
+                width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                background-color 0.25s, 
+                border-color 0.25s, 
+                box-shadow 0.25s;
+        }
+
+        .nav-search-wrapper input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            width: 100%;
+            font-size: 0.88rem;
+            padding: 2px 6px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: color 0.25s;
+        }
+
+        .nav-search-wrapper input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+            transition: color 0.25s;
+        }
+
+        .nav-search-icon {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.92rem;
+            margin-right: 2px;
+            transition: color 0.25s;
+        }
+
+        .nav-search-shortcut {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 4px;
+            padding: 1px 5px;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .nav-search-clear {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+            padding: 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .nav-search-clear:hover {
+            color: #ffffff;
+        }
+
+        /* Active / Focused State Styles */
+        .nav-search-wrapper.is-focused {
+            width: 380px;
+            background: var(--app-surface);
+            border-color: var(--app-line);
+            box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
+        }
+
+        html[data-theme="dark"] .nav-search-wrapper.is-focused {
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .nav-search-wrapper.is-focused input {
+            color: var(--app-text);
+        }
+
+        .nav-search-wrapper.is-focused input::placeholder {
+            color: var(--app-muted);
+        }
+
+        .nav-search-wrapper.is-focused .nav-search-icon {
+            color: var(--app-muted);
+        }
+
+        .nav-search-wrapper.is-focused .nav-search-shortcut {
+            opacity: 0;
+        }
+
+        .nav-search-wrapper.is-focused .nav-search-clear {
+            color: var(--app-muted);
+        }
+
+        .nav-search-wrapper.is-focused .nav-search-clear:hover {
+            color: var(--app-text);
+        }
+
+        /* Backdrop with Modern Blur & Entry/Exit Animations */
+        .nav-search-backdrop {
+            position: fixed;
+            inset: 40px 0 0 0;
+            background: rgba(15, 23, 42, 0.35);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            z-index: 1005;
+            display: block;
+            opacity: 1;
+            transition: display 0.25s, opacity 0.25s ease-out;
+            transition-behavior: allow-discrete;
+        }
+
+        @starting-style {
+            .nav-search-backdrop {
+                opacity: 0;
+            }
+        }
+
+        .nav-search-backdrop[hidden] {
+            display: none;
+            opacity: 0;
+        }
+
+        /* Dynamic Dropdown Results with Elastic Motion CSS */
+        .nav-search-results-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            right: 0;
+            background: var(--app-surface);
+            border: 1px solid var(--app-line);
+            border-radius: 12px;
+            box-shadow: var(--app-shadow);
+            max-height: 420px;
+            overflow-y: auto;
+            z-index: 1015;
+            display: block;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            transition: 
+                display 0.25s, 
+                opacity 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition-behavior: allow-discrete;
+        }
+
+        @starting-style {
+            .nav-search-results-dropdown {
+                opacity: 0;
+                transform: translateY(-8px) scale(0.97);
+            }
+        }
+
+        .nav-search-results-dropdown[hidden] {
+            display: none;
+            opacity: 0;
+            transform: translateY(-8px) scale(0.97);
+        }
+
+        /* Results content styles */
+        .nav-search-category-title {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--app-muted);
+            padding: 10px 14px 4px;
+            background: rgba(15, 23, 42, 0.015);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.03);
+        }
+
+        html[data-theme="dark"] .nav-search-category-title {
+            background: rgba(255, 255, 255, 0.01);
+            border-bottom-color: rgba(255, 255, 255, 0.03);
+        }
+
+        .nav-search-item {
+            display: flex;
+            flex-direction: column;
+            padding: 10px 14px;
+            color: var(--app-text) !important;
+            text-decoration: none !important;
+            transition: background 0.18s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.025);
+        }
+
+        html[data-theme="dark"] .nav-search-item {
+            border-bottom-color: rgba(255, 255, 255, 0.025);
+        }
+
+        .nav-search-item:last-child {
+            border-bottom: none;
+        }
+
+        .nav-search-item:hover,
+        .nav-search-item.is-selected {
+            background: rgba(37, 99, 235, 0.08);
+            transform: translateX(4px);
+            outline: none;
+        }
+
+        html[data-theme="dark"] .nav-search-item:hover,
+        html[data-theme="dark"] .nav-search-item.is-selected {
+            background: rgba(59, 130, 246, 0.15);
+        }
+
+        .nav-search-item-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .nav-search-item-desc {
+            font-size: 0.78rem;
+            color: var(--app-muted);
+            margin-top: 2px;
+        }
+
+        .nav-search-empty-state {
+            padding: 24px;
+            text-align: center;
+            color: var(--app-muted);
+            font-size: 0.88rem;
+        }
+
+        .nav-search-empty-state i.icon {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        @media (max-width: 767px) {
+            .nav-search-container {
+                max-width: 140px;
+                transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .nav-search-wrapper {
+                width: 110px;
+                background: rgba(255, 255, 255, 0.08);
+                padding: 4px 8px;
+            }
+            /* Expand to cover full navbar on focus on mobile devices */
+            .nav-search-container.is-active-mobile {
+                position: absolute;
+                inset: 0;
+                width: 100vw;
+                max-width: none;
+                height: 100%;
+                background: var(--app-surface);
+                padding: 0 12px;
+                margin: 0;
+                display: flex;
+                align-items: center;
+                z-index: 1020;
+            }
+            .nav-search-container.is-active-mobile .nav-search-wrapper {
+                width: 100%;
+                height: 30px;
+                border-radius: 8px;
+                background: var(--app-bg);
+            }
+            .nav-search-container.is-active-mobile .nav-search-results-dropdown {
+                top: 40px;
+                border-radius: 0 0 12px 12px;
+                border-left: none;
+                border-right: none;
+            }
+            .nav-search-shortcut {
+                display: none;
+            }
+        }
     </style>
 
 </head>
@@ -2590,6 +2881,21 @@
             zivaBooks
         </a>
     </div>
+
+    {% if not is_customer_login %}
+    <div class="nav-search-container">
+        <div class="nav-search-wrapper" id="navSearchWrapper">
+            <i class="search icon nav-search-icon"></i>
+            <input type="text" id="navSearchInput" placeholder="Quick search..." autocomplete="off">
+            <span class="nav-search-shortcut">/</span>
+            <button class="nav-search-clear" id="navSearchClear" type="button" aria-label="Clear search" hidden>
+                <i class="times icon"></i>
+            </button>
+            <div id="navSearchResults" class="nav-search-results-dropdown" hidden></div>
+        </div>
+    </div>
+    <div class="nav-search-backdrop" id="navSearchBackdrop" hidden></div>
+    {% endif %}
 
     <div class="right menu">
         <a href="#" class="item theme-toggle" id="themeToggleBtn" title="Toggle theme">
@@ -3959,5 +4265,169 @@
 
 <script src="{% static 'js/pullToRefresh.js' %}"></script>
 <script src="{% static 'js/waves.js' %}"></script>
+
+<!-- Quick Search Interactive Script -->
+<script>
+    (function() {
+        const $input = $('#navSearchInput');
+        if ($input.length === 0) return;
+
+        const $wrapper = $('#navSearchWrapper');
+        const $backdrop = $('#navSearchBackdrop');
+        const $dropdown = $('#navSearchResults');
+        const $clearBtn = $('#navSearchClear');
+        const $container = $('.nav-search-container');
+
+        let searchTimeout = null;
+        let selectedIndex = -1;
+        let resultItems = [];
+
+        function showSearch() {
+            $wrapper.addClass('is-focused');
+            $container.addClass('is-active-mobile');
+            $backdrop.removeAttr('hidden');
+            $dropdown.removeAttr('hidden');
+            const val = $input.val().trim();
+            fetchResults(val);
+        }
+
+        function hideSearch() {
+            $wrapper.removeClass('is-focused');
+            $container.removeClass('is-active-mobile');
+            $backdrop.attr('hidden', true);
+            $dropdown.attr('hidden', true);
+            selectedIndex = -1;
+        }
+
+        function fetchResults(query) {
+            if (searchTimeout) clearTimeout(searchTimeout);
+            
+            searchTimeout = setTimeout(function() {
+                $.ajax({
+                    url: '/api/quick-search/',
+                    data: { q: query },
+                    success: function(data) {
+                        renderResults(data.results);
+                    },
+                    error: function() {
+                        $dropdown.html('<div class="nav-search-empty-state"><i class="exclamation triangle icon"></i>Failed to fetch results</div>');
+                    }
+                });
+            }, 150);
+        }
+
+        function renderResults(results) {
+            $dropdown.empty();
+            selectedIndex = -1;
+            resultItems = [];
+
+            if (!results || results.length === 0) {
+                $dropdown.html('<div class="nav-search-empty-state"><i class="search icon"></i>No matches found</div>');
+                return;
+            }
+
+            // Group results by category
+            const grouped = {};
+            results.forEach(item => {
+                if (!grouped[item.category]) {
+                    grouped[item.category] = [];
+                }
+                grouped[item.category].push(item);
+            });
+
+            // Render categories
+            Object.keys(grouped).forEach(category => {
+                const $catTitle = $('<div class="nav-search-category-title"></div>').text(category);
+                $dropdown.append($catTitle);
+
+                grouped[category].forEach(item => {
+                    const $itemLink = $('<a class="nav-search-item"></a>')
+                        .attr('href', item.url)
+                        .append($('<span class="nav-search-item-title"></span>').text(item.title))
+                        .append($('<span class="nav-search-item-desc"></span>').text(item.description));
+                    
+                    $dropdown.append($itemLink);
+                    resultItems.push($itemLink[0]);
+                });
+            });
+        }
+
+        function updateSelection() {
+            resultItems.forEach((el, idx) => {
+                if (idx === selectedIndex) {
+                    el.classList.add('is-selected');
+                    el.scrollIntoView({ block: 'nearest' });
+                } else {
+                    el.classList.remove('is-selected');
+                }
+            });
+        }
+
+        // Toggle clear button
+        $input.on('input', function() {
+            const val = $(this).val().trim();
+            if (val.length > 0) {
+                $clearBtn.removeAttr('hidden');
+            } else {
+                $clearBtn.attr('hidden', true);
+            }
+            fetchResults(val);
+        });
+
+        // Focus & Blur
+        $input.on('focus', function() {
+            showSearch();
+        });
+
+        $backdrop.on('click', function() {
+            hideSearch();
+        });
+
+        $clearBtn.on('click', function(e) {
+            e.stopPropagation();
+            $input.val('').focus();
+            $clearBtn.attr('hidden', true);
+            fetchResults('');
+        });
+
+        // Global shortcuts and navigation keys
+        $(document).on('keydown', function(e) {
+            // Check if user is typing in form inputs (exclude our search input)
+            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            const isTyping = activeTag === 'input' || activeTag === 'textarea' || document.activeElement.isContentEditable;
+
+            // 1. Focus search with '/' or 'Ctrl+K' / 'Cmd+K'
+            if (!isTyping && (e.key === '/' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'))) {
+                e.preventDefault();
+                $input.focus();
+                return;
+            }
+
+            // 2. Dropdown Keyboard controls
+            if ($wrapper.hasClass('is-focused') && resultItems.length > 0) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = (selectedIndex + 1) % resultItems.length;
+                    updateSelection();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = (selectedIndex - 1 + resultItems.length) % resultItems.length;
+                    updateSelection();
+                } else if (e.key === 'Enter') {
+                    if (selectedIndex >= 0 && selectedIndex < resultItems.length) {
+                        e.preventDefault();
+                        resultItems[selectedIndex].click();
+                    }
+                }
+            }
+
+            // 3. Escape key to close
+            if (e.key === 'Escape' && $wrapper.hasClass('is-focused')) {
+                $input.blur();
+                hideSearch();
+            }
+        });
+    })();
+</script>
 </body>
 </html>

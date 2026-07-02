@@ -4112,3 +4112,101 @@ def party_ledger(request, party_id):
         'is_party_user': is_party_user,
     }
     return render(request, 'home/party/partyLedger.html', context)
+
+
+def quick_search(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'results': []})
+
+    tenant = get_current_tenant(request)
+    if not tenant:
+        return JsonResponse({'results': []})
+
+    # Check if customer login
+    from .navigation import _tenant_membership_role, _perm_match
+    from .models import TenantMembership, Party, StaffUser, Collection, Sales
+    role = _tenant_membership_role(request, tenant)
+    if role == TenantMembership.Role.PARTY:
+        return JsonResponse({'results': []})
+
+    q = request.GET.get('q', '').strip()
+    results = []
+
+    if not q:
+        # Default: list top navigation links (shortcuts) based on permissions
+        sidebar_sections = build_sidebar_sections(request)
+        for section in sidebar_sections:
+            for item in section.get('items', []):
+                results.append({
+                    'category': 'Quick Actions',
+                    'title': item['label'],
+                    'description': f"Jump to {section.get('title')} -> {item['label']}",
+                    'url': item['url']
+                })
+        return JsonResponse({'results': results[:8]})
+
+    # 1. Matches Navigation Menu / Shortcuts (respected by permissions)
+    sidebar_sections = build_sidebar_sections(request)
+    for section in sidebar_sections:
+        for item in section.get('items', []):
+            if q.lower() in item['label'].lower() or q.lower() in section.get('title', '').lower():
+                results.append({
+                    'category': 'Actions & Navigation',
+                    'title': item['label'],
+                    'description': f"Go to {section.get('title')} -> {item['label']}",
+                    'url': item['url']
+                })
+
+    # 2. Search Parties/Customers if permission allows
+    if _perm_match(request, ('home.can_manage_parties', 'home.view_party', 'home.can_view_party_credentials')):
+        parties = Party.objects.filter(tenant=tenant, isDeleted=False).filter(
+            Q(name__icontains=q) | Q(phone__icontains=q) | Q(gstNumber__icontains=q)
+        )[:5]
+        for party in parties:
+            results.append({
+                'category': 'Parties / Customers',
+                'title': party.name,
+                'description': f"Phone: {party.phone or 'N/A'} | GST: {party.gstNumber or 'N/A'}",
+                'url': f"/party-ledger/{party.id}/"
+            })
+
+    # 3. Search Staff if permission allows
+    if _perm_match(request, 'home.can_manage_staff'):
+        staff = StaffUser.objects.filter(tenant=tenant, isDeleted=False).filter(
+            Q(name__icontains=q) | Q(phone__icontains=q) | Q(email__icontains=q)
+        )[:5]
+        for s in staff:
+            results.append({
+                'category': 'Staff Members',
+                'title': s.name,
+                'description': f"Phone: {s.phone or 'N/A'} | Email: {s.email or 'N/A'}",
+                'url': f"/user_list/?q={s.name}"
+            })
+
+    # 4. Search Sales/Invoices if permission allows
+    if _perm_match(request, ('home.view_sales', 'home.can_manage_sales', 'home.can_approve_sales')):
+        sales = Sales.objects.filter(tenant=tenant, isDeleted=False).filter(
+            Q(invoiceNumber__icontains=q) | Q(salesID__icontains=q) | Q(paymentID__icontains=q) | Q(remark__icontains=q)
+        )[:5]
+        for sale in sales:
+            results.append({
+                'category': 'Sales Invoices',
+                'title': f"Invoice: {sale.invoiceNumber or 'N/A'} ({sale.salesID or 'N/A'})",
+                'description': f"Amount: ₹{sale.amount} | Payment: {sale.modeOfPayment} | Date: {sale.buildDate}",
+                'url': f"/edit_sales/{sale.id}/"
+            })
+
+    # 5. Search Collections if permission allows
+    if _perm_match(request, ('home.view_collection', 'home.add_collection', 'home.can_approve_collection')):
+        collections = Collection.objects.filter(tenant=tenant, isDeleted=False).filter(
+            Q(paymentID__icontains=q) | Q(remark__icontains=q) | Q(detail__icontains=q)
+        )[:5]
+        for col in collections:
+            results.append({
+                'category': 'Collections',
+                'title': f"Receipt: {col.paymentID or 'N/A'}",
+                'description': f"Amount: ₹{col.paidAmount} | Mode: {col.modeOfPayment} | Party: {col.partyID.name if col.partyID else 'N/A'}",
+                'url': f"/edit_collection/{col.id}/"
+            })
+
+    return JsonResponse({'results': results})

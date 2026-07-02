@@ -25,12 +25,18 @@ def app_navigation(request):
         user and any(user.has_perm(perm_name) for perm_name in STAFF_LOCATION_ADMIN_PERMS)
     )
     dashboard_state = build_dashboard_state(request, sidebar_sections, tenant=tenant, staff_user=staff_user)
+    is_customer_login = False
+    if is_authenticated and tenant:
+        from .navigation import _tenant_membership_role
+        from .models import TenantMembership
+        is_customer_login = (_tenant_membership_role(request, tenant) == TenantMembership.Role.PARTY)
     context = {
         'sidebar_sections': sidebar_sections,
         'current_tenant': tenant,
         'current_staff_user': staff_user,
         'staff_location_autotrack_enabled': bool(staff_user and not is_staff_location_admin),
         'dashboard_state': dashboard_state,
+        'is_customer_login': is_customer_login,
     }
     request._app_navigation_context_cache = context
     return context

@@ -117,6 +117,7 @@ urlpatterns = [
     path('customer/download-cash-counter-invoice/', customer_download_cash_counter_invoice_pdf, name='customer_download_cash_counter_invoice_pdf'),
     path('customer/change-password/', customer_change_password, name='customer_change_password'),
     path('api/save_recovery_email/', save_recovery_email, name='save_recovery_email'),
+    path('api/quick-search/', quick_search, name='quick_search_api'),
     path('api/customer_ledger_kpis/', customer_ledger_kpis, name='customer_ledger_kpis'),
     path('api/customer_active_collection_otp/', customer_active_collection_otp, name='customer_active_collection_otp'),
     path('api/customer_active_delivery_otp/', customer_active_delivery_otp, name='customer_active_delivery_otp'),
