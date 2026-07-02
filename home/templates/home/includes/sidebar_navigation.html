@@ -1,4 +1,5 @@
-<div class="sidebar-workspace">
+<div class="sidebar-workspace" data-sidebar-tooltip="{{ current_tenant.name|default:'zivaBooks' }}">
+    <div class="sidebar-workspace-badge">{{ current_tenant.name|default:"zivaBooks"|slice:":1"|upper }}</div>
     <div class="sidebar-workspace-kicker">Workspace</div>
     <div class="sidebar-workspace-title">{{ current_tenant.name|default:"zivaBooks" }}</div>
     <div class="sidebar-workspace-meta">
@@ -7,7 +8,7 @@
     </div>
 </div>
 
-<div class="sidebar-search" role="search">
+<div class="sidebar-search" role="search" data-sidebar-tooltip="Search menu">
     <i class="search icon sidebar-search-icon"></i>
     <input id="sidebarSearchInput" type="text" autocomplete="off" placeholder="Search menu" role="searchbox">
     <button class="sidebar-search-clear" type="button" aria-label="Clear search" hidden>
@@ -19,15 +20,50 @@
     {% for section in sidebar_sections %}
         {% if section.items %}
             <div class="nav-section item{% if section.collapsed_by_default %} is-collapsed{% endif %}{% if section.tone == 'muted' %} nav-section-muted{% endif %}{% if section.group_break_after %} nav-section-group-break{% endif %}">
-                <button class="nav-section-header" type="button" aria-expanded="{% if section.collapsed_by_default %}false{% else %}true{% endif %}">
+                <button class="nav-section-header" type="button" aria-expanded="{% if section.collapsed_by_default %}false{% else %}true{% endif %}" data-sidebar-tooltip="{{ section.title }}">
                     <span class="nav-section-title-wrap">
+                        {% if section.title == 'General' %}
+                            <i class="compass icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Staff' %}
+                            <i class="users icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Party' %}
+                            <i class="address book icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Banks' %}
+                            <i class="university icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Collections' %}
+                            <i class="hand holding usd icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Sales' %}
+                            <i class="file invoice dollar icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Inventory & Purchases' %}
+                            <i class="boxes icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Orders' %}
+                            <i class="clipboard outline icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Cash Counter' %}
+                            <i class="calendar check icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Books' %}
+                            <i class="book icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Attendance' %}
+                            <i class="calendar alternate icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Message History' %}
+                            <i class="comment dots outline icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Audit' %}
+                            <i class="history icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Analytics' %}
+                            <i class="chart pie icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Reports' %}
+                            <i class="file outline icon nav-section-icon-main"></i>
+                        {% elif section.title == 'Profile' %}
+                            <i class="user icon nav-section-icon-main"></i>
+                        {% else %}
+                            <i class="folder icon nav-section-icon-main"></i>
+                        {% endif %}
                         <span class="nav-section-title">{{ section.title }}</span>
                     </span>
                     <span class="nav-section-chevron"><i class="chevron down icon"></i></span>
                 </button>
                 <div class="menu nav-section-menu">
                     {% for item in section.items %}
-                        <a class="item nav-link" href="{{ item.url }}">
+                        <a class="item nav-link" href="{{ item.url }}" data-sidebar-tooltip="{{ item.label }}">
                             <span class="nav-link-icon"><i class="{{ item.icon }} icon"></i></span>
                             <span class="nav-link-label">{{ item.label }}</span>
                         </a>
@@ -43,8 +79,8 @@
     <span>No matching menu items</span>
 </div>
 
-<div class="sidebar-meta">
+<div class="sidebar-meta" data-sidebar-tooltip="zivaBooks">
     <div class="sidebar-meta-brand">zivaBooks</div>
     <div class="sidebar-meta-copy">Developed by Ziva Infotech</div>
     <div class="sidebar-meta-version">v 2.0.1</div>
-    </div>
+</div>
