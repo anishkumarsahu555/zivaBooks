@@ -1750,6 +1750,22 @@
             color: var(--app-text) !important;
         }
 
+        /* High-specificity overrides for dark-mode dropdown menus */
+        html[data-theme="dark"] .ui.menu .ui.dropdown .menu > .item,
+        html[data-theme="dark"] .ui.menu:not(.inverted) .ui.dropdown .menu > .item {
+            color: var(--app-text) !important;
+            background: var(--app-surface) !important;
+        }
+        html[data-theme="dark"] .ui.menu .ui.dropdown .menu > .item:hover,
+        html[data-theme="dark"] .ui.menu:not(.inverted) .ui.dropdown .menu > .item:hover {
+            color: var(--app-text) !important;
+            background: var(--app-surface-soft) !important;
+        }
+        html[data-theme="dark"] .ui.menu .ui.dropdown .menu > .item > i.icon,
+        html[data-theme="dark"] .ui.menu:not(.inverted) .ui.dropdown .menu > .item > i.icon {
+            color: inherit !important;
+        }
+
         html[data-theme="dark"] .ui.basic.segment,
         html[data-theme="dark"] .ui.celled.table,
         html[data-theme="dark"] .ui.celled.table tr td,
@@ -3223,6 +3239,33 @@
                 display: none;
             }
         }
+
+        /* View Transition circular clip-path ripple animation for theme toggling */
+        ::view-transition-group(root) {
+            animation: none !important;
+        }
+        ::view-transition-old(root),
+        ::view-transition-new(root) {
+            animation: none !important;
+            mix-blend-mode: normal !important;
+            height: 100vh !important;
+            width: 100vw !important;
+            object-fit: cover !important;
+        }
+        
+        ::view-transition-old(root) {
+            z-index: 1;
+        }
+        ::view-transition-new(root) {
+            z-index: 9999;
+        }
+        
+        .theme-transition-reverse::view-transition-old(root) {
+            z-index: 9999;
+        }
+        .theme-transition-reverse::view-transition-new(root) {
+            z-index: 1;
+        }
     </style>
 
 </head>
@@ -3875,7 +3918,62 @@
     function toggleTheme(event) {
         if (event) event.preventDefault();
         var nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        applyThemeUi(nextTheme, true);
+
+        // Fallback for browsers that don't support document.startViewTransition
+        if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            applyThemeUi(nextTheme, true);
+            return;
+        }
+
+        // Get coordinates of click or center of the screen
+        var x = event ? event.clientX : window.innerWidth / 2;
+        var y = event ? event.clientY : window.innerHeight / 2;
+
+        if (!x && !y && event && event.target) {
+            var rect = event.target.getBoundingClientRect();
+            x = rect.left + rect.width / 2;
+            y = rect.top + rect.height / 2;
+        }
+
+        var endRadius = Math.hypot(
+            Math.max(x, window.innerWidth - x),
+            Math.max(y, window.innerHeight - y)
+        );
+
+        if (nextTheme === 'light') {
+            document.documentElement.classList.add('theme-transition-reverse');
+        } else {
+            document.documentElement.classList.remove('theme-transition-reverse');
+        }
+
+        var transition = document.startViewTransition(function () {
+            applyThemeUi(nextTheme, true);
+        });
+
+        transition.ready.then(function () {
+            var clipPath = [
+                'circle(0px at ' + x + 'px ' + y + 'px)',
+                'circle(' + endRadius + 'px at ' + x + 'px ' + y + 'px)'
+            ];
+
+            document.documentElement.animate(
+                {
+                    clipPath: nextTheme === 'dark' ? clipPath : clipPath.reverse()
+                },
+                {
+                    duration: 480,
+                    easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                    fill: 'both',
+                    pseudoElement: nextTheme === 'dark' 
+                        ? '::view-transition-new(root)' 
+                        : '::view-transition-old(root)'
+                }
+            );
+        });
+
+        transition.finished.then(function () {
+            document.documentElement.classList.remove('theme-transition-reverse');
+        });
     }
 
     function getCookie(name) {
