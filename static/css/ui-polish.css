@@ -102,3 +102,131 @@ html[data-theme="dark"] .ui.message {
         animation-iteration-count: 1 !important;
     }
 }
+
+
+/* Fluid Page Transitions */
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition {
+        navigation: auto;
+    }
+
+    /* Target the view transition root */
+    ::view-transition-group(root) {
+        animation-duration: 0.35s;
+        animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); /* easeOutExponential */
+    }
+
+    /* Forward transition (default) */
+    html:active-view-transition-type(forward)::view-transition-old(root) {
+        animation-name: slide-out-to-left;
+    }
+    html:active-view-transition-type(forward)::view-transition-new(root) {
+        animation-name: slide-in-from-right;
+    }
+
+    /* Backward transition */
+    html:active-view-transition-type(back)::view-transition-old(root) {
+        animation-name: slide-out-to-right;
+    }
+    html:active-view-transition-type(back)::view-transition-new(root) {
+        animation-name: slide-in-from-left;
+    }
+}
+
+@keyframes slide-out-to-left {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(-30px); opacity: 0; }
+}
+
+@keyframes slide-in-from-right {
+    from { transform: translateX(30px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slide-out-to-right {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(30px); opacity: 0; }
+}
+
+@keyframes slide-in-from-left {
+    from { transform: translateX(-30px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Title Bar Back Button */
+#titleBarBackButton {
+    color: var(--app-text) !important;
+    opacity: 0.7;
+    transition: opacity 0.2s var(--app-ease), transform 0.2s var(--app-ease) !important;
+}
+
+#titleBarBackButton:hover {
+    opacity: 1 !important;
+    background: rgba(15, 23, 42, 0.05) !important;
+    transform: translateX(-2px);
+    border-radius: var(--app-radius-sm);
+}
+
+html[data-theme="dark"] #titleBarBackButton:hover {
+    background: rgba(229, 237, 247, 0.08) !important;
+}
+
+/* Title bar floating tooltip - matches collapsed sidebar tooltip styling */
+.title-tooltip-floating {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(15, 23, 42, 0.96);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #ffffff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    z-index: 99999;
+    box-shadow: 
+        0 10px 25px -5px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    transform: translateX(-50%) translateY(4px) scale(0.9);
+    opacity: 0;
+    transition: 
+        opacity 0.15s ease, 
+        transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform-origin: center top;
+}
+
+.title-tooltip-floating.is-active {
+    opacity: 1;
+    transform: translateX(-50%) translateY(8px) scale(1);
+}
+
+.title-tooltip-floating::before {
+    content: "";
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 0 5px 6px 5px;
+    border-style: solid;
+    border-color: transparent transparent rgba(15, 23, 42, 0.96) transparent;
+    pointer-events: none;
+}
+
+/* Light Theme Adapt */
+html:not([data-theme="dark"]) .title-tooltip-floating {
+    background: rgba(255, 255, 255, 0.96);
+    color: #0f172a;
+    box-shadow: 
+        0 10px 25px -5px rgba(15, 23, 42, 0.15),
+        0 0 0 1px rgba(15, 23, 42, 0.08);
+}
+
+html:not([data-theme="dark"]) .title-tooltip-floating::before {
+    border-color: transparent transparent rgba(255, 255, 255, 0.96) transparent;
+}
+
+
+
+
+
