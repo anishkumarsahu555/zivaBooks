@@ -23,6 +23,7 @@ from .apis.proforma_reports import *
 from .apis.sales import *
 from .apis.sales_reports import *
 from .apis.tenant_settings import *
+from .apis.ziva_ai import *
 from .views import *
 from inventory.api import (
     add_inventory_category_api as inventory_add_inventory_category_api,
@@ -96,6 +97,8 @@ from inventory.views import (
 urlpatterns = [
     # pages
     path('home/', homepage, name='homepage'),
+    path('ziva-ai/', ziva_ai_page, name='ziva_ai'),
+    path('api/ziva-ai/chat/', ziva_ai_chat_api, name='ziva_ai_chat_api'),
     path('', loginPage, name='loginPage'),
     path('claim-access/<str:token>/', claim_access, name='claim_access'),
     path('forgot_password/', forgot_password, name='forgot_password'),

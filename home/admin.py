@@ -320,8 +320,15 @@ class CashCounterAdmin(admin.ModelAdmin):
                     'lastUpdatedOn', 'isDeleted']
 
 
+class TenantAiUsageInline(admin.StackedInline):
+    model = TenantAiUsage
+    extra = 0
+    can_delete = False
+
+
 class TenantAdmin(admin.ModelAdmin):
     form = TenantAdminForm
+    inlines = [TenantAiUsageInline]
     list_display = [
         'name',
         'slug',
@@ -484,8 +491,28 @@ class JournalLineAdmin(admin.ModelAdmin):
     entryDateTime.short_description = 'Entry Date'
 
 
+class TenantAiUsageAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'plan_name', 'max_queries_per_month', 'queries_used_this_month', 'last_reset_date']
+    list_filter = ['plan_name', 'last_reset_date']
+    search_fields = ['tenant__name', 'plan_name']
+
+
 admin.site.register(BookAccount, BookAccountAdmin)
 admin.site.register(BookTransaction, BookTransactionAdmin)
 admin.site.register(InvoiceSeries, InvoiceSeriesAdmin)
 admin.site.register(JournalEntry, JournalEntryAdmin)
 admin.site.register(JournalLine, JournalLineAdmin)
+admin.site.register(TenantAiUsage, TenantAiUsageAdmin)
+
+
+class ZivaAiChatMessageAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'user', 'role', 'timestamp', 'message_snippet']
+    list_filter = ['role', 'timestamp', 'tenant']
+    search_fields = ['user__username', 'message']
+
+    def message_snippet(self, obj):
+        return obj.message[:50] + '...' if len(obj.message) > 50 else obj.message
+    message_snippet.short_description = 'Message'
+
+admin.site.register(ZivaAiChatMessage, ZivaAiChatMessageAdmin)
+

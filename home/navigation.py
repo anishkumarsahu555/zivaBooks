@@ -187,6 +187,7 @@ def _admin_sections(user):
                     'home.can_manage_staff',
                     'home.can_view_party_credentials',
                 )),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
             ]),
         },
         {
@@ -473,6 +474,7 @@ def _collection_sections(user):
                     'home.view_collection',
                     'home.can_manage_sales',
                 )),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
             ]),
         },
         {
@@ -531,6 +533,7 @@ def _staff_sections(user):
                     'home.add_attendance',
                     'home.change_attendance',
                 )),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
             ]),
         },
         {
@@ -579,6 +582,7 @@ def _sales_sections(user):
                     'home.change_sales',
                     'home.can_manage_sales',
                 )),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
             ]),
         },
         {
@@ -635,6 +639,7 @@ def _cash_counter_sections(user):
                     'home.can_manage_cash_counter',
                     'home.view_cashcounter',
                 )),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
             ]),
         },
         {
@@ -746,6 +751,7 @@ def build_sidebar_sections(request_or_user):
             'group_break_after': True,
             'items': [
                 _nav_item('Dashboard', 'homeApp:homepage', 'tachometer alternate'),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
             ],
         },
         {

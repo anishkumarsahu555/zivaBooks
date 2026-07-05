@@ -1845,3 +1845,49 @@ class UserTwoFactorAuth(TenantOwnedModel):
             models.Index(fields=['tenant', 'isEnabled'], name='user2fa_tenant_enabled_idx'),
             models.Index(fields=['user', 'isEnabled'], name='user2fa_user_enabled_idx'),
         ]
+
+
+class TenantAiUsage(TenantAwareModel):
+    tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name='ai_usage')
+    plan_name = models.CharField(max_length=50, default='Free')
+    max_queries_per_month = models.IntegerField(default=5)
+    queries_used_this_month = models.IntegerField(default=0)
+    last_reset_date = models.DateField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.tenant.name if self.tenant else 'No Tenant'} - {self.plan_name} ({self.queries_used_this_month}/{self.max_queries_per_month})"
+
+    def check_and_reset_usage(self):
+        from datetime import date
+        today = date.today()
+        if not self.last_reset_date or self.last_reset_date.year != today.year or self.last_reset_date.month != today.month:
+            self.queries_used_this_month = 0
+            self.last_reset_date = today
+            self.save()
+            return True
+        return False
+
+    class Meta:
+        verbose_name_plural = 'Tenant AI Usages'
+        indexes = [
+            models.Index(fields=['tenant', 'plan_name'], name='aiusage_tenant_plan_idx'),
+        ]
+
+
+class ZivaAiChatMessage(TenantOwnedModel):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='ziva_ai_chats')
+    role = models.CharField(max_length=10, choices=[('user', 'User'), ('bot', 'Bot')])
+    message = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user} ({self.role}): {self.message[:30]}"
+
+    class Meta:
+        verbose_name_plural = 'Ziva AI Chat Messages'
+        ordering = ['timestamp']
+        indexes = [
+            models.Index(fields=['tenant', 'user', 'timestamp'], name='aichat_tenant_user_time_idx'),
+        ]
+
+

@@ -4210,3 +4210,40 @@ def quick_search(request):
             })
 
     return JsonResponse({'results': results})
+
+
+@ensure_csrf_cookie
+def ziva_ai_page(request):
+    if not request.user.is_authenticated:
+        return redirect('/')
+
+    # Check if customer
+    from .navigation import _tenant_membership_role
+    from .models import TenantMembership
+    tenant = get_current_tenant(request)
+    if not tenant:
+        return render(request, 'home/accessDenied.html', {'message': 'No active tenant workspace found.'})
+
+    role = _tenant_membership_role(request, tenant)
+    if role == TenantMembership.Role.PARTY:
+        return redirect('/customer_home/')
+
+    ai_usage, created = TenantAiUsage.objects.get_or_create(
+        tenant=tenant,
+        defaults={
+            'plan_name': 'Free',
+            'max_queries_per_month': 5,
+            'queries_used_this_month': 0
+        }
+    )
+    ai_usage.check_and_reset_usage()
+
+    from .models import ZivaAiChatMessage
+    chats = ZivaAiChatMessage.objects.filter(tenant=tenant, user=request.user, isDeleted=False).order_by('timestamp')[:50]
+
+    context = {
+        'ai_usage': ai_usage,
+        'chats': chats,
+    }
+    return render(request, 'home/ziva_ai.html', context)
+
