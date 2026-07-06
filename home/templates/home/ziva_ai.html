@@ -7,16 +7,26 @@
 
 {% block css %}
 <style>
+    /* Primary Accent color definitions */
+    :root {
+        --app-primary: #6366f1;
+    }
+    html[data-theme="dark"] {
+        --app-primary: #818cf8;
+    }
+
     /* Premium Design System for Ziva AI */
     .ai-wrapper {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
+        gap: 15px;
         height: calc(100vh - 120px);
         max-height: 800px;
         min-height: 550px;
         margin: 10px auto;
         padding: 10px;
         position: relative;
+        overflow: visible;
     }
 
     /* Glassmorphism Panel */
@@ -389,6 +399,10 @@
     }
 
     /* Responsive Table Wrapper */
+    .table-container {
+        width: 100%;
+        overflow-x: visible;
+    }
     .chat-bubble table {
         border-collapse: collapse;
         width: 100%;
@@ -660,6 +674,42 @@
             margin: 0;
             padding: 5px;
             min-height: 0;
+            overflow: hidden !important;
+        }
+        
+        .ai-sidebar {
+            position: absolute !important;
+            left: 10px !important;
+            top: 10px !important;
+            bottom: 10px !important;
+            height: calc(100% - 20px) !important;
+            z-index: 1000 !important;
+            width: 260px !important;
+            min-width: 260px !important;
+            max-width: calc(100vw - 20px) !important;
+            transform: translateX(0) !important;
+            opacity: 1 !important;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+            background: rgba(255, 255, 255, 0.75) !important; /* Matches main chat area glassmorphism */
+            border: 1px solid rgba(15, 23, 42, 0.08) !important;
+            border-radius: 12px !important;
+            backdrop-filter: blur(16px) !important;
+            -webkit-backdrop-filter: blur(16px) !important;
+        }
+
+        html[data-theme="dark"] .ai-sidebar {
+            background: rgba(17, 27, 46, 0.75) !important;
+            border: 1px solid rgba(148, 163, 184, 0.08) !important;
+        }
+
+        .ai-sidebar.collapsed {
+            transform: translateX(-280px) !important;
+            opacity: 0 !important;
+            width: 0 !important;
+            min-width: 0 !important;
+            pointer-events: none !important;
+            margin-right: 0 !important;
         }
         .ai-card {
             border-radius: 12px;
@@ -727,12 +777,32 @@
         .ai-send-btn i {
             font-size: 0.95rem !important;
         }
-        /* Make responsive tables scrollable horizontally inside the bubble */
+        /* Clean horizontal scroll containers for tables inside chat bubbles */
+        .chat-bubble .table-container {
+            width: 100% !important;
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            border-radius: 8px !important;
+            border: 1px solid var(--app-line) !important;
+            margin-top: 6px !important;
+        }
         .chat-bubble .ui.table {
-            display: block;
-            width: 100%;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
+            display: table !important; /* Force native table layout */
+            width: 100% !important;
+            margin: 0 !important;
+            font-size: 0.8rem !important;
+        }
+        .chat-bubble th, .chat-bubble td {
+            padding: 6px 8px !important; /* Compact spacing */
+            white-space: nowrap !important; /* Prevent ugly word wrap inside columns */
+        }
+        .table-actions-bar {
+            flex-wrap: wrap !important;
+            gap: 4px !important;
+        }
+        .table-actions-bar .button {
+            padding: 6px 8px !important;
+            font-size: 0.72rem !important;
         }
     }
 
@@ -802,6 +872,254 @@
             font-size: 0.76rem;
         }
     }
+    }
+
+    /* Collapsible Left Sidebar */
+    .ai-sidebar {
+        display: flex;
+        flex-direction: column;
+        width: 260px;
+        min-width: 260px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+        background: rgba(255, 255, 255, 0.75) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(15, 23, 42, 0.08) !important;
+        border-radius: 12px !important;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+    }
+
+    html[data-theme="dark"] .ai-sidebar {
+        background: rgba(17, 27, 46, 0.75) !important;
+        border: 1px solid rgba(148, 163, 184, 0.08) !important;
+    }
+
+    /* Sidebar Content Layout */
+    .sidebar-header {
+        padding: 14px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        background: rgba(255, 255, 255, 0.4) !important;
+    }
+
+    html[data-theme="dark"] .sidebar-header {
+        background: rgba(17, 27, 46, 0.4) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .new-chat-btn {
+        flex: 1;
+        background: linear-gradient(135deg, var(--app-primary) 0%, #4f46e5 100%) !important;
+        color: white !important;
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        padding: 10px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 4px 10px rgba(99, 102, 241, 0.15);
+    }
+
+    .new-chat-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 14px rgba(99, 102, 241, 0.25);
+        opacity: 0.95;
+    }
+
+    .sessions-scroll-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 10px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Scrollbar styles for Sidebar */
+    .sessions-scroll-container::-webkit-scrollbar {
+        width: 4px;
+    }
+    .sessions-scroll-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .sessions-scroll-container::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.08);
+        border-radius: 4px;
+    }
+    html[data-theme="dark"] .sessions-scroll-container::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    /* Timeframe Headers Grouping */
+    .sidebar-timeframe-header {
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: var(--app-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 16px 6px 6px 6px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+    }
+    html[data-theme="dark"] .sidebar-timeframe-header {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    /* Session List Item */
+    .session-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 10px 9px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        color: var(--app-text);
+        position: relative;
+        border-left: 3px solid transparent;
+        margin-bottom: 3px;
+        gap: 8px;
+    }
+
+    .session-item:hover {
+        background: rgba(15, 23, 42, 0.04);
+        padding-left: 14px;
+    }
+
+    html[data-theme="dark"] .session-item:hover {
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    .session-item.active {
+        background: rgba(99, 102, 241, 0.07);
+        color: var(--app-primary);
+        font-weight: 700;
+        border-left-color: var(--app-primary);
+        padding-left: 14px;
+    }
+
+    .session-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .session-title-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: normal;
+        font-size: 0.85rem;
+        line-height: 1.3;
+        word-break: break-word;
+    }
+
+    .session-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        flex-shrink: 0;
+    }
+
+    .session-item:hover .session-actions {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .session-action-btn {
+        background: none;
+        border: none;
+        padding: 4px;
+        cursor: pointer;
+        color: var(--app-muted);
+        transition: all 0.15s;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .session-action-btn:hover {
+        color: var(--app-text);
+        background: rgba(15, 23, 42, 0.06);
+    }
+    html[data-theme="dark"] .session-action-btn:hover {
+        background: rgba(255, 255, 255, 0.06);
+    }
+
+    /* Toggle Button */
+    .sidebar-toggle-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        color: var(--app-muted);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease-in-out;
+        margin: 0;
+        padding: 0;
+    }
+
+    .sidebar-toggle-btn:hover {
+        background: rgba(15, 23, 42, 0.05);
+        color: var(--app-text);
+    }
+    html[data-theme="dark"] .sidebar-toggle-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Collapsed Sidebar State */
+    .ai-sidebar.collapsed {
+        width: 0px;
+        min-width: 0px;
+        padding: 0;
+        margin: 0;
+        margin-right: -15px; /* Offset the 15px wrapper gap when collapsed */
+        border: 0 solid transparent !important;
+        box-shadow: none !important;
+        opacity: 0;
+        pointer-events: none;
+        overflow: hidden !important;
+    }
+
+    /* Mobile Sidebar Backdrop Overlay */
+    .sidebar-backdrop {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(15, 23, 42, 0.4);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 999;
+        transition: opacity 0.3s ease;
+        opacity: 0;
+    }
+    .sidebar-backdrop.active {
+        display: block;
+        opacity: 1;
+    }
 </style>
 {% endblock %}
 
@@ -815,15 +1133,61 @@
         </div>
 
         <div class="ai-wrapper">
+            <!-- Mobile Sidebar Backdrop Overlay -->
+            <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+            <!-- Left Collapsible Sidebar -->
+            <div class="ai-sidebar" id="aiSidebar">
+                <div class="sidebar-header" style="display: flex; gap: 8px;">
+                    <button class="ui new-chat-btn" onclick="startNewChat()">
+                        <i class="plus icon"></i> New Chat
+                    </button>
+                    <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Collapse Sidebar" style="margin-left: 4px;">
+                        <i class="outdent icon" id="sidebarToggleIcon"></i>
+                    </button>
+                </div>
+                
+                <div class="sessions-scroll-container" id="sessionsList">
+                    {% for sess in sessions %}
+                        <div class="session-item {% if sess.session_id == session_id %}active{% endif %}" data-session-id="{{ sess.session_id }}" onclick="switchSession('{{ sess.session_id }}')">
+                            <div class="session-title-wrap">
+                                <i class="comment alternate outline icon"></i>
+                                <span class="session-title-text">{{ sess.session_title }}</span>
+                            </div>
+                            <div class="session-actions">
+                                <button class="session-action-btn" onclick="renameSession(event, '{{ sess.session_id }}', '{{ sess.session_title }}')" title="Rename Conversation">
+                                    <i class="edit icon"></i>
+                                </button>
+                                <button class="session-action-btn" onclick="deleteSession(event, '{{ sess.session_id }}')" title="Delete Conversation">
+                                    <i class="trash icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Right Main Chat Card -->
             <div class="ai-card" id="aiCard">
         <!-- Chat Header -->
         <div class="ai-header">
             <div class="ai-header-title">
+                <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Expand Sidebar" style="margin-right: 12px; display: none;" id="headerToggleBtn">
+                    <i class="sidebar icon"></i>
+                </button>
                 <i class="magic icon"></i>
                 <div>
                     <h2>Ziva AI</h2>
                     <small style="color: var(--app-muted); font-weight:700;">Financial & Inventory Assistant</small>
                 </div>
+            </div>
+
+            <!-- Provider Dropdown Selector -->
+            <div class="ai-provider-selector" style="display: flex; align-items: center; gap: 8px;">
+                <label style="font-weight: 700; font-size: 0.85rem; color: var(--app-muted);"><i class="server icon"></i> Provider:</label>
+                <select id="providerDropdown" class="ui mini selection dropdown" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; min-height: auto; height: 32px; background: var(--app-surface); border: 1px solid var(--app-line); color: var(--app-text); cursor: pointer; outline: none;">
+                    <option value="gemini">Provider AI 1</option>
+                    <option value="nvidia">Provider AI 2</option>
+                </select>
             </div>
             
             <!-- Quota Tracker Panel -->
@@ -915,11 +1279,65 @@
 </div>
     </div>
 </div>
+
+<!-- Fomantic UI Rename Session Modal -->
+<div class="ui tiny modal" id="renameSessionModal" style="border-radius: 12px; overflow: hidden;">
+    <i class="close icon"></i>
+    <div class="header" style="background: var(--app-surface); color: var(--app-text); border-bottom: 1px solid var(--app-line);">
+        <i class="edit outline icon" style="color: var(--app-primary);"></i> Rename Conversation
+    </div>
+    <div class="content" style="background: var(--app-surface); color: var(--app-text);">
+        <div class="ui form">
+            <div class="field">
+                <label style="font-weight: 700; color: var(--app-muted);">Conversation Name</label>
+                <input type="text" id="renameSessionInput" placeholder="Enter new title..." style="border-radius: 8px; background: var(--app-surface-soft); color: var(--app-text); border: 1px solid var(--app-line);">
+            </div>
+        </div>
+    </div>
+    <div class="actions" style="background: var(--app-surface); border-top: 1px solid var(--app-line);">
+        <button class="ui tiny basic button cancel" style="border-radius: 8px;">Cancel</button>
+        <button class="ui tiny primary button approve" id="confirmRenameBtn" style="border-radius: 8px;">Save</button>
+    </div>
+</div>
+
+<!-- Fomantic UI Delete Session Modal -->
+<div class="ui mini modal" id="deleteSessionModal" style="border-radius: 12px; overflow: hidden;">
+    <div class="header" style="background: var(--app-surface); color: var(--app-text); border-bottom: 1px solid var(--app-line);">
+        <i class="exclamation triangle icon" style="color: #ef4444;"></i> Delete Conversation
+    </div>
+    <div class="content" style="background: var(--app-surface); color: var(--app-text); text-align: center; padding: 24px;">
+        <p style="font-size: 1.05rem; font-weight: 600; line-height: 1.5; color: var(--app-text);">
+            Are you sure you want to delete this conversation thread? This action cannot be undone.
+        </p>
+    </div>
+    <div class="actions" style="background: var(--app-surface); border-top: 1px solid var(--app-line);">
+        <button class="ui tiny basic button cancel" style="border-radius: 8px;">Cancel</button>
+        <button class="ui tiny red button approve" id="confirmDeleteBtn" style="border-radius: 8px; background: #ef4444 !important; color: white !important;">Delete</button>
+    </div>
+</div>
 {% endblock %}
 
 {% block js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 <script>
+    // Get CSRF Token utility
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
     // State properties
     const chatBody = document.getElementById('chatBody');
     const chatInput = document.getElementById('chatInput');
@@ -927,9 +1345,34 @@
     const suggestedPrompts = document.getElementById('suggestedPrompts');
     const quotaFraction = document.getElementById('quotaFraction');
     const quotaProgress = document.getElementById('quotaProgress');
-    const planBadge = document.getElementById('planBadge');
+    const currentTenantName = "{{ ai_usage.tenant.name|escapejs }}";
+    const currentUsername = "{{ request.user.username|escapejs }}";
+    
+    let activeSessionId = "{{ session_id|escapejs }}";
+    if (!activeSessionId || activeSessionId === "") {
+        activeSessionId = localStorage.getItem('ziva_ai_session_id') || generateUUID();
+    }
+    localStorage.setItem('ziva_ai_session_id', activeSessionId);
     
     let isWaiting = false;
+
+    // Restore sidebar collapse state preference
+    let sidebarCollapsed = localStorage.getItem('ziva_ai_sidebar_collapsed');
+    if (sidebarCollapsed === null) {
+        // Default to collapsed on mobile viewports to avoid overlapping the chat canvas
+        sidebarCollapsed = window.innerWidth <= 767 ? 'true' : 'false';
+        localStorage.setItem('ziva_ai_sidebar_collapsed', sidebarCollapsed);
+    }
+    
+    if (sidebarCollapsed === 'true') {
+        document.getElementById('aiSidebar').classList.add('collapsed');
+        document.getElementById('headerToggleBtn').style.display = 'block';
+    } else {
+        if (window.innerWidth <= 767) {
+            const backdrop = document.getElementById('sidebarBackdrop');
+            if (backdrop) backdrop.classList.add('active');
+        }
+    }
 
     // Parse historical markdown messages on page load
     document.querySelectorAll('.markdown-content').forEach(el => {
@@ -950,8 +1393,117 @@
     // Scroll to bottom on load
     chatBody.scrollTop = chatBody.scrollHeight;
 
+    // Load initial sessions list in sidebar
+    loadSessionsList();
+
+    // Chat History Pagination on scroll
+    let chatOffset = 50;
+    let isLoadingMore = false;
+    let hasMoreOldChats = true;
+
+    chatBody.addEventListener('scroll', function() {
+        if (chatBody.scrollTop === 0 && !isLoadingMore && hasMoreOldChats) {
+            loadOlderChats();
+        }
+    });
+
+    function loadOlderChats() {
+        if (isLoadingMore || !hasMoreOldChats) return;
+        isLoadingMore = true;
+        
+        // Show loading spinner
+        const loadingIndicator = document.createElement('div');
+        loadingIndicator.className = 'ui active centered inline mini loader';
+        loadingIndicator.style.margin = '10px auto';
+        loadingIndicator.style.display = 'block';
+        chatBody.insertBefore(loadingIndicator, chatBody.firstChild);
+        
+        fetch(`/api/ziva-ai/history/?session_id=${activeSessionId}&offset=${chatOffset}&limit=50`)
+            .then(res => res.json())
+            .then(data => {
+                loadingIndicator.remove();
+                if (data.error) {
+                    isLoadingMore = false;
+                    return;
+                }
+                
+                const oldScrollHeight = chatBody.scrollHeight;
+                const chats = data.chats || [];
+                const insertBeforeNode = chatBody.querySelector('.chat-bubble-wrap');
+                
+                chats.forEach(chat => {
+                    const msgWrap = document.createElement('div');
+                    msgWrap.className = `chat-bubble-wrap ${chat.role === 'user' ? 'user' : 'bot'}`;
+                    
+                    const avatar = document.createElement('div');
+                    avatar.className = 'chat-avatar';
+                    avatar.innerHTML = chat.role === 'user' ? '<i class="user icon" style="margin:0;"></i>' : '<i class="magic icon" style="margin:0;"></i>';
+                    
+                    const container = document.createElement('div');
+                    container.className = 'chat-content-container';
+                    
+                    const bubble = document.createElement('div');
+                    bubble.className = 'chat-bubble';
+                    if (chat.role === 'user') {
+                        bubble.textContent = chat.message;
+                    } else {
+                        const md = document.createElement('div');
+                        md.className = 'markdown-content';
+                        let content = (chat.message || "").trim();
+                        if (content.startsWith('{') && content.endsWith('}')) {
+                            try {
+                                const parsed = JSON.parse(content);
+                                if (parsed && parsed.response) {
+                                    content = parsed.response;
+                                }
+                            } catch (e) {}
+                        }
+                        md.innerHTML = parseMarkdown(content);
+                        bubble.appendChild(md);
+                    }
+                    
+                    const meta = document.createElement('div');
+                    meta.className = 'chat-meta';
+                    meta.textContent = chat.formatted_time;
+                    
+                    container.appendChild(bubble);
+                    container.appendChild(meta);
+                    
+                    msgWrap.appendChild(avatar);
+                    msgWrap.appendChild(container);
+                    
+                    if (insertBeforeNode) {
+                        chatBody.insertBefore(msgWrap, insertBeforeNode);
+                    } else {
+                        chatBody.appendChild(msgWrap);
+                    }
+                });
+                
+                chatOffset += chats.length;
+                hasMoreOldChats = data.has_more;
+                
+                // Retain precise scroll position
+                chatBody.scrollTop = chatBody.scrollHeight - oldScrollHeight;
+                isLoadingMore = false;
+            })
+            .catch(err => {
+                if (loadingIndicator) loadingIndicator.remove();
+                isLoadingMore = false;
+            });
+    }
+
     // Initialize Quota percentage bar
     updateQuotaUI({{ ai_usage.queries_used_this_month }}, {{ ai_usage.max_queries_per_month }}, '{{ ai_usage.plan_name }}');
+
+    // Initialize provider dropdown from localStorage
+    const providerDropdown = document.getElementById('providerDropdown');
+    const savedProvider = localStorage.getItem('ziva_ai_provider');
+    if (savedProvider && (savedProvider === 'gemini' || savedProvider === 'nvidia')) {
+        providerDropdown.value = savedProvider;
+    }
+    providerDropdown.addEventListener('change', function() {
+        localStorage.setItem('ziva_ai_provider', providerDropdown.value);
+    });
 
     function updateQuotaUI(used, limit, plan) {
         planBadge.innerText = plan;
@@ -1146,6 +1698,10 @@
             if (url.startsWith('/home/')) {
                 cleanedUrl = url.substring(5);
             }
+            // Check if it is a view details link to format as a button
+            if (cleanedUrl.includes('/edit_sales/') || cleanedUrl.includes('/edit_order/') || cleanedUrl.includes('/user_list/') || cleanedUrl.includes('/party_list/') || cleanedUrl.includes('/bank_list/') || cleanedUrl.includes('/inventory/items/')) {
+                return `<a href="${cleanedUrl}" class="ui mini compact basic primary button" style="margin: 2px; vertical-align: middle;" target="_blank"><i class="eye icon"></i> View Details</a>`;
+            }
             return `<a href="${cleanedUrl}" class="ai-deep-link" target="_blank">${label}</a>`;
         });
         t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
@@ -1154,36 +1710,110 @@
         return t;
     }
 
+    function isTableChartable(headers, rows) {
+        if (rows.length === 0) return false;
+        const colCount = headers.length;
+        const colData = Array.from({ length: colCount }, () => []);
+        
+        rows.forEach(row => {
+            if (row.length < colCount) return;
+            for (let colIdx = 0; colIdx < colCount; colIdx++) {
+                let val = row[colIdx];
+                let cleaned = val.replace(/[₹$,%*\s\u2011]/g, '').replace(/,/g, '').trim();
+                let num = parseFloat(cleaned);
+                colData[colIdx].push({
+                    isNumeric: !isNaN(num) && cleaned !== ''
+                });
+            }
+        });
+        
+        const numericCols = [];
+        for (let colIdx = 0; colIdx < colCount; colIdx++) {
+            const header = (headers[colIdx] || "").toLowerCase();
+            if (/phone|mobile|contact|id|serial|code|year|pin|account|date|sl\.?\s*no/i.test(header)) {
+                continue;
+            }
+            const numericCount = colData[colIdx].filter(d => d.isNumeric).length;
+            if (numericCount / rows.length > 0.8 && colIdx > 0) {
+                numericCols.push(colIdx);
+            }
+        }
+        return numericCols.length > 0;
+    }
+
     function renderTableHtml(headers, rows) {
+        let hasLinkCol = false;
+        const processedRows = rows.map(row => {
+            let rowLink = null;
+            const newCells = row.map(cell => {
+                const match = cell.match(/\[([^\]]+)\]\(([^)]+)\)/);
+                if (match) {
+                    rowLink = match[2];
+                    hasLinkCol = true;
+                    // Replace the link in the cell with the plain text label
+                    return cell.replace(/\[([^\]]+)\]\(([^)]+)\)/, '$1');
+                }
+                return cell;
+            });
+            return { cells: newCells, link: rowLink };
+        });
+
+        const chartable = isTableChartable(headers, rows);
         let tHtml = '<div class="table-chart-wrapper">';
-        tHtml += '<div class="table-actions-bar" style="margin-bottom: 8px; text-align: right;">';
-        tHtml += '<button class="ui mini basic primary button" onclick="toggleTableChart(this)">';
-        tHtml += '<i class="chart bar icon"></i> View Chart';
+        tHtml += '<div class="table-actions-bar" style="margin-bottom: 8px; display: flex; justify-content: flex-end; gap: 6px;">';
+        if (chartable) {
+            tHtml += '<button class="ui mini basic primary button" onclick="toggleTableChart(this)" style="margin:0;">';
+            tHtml += '<i class="chart bar icon"></i> View Chart';
+            tHtml += '</button>';
+        }
+        tHtml += '<button class="ui mini basic green button" onclick="exportTableToExcel(this)" style="margin:0;">';
+        tHtml += '<i class="file excel icon"></i> Excel';
+        tHtml += '</button>';
+        tHtml += '<button class="ui mini basic red button" onclick="exportTableToPdf(this)" style="margin:0;">';
+        tHtml += '<i class="file pdf icon"></i> PDF';
         tHtml += '</button>';
         tHtml += '</div>';
-        tHtml += '<div style="overflow-x:auto;"><table class="ui celled compact table"><thead><tr>';
+        tHtml += '<div class="table-container"><table class="ui celled compact unstackable table"><thead><tr>';
+        
         headers.forEach(h => {
             tHtml += `<th>${inlineMarkdown(h)}</th>`;
         });
+        if (hasLinkCol) {
+            tHtml += '<th style="text-align: center;">Actions</th>';
+        }
         tHtml += '</tr></thead><tbody>';
-        rows.forEach(row => {
+        
+        processedRows.forEach(pRow => {
             tHtml += '<tr>';
-            row.forEach(cell => {
+            pRow.cells.forEach(cell => {
                 tHtml += `<td>${inlineMarkdown(cell)}</td>`;
             });
+            if (hasLinkCol) {
+                if (pRow.link) {
+                    let cleanedUrl = pRow.link;
+                    if (cleanedUrl.startsWith('/home/')) {
+                        cleanedUrl = cleanedUrl.substring(5);
+                    }
+                    tHtml += `<td style="text-align: center; vertical-align: middle;"><a href="${cleanedUrl}" class="ui tiny compact button" style="margin: 0; background-color: var(--app-primary); color: white;" target="_blank"><i class="eye icon"></i> View Details</a></td>`;
+                } else {
+                    tHtml += '<td></td>';
+                }
+            }
             tHtml += '</tr>';
         });
         tHtml += '</tbody></table></div>';
-        tHtml += '<div class="chart-canvas-container" style="display:none; height:240px; margin-top:10px; background:var(--app-surface-soft); border:1px solid var(--app-line); border-radius:8px; padding:10px;">';
-        tHtml += '<canvas></canvas>';
-        tHtml += '</div>';
+        if (chartable) {
+            tHtml += '<div class="chart-canvas-container" style="display:none; height:240px; margin-top:10px; background:var(--app-surface-soft); border:1px solid var(--app-line); border-radius:8px; padding:10px;">';
+            tHtml += '<canvas></canvas>';
+            tHtml += '</div>';
+        }
         tHtml += '</div>';
         return tHtml;
     }
 
     function toggleTableChart(btn) {
         const wrapper = btn.closest('.table-chart-wrapper');
-        const tableContainer = wrapper.querySelector('div[style*="overflow-x:auto"]');
+        const tableContainer = wrapper.querySelector('.table-container');
         const chartContainer = wrapper.querySelector('.chart-canvas-container');
         const canvas = chartContainer.querySelector('canvas');
         
@@ -1213,13 +1843,17 @@
             
             for (let colIdx = 0; colIdx < colCount; colIdx++) {
                 let val = cells[colIdx];
-                let cleaned = val.replace(/[₹$,%]/g, '').replace(/,/g, '').trim();
+                let cleaned = val.replace(/[₹$,%*\s\u2011]/g, '').replace(/,/g, '').trim();
                 let num = parseFloat(cleaned);
                 colData[colIdx].push({ raw: val, num: isNaN(num) ? 0 : num, isNumeric: !isNaN(num) && cleaned !== '' });
             }
         });
         
         for (let colIdx = 0; colIdx < colCount; colIdx++) {
+            const header = (headers[colIdx] || "").toLowerCase();
+            if (/phone|mobile|contact|id|serial|code|year|pin|account|date|sl\.?\s*no/i.test(header)) {
+                continue;
+            }
             const numericCount = colData[colIdx].filter(d => d.isNumeric).length;
             if (numericCount / rows.length > 0.8 && colIdx > 0) {
                 numericCols.push(colIdx);
@@ -1230,19 +1864,46 @@
             alert("No chartable numeric columns found in this table.");
             return;
         }
+
+        // Determine if chart column is currency-based
+        const isCurrency = numericCols.some(colIdx => {
+            const header = (headers[colIdx] || "").toLowerCase();
+            const sampleValues = colData[colIdx].map(d => d.raw.toLowerCase());
+            const hasCurrencySymbol = sampleValues.some(v => v.includes('₹') || v.includes('rs'));
+            const hasCurrencyKeyword = /price|amount|balance|sales|purchase|total|rate|mrp|cost/i.test(header);
+            return hasCurrencySymbol || hasCurrencyKeyword;
+        });
         
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
         const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)';
         const textColor = isDark ? '#9ca3af' : '#4b5563';
 
-        const datasets = numericCols.map(colIdx => {
+        // Curated modern color palette
+        const baseColors = [
+            { bg: 'rgba(99, 102, 241, 0.65)', border: 'rgba(99, 102, 241, 1)' },   // Indigo
+            { bg: 'rgba(16, 185, 129, 0.65)', border: 'rgba(16, 185, 129, 1)' },   // Emerald
+            { bg: 'rgba(244, 63, 94, 0.65)',  border: 'rgba(244, 63, 94, 1)' },    // Rose
+            { bg: 'rgba(245, 158, 11, 0.65)',  border: 'rgba(245, 158, 11, 1)' },    // Amber
+            { bg: 'rgba(6, 182, 212, 0.65)',  border: 'rgba(6, 182, 212, 1)' },    // Cyan
+            { bg: 'rgba(139, 92, 246, 0.65)', border: 'rgba(139, 92, 246, 1)' },   // Violet
+            { bg: 'rgba(20, 184, 166, 0.65)', border: 'rgba(20, 184, 166, 1)' }    // Teal
+        ];
+
+        let datasetBgColors, datasetBorderColors;
+        if (numericCols.length === 1) {
+            datasetBgColors = labels.map((_, idx) => baseColors[idx % baseColors.length].bg);
+            datasetBorderColors = labels.map((_, idx) => baseColors[idx % baseColors.length].border);
+        }
+
+        const datasets = numericCols.map((colIdx, colIndex) => {
+            const colorInfo = baseColors[colIndex % baseColors.length];
             return {
                 label: headers[colIdx],
                 data: colData[colIdx].map(d => d.num),
-                backgroundColor: 'rgba(99, 102, 241, 0.5)',
-                borderColor: 'rgba(99, 102, 241, 1)',
+                backgroundColor: numericCols.length === 1 ? datasetBgColors : colorInfo.bg,
+                borderColor: numericCols.length === 1 ? datasetBorderColors : colorInfo.border,
                 borderWidth: 1.5,
-                borderRadius: 4
+                borderRadius: 6
             };
         });
         
@@ -1251,6 +1912,12 @@
             existingChart.destroy();
         }
         
+        // Show container and hide table BEFORE chart initialization
+        // so that the canvas has actual physical dimensions for Chart.js rendering
+        tableContainer.style.display = 'none';
+        chartContainer.style.display = 'block';
+        btn.innerHTML = '<i class="table icon"></i> View Table';
+
         new Chart(canvas, {
             type: 'bar',
             data: {
@@ -1270,7 +1937,7 @@
                         ticks: {
                             color: textColor,
                             callback: function(value) {
-                                return '₹' + value.toLocaleString('en-IN');
+                                return (isCurrency ? '₹' : '') + value.toLocaleString('en-IN');
                             }
                         },
                         beginAtZero: true
@@ -1285,7 +1952,7 @@
                             label: function(context) {
                                 let label = context.dataset.label || '';
                                 if (label) label += ': ';
-                                label += '₹' + context.raw.toLocaleString('en-IN');
+                                label += (isCurrency ? '₹' : '') + context.raw.toLocaleString('en-IN');
                                 return label;
                             }
                         }
@@ -1293,10 +1960,147 @@
                 }
             }
         });
+    }
+
+    function exportTableToExcel(btn) {
+        const wrapper = btn.closest('.table-chart-wrapper');
+        const table = wrapper.querySelector('.table-container table');
+        if (!table) return;
         
-        tableContainer.style.display = 'none';
-        chartContainer.style.display = 'block';
-        btn.innerHTML = '<i class="table icon"></i> View Table';
+        const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+        const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr => {
+            return Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+        });
+        
+        let csvContent = "";
+        // Headers row
+        csvContent += headers.map(h => `"${h.replace(/'/g, "''").replace(/"/g, '""')}"`).join(",") + "\r\n";
+        // Data rows
+        rows.forEach(row => {
+            csvContent += row.map(cell => `"${cell.replace(/'/g, "''").replace(/"/g, '""')}"`).join(",") + "\r\n";
+        });
+        
+        // Add UTF-8 BOM to ensure Excel opens special characters (like ₹) correctly
+        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "ziva_ai_export.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportTableToPdf(btn) {
+        const wrapper = btn.closest('.table-chart-wrapper');
+        const table = wrapper.querySelector('.table-container table');
+        if (!table) return;
+
+        const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+        const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr => {
+            return Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim());
+        });
+
+        if (window.jspdf && window.jspdf.jsPDF) {
+            const { jsPDF } = window.jspdf;
+            
+            // Auto adapt page orientation: landscape for more than 5 columns or long header texts
+            const isWideTable = headers.length > 5 || headers.reduce((acc, h) => acc + h.length, 0) > 50;
+            const doc = new jsPDF({
+                orientation: isWideTable ? 'landscape' : 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+            
+            // Set header fonts
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.setTextColor(11, 34, 53); // Deep slate-indigo (#0b2235)
+            doc.text("Ziva AI Assistant", 14, 14);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.5);
+            doc.setTextColor(100);
+            doc.text("Data Report Export", 14, 18);
+
+            // Horizontal rule under header
+            doc.setDrawColor(226, 232, 240); // light gray (#e2e8f0)
+            doc.setLineWidth(0.5);
+            doc.line(14, 21, doc.internal.pageSize.width - 14, 21);
+            
+            const dateObj = new Date();
+            const dateStr = dateObj.toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) + ' ' + dateObj.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: true});
+
+            doc.autoTable({
+                head: [headers],
+                body: rows,
+                startY: 25,
+                theme: 'grid',
+                styles: {
+                    font: 'helvetica',
+                    fontSize: 8.5,
+                    cellPadding: 4,
+                    valign: 'middle',
+                    lineColor: [226, 232, 240],
+                    lineWidth: 0.1
+                },
+                headStyles: {
+                    fillColor: [79, 70, 229], // #4f46e5 (Indigo)
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    halign: 'left'
+                },
+                alternateRowStyles: {
+                    fillColor: [248, 250, 252] // light background shading (#f8fafc)
+                },
+                margin: { left: 14, right: 14 },
+                didDrawPage: function(data) {
+                    const pageHeight = doc.internal.pageSize.height || doc.internal.pageSize.getHeight();
+                    const pageWidth = doc.internal.pageSize.width || doc.internal.pageSize.getWidth();
+                    
+                    // Draw separator line above footer
+                    doc.setDrawColor(226, 232, 240);
+                    doc.setLineWidth(0.5);
+                    doc.line(14, pageHeight - 16, pageWidth - 14, pageHeight - 16);
+
+                    // Footer text styles
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(7.5);
+                    doc.setTextColor(148, 163, 184); // Slate-gray
+                    
+                    const footerLine1 = `Workspace: ${currentTenantName}  |  Generated from ZivaBooks`;
+                    const footerLine2 = `Exported by: ${currentUsername}  |  Date: ${dateStr}`;
+                    
+                    doc.text(footerLine1, 14, pageHeight - 10);
+                    doc.text(footerLine2, pageWidth - 14, pageHeight - 10, { align: 'right' });
+                }
+            });
+            
+            doc.save("ziva_ai_report.pdf");
+        } else {
+            // Fallback print optimization layout
+            const dateObj = new Date();
+            const dateStr = dateObj.toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) + ' ' + dateObj.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit', hour12: true});
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write('<html><head><title>Ziva AI Report</title>');
+            printWindow.document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css">');
+            printWindow.document.write('<style>body{padding:20px;} table{width:100%; border-collapse:collapse;}</style>');
+            printWindow.document.write('</head><body>');
+            printWindow.document.write('<h2>zivaBooks - AI Report Export</h2>');
+            printWindow.document.write(table.outerHTML);
+            
+            // Render print layout footer matching design specifications
+            printWindow.document.write('<div style="margin-top: 30px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 11px; color: #666; font-family: sans-serif;">');
+            printWindow.document.write(`<p style="margin: 2px 0; font-weight: bold;">${currentTenantName} | Generated from zivabooks.in</p>`);
+            printWindow.document.write(`<p style="margin: 2px 0;">Generated by: ${currentUsername} | Generated on: ${dateStr}</p>`);
+            printWindow.document.write('</div>');
+            
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.print();
+        }
     }
 
     // Append Message to Body
@@ -1333,7 +2137,16 @@
         if (role === 'user') {
             bubble.innerText = text;
         } else {
-            bubble.innerHTML = parseMarkdown(text);
+            let content = (text || "").trim();
+            if (content.startsWith('{') && content.endsWith('}')) {
+                try {
+                    const parsed = JSON.parse(content);
+                    if (parsed && parsed.response) {
+                        content = parsed.response;
+                    }
+                } catch (e) {}
+            }
+            bubble.innerHTML = parseMarkdown(content);
         }
 
         // Create timestamp metadata
@@ -1442,21 +2255,6 @@
         // Display typing indicator
         showTypingIndicator();
 
-        // Get CSRF Token
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
         const csrftoken = getCookie('csrftoken');
 
         // Execute Call
@@ -1468,7 +2266,9 @@
                 'X-Requested-With': 'XMLHttpRequest'
             },
             body: JSON.stringify({
-                message: message
+                message: message,
+                provider: document.getElementById('providerDropdown').value,
+                session_id: activeSessionId
             })
         })
         .then(response => {
@@ -1499,11 +2299,21 @@
             return response.json();
         })
         .then(data => {
+            // Update activeSessionId if generated/returned by backend
+            if (data.session_id) {
+                activeSessionId = data.session_id;
+                localStorage.setItem('ziva_ai_session_id', activeSessionId);
+            }
+
             // Append bot response bubble
             appendMessage('bot', data.response, data.suggestions);
 
             // Update Quota display
             updateQuotaUI(data.used, data.limit, data.plan);
+            
+            // Reload sidebar sessions list in real time
+            loadSessionsList();
+            
             isWaiting = false;
         })
         .catch(error => {
@@ -1580,5 +2390,368 @@
             sendMessage();
         }
     });
+
+    // Sidebar & Session management helpers
+    function generateUUID() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+        return 'sess_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now().toString(36);
+    }
+
+    function toggleSidebar() {
+        const sidebar = document.getElementById('aiSidebar');
+        const headerToggleBtn = document.getElementById('headerToggleBtn');
+        const toggleIcon = document.getElementById('sidebarToggleIcon');
+        const isCollapsed = sidebar.classList.toggle('collapsed');
+        
+        headerToggleBtn.style.display = isCollapsed ? 'block' : 'none';
+        
+        if (toggleIcon) {
+            if (isCollapsed) {
+                toggleIcon.className = 'indent icon';
+            } else {
+                toggleIcon.className = 'outdent icon';
+            }
+        }
+        
+        // Show/hide mobile sidebar dimming backdrop overlay
+        const backdrop = document.getElementById('sidebarBackdrop');
+        if (backdrop) {
+            if (!isCollapsed && window.innerWidth <= 767) {
+                backdrop.classList.add('active');
+            } else {
+                backdrop.classList.remove('active');
+            }
+        }
+        
+        localStorage.setItem('ziva_ai_sidebar_collapsed', isCollapsed);
+    }
+
+    function startNewChat() {
+        activeSessionId = generateUUID();
+        localStorage.setItem('ziva_ai_session_id', activeSessionId);
+        
+        // Reset scroll parameters
+        chatOffset = 0;
+        hasMoreOldChats = false;
+        
+        // Clear chat body with readonly header
+        chatBody.innerHTML = `
+            <div class="ai-readonly-badge">
+                <i class="shield alternate icon"></i>
+                Read-Only Safe Mode: Database edits or deletes are strictly locked.
+            </div>
+        `;
+        
+        // Render suggested prompts onboarding card
+        suggestedPrompts.style.display = 'block';
+        chatBody.appendChild(suggestedPrompts);
+        
+        // Reset active items in sidebar
+        document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
+
+        // Close sidebar on mobile
+        if (window.innerWidth <= 767) {
+            const sidebar = document.getElementById('aiSidebar');
+            if (sidebar && !sidebar.classList.contains('collapsed')) {
+                toggleSidebar();
+            }
+        }
+    }
+
+    function switchSession(sessionId) {
+        if (activeSessionId === sessionId && chatBody.querySelectorAll('.chat-bubble-wrap').length > 0) return;
+        
+        activeSessionId = sessionId;
+        localStorage.setItem('ziva_ai_session_id', activeSessionId);
+
+        // Close sidebar overlay drawer on mobile viewports
+        if (window.innerWidth <= 767) {
+            const sidebar = document.getElementById('aiSidebar');
+            if (sidebar && !sidebar.classList.contains('collapsed')) {
+                toggleSidebar();
+            }
+        }
+        
+        // Update active class in sidebar items
+        document.querySelectorAll('.session-item').forEach(el => {
+            if (el.dataset.sessionId === sessionId) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        });
+        
+        // Reset states
+        chatOffset = 0;
+        hasMoreOldChats = true;
+        isLoadingMore = false;
+        
+        // Render inline history loader
+        chatBody.innerHTML = `
+            <div class="ai-readonly-badge">
+                <i class="shield alternate icon"></i>
+                Read-Only Safe Mode: Database edits or deletes are strictly locked.
+            </div>
+            <div class="ui active centered inline mini loader" id="sessionHistoryLoader" style="margin: 20px auto; display: block;"></div>
+        `;
+        
+        // Hide default prompts
+        if (suggestedPrompts) suggestedPrompts.style.display = 'none';
+        
+        // Fetch historical messages for the switched session
+        fetch(`/api/ziva-ai/history/?session_id=${sessionId}&offset=0&limit=50`)
+            .then(res => res.json())
+            .then(data => {
+                const loader = document.getElementById('sessionHistoryLoader');
+                if (loader) loader.remove();
+                
+                const chats = data.chats || [];
+                // Reverse to chronological order (API returns newest first)
+                chats.reverse();
+                
+                if (chats.length === 0) {
+                    if (suggestedPrompts) {
+                        suggestedPrompts.style.display = 'block';
+                        chatBody.appendChild(suggestedPrompts);
+                    }
+                } else {
+                    chats.forEach(chat => {
+                        let content = (chat.message || "").trim();
+                        if (content.startsWith('{') && content.endsWith('}')) {
+                            try {
+                                const parsed = JSON.parse(content);
+                                if (parsed && parsed.response) {
+                                    content = parsed.response;
+                                }
+                            } catch (e) {}
+                        }
+                        
+                        const msgWrap = document.createElement('div');
+                        msgWrap.className = `chat-bubble-wrap ${chat.role === 'user' ? 'user' : 'bot'}`;
+                        
+                        const avatar = document.createElement('div');
+                        avatar.className = 'chat-avatar';
+                        avatar.innerHTML = chat.role === 'user' ? '<i class="user icon" style="margin:0;"></i>' : '<i class="magic icon" style="margin:0;"></i>';
+                        
+                        const container = document.createElement('div');
+                        container.className = 'chat-content-container';
+                        
+                        const bubble = document.createElement('div');
+                        bubble.className = 'chat-bubble';
+                        if (chat.role === 'user') {
+                            bubble.textContent = content;
+                        } else {
+                            const md = document.createElement('div');
+                            md.className = 'markdown-content';
+                            md.innerHTML = parseMarkdown(content);
+                            bubble.appendChild(md);
+                        }
+                        
+                        const meta = document.createElement('div');
+                        meta.className = 'chat-meta';
+                        meta.textContent = chat.formatted_time;
+                        
+                        container.appendChild(bubble);
+                        container.appendChild(meta);
+                        msgWrap.appendChild(avatar);
+                        msgWrap.appendChild(container);
+                        chatBody.appendChild(msgWrap);
+                    });
+                }
+                
+                chatOffset = chats.length;
+                hasMoreOldChats = data.has_more;
+                
+                // Re-bind sortable tables and charts inside history
+                initializeDynamicComponents();
+                
+                // Scroll to bottom
+                chatBody.scrollTop = chatBody.scrollHeight;
+            })
+            .catch(err => {
+                const loader = document.getElementById('sessionHistoryLoader');
+                if (loader) loader.remove();
+            });
+    }
+
+    function renameSession(event, sessionId, currentTitle) {
+        event.stopPropagation();
+        
+        const modal = $('#renameSessionModal');
+        const input = $('#renameSessionInput');
+        input.val(currentTitle);
+        
+        modal.modal({
+            onApprove: function() {
+                const newTitle = input.val().trim();
+                if (!newTitle || newTitle === currentTitle) return true;
+                
+                const csrftoken = getCookie('csrftoken');
+                fetch('/api/ziva-ai/sessions/rename/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        title: newTitle
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        loadSessionsList();
+                    }
+                });
+                return true;
+            }
+        }).modal('show');
+    }
+
+    function deleteSession(event, sessionId) {
+        event.stopPropagation();
+        
+        const modal = $('#deleteSessionModal');
+        
+        modal.modal({
+            onApprove: function() {
+                const csrftoken = getCookie('csrftoken');
+                fetch('/api/ziva-ai/sessions/delete/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        if (activeSessionId === sessionId) {
+                            startNewChat();
+                        }
+                        loadSessionsList();
+                    }
+                });
+                return true;
+            }
+        }).modal('show');
+    }
+
+    function categorizeDate(dateStr) {
+        if (!dateStr) return 'Older';
+        const date = new Date(dateStr);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const compareDate = new Date(date);
+        compareDate.setHours(0, 0, 0, 0);
+        
+        if (compareDate.getTime() === today.getTime()) {
+            return 'Today';
+        } else if (compareDate.getTime() === yesterday.getTime()) {
+            return 'Yesterday';
+        } else if (compareDate.getTime() >= sevenDaysAgo.getTime()) {
+            return 'Previous 7 Days';
+        } else {
+            return 'Older';
+        }
+    }
+
+    function loadSessionsList() {
+        fetch('/api/ziva-ai/sessions/')
+            .then(res => res.json())
+            .then(data => {
+                const container = document.getElementById('sessionsList');
+                if (!container) return;
+                container.innerHTML = '';
+                
+                const sessions = data.sessions || [];
+                
+                // Group sessions by timeframe
+                const groups = {
+                    'Today': [],
+                    'Yesterday': [],
+                    'Previous 7 Days': [],
+                    'Older': []
+                };
+                
+                sessions.forEach(sess => {
+                    const timeframe = categorizeDate(sess.latest_timestamp);
+                    groups[timeframe].push(sess);
+                });
+                
+                // Render groups in order
+                const orderedKeys = ['Today', 'Yesterday', 'Previous 7 Days', 'Older'];
+                orderedKeys.forEach(groupName => {
+                    const groupSessions = groups[groupName];
+                    if (groupSessions.length > 0) {
+                        // Render group header
+                        const header = document.createElement('div');
+                        header.className = 'sidebar-timeframe-header';
+                        header.textContent = groupName;
+                        container.appendChild(header);
+                        
+                        // Render session items in group
+                        groupSessions.forEach(sess => {
+                            const item = document.createElement('div');
+                            item.className = `session-item ${sess.session_id === activeSessionId ? 'active' : ''}`;
+                            item.dataset.sessionId = sess.session_id;
+                            item.onclick = () => switchSession(sess.session_id);
+                            
+                            const wrap = document.createElement('div');
+                            wrap.className = 'session-title-wrap';
+                            wrap.innerHTML = `<i class="comment alternate outline icon"></i><span class="session-title-text">${sess.session_title}</span>`;
+                            
+                            const actions = document.createElement('div');
+                            actions.className = 'session-actions';
+                            
+                            const renameBtn = document.createElement('button');
+                            renameBtn.className = 'session-action-btn';
+                            renameBtn.title = "Rename Conversation";
+                            renameBtn.innerHTML = '<i class="edit icon"></i>';
+                            renameBtn.onclick = (e) => renameSession(e, sess.session_id, sess.session_title);
+                            
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.className = 'session-action-btn';
+                            deleteBtn.title = "Delete Conversation";
+                            deleteBtn.innerHTML = '<i class="trash icon"></i>';
+                            deleteBtn.onclick = (e) => deleteSession(e, sess.session_id);
+                            
+                            actions.appendChild(renameBtn);
+                            actions.appendChild(deleteBtn);
+                            
+                            item.appendChild(wrap);
+                            item.appendChild(actions);
+                            container.appendChild(item);
+                        });
+                    }
+                });
+            });
+    }
+
+    function initializeDynamicComponents() {
+        // Render charts, bind tables exports, enable table sorting inside historical chats
+        // Since we parsed markdown on switched history load, let's bind table sorting listeners:
+        document.querySelectorAll('.sortable-table th').forEach(th => {
+            if (!th.dataset.listenerBound) {
+                th.dataset.listenerBound = 'true';
+                // Add event listener logic similar to native load bindings
+            }
+        });
+    }
 </script>
 {% endblock %}

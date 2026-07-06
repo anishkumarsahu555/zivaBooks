@@ -10,6 +10,7 @@ dependencies = [
     "django-pwa>=2.0.1",
     "django-redis>=6.0.0",
     "django-stdimage>=6.0.2",
+    "openai>=2.44.0",
     "openpyxl>=3.1.5",
     "psycopg[binary]>=3.2.10",
     "python-dotenv>=1.2.2",

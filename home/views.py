@@ -4239,11 +4239,55 @@ def ziva_ai_page(request):
     ai_usage.check_and_reset_usage()
 
     from .models import ZivaAiChatMessage
-    chats = ZivaAiChatMessage.objects.filter(tenant=tenant, user=request.user, isDeleted=False).order_by('timestamp')[:50]
+    from django.db.models import Max
+
+    # Get latest active chat message to identify active session
+    latest_chat = ZivaAiChatMessage.objects.filter(
+        tenant=tenant,
+        user=request.user,
+        isDeleted=False
+    ).order_by('-timestamp').first()
+    session_id = latest_chat.session_id if latest_chat else 'default'
+
+    db_chats = ZivaAiChatMessage.objects.filter(
+        tenant=tenant,
+        user=request.user,
+        session_id=session_id,
+        isDeleted=False
+    ).order_by('-timestamp')[:50]
+    chats = list(db_chats)
+    chats.reverse()
+
+    # Get unique session lists for left sidebar
+    unique_sessions = ZivaAiChatMessage.objects.filter(
+        tenant=tenant,
+        user=request.user,
+        isDeleted=False
+    ).values('session_id').annotate(
+        latest_timestamp=Max('timestamp')
+    ).order_by('-latest_timestamp')
+
+    sessions_list = []
+    for s in unique_sessions:
+        sess_id = s['session_id']
+        latest_msg = ZivaAiChatMessage.objects.filter(
+            tenant=tenant,
+            user=request.user,
+            session_id=sess_id,
+            isDeleted=False
+        ).order_by('-timestamp').first()
+        title = latest_msg.session_title if latest_msg else "General Chat"
+        sessions_list.append({
+            'session_id': sess_id,
+            'session_title': title,
+            'latest_timestamp': s['latest_timestamp']
+        })
 
     context = {
         'ai_usage': ai_usage,
         'chats': chats,
+        'session_id': session_id,
+        'sessions': sessions_list,
     }
     return render(request, 'home/ziva_ai.html', context)
 

@@ -217,3 +217,172 @@ class ZivaAiTests(SeededTenantMixin, TestCase):
         self.assertEqual(response.json()['suggestions'], ['Ok'])
         self.assertEqual(mock_post.call_count, 3)
 
+    @mock.patch('openai.resources.chat.completions.Completions.create')
+    def test_ziva_ai_chat_api_nvidia_saves_messages(self, mock_create):
+        from unittest import mock
+        from home.models import ZivaAiChatMessage
+        
+        mock_choice = mock.Mock()
+        mock_choice.message = mock.Mock()
+        mock_choice.message.content = '{"response": "Hello from Nvidia GLM-5.2.", "suggestions": ["Nvidia Ok"]}'
+        mock_choice.message.tool_calls = None
+        
+        mock_completion = mock.Mock()
+        mock_completion.choices = [mock_choice]
+        mock_create.return_value = mock_completion
+        
+        self.client.force_login(self.owner)
+        
+        # Configure NVIDIA_API_KEY inside environment patch
+        with mock.patch.dict('os.environ', {'NVIDIA_API_KEY': 'valid_key'}):
+            response = self.client.post(
+                reverse('homeApp:ziva_ai_chat_api'),
+                {'message': 'Hello Nvidia', 'provider': 'nvidia'},
+                content_type='application/json'
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['response'], 'Hello from Nvidia GLM-5.2.')
+            self.assertEqual(response.json()['suggestions'], ['Nvidia Ok'])
+            
+            messages = ZivaAiChatMessage.objects.filter(tenant=self.tenant, user=self.owner).order_by('timestamp')
+            self.assertEqual(messages.count(), 2)
+            
+            # User message
+            user_msg = messages[0]
+            self.assertEqual(user_msg.role, 'user')
+            self.assertEqual(user_msg.message, 'Hello Nvidia')
+            
+            # Bot message
+            bot_msg = messages[1]
+            self.assertEqual(bot_msg.role, 'bot')
+            self.assertEqual(bot_msg.message, 'Hello from Nvidia GLM-5.2.')
+
+    @mock.patch('openai.resources.chat.completions.Completions.create')
+    def test_ziva_ai_chat_api_nvidia_supports_sequential_multi_tool_calls(self, mock_create):
+        from unittest import mock
+        
+        # Define 2 sequential mocked responses
+        mock_tc = mock.Mock()
+        mock_tc.id = 'call-nv-1'
+        mock_tc.type = 'function'
+        mock_tc.function = mock.Mock()
+        mock_tc.function.name = 'lookup_tenant_data'
+        mock_tc.function.arguments = '{"model_name": "Sales"}'
+
+        mock_choice_1 = mock.Mock()
+        mock_choice_1.message = mock.Mock()
+        mock_choice_1.message.content = None
+        mock_choice_1.message.tool_calls = [mock_tc]
+
+        mock_completion_1 = mock.Mock()
+        mock_completion_1.choices = [mock_choice_1]
+
+        mock_choice_2 = mock.Mock()
+        mock_choice_2.message = mock.Mock()
+        mock_choice_2.message.content = '{"response": "Nvidia multi-turn tool success.", "suggestions": ["Nvidia Chip"]}'
+        mock_choice_2.message.tool_calls = None
+
+        mock_completion_2 = mock.Mock()
+        mock_completion_2.choices = [mock_choice_2]
+
+        mock_create.side_effect = [mock_completion_1, mock_completion_2]
+
+        self.client.force_login(self.owner)
+        
+        with mock.patch.dict('os.environ', {'NVIDIA_API_KEY': 'valid_key'}):
+            response = self.client.post(
+                reverse('homeApp:ziva_ai_chat_api'),
+                {'message': 'show nvidia sales data', 'provider': 'nvidia'},
+                content_type='application/json'
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['response'], 'Nvidia multi-turn tool success.')
+            self.assertEqual(response.json()['suggestions'], ['Nvidia Chip'])
+            self.assertEqual(mock_create.call_count, 2)
+
+    def test_ziva_ai_history_api_requires_login(self):
+        response = self.client.get(reverse('homeApp:ziva_ai_history_api'))
+        self.assertEqual(response.status_code, 401)
+
+    def test_ziva_ai_history_api_returns_paginated_history(self):
+        self.client.force_login(self.owner)
+        from home.models import ZivaAiChatMessage
+        
+        # Create 60 dummy messages
+        for i in range(60):
+            ZivaAiChatMessage.objects.create(
+                tenant=self.tenant,
+                user=self.owner,
+                role='user' if i % 2 == 0 else 'bot',
+                message=f"Message {i}"
+            )
+            
+        # Call history API
+        response = self.client.get(reverse('homeApp:ziva_ai_history_api'), {'offset': 0, 'limit': 40})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data['chats']), 40)
+        self.assertTrue(data['has_more'])
+        
+        # Fetch next page
+        response = self.client.get(reverse('homeApp:ziva_ai_history_api'), {'offset': 40, 'limit': 40})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data['chats']), 20)
+        self.assertFalse(data['has_more'])
+
+    def test_ziva_ai_sessions_apis(self):
+        self.client.force_login(self.owner)
+        from home.models import ZivaAiChatMessage
+
+        # 1. Create message under specific session
+        sess_id = "test-session-123"
+        ZivaAiChatMessage.objects.create(
+            tenant=self.tenant,
+            user=self.owner,
+            role='user',
+            message="Hello Session",
+            session_id=sess_id,
+            session_title="Initial Title"
+        )
+
+        # 2. Test sessions list API
+        list_url = reverse('homeApp:ziva_ai_sessions_list_api')
+        response = self.client.get(list_url)
+        self.assertEqual(response.status_code, 200)
+        sessions = response.json().get('sessions', [])
+        # Ensure our session is listed
+        my_session = next((s for s in sessions if s['session_id'] == sess_id), None)
+        self.assertIsNotNone(my_session)
+        self.assertEqual(my_session['session_title'], "Initial Title")
+
+        # 3. Test sessions rename API
+        rename_url = reverse('homeApp:ziva_ai_sessions_rename_api')
+        response = self.client.post(
+            rename_url,
+            {'session_id': sess_id, 'title': "New Session Title"},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json().get('success'))
+
+        # Verify renaming happened in database
+        refreshed_msg = ZivaAiChatMessage.objects.filter(session_id=sess_id).first()
+        self.assertEqual(refreshed_msg.session_title, "New Session Title")
+
+        # 4. Test sessions delete API
+        delete_url = reverse('homeApp:ziva_ai_sessions_delete_api')
+        response = self.client.post(
+            delete_url,
+            {'session_id': sess_id},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json().get('success'))
+
+        # Verify message is soft-deleted
+        deleted_exists = ZivaAiChatMessage.objects.filter(session_id=sess_id, isDeleted=False).exists()
+        self.assertFalse(deleted_exists)
+
+
+

@@ -1879,6 +1879,8 @@ class ZivaAiChatMessage(TenantOwnedModel):
     role = models.CharField(max_length=10, choices=[('user', 'User'), ('bot', 'Bot')])
     message = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    session_id = models.CharField(max_length=64, default='default', db_index=True)
+    session_title = models.CharField(max_length=255, default='General Chat')
 
     def __str__(self):
         return f"{self.user} ({self.role}): {self.message[:30]}"
@@ -1887,7 +1889,7 @@ class ZivaAiChatMessage(TenantOwnedModel):
         verbose_name_plural = 'Ziva AI Chat Messages'
         ordering = ['timestamp']
         indexes = [
-            models.Index(fields=['tenant', 'user', 'timestamp'], name='aichat_tenant_user_time_idx'),
+            models.Index(fields=['tenant', 'user', 'session_id', 'timestamp'], name='aichat_tenant_user_sess_idx'),
         ]
 
 
