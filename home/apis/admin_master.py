@@ -396,6 +396,7 @@ def _tenant_admin_group_name(tenant):
 LOCATION_ASSIGNABLE_PERMISSION_CODENAMES = {
     'can_track_staff_location',
     'can_view_staff_locations',
+    'can_access_ziva_ai',
 }
 
 

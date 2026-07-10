@@ -88,6 +88,14 @@ TENANT_PERMISSION_BUNDLE_DEFS = [
         ],
     },
     {
+        'key': 'tenant_ziva_ai',
+        'label': 'Enable Ziva AI',
+        'description': 'Access the Ziva AI assistant and chat history.',
+        'permissions': [
+            'home.can_access_ziva_ai',
+        ],
+    },
+    {
         'key': 'tenant_collections',
         'label': 'Enable Collections',
         'description': 'Manage collection workflow, approvals, tally, and reporting.',

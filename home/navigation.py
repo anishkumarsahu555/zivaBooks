@@ -19,6 +19,14 @@ LOCATION_PERMISSION_NAMES = {
     'home.can_view_staff_locations',
 }
 
+ZIVA_AI_PERMS = (
+    'home.can_access_ziva_ai',
+    'home.view_zivaaichatmessage',
+    'home.view_tenantaiusage',
+    'home.change_zivaaichatmessage',
+    'home.change_tenantaiusage',
+)
+
 
 def _tenant_admin_group_name(tenant):
     tenant_slug = getattr(tenant, 'slug', 'tenant')
@@ -124,26 +132,28 @@ def _effective_permission_names(request_or_user):
     tenant_permissions = _tenant_permission_names(request_or_user, tenant)
     membership_role = _tenant_membership_role(request_or_user, tenant)
 
+    ziva_ai_direct_permissions = (user_permissions & set(ZIVA_AI_PERMS)) if tenant_permissions else set()
     legacy_user_location_permissions = (
         set()
         if membership_role in {TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN}
         else user_permissions & LOCATION_PERMISSION_NAMES
     )
+    direct_assignable_permissions = ziva_ai_direct_permissions | legacy_user_location_permissions
 
     if membership_role in {TenantMembership.Role.OWNER, TenantMembership.Role.ADMIN}:
         owner_admin_permissions = {
             f'{permission.content_type.app_label}.{permission.codename}'
             for permission in Permission.objects.select_related('content_type').filter(content_type__app_label='home')
         }
-        effective_permissions = ((user_permissions | owner_admin_permissions) & tenant_permissions) | legacy_user_location_permissions
+        effective_permissions = ((user_permissions | owner_admin_permissions) & tenant_permissions) | direct_assignable_permissions
         if hasattr(request_or_user, 'META'):
             request_or_user._tenant_effective_perm_cache = effective_permissions
         user._tenant_effective_perm_cache = effective_permissions
         return effective_permissions
     effective_permissions = (
-        tenant_permissions | legacy_user_location_permissions
+        tenant_permissions | direct_assignable_permissions
         if user.is_superuser
-        else (user_permissions & tenant_permissions) | legacy_user_location_permissions
+        else (user_permissions & tenant_permissions) | direct_assignable_permissions
     )
     if hasattr(request_or_user, 'META'):
         request_or_user._tenant_effective_perm_cache = effective_permissions
@@ -154,6 +164,17 @@ def _effective_permission_names(request_or_user):
 def _has_any_perm(request_or_user, perm_names):
     effective_permissions = _effective_permission_names(request_or_user)
     return any(perm_name in effective_permissions for perm_name in perm_names)
+
+
+def has_ziva_ai_access(request_or_user, tenant=None):
+    user = getattr(request_or_user, 'user', request_or_user)
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    tenant = tenant or get_current_tenant(request_or_user)
+    role = _tenant_membership_role(request_or_user, tenant)
+    if role == TenantMembership.Role.PARTY:
+        return False
+    return _has_any_perm(request_or_user, ZIVA_AI_PERMS)
 
 
 def _nav_item(label, url_name, icon, perm=None):
@@ -187,7 +208,7 @@ def _admin_sections(user):
                     'home.can_manage_staff',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS),
             ]),
         },
         {
@@ -474,7 +495,7 @@ def _collection_sections(user):
                     'home.view_collection',
                     'home.can_manage_sales',
                 )),
-                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS),
             ]),
         },
         {
@@ -533,7 +554,7 @@ def _staff_sections(user):
                     'home.add_attendance',
                     'home.change_attendance',
                 )),
-                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS),
             ]),
         },
         {
@@ -582,7 +603,7 @@ def _sales_sections(user):
                     'home.change_sales',
                     'home.can_manage_sales',
                 )),
-                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS),
             ]),
         },
         {
@@ -639,7 +660,7 @@ def _cash_counter_sections(user):
                     'home.can_manage_cash_counter',
                     'home.view_cashcounter',
                 )),
-                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS),
             ]),
         },
         {
@@ -749,10 +770,10 @@ def build_sidebar_sections(request_or_user):
         {
             'title': 'General',
             'group_break_after': True,
-            'items': [
+            'items': _filter_items(request_or_user, [
                 _nav_item('Dashboard', 'homeApp:homepage', 'tachometer alternate'),
-                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic'),
-            ],
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS),
+            ]),
         },
         {
             'title': 'Staff',

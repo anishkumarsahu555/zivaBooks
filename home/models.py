@@ -1891,5 +1891,7 @@ class ZivaAiChatMessage(TenantOwnedModel):
         indexes = [
             models.Index(fields=['tenant', 'user', 'session_id', 'timestamp'], name='aichat_tenant_user_sess_idx'),
         ]
-
+        permissions = [
+            ('can_access_ziva_ai', 'Can access Ziva AI'),
+        ]
 

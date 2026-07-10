@@ -1,11 +1,33 @@
 from django.test import TestCase
 from django.urls import reverse
+from django.contrib.auth.models import Group, Permission
 from unittest import mock
 from home.tests.utils import SeededTenantMixin
 from home.models import TenantAiUsage
 from datetime import date, timedelta
 
 class ZivaAiTests(SeededTenantMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        import os
+        self._orig_gemini_key = os.environ.get('GEMINI_API_KEY')
+        self._orig_nvidia_key = os.environ.get('NVIDIA_API_KEY')
+        os.environ['GEMINI_API_KEY'] = 'dummy_gemini_key'
+        os.environ['NVIDIA_API_KEY'] = 'dummy_nvidia_key'
+
+    def tearDown(self):
+        import os
+        if self._orig_gemini_key is not None:
+            os.environ['GEMINI_API_KEY'] = self._orig_gemini_key
+        else:
+            os.environ.pop('GEMINI_API_KEY', None)
+            
+        if self._orig_nvidia_key is not None:
+            os.environ['NVIDIA_API_KEY'] = self._orig_nvidia_key
+        else:
+            os.environ.pop('NVIDIA_API_KEY', None)
+        super().tearDown()
+
     def test_ziva_ai_page_requires_login(self):
         response = self.client.get(reverse('homeApp:ziva_ai'))
         # Should redirect to login page
@@ -384,5 +406,41 @@ class ZivaAiTests(SeededTenantMixin, TestCase):
         deleted_exists = ZivaAiChatMessage.objects.filter(session_id=sess_id, isDeleted=False).exists()
         self.assertFalse(deleted_exists)
 
+    def test_non_admin_staff_cannot_access_ziva_ai(self):
+        # Log in as a standard staff user (e.g. sales)
+        self.client.force_login(self.sales)
+        
+        # 1. Page view should be forbidden
+        response = self.client.get(reverse('homeApp:ziva_ai'))
+        self.assertEqual(response.status_code, 403)
+        
+        # 2. Chat API should be forbidden
+        response = self.client.post(
+            reverse('homeApp:ziva_ai_chat_api'),
+            {'message': 'Hello AI'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 403)
+        
+        # 3. History API should be forbidden
+        response = self.client.get(reverse('homeApp:ziva_ai_history_api'))
+        self.assertEqual(response.status_code, 403)
+        
+        # 4. Sessions list API should be forbidden
+        response = self.client.get(reverse('homeApp:ziva_ai_sessions_list_api'))
+        self.assertEqual(response.status_code, 403)
 
+    def test_staff_with_ziva_ai_permission_can_access_page_and_history_api(self):
+        permission = Permission.objects.get(content_type__app_label='home', codename='can_access_ziva_ai')
+        tenant_admin_group = Group.objects.get(name=f'{self.tenant.slug}:Tenant Admin')
+        tenant_admin_group.permissions.remove(permission)
+        self.sales.user_permissions.add(permission)
+
+        self.client.force_login(self.sales)
+
+        response = self.client.get(reverse('homeApp:ziva_ai'))
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(reverse('homeApp:ziva_ai_history_api'))
+        self.assertEqual(response.status_code, 200)
 

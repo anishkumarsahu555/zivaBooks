@@ -37,7 +37,7 @@ from activation.views import is_activated
 from .models import *
 from .books import ensure_books_for_tenant
 from .credential_links import credential_share_token_status, consume_credential_share_token
-from .navigation import build_sidebar_sections, _has_any_perm as _has_tenant_any_perm
+from .navigation import build_sidebar_sections, has_ziva_ai_access, _has_any_perm as _has_tenant_any_perm
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_object_or_superuser, tenant_qs
 from .otp import get_collection_otp_payload, get_collection_status_payload, get_order_delivery_otp_payload, get_order_delivery_status_payload, OTP_TTL_SECONDS
 from utils.logger import logger
@@ -140,6 +140,7 @@ def _tenant_admin_group_name(tenant):
 LOCATION_ASSIGNABLE_PERMISSION_CODENAMES = {
     'can_track_staff_location',
     'can_view_staff_locations',
+    'can_access_ziva_ai',
 }
 
 
@@ -678,6 +679,14 @@ STAFF_GROUP_PRESET_DEFS = [
         'description': 'Read-only access to message history.',
         'permissions': [
             'home.view_whatsappmessagestatus',
+        ],
+    },
+    {
+        'key': 'ziva_ai_access',
+        'label': 'Ziva AI Access',
+        'description': 'Open the Ziva AI assistant and use chat history.',
+        'permissions': [
+            'home.can_access_ziva_ai',
         ],
     },
     {
@@ -4217,7 +4226,7 @@ def ziva_ai_page(request):
     if not request.user.is_authenticated:
         return redirect('/')
 
-    # Check if customer
+    # Restrict to users with tenant-enabled Ziva AI access.
     from .navigation import _tenant_membership_role
     from .models import TenantMembership
     tenant = get_current_tenant(request)
@@ -4227,6 +4236,9 @@ def ziva_ai_page(request):
     role = _tenant_membership_role(request, tenant)
     if role == TenantMembership.Role.PARTY:
         return redirect('/customer_home/')
+
+    if not has_ziva_ai_access(request, tenant):
+        return custom_permission_denied(request, message="Access denied. You do not have permission to view Ziva AI.")
 
     ai_usage, created = TenantAiUsage.objects.get_or_create(
         tenant=tenant,
@@ -4290,4 +4302,3 @@ def ziva_ai_page(request):
         'sessions': sessions_list,
     }
     return render(request, 'home/ziva_ai.html', context)
-

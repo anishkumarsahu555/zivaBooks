@@ -3,6 +3,7 @@ import os
 import requests
 import django.apps
 import typing
+from functools import wraps
 
 # Monkeypatch typing._eval_type for Python 3.14 Pydantic compatibility
 original_eval_type = getattr(typing, '_eval_type', None)
@@ -19,6 +20,7 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from home.tenancy import get_current_tenant
 from home.models import TenantAiUsage
+from home.navigation import has_ziva_ai_access
 from home.services.ai_context import get_tenant_business_data_snapshot
 
 def get_model_query_fields(model_class, allowed_base_fields):
@@ -193,8 +195,23 @@ def execute_tenant_lookup(tenant, model_name, filters_json=None, limit=15, is_su
         return {"error": f"Failed to execute lookup: {str(e)}"}
 
 
-@login_required
+def check_ziva_ai_access(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+        tenant = get_current_tenant(request)
+        if not tenant:
+            return JsonResponse({'error': 'No active tenant workspace found.'}, status=400)
+        if not has_ziva_ai_access(request, tenant):
+            return JsonResponse({'error': 'Access Denied', 'message': 'You do not have permission to access Ziva AI API.'}, status=403)
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
 @require_POST
+@login_required
+@check_ziva_ai_access
 def ziva_ai_chat_api(request):
     provider = 'gemini'
     try:
@@ -748,13 +765,9 @@ CRITICAL RULES:
         }, status=500)
 
 
+@check_ziva_ai_access
 def ziva_ai_history_api(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Unauthorized'}, status=401)
-
     tenant = get_current_tenant(request)
-    if not tenant:
-        return JsonResponse({'error': 'No active tenant workspace'}, status=400)
 
     try:
         offset = int(request.GET.get('offset', 0))
@@ -787,13 +800,9 @@ def ziva_ai_history_api(request):
     })
 
 
+@check_ziva_ai_access
 def ziva_ai_sessions_list_api(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Unauthorized'}, status=401)
-
     tenant = get_current_tenant(request)
-    if not tenant:
-        return JsonResponse({'error': 'No active tenant workspace'}, status=400)
 
     from home.models import ZivaAiChatMessage
     from django.db.models import Max
@@ -827,13 +836,9 @@ def ziva_ai_sessions_list_api(request):
 
 
 @require_POST
+@check_ziva_ai_access
 def ziva_ai_sessions_delete_api(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Unauthorized'}, status=401)
-
     tenant = get_current_tenant(request)
-    if not tenant:
-        return JsonResponse({'error': 'No active tenant workspace'}, status=400)
 
     try:
         body = json.loads(request.body)
@@ -855,13 +860,9 @@ def ziva_ai_sessions_delete_api(request):
 
 
 @require_POST
+@check_ziva_ai_access
 def ziva_ai_sessions_rename_api(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({'error': 'Unauthorized'}, status=401)
-
     tenant = get_current_tenant(request)
-    if not tenant:
-        return JsonResponse({'error': 'No active tenant workspace'}, status=400)
 
     try:
         body = json.loads(request.body)
