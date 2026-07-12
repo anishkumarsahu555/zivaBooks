@@ -4406,6 +4406,12 @@
                 }
             }
 
+            window.zivaSidebar = {
+                open: function () { setDrawerOpen(true); },
+                close: function () { setDrawerOpen(false); },
+                isOpen: function () { return document.body.classList.contains('sidebar-fallback-open'); }
+            };
+
             if (toggler) {
                 toggler.setAttribute('aria-controls', 'sidebar');
                 toggler.setAttribute('aria-expanded', 'false');

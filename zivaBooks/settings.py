@@ -52,7 +52,7 @@ if not SECRET_KEY:
         raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG is false.')
 
 
-ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '[::1]'] if DEBUG else [])
+ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '[::1]', '*'] if DEBUG else [])
 if not ALLOWED_HOSTS:
     raise ImproperlyConfigured('ALLOWED_HOSTS must be set when DEBUG is false.')
 
