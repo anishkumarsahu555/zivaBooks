@@ -9,10 +9,12 @@
 <style>
     /* Primary Accent color definitions */
     :root {
-        --app-primary: #6366f1;
+        --app-primary: var(--app-accent, #0d9488);
+        --app-primary-dark: #0f766e;
     }
     html[data-theme="dark"] {
-        --app-primary: #818cf8;
+        --app-primary: var(--app-accent, #2dd4bf);
+        --app-primary-dark: #0d9488;
     }
 
     /* Premium Design System for Ziva AI */
@@ -74,9 +76,9 @@
     }
 
     .ai-header-title i {
-        color: #6366f1;
+        color: var(--app-primary);
         font-size: 1.6rem;
-        text-shadow: 0 0 12px rgba(99, 102, 241, 0.4);
+        text-shadow: 0 0 12px rgba(13, 148, 136, 0.4);
         animation: ai-glow 3s infinite ease-in-out;
     }
 
@@ -84,13 +86,13 @@
         margin: 0;
         font-size: 1.4rem;
         font-weight: 800;
-        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 50%, #818cf8 100%);
+        background: linear-gradient(135deg, #0f766e 0%, var(--app-primary) 50%, #0284c7 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
 
     html[data-theme="dark"] .ai-header-title h2 {
-        background: linear-gradient(135deg, #818cf8 0%, #a5b4fc 50%, #c7d2fe 100%);
+        background: linear-gradient(135deg, var(--app-primary) 0%, #38bdf8 50%, #60a5fa 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
@@ -114,14 +116,14 @@
     }
 
     .ai-quota-badge {
-        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        background: linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-dark) 100%);
         color: #ffffff;
         padding: 2px 10px;
         border-radius: 99px;
         font-size: 0.75rem;
         font-weight: 800;
         text-transform: uppercase;
-        box-shadow: 0 4px 10px rgba(99, 102, 241, 0.25);
+        box-shadow: 0 4px 10px rgba(13, 148, 136, 0.25);
     }
 
     .ai-quota-bar-bg {
@@ -135,7 +137,7 @@
 
     .ai-quota-bar-fill {
         height: 100%;
-        background: linear-gradient(90deg, #6366f1, #818cf8);
+        background: linear-gradient(90deg, var(--app-primary), var(--app-accent));
         border-radius: 99px;
         transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         width: 0%;
@@ -206,14 +208,14 @@
     }
 
     .chat-bubble-wrap.bot .chat-avatar {
-        background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-        color: #4f46e5;
-        border: 1px solid rgba(79, 70, 229, 0.15);
+        background: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%);
+        color: var(--app-primary-dark);
+        border: 1px solid rgba(13, 148, 136, 0.15);
     }
     html[data-theme="dark"] .chat-bubble-wrap.bot .chat-avatar {
-        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
-        color: #a5b4fc;
-        border: 1px solid rgba(165, 180, 252, 0.15);
+        background: linear-gradient(135deg, #11293c 0%, #15456b 100%);
+        color: var(--app-primary);
+        border: 1px solid rgba(45, 212, 191, 0.15);
     }
 
     .chat-bubble {
@@ -227,10 +229,10 @@
     }
 
     .chat-bubble-wrap.user .chat-bubble {
-        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        background: linear-gradient(135deg, var(--app-primary-dark) 0%, var(--app-primary) 100%);
         color: #ffffff;
         border-top-right-radius: 2px;
-        box-shadow: 0 6px 15px rgba(79, 70, 229, 0.2);
+        box-shadow: 0 6px 15px rgba(13, 148, 136, 0.2);
     }
 
     .chat-bubble-wrap.bot .chat-bubble {
@@ -271,10 +273,10 @@
     /* Bold text styling */
     .chat-bubble strong {
         font-weight: 700;
-        color: #4f46e5;
+        color: var(--app-primary-dark);
     }
     html[data-theme="dark"] .chat-bubble strong {
-        color: #818cf8;
+        color: var(--app-primary);
     }
     .chat-bubble-wrap.user .chat-bubble strong {
         color: #ffffff;
@@ -303,7 +305,7 @@
     }
     .chat-bubble-wrap.bot li::before {
         content: "•";
-        color: #6366f1;
+        color: var(--app-primary);
         font-weight: bold;
         display: inline-block;
         width: 1em;
@@ -360,18 +362,18 @@
     /* Inline Code */
     .chat-bubble :not(pre) > code {
         font-family: monospace;
-        background: rgba(99, 102, 241, 0.08);
-        color: #4f46e5;
+        background: rgba(13, 148, 136, 0.08);
+        color: var(--app-primary-dark);
         padding: 2px 6px;
         border-radius: 6px;
         font-size: 0.85em;
         font-weight: 700;
-        border: 1px solid rgba(99, 102, 241, 0.15);
+        border: 1px solid rgba(13, 148, 136, 0.15);
     }
     html[data-theme="dark"] .chat-bubble :not(pre) > code {
-        background: rgba(129, 140, 248, 0.08);
-        color: #a5b4fc;
-        border-color: rgba(129, 140, 248, 0.15);
+        background: rgba(45, 212, 191, 0.08);
+        color: var(--app-primary);
+        border-color: rgba(45, 212, 191, 0.15);
     }
     .chat-bubble-wrap.user :not(pre) > code {
         background: rgba(255, 255, 255, 0.2) !important;
@@ -383,14 +385,14 @@
     .chat-bubble blockquote {
         margin: 12px 0;
         padding: 10px 18px;
-        border-left: 4px solid #6366f1;
-        background: rgba(99, 102, 241, 0.03);
+        border-left: 4px solid var(--app-primary);
+        background: rgba(13, 148, 136, 0.03);
         color: var(--app-muted);
         font-style: italic;
         border-radius: 0 8px 8px 0;
     }
     html[data-theme="dark"] .chat-bubble blockquote {
-        background: rgba(129, 140, 248, 0.03);
+        background: rgba(45, 212, 191, 0.03);
     }
 
     /* Horizontal Rule */
@@ -418,22 +420,22 @@
         text-align: left;
     }
     .chat-bubble th {
-        background: rgba(99, 102, 241, 0.05);
-        color: #4f46e5;
+        background: rgba(13, 148, 136, 0.05);
+        color: var(--app-primary-dark);
         font-weight: 750;
         cursor: pointer;
         transition: background 0.2s ease;
         user-select: none;
     }
     .chat-bubble th:hover {
-        background: rgba(99, 102, 241, 0.12) !important;
+        background: rgba(13, 148, 136, 0.12) !important;
     }
     html[data-theme="dark"] .chat-bubble th {
-        background: rgba(129, 140, 248, 0.05);
-        color: #a5b4fc;
+        background: rgba(45, 212, 191, 0.05);
+        color: var(--app-primary);
     }
     html[data-theme="dark"] .chat-bubble th:hover {
-        background: rgba(129, 140, 248, 0.12) !important;
+        background: rgba(45, 212, 191, 0.12) !important;
     }
     .chat-bubble tr:nth-child(even) {
         background: rgba(0, 0, 0, 0.01);
@@ -486,13 +488,13 @@
 
     .prompt-card:hover {
         transform: translateY(-3px) scale(1.02);
-        box-shadow: 0 10px 20px rgba(99, 102, 241, 0.08);
-        border-color: rgba(99, 102, 241, 0.3);
+        box-shadow: 0 10px 20px rgba(13, 148, 136, 0.08);
+        border-color: rgba(13, 148, 136, 0.3);
         background: var(--app-surface-soft);
     }
 
     .prompt-card i {
-        color: #6366f1;
+        color: var(--app-primary);
         font-size: 1.1rem;
     }
 
@@ -563,8 +565,8 @@
     }
 
     .ai-input-container:focus-within {
-        border-color: rgba(99, 102, 241, 0.6);
-        box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12);
+        border-color: rgba(13, 148, 136, 0.6);
+        box-shadow: 0 8px 24px rgba(13, 148, 136, 0.12);
     }
 
     .ai-input-field {
@@ -585,21 +587,21 @@
         width: 44px;
         height: 44px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+        background: linear-gradient(135deg, var(--app-primary-dark) 0%, var(--app-primary) 100%);
         color: #ffffff;
         border: none;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
+        box-shadow: 0 4px 10px rgba(13, 148, 136, 0.3);
         transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     }
 
     .ai-send-btn:hover {
         transform: scale(1.1) rotate(5deg);
-        box-shadow: 0 6px 16px rgba(79, 70, 229, 0.45);
-        background: linear-gradient(135deg, #4338ca 0%, #4f46e5 100%);
+        box-shadow: 0 6px 16px rgba(13, 148, 136, 0.45);
+        background: linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-dark) 100%);
     }
 
     .ai-send-btn:active {
@@ -810,19 +812,19 @@
 
     /* Deep Links Styles */
     .ai-deep-link {
-        color: #4f46e5 !important;
+        color: var(--app-primary-dark) !important;
         font-weight: 700;
         text-decoration: underline;
         transition: color 0.2s ease;
     }
     .ai-deep-link:hover {
-        color: #6366f1 !important;
+        color: var(--app-primary) !important;
     }
     html[data-theme="dark"] .ai-deep-link {
-        color: #818cf8 !important;
+        color: var(--app-primary) !important;
     }
     html[data-theme="dark"] .ai-deep-link:hover {
-        color: #a5b4fc !important;
+        color: var(--app-accent) !important;
     }
     .chat-bubble-wrap.user .ai-deep-link {
         color: #ffffff !important;
@@ -851,18 +853,18 @@
         box-shadow: 0 2px 5px rgba(0,0,0,0.02);
     }
     .suggestion-chip:hover {
-        border-color: #6366f1;
-        color: #6366f1;
-        background: rgba(99, 102, 241, 0.04);
+        border-color: var(--app-primary);
+        color: var(--app-primary);
+        background: rgba(13, 148, 136, 0.04);
         transform: translateY(-1px);
     }
     html[data-theme="dark"] .suggestion-chip {
         color: #9ca3af;
     }
     html[data-theme="dark"] .suggestion-chip:hover {
-        color: #818cf8;
-        background: rgba(129, 140, 248, 0.06);
-        border-color: #818cf8;
+        color: var(--app-primary);
+        background: rgba(45, 212, 191, 0.06);
+        border-color: var(--app-primary);
     }
     @media (max-width: 767px) {
         .ai-suggestion-chips {
@@ -920,7 +922,7 @@
 
     .new-chat-btn {
         flex: 1;
-        background: linear-gradient(135deg, var(--app-primary) 0%, #4f46e5 100%) !important;
+        background: linear-gradient(135deg, var(--app-primary) 0%, var(--app-primary-dark) 100%) !important;
         color: white !important;
         border-radius: 8px !important;
         font-weight: 700 !important;
@@ -932,12 +934,12 @@
         border: none;
         cursor: pointer;
         transition: all 0.2s ease-in-out;
-        box-shadow: 0 4px 10px rgba(99, 102, 241, 0.15);
+        box-shadow: 0 4px 10px rgba(13, 148, 136, 0.15);
     }
 
     .new-chat-btn:hover {
         transform: translateY(-1px);
-        box-shadow: 0 6px 14px rgba(99, 102, 241, 0.25);
+        box-shadow: 0 6px 14px rgba(13, 148, 136, 0.25);
         opacity: 0.95;
     }
 
@@ -1008,7 +1010,7 @@
     }
 
     .session-item.active {
-        background: rgba(99, 102, 241, 0.07);
+        background: rgba(13, 148, 136, 0.07);
         color: var(--app-primary);
         font-weight: 700;
         border-left-color: var(--app-primary);
@@ -1526,9 +1528,9 @@
             if (pct >= 90) {
                 quotaProgress.style.background = 'linear-gradient(90deg, #f59e0b, #ef4444)';
             } else if (pct >= 70) {
-                quotaProgress.style.background = 'linear-gradient(90deg, #6366f1, #f59e0b)';
+                quotaProgress.style.background = 'linear-gradient(90deg, var(--app-primary), #f59e0b)';
             } else {
-                quotaProgress.style.background = 'linear-gradient(90deg, #6366f1, #818cf8)';
+                quotaProgress.style.background = 'linear-gradient(90deg, var(--app-primary), var(--app-accent))';
             }
         } else {
             // Unlimited
@@ -2056,7 +2058,7 @@
                     lineWidth: 0.1
                 },
                 headStyles: {
-                    fillColor: [79, 70, 229], // #4f46e5 (Indigo)
+                    fillColor: [13, 148, 136], // #0d9488 (Teal)
                     textColor: [255, 255, 255],
                     fontStyle: 'bold',
                     halign: 'left'
@@ -2235,7 +2237,7 @@
                 </p>
                 <div class="ui statistics" style="margin-top: 15px; justify-content: center;">
                     <div class="statistic">
-                        <div class="value" style="color: #6366f1;">${plan || 'Free'}</div>
+                        <div class="value" style="color: var(--app-primary);">${plan || 'Free'}</div>
                         <div class="label" style="font-weight: 700; text-transform: uppercase;">Current Plan</div>
                     </div>
                     <div class="statistic">
