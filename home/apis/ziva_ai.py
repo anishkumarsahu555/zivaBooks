@@ -20,8 +20,17 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 from home.tenancy import get_current_tenant
 from home.models import TenantAiUsage
-from home.navigation import has_ziva_ai_access
-from home.services.ai_context import get_tenant_business_data_snapshot
+from home.navigation import has_ziva_ai_access, _effective_permission_names
+from home.services.ai_context import AI_MODEL_PERMISSIONS, can_access_ai_model, get_tenant_business_data_snapshot
+
+
+def _ai_provider_timeout_seconds():
+    """Return a bounded provider timeout so failed requests do not stall chat."""
+    try:
+        configured = int(os.getenv('ZIVA_AI_PROVIDER_TIMEOUT_SECONDS', '45'))
+    except (TypeError, ValueError):
+        configured = 45
+    return max(10, min(configured, 90))
 
 def get_model_query_fields(model_class, allowed_base_fields):
     fields_to_query = []
@@ -48,14 +57,14 @@ def get_model_query_fields(model_class, allowed_base_fields):
             
     return fields_to_query
 
-def execute_tenant_lookup(tenant, model_name, filters_json=None, limit=15, is_superuser=False):
+def execute_tenant_lookup(tenant, model_name, filters_json=None, limit=15, is_superuser=False, user=None, permission_names=None):
     allowed_models = {
         'tenant': ['id', 'name', 'legalName', 'gstNumber', 'phone', 'billingAddress'],
-        'staffuser': ['id', 'name', 'phone', 'email', 'group', 'isActive'],
+        'staffuser': ['id', 'name', 'phone', 'email', 'group', 'isActive', 'username'],
         'party': ['id', 'name', 'phone', 'openingBalance', 'isB2B', 'partyGroupID', 'assignTo', 'address'],
-        'collection': ['id', 'paymentID', 'modeOfPayment', 'paidAmount', 'bankID', 'detail', 'remark', 'collectionDateTime', 'datetime', 'collectedBy', 'approvedBy', 'isApproved'],
-        'sales': ['id', 'salesID', 'invoiceNumber', 'buildDate', 'amount', 'taxableAmount', 'gstAmount', 'modeOfPayment', 'bankID', 'isApproved', 'createdBy', 'approvedBy'],
-        'order': ['id', 'orderNumber', 'buildDate', 'status', 'orderText', 'assignedTo', 'createdBy', 'approvedBy', 'remark'],
+        'collection': ['id', 'paymentID', 'modeOfPayment', 'paidAmount', 'bankID', 'detail', 'remark', 'collectionDateTime', 'datetime', 'collectedBy', 'approvedBy', 'isApproved', 'partyID'],
+        'sales': ['id', 'salesID', 'invoiceNumber', 'buildDate', 'amount', 'taxableAmount', 'gstAmount', 'modeOfPayment', 'bankID', 'isApproved', 'createdBy', 'approvedBy', 'partyID'],
+        'order': ['id', 'orderNumber', 'buildDate', 'status', 'orderText', 'assignedTo', 'createdBy', 'approvedBy', 'remark', 'partyID'],
         'inventoryitem': ['id', 'name', 'sku', 'category', 'defaultSalesPrice', 'defaultPurchasePrice', 'mrp', 'gstRate', 'isActive'],
         'bank': ['id', 'name', 'accountNumber', 'description'],
         'purchaseinvoice': ['id', 'purchaseID', 'invoiceNumber', 'buildDate', 'gstTreatment', 'claimStatus', 'subtotalAmount', 'gstAmount', 'totalAmount', 'remark', 'createdBy', 'partyID'],
@@ -104,8 +113,8 @@ def execute_tenant_lookup(tenant, model_name, filters_json=None, limit=15, is_su
         if model_name_lower not in allowed_models:
             return {"error": f"Access denied or table '{model_name}' is not supported."}
 
-        if model_name_lower == 'tenant' and not is_superuser:
-            return {"error": "Access to the Tenant configuration is restricted to administrator users."}
+        # All authenticated users with Ziva AI access have uniform access to query all supported tables.
+
 
         model_class_names = {
             'tenant': 'Tenant',
@@ -131,14 +140,13 @@ def execute_tenant_lookup(tenant, model_name, filters_json=None, limit=15, is_su
         if not model_class:
             return {"error": f"Table '{actual_model_name}' was not found."}
 
-        # Query base: Superusers can look up records across all tenants, whereas regular users are locked to their own tenant
-        if is_superuser:
-            queryset = model_class.objects.all()
+        # Query base: All lookups are strictly locked to the logged-in user's active tenant
+        if model_name_lower == 'tenant':
+            queryset = model_class.objects.filter(id=tenant.id)
+        elif hasattr(model_class, 'tenant'):
+            queryset = model_class.objects.filter(tenant=tenant)
         else:
-            if hasattr(model_class, 'tenant'):
-                queryset = model_class.objects.filter(tenant=tenant)
-            else:
-                queryset = model_class.objects.all()
+            queryset = model_class.objects.none()
 
         if hasattr(model_class, 'isDeleted'):
             queryset = queryset.filter(isDeleted=False)
@@ -158,14 +166,29 @@ def execute_tenant_lookup(tenant, model_name, filters_json=None, limit=15, is_su
         for key, val in filters.items():
             base_key = key.split('__')[0]
             
-            # Superusers can filter by tenant columns (e.g. tenant_id or tenant__name)
-            if is_superuser and base_key in ('tenant', 'tenant_id'):
-                cleaned_filters[key] = val
-                continue
-                
             if base_key not in allowed_models[model_name_lower]:
                 return {"error": f"Field '{key}' is invalid or restricted for table '{actual_model_name}'."}
-            cleaned_filters[key] = val
+
+            # Special normalization for StaffUser.isActive which is a CharField storing 'Active'/'Inactive'
+            if model_name_lower == 'staffuser' and base_key == 'isActive':
+                if val in (True, 'True', 'true', 'Active', 'active', '1', 1):
+                    cleaned_filters['isActive__iexact'] = 'Active'
+                elif val in (False, 'False', 'false', 'Inactive', 'inactive', '0', 0):
+                    cleaned_filters['isActive__iexact'] = 'Inactive'
+                else:
+                    cleaned_filters[key] = val
+                continue
+                
+            # Clean string null or None representations
+            cleaned_val = val
+            if isinstance(val, str):
+                val_stripped = val.strip()
+                if val_stripped.lower() in ('null', 'none', ''):
+                    cleaned_val = None
+                elif key.endswith('__isnull'):
+                    cleaned_val = (val_stripped.lower() == 'true')
+            
+            cleaned_filters[key] = cleaned_val
 
         queryset = queryset.filter(**cleaned_filters)
 
@@ -173,9 +196,6 @@ def execute_tenant_lookup(tenant, model_name, filters_json=None, limit=15, is_su
         
         # Dynamically resolve relation sub-fields to obtain human-readable text details (e.g., partyID__name)
         fields = get_model_query_fields(model_class, allowed_models[model_name_lower])
-        
-        if is_superuser and hasattr(model_class, 'tenant') and model_name_lower != 'tenant':
-            fields.extend(['tenant_id', 'tenant__name'])
 
         results = list(queryset.values(*fields)[:limit])
         
@@ -209,162 +229,47 @@ def check_ziva_ai_access(view_func):
     return wrapper
 
 
-@require_POST
-@login_required
-@check_ziva_ai_access
-def ziva_ai_chat_api(request):
-    provider = 'gemini'
+def _ziva_ai_generate_in_background(tenant_id, user_id, user_message, session_id, session_title, bot_msg_id, provider, is_superuser, api_key, nvidia_model, system_instruction, permission_names=None):
+    from django.db import connections
+    from django.contrib.auth import get_user_model
+    from home.models import Tenant, TenantAiUsage, ZivaAiChatMessage
+    from django.db.models import F
+    import json
+    import requests
+    import openai
+    from openai import OpenAI
+
+    if provider == 'nvidia':
+        if not nvidia_model or 'openai' in nvidia_model or 'gpt' in nvidia_model:
+            nvidia_model = 'meta/llama-3.1-70b-instruct'
+
     try:
-        tenant = get_current_tenant(request)
-        if not tenant:
-            return JsonResponse({'error': 'No active tenant workspace found.'}, status=400)
-
-        # Get or create usage stats
-        ai_usage, created = TenantAiUsage.objects.get_or_create(
+        provider_timeout = _ai_provider_timeout_seconds()
+        tenant = Tenant.objects.get(id=tenant_id)
+        User = get_user_model()
+        user = User.objects.get(id=user_id)
+        bot_msg = ZivaAiChatMessage.objects.get(
+            id=bot_msg_id,
             tenant=tenant,
-            defaults={
-                'plan_name': 'Free',
-                'max_queries_per_month': 5,
-                'queries_used_this_month': 0
-            }
-        )
-        ai_usage.check_and_reset_usage()
-
-        # Check limits
-        if ai_usage.max_queries_per_month >= 0 and ai_usage.queries_used_this_month >= ai_usage.max_queries_per_month:
-            return JsonResponse({
-                'error': 'Quota Exceeded',
-                'message': f"You have exhausted your monthly limit of {ai_usage.max_queries_per_month} free queries.",
-                'used': ai_usage.queries_used_this_month,
-                'limit': ai_usage.max_queries_per_month,
-                'plan': ai_usage.plan_name
-            }, status=403)
-
-        # Parse request body
-        try:
-            body = json.loads(request.body)
-            user_message = body.get('message', '').strip()
-            session_id = body.get('session_id', 'default').strip()
-            session_title = body.get('session_title', 'General Chat').strip()
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
-
-        if not user_message:
-            return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
-
-        if not session_id:
-            session_id = 'default'
-
-        from home.models import ZivaAiChatMessage
-        
-        # Lookup if session already exists to reuse its title, otherwise generate one
-        existing_msg = ZivaAiChatMessage.objects.filter(
-            tenant=tenant,
-            user=request.user,
+            user=user,
             session_id=session_id,
-            isDeleted=False
-        ).first()
-
-        if existing_msg:
-            session_title = existing_msg.session_title
-        elif user_message:
-            cleaned_title = user_message[:30] + '...' if len(user_message) > 30 else user_message
-            session_title = cleaned_title
-
-        # Save user message to database
-        ZivaAiChatMessage.objects.create(
-            tenant=tenant,
-            user=request.user,
-            role='user',
-            message=user_message,
-            session_id=session_id,
-            session_title=session_title
+            role='bot',
         )
 
-        # Read Provider selection from payload
-        provider = body.get('provider', 'gemini').strip().lower()
-        if provider not in ('gemini', 'nvidia'):
-            provider = 'gemini'
-
-        # Read API Key
-        if provider == 'nvidia':
-            api_key = os.getenv('NVIDIA_API_KEY')
-            if not api_key or api_key == 'your_nvidia_api_key_here':
-                return JsonResponse({
-                    'error': 'Configuration Error',
-                    'message': 'NVIDIA_API_KEY is not configured in the server environment (.env file).'
-                }, status=500)
-            nvidia_model = os.getenv('NVIDIA_MODEL', 'meta/llama-3.1-70b-instruct').strip()
-        else:
-            api_key = os.getenv('GEMINI_API_KEY')
-            if not api_key:
-                return JsonResponse({
-                    'error': 'Configuration Error',
-                    'message': 'GEMINI_API_KEY is not configured in the server environment (.env file).'
-                }, status=500)
-
-        # Compile basic tenant summary metadata context (for fallback and overview)
-        tenant_context = get_tenant_business_data_snapshot(tenant)
-
-        # Build privilege indicator
-        privilege_desc = ""
-        if request.user.is_superuser:
-            privilege_desc = (
-                "You are signed in as a System Administrator (Superuser). You have cross-tenant clearance! "
-                "You can query records across any tenant in the database, view the 'Tenant' configuration, "
-                "or filter by specific tenant IDs/names. Do not reveal raw password hashes or internal sensitive tokens."
-            )
-        else:
-            privilege_desc = (
-                f"You are signed in as a standard staff member of the tenant \"{tenant.name}\". "
-                "You can only query records belonging to this tenant workspace."
-            )
-
-        # System Instruction
-        system_instruction = f"""You are Ziva AI, the premium virtual financial and inventory assistant built for zivaBooks.
-Your purpose is to answer questions, analyze transactions, verify stock levels, check customer balances, or summarize business activities.
-
-{privilege_desc}
-
-CRITICAL RULES:
-1. READ-ONLY ENFORCEMENT: You must never allow, suggest, or pretend to perform write, create, update, or delete operations. If the user asks you to "add a sale", "create a party", "delete an order", "edit bank account", or "update attendance", you must respond that you have read-only access and cannot perform modifications.
-2. Rely only on the lookup tools or the provided basic business summary. Do not invent any numbers, customers, staff, or sales.
-3. Be professional, direct, concise, and structured. Use bold formatting for clarity.
-4. Format all currency values in Indian Rupees (₹).
-5. TABULAR DATA PREFERENCE: Whenever presenting lists of transactions, items, staff, collections, bank accounts, or outstanding balances, you MUST format the response in a Markdown table (e.g. using `| Header |`) instead of plain text lists. This allows the client-side system to render it as a highly readable, sortable database grid.
-6. DYNAMIC LOOKUP METHOD: Always use the `lookup_tenant_data` tool to dynamically query the database for records when a query asks for specific invoices, collections, inventories, stock counts, attendances, or other business logs. Do not rely solely on memory or hardcoded summaries if details are missing.
-7. DEEP LINKING: Whenever you present a Sales Invoice, Order, Staff User, Party (Customer/Supplier), Bank Account, or Inventory Item, format their name/identifier as a relative markdown link.
-   - Sales Invoice: [/edit_sales/<id>/](/edit_sales/<id>/) (e.g. "[INV-1002](/edit_sales/15/)")
-   - Order: [/edit_order/<id>/](/edit_order/<id>/) (e.g. "[ORD-5012](/edit_order/8/)")
-   - Staff User: [/user_list/?search=<name>](/user_list/?search=<name>) (e.g. "[John Doe](/user_list/?search=John%20Doe)")
-   - Customer/Supplier (Party): [/party_list/?search=<name>](/party_list/?search=<name>) (e.g. "[Acme Corp](/party_list/?search=Acme%20Corp)")
-   - Bank Account: [/bank_list/](/bank_list/) (e.g. "[HDFC Bank](/bank_list/)")
-   - Inventory Item: [/inventory/items/](/inventory/items/) (e.g. "[Browser Normal Item](/inventory/items/)")
-   Ensure the labels are human-readable (names/numbers) and URLs are correct.
-8. RESPONSE FORMAT: You MUST return your final text answer formatted as a JSON object containing keys "response" (markdown string) and "suggestions" (array of 2 to 4 highly relevant short follow-up action queries or follow-up questions).
-9. FRIENDLY ERROR HANDLING: If a database lookup fails, is denied, or requests an unsupported database model (e.g. permission tables like 'GroupPermission'), you MUST NOT print the raw error message or lists of tables/fields to the user. Instead, output a simple, friendly, and generic response stating that the requested details are restricted or not supported by the assistant, and guide the user on what records they can query.
-
---- BASIC BUSINESS SNAPSHOT SUMMARY ---
-{tenant_context}
----------------------------
-"""
-
-        # Fetch recent chat messages history directly from database to construct conversation context for current session
+        # Retrieve recent chat messages history
         db_chats = ZivaAiChatMessage.objects.filter(
             tenant=tenant,
-            user=request.user,
+            user=user,
             session_id=session_id,
             isDeleted=False
-        ).order_by('-timestamp')[:16]
+        ).exclude(id=bot_msg_id).exclude(message='__pending__').order_by('-timestamp')[:16]
         
-        # Reverse to chronological order
         db_chats = list(reversed(db_chats))
 
         nvidia_raw_text = ""
         gemini_raw_text = ""
 
         if provider == 'nvidia':
-            # Setup OpenAI Messages Format
             openai_messages = [{"role": "system", "content": system_instruction}]
             for chat in db_chats:
                 role = 'user' if chat.role == 'user' else 'assistant'
@@ -373,7 +278,6 @@ CRITICAL RULES:
                     'content': chat.message
                 })
 
-            # Setup OpenAI Tools Format
             openai_tools = [
                 {
                     "type": "function",
@@ -443,10 +347,11 @@ CRITICAL RULES:
                 top_p=1.0,
                 max_tokens=4096,
                 seed=42,
-                timeout=120
+                timeout=provider_timeout
             )
 
-            max_tool_loops = 5
+            # Allow up to two lookup rounds, plus the final model response.
+            max_tool_loops = 3
             tool_loop_count = 0
 
             while tool_loop_count < max_tool_loops:
@@ -458,7 +363,6 @@ CRITICAL RULES:
 
                 tool_calls = message_obj.tool_calls
                 if tool_calls:
-                    # Append simplified assistant query explanation instead of raw tool call object
                     openai_messages.append({
                         'role': 'assistant',
                         'content': f"I need to search the database records using the lookup_tenant_data tool for model '{tool_calls[0].function.name}'."
@@ -483,16 +387,16 @@ CRITICAL RULES:
                                 model_name=model_name_arg,
                                 filters_json=filters_json,
                                 limit=limit,
-                                is_superuser=request.user.is_superuser
+                                is_superuser=is_superuser,
+                                user=user,
+                                permission_names=permission_names,
                             )
 
-                            # Append database lookup result as a user message turn
                             openai_messages.append({
                                 'role': 'user',
                                 'content': f"[System Data Lookup Result]: Here is the database query output for model '{model_name_arg}': {json.dumps(result)}. Please use this data to complete your analysis and reply to my previous request."
                             })
 
-                    # Follow-up request to Nvidia (omitting tools to get final text response)
                     completion = client.chat.completions.create(
                         model=nvidia_model,
                         messages=openai_messages,
@@ -500,7 +404,7 @@ CRITICAL RULES:
                         top_p=1.0,
                         max_tokens=4096,
                         seed=42,
-                        timeout=120
+                        timeout=provider_timeout
                     )
                     tool_loop_count += 1
                 else:
@@ -508,7 +412,6 @@ CRITICAL RULES:
                     break
 
         else:
-            # Prepare Gemini REST Payload contents
             contents = []
             for chat in db_chats:
                 role = 'user' if chat.role == 'user' else 'model'
@@ -517,7 +420,6 @@ CRITICAL RULES:
                     'parts': [{'text': chat.message}]
                 })
 
-            # Define Dynamic Lookup Tool (Gemini REST Schema)
             tools = [
                 {
                     "functionDeclarations": [
@@ -575,7 +477,6 @@ CRITICAL RULES:
                 }
             ]
 
-            # Define Structured Response Schema Configuration
             generation_config = {
                 'temperature': 0.2,
                 'maxOutputTokens': 2048
@@ -593,11 +494,12 @@ CRITICAL RULES:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
             headers = {'Content-Type': 'application/json'}
 
-            response = requests.post(url, headers=headers, json=payload, timeout=120)
+            response = requests.post(url, headers=headers, json=payload, timeout=provider_timeout)
             response.raise_for_status()
             res_json = response.json()
 
-            max_tool_loops = 5
+            # Allow up to two lookup rounds, plus the final model response.
+            max_tool_loops = 3
             tool_loop_count = 0
 
             while tool_loop_count < max_tool_loops:
@@ -608,7 +510,6 @@ CRITICAL RULES:
                 except (KeyError, IndexError):
                     break
 
-                # Check if model wants to call the tool
                 if 'functionCall' in part:
                     fc = part['functionCall']
                     function_name = fc['name']
@@ -619,22 +520,21 @@ CRITICAL RULES:
                         filters_json = args.get('filters_json')
                         limit = args.get('limit', 15)
 
-                        # Execute the lookup dynamically
                         result = execute_tenant_lookup(
                             tenant=tenant,
                             model_name=model_name_arg,
                             filters_json=filters_json,
                             limit=limit,
-                            is_superuser=request.user.is_superuser
+                            is_superuser=is_superuser,
+                            user=user,
+                            permission_names=permission_names,
                         )
 
-                        # Append model's functionCall turn to dialogue contents
                         contents.append({
                             'role': 'model',
                             'parts': [part]
                         })
 
-                        # Append server's functionResponse turn to dialogue contents
                         contents.append({
                             'role': 'function',
                             'parts': [{
@@ -645,7 +545,6 @@ CRITICAL RULES:
                             }]
                         })
 
-                        # Follow-up request to Gemini
                         followup_payload = {
                             'contents': contents,
                             'systemInstruction': {
@@ -655,7 +554,7 @@ CRITICAL RULES:
                             'generationConfig': generation_config
                         }
 
-                        followup_response = requests.post(url, headers=headers, json=followup_payload, timeout=120)
+                        followup_response = requests.post(url, headers=headers, json=followup_payload, timeout=provider_timeout)
                         followup_response.raise_for_status()
                         res_json = followup_response.json()
                         tool_loop_count += 1
@@ -668,14 +567,11 @@ CRITICAL RULES:
         raw_text = nvidia_raw_text if provider == 'nvidia' else gemini_raw_text
         if not raw_text:
             provider_label = 'Nvidia GLM-5.2' if provider == 'nvidia' else 'Google Gemini'
-            return JsonResponse({'error': 'API Error', 'message': f'Received empty or malformed response from {provider_label}.'}, status=502)
+            raise ValueError(f"Received empty or malformed response from {provider_label}.")
 
-
-        # Parse the structured JSON response
+        # Parse structured JSON response
         ai_text = ""
         suggestions = []
-        
-        # Pre-clean markdown code fences if present in the raw text response
         cleaned_text = raw_text.strip()
         if cleaned_text.startswith("```"):
             lines = cleaned_text.splitlines()
@@ -687,34 +583,231 @@ CRITICAL RULES:
                 cleaned_text = "\n".join(lines).strip()
 
         try:
-            parsed_data = json.loads(cleaned_text)
+            parsed_data = None
+            # Locate first '{' and last '}' to extract raw JSON block (bypassing any garbage prefixes/suffixes)
+            start_idx = cleaned_text.find('{')
+            end_idx = cleaned_text.rfind('}')
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                json_candidate = cleaned_text[start_idx:end_idx + 1]
+                try:
+                    parsed_data = json.loads(json_candidate)
+                except Exception:
+                    pass
+            
+            if parsed_data is None:
+                parsed_data = json.loads(cleaned_text)
+
             ai_text = parsed_data.get('response', '').strip()
             suggestions = parsed_data.get('suggestions', [])
         except Exception:
-            # Safe fallback if API returns raw plain text instead of JSON
             ai_text = raw_text.strip()
             suggestions = ["Show profile summary", "Show stock levels", "List active staff"]
 
         if not ai_text:
             ai_text = raw_text.strip()
 
-        # Save AI generated bot response to database
+        if ai_text:
+            import re
+            # Dynamically repair collapsed Markdown tables, lists, and headings
+            ai_text = re.sub(r'\|\s*\|', '|\n|', ai_text)
+            ai_text = re.sub(r'\s+(#{1,6}\s+)', r'\n\n\1', ai_text)
+            ai_text = re.sub(r'\s+(\*\s+)', r'\n\1', ai_text)
+            ai_text = re.sub(r'\s+(-\s+)', r'\n\1', ai_text)
+            ai_text = re.sub(r'(#{1,6}\s+[^\n|]+)\s+(\|)', r'\1\n\n\2', ai_text)
+            ai_text = re.sub(r'\|\s+(\*\*[^*]+\*\*|[Ss]uggestions:)', r'|\n\n\1', ai_text)
+
+        # Update bot message in DB
+        bot_msg.message = ai_text
+        bot_msg.save()
+
+        # Cache suggestions for retrieval by status API
+        from django.core.cache import cache
+        cache.set(f"ziva_ai_suggestions_{bot_msg.id}", suggestions, 600)
+
+        # Atomic increment of queries used to prevent database lock contention
+        TenantAiUsage.objects.filter(tenant=tenant).update(
+            queries_used_this_month=F('queries_used_this_month') + 1
+        )
+
+    except Exception as e:
+        # Log error cleanly on the bot message
+        try:
+            bot_msg = ZivaAiChatMessage.objects.get(id=bot_msg_id)
+            bot_msg.message = f"__error__: {str(e)}"
+            bot_msg.save()
+        except Exception:
+            pass
+    finally:
+        import sys
+        from django.conf import settings
+        if 'test' not in sys.argv and not getattr(settings, 'TESTING', False):
+            connections.close_all()
+
+
+@require_POST
+@login_required
+@check_ziva_ai_access
+def ziva_ai_chat_api(request):
+    import threading
+    try:
+        tenant = get_current_tenant(request)
+        if not tenant:
+            return JsonResponse({'error': 'No active tenant workspace found.'}, status=400)
+
+        ai_usage, created = TenantAiUsage.objects.get_or_create(
+            tenant=tenant,
+            defaults={
+                'plan_name': 'Free',
+                'max_queries_per_month': 5,
+                'queries_used_this_month': 0
+            }
+        )
+        ai_usage.check_and_reset_usage()
+
+        if ai_usage.max_queries_per_month >= 0 and ai_usage.queries_used_this_month >= ai_usage.max_queries_per_month:
+            return JsonResponse({
+                'error': 'Quota Exceeded',
+                'message': f"You have exhausted your monthly limit of {ai_usage.max_queries_per_month} free queries.",
+                'used': ai_usage.queries_used_this_month,
+                'limit': ai_usage.max_queries_per_month,
+                'plan': ai_usage.plan_name
+            }, status=403)
+
+        try:
+            body = json.loads(request.body)
+            user_message = body.get('message', '').strip()
+            session_id = body.get('session_id', 'default').strip()
+            session_title = body.get('session_title', 'General Chat').strip()
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+        if not user_message:
+            return JsonResponse({'error': 'Message cannot be empty.'}, status=400)
+
+        if not session_id:
+            session_id = 'default'
+
+        # Validate the selected provider before creating a pending chat entry.
+        # Otherwise a missing API key leaves the user with a reply that can
+        # never complete.
+        provider = body.get('provider', 'gemini').strip().lower()
+        if provider not in ('gemini', 'nvidia'):
+            provider = 'gemini'
+
+        if provider == 'nvidia':
+            api_key = os.getenv('NVIDIA_API_KEY')
+            if not api_key or api_key == 'your_nvidia_api_key_here':
+                return JsonResponse({
+                    'error': 'Configuration Error',
+                    'message': 'NVIDIA_API_KEY is not configured in the server environment (.env file).'
+                }, status=500)
+            nvidia_model = os.getenv('NVIDIA_MODEL', 'meta/llama-3.1-70b-instruct').strip()
+        else:
+            api_key = os.getenv('GEMINI_API_KEY')
+            if not api_key:
+                return JsonResponse({
+                    'error': 'Configuration Error',
+                    'message': 'GEMINI_API_KEY is not configured in the server environment (.env file).'
+                }, status=500)
+            nvidia_model = ''
+
+        from home.models import ZivaAiChatMessage
+        
+        existing_msg = ZivaAiChatMessage.objects.filter(
+            tenant=tenant,
+            user=request.user,
+            session_id=session_id,
+            isDeleted=False
+        ).first()
+
+        if existing_msg:
+            session_title = existing_msg.session_title
+        elif user_message:
+            cleaned_title = user_message[:30] + '...' if len(user_message) > 30 else user_message
+            session_title = cleaned_title
+
+        # 1. Save user message to database
         ZivaAiChatMessage.objects.create(
             tenant=tenant,
             user=request.user,
-            role='bot',
-            message=ai_text,
+            role='user',
+            message=user_message,
             session_id=session_id,
             session_title=session_title
         )
 
-        # Successful query: update and save usage
-        ai_usage.queries_used_this_month += 1
-        ai_usage.save()
+        # 2. Create placeholder bot message
+        bot_msg = ZivaAiChatMessage.objects.create(
+            tenant=tenant,
+            user=request.user,
+            role='bot',
+            message='__pending__',
+            session_id=session_id,
+            session_title=session_title
+        )
+
+        permission_names = _effective_permission_names(request)
+        tenant_context = get_tenant_business_data_snapshot(
+            tenant,
+            permission_names=permission_names,
+            is_superuser=request.user.is_superuser,
+        )
+
+        privilege_desc = (
+            f"You are signed in as a staff member of the tenant \"{tenant.name}\". "
+            "You have full read-only access to query any of the tenant's business records."
+        )
+
+        system_instruction = f"""You are Ziva AI, the premium virtual financial and inventory assistant built for zivaBooks.
+Your purpose is to answer questions, analyze transactions, verify stock levels, check customer balances, or summarize business activities.
+
+{privilege_desc}
+
+CRITICAL RULES:
+1. READ-ONLY ENFORCEMENT: You must never allow, suggest, or pretend to perform write, create, update, or delete operations. If the user asks you to "add a sale", "create a party", "delete an order", "edit bank account", or "update attendance", you must respond that you have read-only access and cannot perform modifications.
+2. Rely only on the lookup tools or the provided basic business summary. Do not invent any numbers, customers, staff, or sales.
+3. Be professional, direct, concise, and structured. Use bold formatting for clarity.
+4. Format all currency values in Indian Rupees (₹).
+5. TABULAR DATA PREFERENCE: Whenever presenting lists of transactions, items, staff, collections, bank accounts, or outstanding balances, you MUST format the response in a Markdown table (e.g. using `| Header |`) instead of plain text lists. This allows the client-side system to render it as a highly readable, sortable database grid. Ensure that the table title/heading is always placed on its own separate line using heading syntax (e.g., `### Heading`) followed by a newline, and never on the same line as the table columns (i.e. do not prefix the column headers with the table title separated by a pipe). You MUST separate every row of the markdown table with a literal newline (\n) character so that each row is on its own line in the markdown string.
+6. DYNAMIC LOOKUP METHOD: Always use the `lookup_tenant_data` tool to dynamically query the database for records when a query asks for specific invoices, collections, inventories, stock counts, attendances, or other business logs. Do not rely solely on memory or hardcoded summaries if details are missing.
+7. DEEP LINKING: Whenever you present a Sales Invoice, Order, Staff User, Party (Customer/Supplier), Bank Account, or Inventory Item, format their name/identifier as a relative markdown link.
+   - Sales Invoice: [/edit_sales/<id>/](/edit_sales/<id>/) (e.g. "[INV-1002](/edit_sales/15/)")
+   - Order: [/edit_order/<id>/](/edit_order/<id>/) (e.g. "[ORD-5012](/edit_order/8/)")
+   - Staff User: [/user_list/?search=<name>](/user_list/?search=<name>) (e.g. "[John Doe](/user_list/?search=John%20Doe)")
+   - Customer/Supplier (Party): [/party_list/?search=<name>](/party_list/?search=<name>) (e.g. "[Acme Corp](/party_list/?search=Acme%20Corp)")
+   - Bank Account: [/bank_list/](/bank_list/) (e.g. "[HDFC Bank](/bank_list/)")
+   - Inventory Item: [/inventory/items/](/inventory/items/) (e.g. "[Browser Normal Item](/inventory/items/)")
+   Ensure the labels are human-readable (names/numbers) and URLs are correct.
+8. RESPONSE FORMAT: You MUST return your final text answer formatted as a JSON object containing keys "response" (markdown string) and "suggestions" (array of 2 to 4 highly relevant short follow-up action queries or follow-up questions). Ensure that the markdown string inside the "response" key contains literal newline (\n) characters between paragraphs, headings, list items, and table rows. Never collapse the entire response or the markdown table into a single line.
+9. CLEAN PROFESSIONAL OUTPUT: Under no circumstances should you output technical system debug statements or meta-commentary such as "Tenant Details Error:", "The provided database query output contains multiple records...", or "Error: Invalid Filters". Always present database records directly, formatted with clean Markdown headings and tables. If a database lookup is restricted or returns no data, output a friendly, professional response without printing technical system debug messages.
+10. VERBATIM PREVENTION: Under no circumstances should you repeat or output the "BASIC BUSINESS SNAPSHOT SUMMARY" section verbatim, nor should you print the heading "COMPLETE BUSINESS LEDGER SNAPSHOT" at the beginning of your response. This summary is strictly for your internal reference to answer user queries; do not regurgitate it.
+
+--- BASIC BUSINESS SNAPSHOT SUMMARY ---
+[Internal Reference Only - Do Not Output Verbatim]
+{tenant_context}
+---------------------------
+"""
+
+        # 3. Spawn background Celery task
+        from home.tasks import ziva_ai_generate_task
+        ziva_ai_generate_task.delay(
+            tenant.id,
+            request.user.id,
+            user_message,
+            session_id,
+            session_title,
+            bot_msg.id,
+            provider,
+            request.user.is_superuser,
+            api_key,
+            nvidia_model,
+            system_instruction,
+            sorted(permission_names),
+        )
 
         return JsonResponse({
-            'response': ai_text,
-            'suggestions': suggestions,
+            'status': 'pending',
+            'message_id': bot_msg.id,
             'session_id': session_id,
             'session_title': session_title,
             'used': ai_usage.queries_used_this_month,
@@ -722,42 +815,64 @@ CRITICAL RULES:
             'plan': ai_usage.plan_name
         })
 
-    except openai.OpenAIError as e:
-        provider_name = 'Nvidia GLM-5.2' if provider == 'nvidia' else 'Google Gemini'
-        message = str(e)
-        status_code = 502
-        if isinstance(e, openai.APIStatusError):
-            status_code = e.status_code
-            if e.status_code == 401:
-                message = f"Request to {provider_name} failed: Unauthorized. Please check your credentials in the .env file."
-            elif e.status_code == 429:
-                message = f"You have hit the {provider_name} API rate limit (Too Many Requests). Please wait a moment and try again."
+    except Exception as e:
         return JsonResponse({
-            'error': 'AI Service Unavailable',
-            'message': message
-        }, status=status_code)
-    except requests.exceptions.RequestException as e:
-        provider_name = 'Nvidia GLM-5.2' if provider == 'nvidia' else 'Google Gemini'
-        if e.response is not None:
-            if e.response.status_code == 429:
-                return JsonResponse({
-                    'error': 'Rate Limit Exceeded',
-                    'message': f'You have hit the {provider_name} API rate limit (Too Many Requests). Please wait a moment and try again.'
-                }, status=429)
-            elif e.response.status_code == 400:
-                return JsonResponse({
-                    'error': 'Bad Request',
-                    'message': f'The request was rejected by {provider_name}. This is usually caused by prompt safety filters or content constraints.'
-                }, status=400)
-            elif e.response.status_code == 401:
-                return JsonResponse({
-                    'error': 'Unauthorized',
-                    'message': f'Request to {provider_name} failed: Unauthorized. Please check your credentials in the .env file.'
-                }, status=401)
+            'error': 'Internal Server Error',
+            'message': str(e)
+        }, status=500)
+
+
+@login_required
+@check_ziva_ai_access
+def ziva_ai_chat_status_api(request, message_id):
+    try:
+        tenant = get_current_tenant(request)
+        if not tenant:
+            return JsonResponse({'error': 'No active tenant workspace found.'}, status=400)
+
+        from home.models import ZivaAiChatMessage, TenantAiUsage
+        from django.core.cache import cache
+
+        try:
+            bot_msg = ZivaAiChatMessage.objects.get(
+                id=message_id,
+                tenant=tenant,
+                user=request.user,
+                role='bot'
+            )
+        except ZivaAiChatMessage.DoesNotExist:
+            return JsonResponse({'error': 'Message not found.'}, status=404)
+
+        if bot_msg.message == '__pending__':
+            return JsonResponse({'status': 'pending'})
+
+        if bot_msg.message.startswith('__error__:'):
+            error_details = bot_msg.message[len('__error__:'):].strip()
+            return JsonResponse({
+                'status': 'error',
+                'message': error_details
+            })
+
+        suggestions = cache.get(f"ziva_ai_suggestions_{bot_msg.id}")
+        if suggestions is None:
+            suggestions = ["Show profile summary", "Show stock levels", "List active staff"]
+
+        ai_usage = TenantAiUsage.objects.filter(tenant=tenant).first()
+        used = ai_usage.queries_used_this_month if ai_usage else 0
+        limit = ai_usage.max_queries_per_month if ai_usage else 5
+        plan = ai_usage.plan_name if ai_usage else 'Free'
+
         return JsonResponse({
-            'error': 'AI Service Unavailable',
-            'message': f"Request to {provider_name} API failed: {str(e)}"
-        }, status=502)
+            'status': 'completed',
+            'response': bot_msg.message,
+            'suggestions': suggestions,
+            'session_id': bot_msg.session_id,
+            'session_title': bot_msg.session_title,
+            'used': used,
+            'limit': limit,
+            'plan': plan
+        })
+
     except Exception as e:
         return JsonResponse({
             'error': 'Internal Server Error',

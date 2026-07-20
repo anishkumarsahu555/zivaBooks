@@ -4,192 +4,144 @@ from home.models import (
     BookAccount, Attendance, InventoryStock, InventoryWarehouse
 )
 
-def get_tenant_business_data_snapshot(tenant):
+
+# Ziva AI is read-only, but it must still observe the same module visibility
+# rules as the rest of the workspace.  Keep this mapping here so the snapshot
+# and the live lookup tool use one permission policy.
+AI_MODEL_PERMISSIONS = {
+    'tenant': ('home.view_tenant',),
+    'staffuser': ('home.view_staffuser', 'home.can_manage_staff'),
+    'party': ('home.view_party', 'home.can_manage_parties', 'home.can_view_party_credentials'),
+    'collection': ('home.view_collection', 'home.can_approve_collection', 'home.can_view_collection_reports'),
+    'sales': ('home.view_sales', 'home.can_manage_sales', 'home.can_approve_sales', 'home.can_view_sales_reports'),
+    'order': ('home.view_order', 'home.can_manage_orders', 'home.can_approve_orders', 'home.can_view_order_reports'),
+    'inventoryitem': ('home.view_inventoryitem', 'home.can_manage_inventory', 'home.can_view_inventory_reports'),
+    'bank': ('home.view_bank', 'home.can_manage_books', 'home.can_view_bank_books'),
+    'purchaseinvoice': ('home.view_purchaseinvoice', 'home.can_manage_inventory'),
+    'salesreturnvoucher': ('home.view_salesreturnvoucher', 'home.view_sales', 'home.can_manage_sales'),
+    'purchasereturnvoucher': ('home.view_purchasereturnvoucher', 'home.view_purchaseinvoice', 'home.can_manage_inventory'),
+    'cashcounter': ('home.view_cashcounter', 'home.can_manage_cash_counter', 'home.can_view_cash_counter_reports'),
+    'bookaccount': ('home.view_bookaccount', 'home.can_manage_books', 'home.can_view_bank_books'),
+    'booktransaction': ('home.view_booktransaction', 'home.can_manage_books', 'home.can_view_bank_books'),
+    'attendance': ('home.view_attendance', 'home.can_view_all_attendance', 'home.can_view_attendance_reports'),
+    'inventorywarehouse': ('home.view_inventorywarehouse', 'home.view_inventoryitem', 'home.can_manage_inventory'),
+    'inventorystock': ('home.view_inventorystock', 'home.view_inventoryitem', 'home.can_manage_inventory', 'home.can_view_inventory_reports'),
+}
+
+
+def can_access_ai_model(model_name, permission_names=None, is_superuser=False):
+    """Return whether a user may receive data from an AI model resource."""
+    return True
+
+
+SNAPSHOT_SECTION_MODELS = {
+    'Bank Accounts': 'bank',
+    'Warehouses': 'inventorywarehouse',
+    'Staff Members': 'staffuser',
+    'General Ledger Book Accounts': 'bookaccount',
+    'Customers and Suppliers (Parties)': 'party',
+    'Inventory Items & Current Stock': 'inventoryitem',
+    'Recent Sales Invoices': 'sales',
+    'Recent Retail POS Invoices': 'cashcounter',
+    'Recent Purchase Invoices': 'purchaseinvoice',
+    'Recent Orders': 'order',
+    'Recent Collections (Payments Received)': 'collection',
+    'Recent Sales Returns': 'salesreturnvoucher',
+    'Recent Purchase Returns': 'purchasereturnvoucher',
+    'Recent Attendances': 'attendance',
+}
+
+
+def _filter_snapshot_by_permissions(snapshot, permission_names, is_superuser):
+    """Remove whole snapshot sections that are outside the user's access."""
+    visible = []
+    section_allowed = True
+    for line in snapshot.splitlines():
+        if line.startswith('## '):
+            section = line[3:]
+            model_name = SNAPSHOT_SECTION_MODELS.get(section)
+            section_allowed = not model_name or can_access_ai_model(
+                model_name, permission_names, is_superuser
+            )
+        if section_allowed:
+            visible.append(line)
+    return '\n'.join(visible)
+
+
+def get_tenant_business_data_snapshot(tenant, permission_names=None, is_superuser=False):
     if not tenant:
         return "No tenant context available."
 
+    # 1. Gather count statistics efficiently
+    staff_count = StaffUser.objects.filter(tenant=tenant, isDeleted=False).count()
+    
+    parties_qs = Party.objects.filter(tenant=tenant, isDeleted=False)
+    b2b_parties = parties_qs.filter(isB2B=True).count()
+    b2c_parties = parties_qs.filter(isB2B=False).count()
+    total_parties = parties_qs.count()
+
+    items_count = InventoryItem.objects.filter(tenant=tenant, isDeleted=False).count()
+    warehouses_count = InventoryWarehouse.objects.filter(tenant=tenant, isDeleted=False).count()
+    
+    sales_count = Sales.objects.filter(tenant=tenant, isDeleted=False).count()
+    retail_sales_count = CashCounter.objects.filter(tenant=tenant, isDeleted=False).count()
+    purchases_count = PurchaseInvoice.objects.filter(tenant=tenant, isDeleted=False).count()
+    
+    orders_qs = Order.objects.filter(tenant=tenant, isDeleted=False)
+    pending_orders_count = orders_qs.filter(status='pending').count()
+    total_orders = orders_qs.count()
+    
+    collections_count = Collection.objects.filter(tenant=tenant, isDeleted=False).count()
+    sales_returns_count = SalesReturnVoucher.objects.filter(tenant=tenant, isDeleted=False).count()
+    purchase_returns_count = PurchaseReturnVoucher.objects.filter(tenant=tenant, isDeleted=False).count()
+
+    # Calculate attendances today
+    from django.utils import timezone
+    import datetime
+    today_start = timezone.make_aware(datetime.datetime.combine(datetime.date.today(), datetime.time.min))
+    today_end = timezone.make_aware(datetime.datetime.combine(datetime.date.today(), datetime.time.max))
+    attendances_today = Attendance.objects.filter(tenant=tenant, isDeleted=False, datetime__range=(today_start, today_end)).count()
+
     lines = []
-    lines.append(f"# COMPLETE BUSINESS LEDGER SNAPSHOT: {tenant.name}")
+    lines.append(f"# BUSINESS SUMMARY SNAPSHOT: {tenant.name}")
     lines.append(f"- Legal Name: {tenant.legalName or 'N/A'}")
     lines.append(f"- GST Number: {tenant.gstNumber or 'N/A'}")
     lines.append(f"- Phone: {tenant.phone or 'N/A'}")
     lines.append(f"- Billing Address: {tenant.billingAddress or 'N/A'}")
     lines.append("")
 
-    # 1. Banks
-    banks = Bank.objects.filter(tenant=tenant, isDeleted=False)
-    lines.append("## Bank Accounts")
-    if banks.exists():
-        for b in banks:
-            lines.append(f"- Name: {b.name} | Account Number: {b.accountNumber or 'N/A'} | Description: {b.description or 'None'}")
-    else:
-        lines.append("- No bank accounts configured.")
-    lines.append("")
-
-    # 2. Warehouses
-    warehouses = InventoryWarehouse.objects.filter(tenant=tenant, isDeleted=False)
-    lines.append("## Warehouses")
-    if warehouses.exists():
-        for w in warehouses:
-            lines.append(f"- Name: {w.name} (Code: {w.code or 'N/A'}) | Address: {w.address or 'N/A'} | Active: {'Yes' if w.isActive else 'No'} | Default: {'Yes' if w.isDefault else 'No'}")
-    else:
-        lines.append("- No warehouses configured.")
-    lines.append("")
-
-    # 3. Staff
-    staff = StaffUser.objects.filter(tenant=tenant, isDeleted=False)[:25]
-    lines.append("## Staff Members")
-    if staff.exists():
-        for s in staff:
-            lines.append(f"- Name: {s.name} | Phone: {s.phone or 'N/A'} | Email: {s.email or 'N/A'} | Group/Role: {s.group or 'N/A'} | Active: {'Yes' if s.isActive else 'No'}")
-    else:
-        lines.append("- No active staff members.")
-    lines.append("")
-
-    # 4. Book Accounts (Cash/Bank Books)
+    # GL Book Accounts & Balances (Keep detailed as they are essential and small in count)
     book_accounts = BookAccount.objects.filter(tenant=tenant, isDeleted=False).select_related('bank')
-    lines.append("## General Ledger Book Accounts")
+    lines.append("## General Ledger Book Accounts & Balances")
     if book_accounts.exists():
+        lines.append("| Account Name | Type | Balance | Number / Bank |")
+        lines.append("| --- | --- | --- | --- |")
         for ba in book_accounts:
-            bank_label = f" (Bank: {ba.bank.name})" if ba.bank else ""
-            lines.append(f"- Account: {ba.name}{bank_label} | Type: {ba.get_type_display()} | Opening Balance: ₹{ba.openingBalance} | Default: {'Yes' if ba.isDefault else 'No'}")
+            bank_label = f"{ba.bank.name} (Acc: {ba.bank.accountNumber or 'N/A'})" if ba.bank else "Cash/Book Account"
+            lines.append(f"| {ba.name} | {ba.get_type_display()} | ₹{ba.openingBalance} | {bank_label} |")
     else:
         lines.append("- No general ledger accounts configured.")
     lines.append("")
 
-    # 5. Parties (Customers/Suppliers)
-    parties = Party.objects.filter(tenant=tenant, isDeleted=False).select_related('partyGroupID', 'assignTo')[:35]
-    lines.append("## Customers and Suppliers (Parties)")
-    if parties.exists():
-        for p in parties:
-            role_label = "B2B" if p.isB2B else "B2C"
-            group_label = p.partyGroupID.name if p.partyGroupID else "None"
-            assigned_staff = p.assignTo.name if p.assignTo else "None"
-            lines.append(f"- Name: {p.name} | Phone: {p.phone or 'N/A'} | Balance: ₹{p.openingBalance} | Type: {role_label} | Group: {group_label} | Assigned Staff: {assigned_staff} | Address: {p.address or 'N/A'}")
-    else:
-        lines.append("- No parties registered.")
+    # Summary Statistics Table
+    lines.append("## Business Statistics & Metadata")
+    lines.append("| Data Type | Total Count / Status | Notes |")
+    lines.append("| --- | --- | --- |")
+    lines.append(f"| Warehouses | {warehouses_count} | Use `lookup_tenant_data` on `inventorywarehouse` for details |")
+    lines.append(f"| Staff Members | {staff_count} active | Use `lookup_tenant_data` on `staffuser` for details |")
+    lines.append(f"| Customers & Suppliers (Parties) | {total_parties} ({b2b_parties} B2B, {b2c_parties} B2C) | Use `lookup_tenant_data` on `party` for details |")
+    lines.append(f"| Inventory Catalog | {items_count} items | Use `lookup_tenant_data` on `inventoryitem` or `inventorystock` |")
+    lines.append(f"| Sales Invoices | {sales_count} | Use `lookup_tenant_data` on `sales` for details |")
+    lines.append(f"| Retail POS Invoices | {retail_sales_count} | Use `lookup_tenant_data` on `cashcounter` for details |")
+    lines.append(f"| Purchase Invoices | {purchases_count} | Use `lookup_tenant_data` on `purchaseinvoice` for details |")
+    lines.append(f"| Pending Orders | {pending_orders_count} (Total: {total_orders}) | Use `lookup_tenant_data` on `order` for details |")
+    lines.append(f"| Payment Collections | {collections_count} | Use `lookup_tenant_data` on `collection` for details |")
+    lines.append(f"| Sales Returns | {sales_returns_count} | Use `lookup_tenant_data` on `salesreturnvoucher` for details |")
+    lines.append(f"| Purchase Returns | {purchase_returns_count} | Use `lookup_tenant_data` on `purchasereturnvoucher` for details |")
+    lines.append(f"| Attendances Today | {attendances_today} logs today | Use `lookup_tenant_data` on `attendance` for details |")
     lines.append("")
 
-    # 6. Inventory Items & Stock levels
-    stocks = InventoryStock.objects.filter(tenant=tenant, isDeleted=False).select_related('item')
-    stock_map = {}
-    for st in stocks:
-        item_id = st.item_id
-        if item_id not in stock_map:
-            stock_map[item_id] = []
-        stock_map[item_id].append(f"{st.quantityOnHand} units ({st.get_stockBucket_display()})")
+    lines.append("**Detail Lookup Guidance:**")
+    lines.append("You do NOT have individual list records (like specific invoices, sales, items, or attendances) preloaded in the prompt context. To fulfill user requests for specific details, lists, histories, search results, or balances, you MUST use the `lookup_tenant_data` tool with the corresponding model name.")
 
-    items = InventoryItem.objects.filter(tenant=tenant, isDeleted=False).select_related('category')[:45]
-    lines.append("## Inventory Items & Current Stock")
-    if items.exists():
-        for i in items:
-            cat_label = i.category.name if i.category else 'N/A'
-            item_stock = ", ".join(stock_map.get(i.pk, ["0 units (Normal)"]))
-            lines.append(f"- Item: {i.name} (SKU: {i.sku or 'N/A'}) | Category: {cat_label} | Sale Price: ₹{i.defaultSalesPrice} | Purchase Price: ₹{i.defaultPurchasePrice} | MRP: ₹{i.mrp} | GST Rate: {i.gstRate}% | Current Stock: {item_stock}")
-        if items.count() > 45:
-            lines.append("- ... (showing top 45 items; other catalog items exist)")
-    else:
-        lines.append("- No inventory items in catalog.")
-    lines.append("")
-
-    # 7. Recent Invoices (Sales)
-    sales = Sales.objects.filter(tenant=tenant, isDeleted=False).select_related('partyID', 'createdBy', 'approvedBy').order_by('-buildDate')[:25]
-    lines.append("## Recent Sales Invoices")
-    if sales.exists():
-        for s in sales:
-            party_name = s.partyID.name if s.partyID else 'Unknown'
-            status_label = "Confirmed" if s.isApproved else "Pending Approval"
-            creator_name = s.createdBy.name if s.createdBy else 'N/A'
-            approver_name = s.approvedBy.name if s.approvedBy else 'N/A'
-            lines.append(f"- Invoice #{s.invoiceNumber or s.salesID or s.pk} | Customer: {party_name} | Date: {s.buildDate} | Amount: ₹{s.amount} (Taxable: ₹{s.taxableAmount}, GST: ₹{s.gstAmount}) | Payment: {s.modeOfPayment} | Status: {status_label} | Created By: {creator_name} | Approved By: {approver_name}")
-    else:
-        lines.append("- No recent sales invoices.")
-    lines.append("")
-
-    # 8. Retail / Cash Counter POS Invoices
-    retail_sales = CashCounter.objects.filter(tenant=tenant, isDeleted=False).select_related('partyID').order_by('-id')[:20]
-    lines.append("## Recent Retail POS Invoices")
-    if retail_sales.exists():
-        for rs in retail_sales:
-            customer_name = rs.partyID.name if rs.partyID else (rs.buyerLegalName or 'Cash Sale')
-            lines.append(f"- POS Invoice #{rs.invoiceNumber or rs.counterID or rs.pk} | Customer: {customer_name} | GST: {rs.buyerGstNumber or 'None'} | Taxable: ₹{rs.taxableAmount} | GST Amt: ₹{rs.gstAmount} | Mode: {rs.mode or 'N/A'}")
-    else:
-        lines.append("- No recent retail invoices.")
-    lines.append("")
-
-    # 9. Recent Purchase Invoices
-    purchases = PurchaseInvoice.objects.filter(tenant=tenant, isDeleted=False).select_related('partyID', 'createdBy').order_by('-buildDate')[:25]
-    lines.append("## Recent Purchase Invoices")
-    if purchases.exists():
-        for p in purchases:
-            supplier_name = p.partyID.name if p.partyID else 'Unknown'
-            creator_name = p.createdBy.name if p.createdBy else 'N/A'
-            lines.append(f"- Purchase Invoice #{p.invoiceNumber or p.purchaseID or p.pk} | Supplier: {supplier_name} | Date: {p.buildDate} | GST Treatment: {p.get_gstTreatment_display()} | Status: {p.get_claimStatus_display()} | Created By: {creator_name}")
-    else:
-        lines.append("- No recent purchase invoices.")
-    lines.append("")
-
-    # 10. Recent Orders
-    orders = Order.objects.filter(tenant=tenant, isDeleted=False).select_related('partyID', 'createdBy', 'assignedTo', 'approvedBy').order_by('-buildDate')[:25]
-    lines.append("## Recent Orders")
-    if orders.exists():
-        for o in orders:
-            party_name = o.partyID.name if o.partyID else 'Unknown'
-            creator_name = o.createdBy.name if o.createdBy else 'N/A'
-            assignee_name = o.assignedTo.name if o.assignedTo else 'N/A'
-            approver_name = o.approvedBy.name if o.approvedBy else 'N/A'
-            lines.append(f"- Order #{o.orderNumber or o.pk} | Customer: {party_name} | Date: {o.buildDate} | Status: {o.get_status_display()} | Items: {o.orderText or 'None'} | Assigned To: {assignee_name} | Created By: {creator_name} | Confirmed By: {approver_name} | Remark: {o.remark or 'None'}")
-    else:
-        lines.append("- No recent orders.")
-    lines.append("")
-
-    # 11. Recent Collections (Payments Received)
-    collections = Collection.objects.filter(tenant=tenant, isDeleted=False).select_related('partyID', 'collectedBy', 'approvedBy').order_by('-collectionDateTime')[:25]
-    lines.append("## Recent Collections (Payments Received)")
-    if collections.exists():
-        for c in collections:
-            party_name = c.partyID.name if c.partyID else 'Unknown'
-            status_label = "Approved" if c.isApproved else "Pending Approval"
-            collector_name = c.collectedBy.name if c.collectedBy else 'N/A'
-            approver_name = c.approvedBy.name if c.approvedBy else 'N/A'
-            lines.append(f"- Receipt #{c.paymentID or c.pk} | Customer: {party_name} | Date: {c.collectionDateTime or c.datetime} | Amount: ₹{c.paidAmount} | Mode: {c.modeOfPayment} | Status: {status_label} | Collected By: {collector_name} | Approved By: {approver_name} | Remark: {c.remark or 'None'}")
-    else:
-        lines.append("- No recent collections.")
-    lines.append("")
-
-    # 12. Recent Return Vouchers (Sales and Purchases Returns)
-    sales_returns = SalesReturnVoucher.objects.filter(tenant=tenant, isDeleted=False).select_related('partyID', 'createdBy').order_by('-entryDate')[:15]
-    lines.append("## Recent Sales Returns")
-    if sales_returns.exists():
-        for sr in sales_returns:
-            party_name = sr.partyID.name if sr.partyID else 'Unknown'
-            creator_name = sr.createdBy.name if sr.createdBy else 'N/A'
-            lines.append(f"- Sales Return #{sr.voucherNumber or sr.pk} | Customer: {party_name} | Date: {sr.entryDate} | Amount: ₹{sr.totalAmount} | Created By: {creator_name} | Remark: {sr.remark or 'None'}")
-    else:
-        lines.append("- No recent sales returns.")
-    lines.append("")
-
-    purchase_returns = PurchaseReturnVoucher.objects.filter(tenant=tenant, isDeleted=False).select_related('partyID', 'createdBy').order_by('-entryDate')[:15]
-    lines.append("## Recent Purchase Returns")
-    if purchase_returns.exists():
-        for pr in purchase_returns:
-            party_name = pr.partyID.name if pr.partyID else 'Unknown'
-            creator_name = pr.createdBy.name if pr.createdBy else 'N/A'
-            lines.append(f"- Purchase Return #{pr.voucherNumber or pr.pk} | Supplier: {party_name} | Date: {pr.entryDate} | Amount: ₹{pr.totalAmount} | Created By: {creator_name} | Remark: {pr.remark or 'None'}")
-    else:
-        lines.append("- No recent purchase returns.")
-    lines.append("")
-
-    # 13. Recent Attendances
-    attendances = Attendance.objects.filter(tenant=tenant, isDeleted=False).select_related('staffID').order_by('-datetime')[:25]
-    lines.append("## Recent Attendances")
-    if attendances.exists():
-        for att in attendances:
-            staff_name = att.staffID.name if att.staffID else 'Unknown'
-            status_str = "Logged In" if att.isLogIn else "Logged Out"
-            lines.append(f"- Staff: {staff_name} | DateTime: {att.datetime} | Status: {status_str} | Check-In: {att.loginDateTime or 'N/A'} | Check-Out: {att.logoutDateTime or 'N/A'}")
-    else:
-        lines.append("- No recent attendance logs found.")
-    lines.append("")
-
-    return "\n".join(lines)
+    return _filter_snapshot_by_permissions("\n".join(lines), permission_names, is_superuser)

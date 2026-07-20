@@ -405,43 +405,62 @@
     /* Responsive Table Wrapper */
     .table-container {
         width: 100%;
-        overflow-x: visible;
+        overflow-x: auto;
+        border: 1px solid var(--app-line);
+        border-radius: 12px;
+        margin: 16px 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+        background: var(--app-surface);
     }
     .chat-bubble table {
         border-collapse: collapse;
         width: 100%;
-        margin: 14px 0 !important;
-        font-size: 0.88rem;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.01) !important;
+        margin: 0 !important;
+        font-size: 0.9rem;
     }
     .chat-bubble th, .chat-bubble td {
-        border: 1px solid var(--app-line);
-        padding: 8px 12px;
+        border: none;
+        border-bottom: 1px solid var(--app-line);
+        padding: 10px 14px;
         text-align: left;
     }
+    .chat-bubble tr:last-child td {
+        border-bottom: none;
+    }
     .chat-bubble th {
-        background: rgba(13, 148, 136, 0.05);
+        background: rgba(13, 148, 136, 0.06);
         color: var(--app-primary-dark);
         font-weight: 750;
         cursor: pointer;
-        transition: background 0.2s ease;
+        transition: background 0.25s ease;
         user-select: none;
+        border-bottom: 1px solid rgba(13, 148, 136, 0.15);
     }
     .chat-bubble th:hover {
         background: rgba(13, 148, 136, 0.12) !important;
     }
     html[data-theme="dark"] .chat-bubble th {
-        background: rgba(45, 212, 191, 0.05);
+        background: rgba(45, 212, 191, 0.08);
         color: var(--app-primary);
+        border-bottom: 1px solid rgba(45, 212, 191, 0.15);
     }
     html[data-theme="dark"] .chat-bubble th:hover {
-        background: rgba(45, 212, 191, 0.12) !important;
+        background: rgba(45, 212, 191, 0.15) !important;
+    }
+    .chat-bubble tr {
+        transition: background-color 0.2s ease;
+    }
+    .chat-bubble tr:hover {
+        background-color: rgba(13, 148, 136, 0.03) !important;
+    }
+    html[data-theme="dark"] .chat-bubble tr:hover {
+        background-color: rgba(45, 212, 191, 0.04) !important;
     }
     .chat-bubble tr:nth-child(even) {
-        background: rgba(0, 0, 0, 0.01);
+        background: rgba(0, 0, 0, 0.005);
     }
     html[data-theme="dark"] .chat-bubble tr:nth-child(even) {
-        background: rgba(255, 255, 255, 0.01);
+        background: rgba(255, 255, 255, 0.005);
     }
 
 
@@ -2189,6 +2208,9 @@
             chatBody.appendChild(chipsWrap);
         }
         
+        // Add copy buttons to code blocks
+        addCopyButtons();
+        
         // Scroll to bottom
         chatBody.scrollTop = chatBody.scrollHeight;
     }
@@ -2251,6 +2273,90 @@
         document.getElementById('aiFooter').style.display = 'none';
     }
 
+    // Poll Task Status AJAX Handler
+    function pollTaskStatus(messageId) {
+        let pollAttempts = 0;
+        const maxPollAttempts = 120; // 3 minutes at the 1.5s polling interval
+        const pollInterval = setInterval(() => {
+            pollAttempts += 1;
+            if (pollAttempts > maxPollAttempts) {
+                clearInterval(pollInterval);
+                removeTypingIndicator();
+                isWaiting = false;
+                appendMessage('bot', '⚠️ **Error:** Ziva AI is taking longer than expected. Please try again shortly.');
+                return;
+            }
+
+            fetch(`/api/ziva-ai/chat/status/${messageId}/`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                const contentType = response.headers.get("content-type");
+                const isJson = contentType && contentType.indexOf("application/json") !== -1;
+
+                if (!response.ok) {
+                    if (isJson) {
+                        return response.json().then(err => {
+                            throw new Error(err.message || 'Server returned error status.');
+                        });
+                    } else {
+                        return response.text().then(text => {
+                            throw new Error(text || `Server returned error status (${response.status}).`);
+                        });
+                    }
+                }
+
+                if (!isJson) {
+                    return response.text().then(text => {
+                        if (text.trim() === 'Offline') {
+                            throw new Error('You are currently offline. Please check your internet connection.');
+                        }
+                        throw new Error('Received non-JSON response from server.');
+                    });
+                }
+
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'pending') {
+                    // Still generating, wait for next tick
+                    return;
+                }
+                
+                // Final state reached: clear interval and loader
+                clearInterval(pollInterval);
+                removeTypingIndicator();
+                isWaiting = false;
+
+                if (data.status === 'completed') {
+                    if (data.session_id) {
+                        activeSessionId = data.session_id;
+                        localStorage.setItem('ziva_ai_session_id', activeSessionId);
+                    }
+                    
+                    // Append bot response bubble
+                    appendMessage('bot', data.response, data.suggestions);
+
+                    // Update Quota display
+                    updateQuotaUI(data.used, data.limit, data.plan);
+                    
+                    // Reload sidebar sessions list in real time
+                    loadSessionsList();
+                } else if (data.status === 'error') {
+                    appendMessage('bot', `⚠️ **Error:** ${data.message || 'The AI service encountered an issue. Please try again.'}`);
+                }
+            })
+            .catch(error => {
+                clearInterval(pollInterval);
+                removeTypingIndicator();
+                isWaiting = false;
+                appendMessage('bot', `⚠️ **Error:** ${error.message || 'Unable to connect to AI server. Please check your internet connection.'}`);
+            });
+        }, 1500);
+    }
+
     // Send Message AJAX Handler
     function sendMessage() {
         if (isWaiting) return;
@@ -2284,11 +2390,11 @@
             })
         })
         .then(response => {
-            removeTypingIndicator();
             const contentType = response.headers.get("content-type");
             const isJson = contentType && contentType.indexOf("application/json") !== -1;
 
             if (response.status === 403) {
+                removeTypingIndicator();
                 if (isJson) {
                     return response.json().then(data => {
                         renderBlockedScreen(data.message, data.plan, data.used, data.limit);
@@ -2300,33 +2406,55 @@
                 }
             }
             if (!response.ok) {
+                removeTypingIndicator();
                 if (isJson) {
                     return response.json().then(err => {
                         throw new Error(err.message || 'Server returned error status.');
                     });
                 } else {
-                    throw new Error(`Server returned error status (${response.status}). Please verify that GEMINI_API_KEY is configured in your .env file.`);
+                    return response.text().then(text => {
+                        if (text.trim() === 'Offline') {
+                            throw new Error('You are currently offline. Please check your internet connection.');
+                        }
+                        throw new Error(`Server returned error status (${response.status}). Please verify that GEMINI_API_KEY is configured in your .env file.`);
+                    });
                 }
             }
+            
+            if (!isJson) {
+                removeTypingIndicator();
+                return response.text().then(text => {
+                    if (text.trim() === 'Offline') {
+                        throw new Error('You are currently offline. Please check your internet connection.');
+                    }
+                    throw new Error('Received non-JSON response from server.');
+                });
+            }
+            
             return response.json();
         })
         .then(data => {
-            // Update activeSessionId if generated/returned by backend
-            if (data.session_id) {
-                activeSessionId = data.session_id;
-                localStorage.setItem('ziva_ai_session_id', activeSessionId);
+            if (data.status === 'pending') {
+                // Keep typing indicator and start polling
+                pollTaskStatus(data.message_id);
+            } else {
+                removeTypingIndicator();
+                if (data.session_id) {
+                    activeSessionId = data.session_id;
+                    localStorage.setItem('ziva_ai_session_id', activeSessionId);
+                }
+
+                // Append bot response bubble
+                appendMessage('bot', data.response, data.suggestions);
+
+                // Update Quota display
+                updateQuotaUI(data.used, data.limit, data.plan);
+                
+                // Reload sidebar sessions list in real time
+                loadSessionsList();
+                
+                isWaiting = false;
             }
-
-            // Append bot response bubble
-            appendMessage('bot', data.response, data.suggestions);
-
-            // Update Quota display
-            updateQuotaUI(data.used, data.limit, data.plan);
-            
-            // Reload sidebar sessions list in real time
-            loadSessionsList();
-            
-            isWaiting = false;
         })
         .catch(error => {
             removeTypingIndicator();
@@ -2763,6 +2891,58 @@
                 th.dataset.listenerBound = 'true';
                 // Add event listener logic similar to native load bindings
             }
+        });
+        
+        // Add copy buttons to code blocks
+        addCopyButtons();
+    }
+
+    function addCopyButtons() {
+        const codeBlocks = chatBody.querySelectorAll('.chat-bubble pre');
+        codeBlocks.forEach(pre => {
+            if (pre.querySelector('.copy-code-btn')) return;
+
+            pre.style.position = 'relative';
+
+            const btn = document.createElement('button');
+            btn.className = 'copy-code-btn';
+            btn.innerHTML = '<i class="copy icon"></i>Copy';
+            btn.style.position = 'absolute';
+            btn.style.top = '8px';
+            btn.style.right = '8px';
+            btn.style.background = 'rgba(255,255,255,0.15)';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '6px';
+            btn.style.padding = '4px 8px';
+            btn.style.color = '#fff';
+            btn.style.cursor = 'pointer';
+            btn.style.fontSize = '0.75rem';
+            btn.style.display = 'flex';
+            btn.style.alignItems = 'center';
+            btn.style.gap = '4px';
+            btn.style.transition = 'all 0.2s';
+            btn.style.backdropFilter = 'blur(4px)';
+            btn.style.zIndex = '10';
+
+            btn.onmouseover = () => {
+                btn.style.background = 'rgba(255,255,255,0.3)';
+            };
+            btn.onmouseout = () => {
+                btn.style.background = 'rgba(255,255,255,0.15)';
+            };
+
+            const code = pre.querySelector('code');
+            btn.onclick = () => {
+                const text = code ? code.innerText : pre.innerText;
+                navigator.clipboard.writeText(text).then(() => {
+                    btn.innerHTML = '<i class="check icon" style="color: #2dd4bf;"></i>Copied!';
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="copy icon"></i>Copy';
+                    }, 2000);
+                });
+            };
+
+            pre.appendChild(btn);
         });
     }
 </script>

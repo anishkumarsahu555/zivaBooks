@@ -76,10 +76,18 @@ def _rotation_worker(listener):
     while not _stop_rotation:
         time.sleep(60)
         if datetime.now().date() != _current_log_date and LOG_TO_FILE:
+            old_handler = _file_handler
             new_handler = _create_file_handler()
-            if len(listener.handlers) > 1:
-                listener.handlers[1].close()
-                listener.handlers[1] = new_handler
+            handlers_list = list(listener.handlers)
+            if old_handler in handlers_list:
+                idx = handlers_list.index(old_handler)
+                handlers_list[idx] = new_handler
+                old_handler.close()
+                listener.handlers = tuple(handlers_list)
+            elif len(handlers_list) > 0:
+                handlers_list[-1].close()
+                handlers_list[-1] = new_handler
+                listener.handlers = tuple(handlers_list)
 
 
 def _init_logger():
