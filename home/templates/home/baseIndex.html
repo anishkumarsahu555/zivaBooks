@@ -4818,11 +4818,21 @@
         let selectedIndex = -1;
         let resultItems = [];
 
+        function updateClearBtnVisibility() {
+            const val = $input.val().trim();
+            if (val.length > 0 || $wrapper.hasClass('is-focused')) {
+                $clearBtn.removeAttr('hidden');
+            } else {
+                $clearBtn.attr('hidden', true);
+            }
+        }
+
         function showSearch() {
             $wrapper.addClass('is-focused');
             $container.addClass('is-active-mobile');
             $backdrop.removeAttr('hidden');
             $dropdown.removeAttr('hidden');
+            updateClearBtnVisibility();
             const val = $input.val().trim();
             fetchResults(val);
         }
@@ -4832,6 +4842,7 @@
             $container.removeClass('is-active-mobile');
             $backdrop.attr('hidden', true);
             $dropdown.attr('hidden', true);
+            $clearBtn.attr('hidden', true);
             selectedIndex = -1;
         }
 
@@ -4904,11 +4915,7 @@
         // Toggle clear button
         $input.on('input', function() {
             const val = $(this).val().trim();
-            if (val.length > 0) {
-                $clearBtn.removeAttr('hidden');
-            } else {
-                $clearBtn.attr('hidden', true);
-            }
+            updateClearBtnVisibility();
             fetchResults(val);
         });
 
@@ -4921,11 +4928,21 @@
             hideSearch();
         });
 
+        // Two-stage X button: 1st click clears text, 2nd click (or empty input) closes search
         $clearBtn.on('click', function(e) {
             e.stopPropagation();
-            $input.val('').focus();
-            $clearBtn.attr('hidden', true);
-            fetchResults('');
+            e.preventDefault();
+            const currentVal = $input.val().trim();
+            if (currentVal.length > 0) {
+                // Stage 1: Clear text, keep search focused
+                $input.val('');
+                $input.focus();
+                fetchResults('');
+            } else {
+                // Stage 2: Input is empty -> close search overlay
+                $input.blur();
+                hideSearch();
+            }
         });
 
         // Global shortcuts and navigation keys
