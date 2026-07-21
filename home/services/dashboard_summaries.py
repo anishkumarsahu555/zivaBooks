@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from django.db.models import Count, Q, Sum
 
+from utils.logger import logger
 from home.models import Bank, Collection, GeolocationPackage, Order, Party, PartyGroup, Sales, StaffUser
 from home.services.orders import can_filter_all_orders
 from home.services.reports import formatINR

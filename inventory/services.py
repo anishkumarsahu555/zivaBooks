@@ -7,6 +7,7 @@ from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Q
 
+from utils.logger import logger
 from home.cache_keys import inventory_list_version_cache_key
 from home.models import (
     CashCounterLine,
@@ -459,6 +460,7 @@ def rebuild_inventory_stock(tenant, item_ids=None):
             stock_row.isDeleted = False
             stock_row.save(update_fields=['quantityOnHand', 'isDeleted', 'lastUpdatedOn'])
     _bump_inventory_list_cache_version('items', tenant=tenant)
+    logger.info("[InventoryService] Rebuilt stock for tenant %s across %d items", getattr(tenant, 'pk', None), len(item_ids))
 
 
 def validate_non_negative_inventory(tenant, item_ids=None, item_bucket_pairs=None):
@@ -489,10 +491,12 @@ def validate_non_negative_inventory(tenant, item_ids=None, item_bucket_pairs=Non
             return
         warehouse_label = negative_batch_row.warehouse.name if negative_batch_row.warehouse_id else 'default warehouse'
         batch_label = negative_batch_row.batch.batchNumber or f'Batch #{negative_batch_row.batch_id}'
-        raise ValueError(
+        err_msg = (
             f'Insufficient batch stock for {negative_batch_row.item.name}, {batch_label} in {warehouse_label}. '
             f'Current batch balance is {negative_batch_row.quantityOnHand}.'
         )
+        logger.error("[InventoryService] Validation error: %s", err_msg)
+        raise ValueError(err_msg)
     alternate_note = ''
     if getattr(tenant, 'nonGstShadowEnabled', False) or negative_row.stockBucket == InventoryItem.StockBucket.NON_GST:
         alternate_bucket = (
@@ -510,12 +514,14 @@ def validate_non_negative_inventory(tenant, item_ids=None, item_bucket_pairs=Non
             if alternate_row is not None and float(alternate_row.quantityOnHand or 0.0) > 0:
                 alternate_label = 'Non-GST' if alternate_bucket == InventoryItem.StockBucket.NON_GST else 'GST'
                 alternate_note = f' {alternate_label} stock available: {alternate_row.quantityOnHand}.'
-    raise ValueError(
+    err_msg = (
         f'Insufficient {negative_row.get_stockBucket_display()} stock for {negative_row.item.name}. '
         f'Current on-hand balance in this bucket is {negative_row.quantityOnHand}. '
         f'Please add stock, use the correct bucket, or adjust inventory first.'
         f'{alternate_note}'
     )
+    logger.error("[InventoryService] Validation error: %s", err_msg)
+    raise ValueError(err_msg)
 
 
 def stock_snapshot_for_tenant(tenant):

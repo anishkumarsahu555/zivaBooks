@@ -1,6 +1,7 @@
 from django.utils import timezone
 from django.utils.html import escape
 
+from utils.logger import logger
 from home.models import Order, OrderStatusEvent, StaffUser
 from home.services.collections import has_any_permission
 from home.tenancy import assign_tenant, tenant_qs
@@ -145,6 +146,7 @@ def create_order_status_event(request, order_obj, from_status, to_status, note='
     if staff:
         event.actor_id = staff.pk
     event.save()
+    logger.info("[Orders] Order %s status transition: %s -> %s", order_obj.pk, event.fromStatus, event.toStatus)
 
 
 def order_allowed_next_statuses(order_obj):

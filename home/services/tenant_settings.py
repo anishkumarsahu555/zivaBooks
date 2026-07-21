@@ -1,3 +1,4 @@
+from utils.logger import logger
 from django.contrib.auth.hashers import check_password
 
 from home.navigation import _effective_permission_names
@@ -24,9 +25,15 @@ def request_can_manage_tenant_settings(request):
 
 def tenant_settings_access_code_error(tenant, raw_code):
     if not tenant.nonGstShadowCodeHash:
-        return 'Set the 6-digit Non-GST passcode first.'
+        err = 'Set the 6-digit Non-GST passcode first.'
+        logger.error("[TenantSettings] %s", err)
+        return err
     if len(raw_code) != 6 or not raw_code.isdigit():
-        return 'Enter the valid 6-digit passcode.'
+        err = 'Enter the valid 6-digit passcode.'
+        logger.error("[TenantSettings] %s", err)
+        return err
     if not check_password(raw_code, tenant.nonGstShadowCodeHash):
-        return 'Invalid 6-digit passcode.'
+        err = 'Invalid 6-digit passcode.'
+        logger.error("[TenantSettings] %s", err)
+        return err
     return None

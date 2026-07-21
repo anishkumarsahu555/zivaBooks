@@ -25,6 +25,7 @@ from home.services.collections import (
 )
 from home.services.reports import formatINR
 from home.services.sequences import next_tenant_sequence_value as _next_tenant_sequence_value
+from utils.logger import logger
 from home.tenancy import assign_tenant, tenant_qs
 
 

@@ -41,6 +41,7 @@ from home.services.orders import (
     orders_list_base_qs as _orders_list_base_qs,
     set_order_tracking_timestamps as _set_order_tracking_timestamps,
 )
+from utils.logger import logger
 from home.tenancy import assign_tenant, get_current_tenant, tenant_qs
 
 
@@ -65,8 +66,10 @@ def request_order_delivery_otp_api(request):
         meta = {'orderID': obj.pk, 'status': Order.Status.DELIVERED, 'orderNumber': obj.orderNumber or str(obj.pk)}
         clear_order_delivery_status(obj.partyID.tenant_id, obj.partyID_id)
         set_order_delivery_otp(obj.partyID.tenant_id, obj.partyID_id, otp, ttl=OTP_TTL_SECONDS, meta=meta)
+        logger.info("[Orders] Order delivery OTP requested for order %s (Party ID: %s)", obj.pk, obj.partyID_id)
         return JsonResponse({'message': 'success', 'expires_in': OTP_TTL_SECONDS}, safe=False)
     except Exception as exc:
+        logger.error("[Orders] Error requesting order delivery OTP: %s", str(exc))
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
 
 
@@ -89,12 +92,16 @@ def verify_order_delivery_otp_api(request):
             return JsonResponse({'message': 'error', 'error': 'Party is required for delivery OTP.'}, status=400)
         payload = get_order_delivery_otp_payload(obj.partyID.tenant_id, obj.partyID_id) or {}
         if not payload or str(payload.get('otp')) != otp_code:
+            logger.info("[Orders] Invalid delivery OTP attempted for order %s", obj.pk)
             return JsonResponse({'message': 'otp_invalid'}, safe=False)
         meta = payload.get('meta') or {}
         if str(meta.get('orderID') or '') not in {'', str(obj.pk)}:
+            logger.info("[Orders] Mismatched delivery OTP for order %s", obj.pk)
             return JsonResponse({'message': 'otp_invalid'}, safe=False)
+        logger.info("[Orders] Order delivery OTP verified successfully for order %s", obj.pk)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
+        logger.error("[Orders] Error verifying order delivery OTP: %s", str(exc))
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
 
 

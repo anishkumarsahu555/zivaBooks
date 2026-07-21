@@ -1,5 +1,4 @@
-from django.http import JsonResponse
-
+from utils.logger import logger
 from home.apis import inventory_catalog
 from home.apis import inventory_purchases
 from home.apis import inventory_reports
@@ -11,6 +10,7 @@ from home.services.inventory_lines import inventory_feature_enabled
 def _inventory_feature_guard(request):
     if inventory_feature_enabled(request):
         return None
+    logger.info("[InventoryAPI] Access blocked: Inventory feature disabled for tenant")
     return JsonResponse(
         {
             'message': 'error',

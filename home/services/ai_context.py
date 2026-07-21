@@ -1,3 +1,4 @@
+from utils.logger import logger
 from home.models import (
     StaffUser, Party, Collection, Sales, Order, InventoryItem, Bank,
     PurchaseInvoice, SalesReturnVoucher, PurchaseReturnVoucher, CashCounter,
@@ -144,4 +145,5 @@ def get_tenant_business_data_snapshot(tenant, permission_names=None, is_superuse
     lines.append("**Detail Lookup Guidance:**")
     lines.append("You do NOT have individual list records (like specific invoices, sales, items, or attendances) preloaded in the prompt context. To fulfill user requests for specific details, lists, histories, search results, or balances, you MUST use the `lookup_tenant_data` tool with the corresponding model name.")
 
+    logger.info("[AIContext] Generated snapshot for tenant %s", getattr(tenant, 'pk', None))
     return _filter_snapshot_by_permissions("\n".join(lines), permission_names, is_superuser)

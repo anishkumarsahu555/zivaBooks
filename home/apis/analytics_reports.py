@@ -26,6 +26,7 @@ from home.services.reports import (
     pdf_base_context as _pdf_base_context,
     xlsx_report_response as _xlsx_report_response,
 )
+from utils.logger import logger
 from home.tenancy import get_current_tenant, tenant_qs
 
 

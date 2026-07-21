@@ -14,6 +14,7 @@ from home.services.inventory_mutations import (
     sync_purchase_lines,
 )
 from home.services.sales import parse_sales_party
+from utils.logger import logger
 from home.services.sequences import next_tenant_sequence_value
 from home.tenancy import assign_tenant, tenant_qs
 

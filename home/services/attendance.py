@@ -3,6 +3,7 @@ from calendar import monthrange
 from collections import defaultdict
 from datetime import datetime
 
+from utils.logger import logger
 from home.models import Attendance
 from home.tenancy import get_current_tenant, tenant_qs
 

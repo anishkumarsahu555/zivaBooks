@@ -1,3 +1,4 @@
+from utils.logger import logger
 from home.models import Bank, Party, Sales, StaffUser
 from home.services.collections import has_any_permission
 from home.services.orders import is_admin_like
@@ -72,10 +73,12 @@ def sales_list_base_qs(request_or_user):
 def parse_sales_party(request, party_value: str | None) -> Party:
     raw = str(party_value or '').strip()
     if not raw:
+        logger.error("[SalesService] Party selection missing")
         raise ValueError('Party is required.')
     if '@' in raw:
         raw = raw.rsplit('@', 1)[-1].strip()
     if not raw.isdigit():
+        logger.error("[SalesService] Invalid party ID '%s'", raw)
         raise ValueError('Invalid party selection.')
     return tenant_qs(request, Party).select_related().get(pk=int(raw))
 
@@ -85,8 +88,10 @@ def parse_sales_bank_id(request, bank_value: str | None) -> int | None:
     if not raw:
         return None
     if not raw.isdigit():
+        logger.error("[SalesService] Invalid bank ID '%s'", raw)
         raise ValueError('Invalid bank selection.')
     bank = tenant_qs(request, Bank).filter(isDeleted=False, pk=int(raw)).only('id').first()
     if not bank:
+        logger.error("[SalesService] Bank ID '%s' not found", raw)
         raise ValueError('Selected bank was not found.')
     return bank.pk

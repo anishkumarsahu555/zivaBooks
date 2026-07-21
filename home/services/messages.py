@@ -1,6 +1,7 @@
 import sys
 import threading
 
+from utils.logger import logger
 from home.models import WhatsappMessage, WhatsappMessageStatus
 from home.tenancy import assign_tenant, get_current_tenant, tenant_qs
 
@@ -23,14 +24,13 @@ class MessageThread(threading.Thread):
                     obj.phone = self.number
                     obj.message = self.message
                     obj.messageTo = self.partyName
-                    try:
-                        obj.status = 'Fail'
-                    except Exception:
-                        obj.status = 'Fail'
+                    obj.status = 'Fail'
                     obj.save()
                     msg.used = msg.used + 1
                     msg.save()
-                except Exception:
+                    logger.info("[Messages] Dispatched message to %s (%s)", self.partyName, self.number)
+                except Exception as exc:
+                    logger.error("[Messages] Failed to dispatch message to %s: %s", self.number, str(exc))
                     obj = WhatsappMessageStatus()
                     assign_tenant(obj, get_current_tenant(None))
                     obj.phone = self.number
@@ -39,6 +39,7 @@ class MessageThread(threading.Thread):
                     obj.status = 'Fail'
                     obj.save()
             else:
+                logger.info("[Messages] Message quota exceeded or no active configuration for tenant")
                 obj = WhatsappMessageStatus()
                 assign_tenant(obj, get_current_tenant(None))
                 obj.phone = self.number

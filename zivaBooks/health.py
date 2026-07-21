@@ -2,6 +2,8 @@ from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
 
+from utils.logger import logger
+
 
 def health_check(request):
     checks = {
@@ -9,6 +11,10 @@ def health_check(request):
         'cache': _check_cache(),
     }
     is_healthy = all(item['ok'] for item in checks.values())
+    if is_healthy:
+        logger.info("[HealthCheck] System health check succeeded.")
+    else:
+        logger.error(f"[HealthCheck] System health check failed: {checks}")
     return JsonResponse(
         {
             'status': 'ok' if is_healthy else 'error',

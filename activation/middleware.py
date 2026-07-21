@@ -37,6 +37,9 @@ def _is_expired(validity) -> bool:
     return expiry < date.today()
 
 
+from utils.logger import logger
+
+
 class TenantActivationMiddleware:
     """
     When a tenant's Validity is expired, block every URL except this allowlist:
@@ -55,6 +58,12 @@ class TenantActivationMiddleware:
         validity = _validity_for_request(request)
         if not _is_expired(validity):
             return self.get_response(request)
+
+        logger.info(
+            "[TenantActivation] Expired tenant %s blocked for path: %s",
+            getattr(validity, 'tenant_id', None),
+            request.path
+        )
 
         if self._is_api_request(request):
             return JsonResponse(

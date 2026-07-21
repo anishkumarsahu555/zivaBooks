@@ -1,3 +1,4 @@
+from utils.logger import logger
 from home.models import CashCounter, InvoiceSeries, ProformaInvoice, Sales
 from home.tenancy import tenant_qs
 
@@ -43,6 +44,7 @@ def available_invoice_numbers_for_series(series, limit=150, *, exclude_instance=
             numbers.append(candidate)
         candidate += 1
     if not numbers:
+        logger.error("[InvoiceSeries] Invoice series %s exhausted.", series.seriesCode)
         raise ValueError('Invoice series exhausted.')
     return numbers
 
@@ -61,6 +63,7 @@ def reserve_invoice_number(request_or_user, module, series_id, *, exclude_instan
     if preferred_number is not None:
         preferred_number = int(preferred_number)
         if preferred_number not in available_numbers:
+            logger.error("[InvoiceSeries] Preferred number %s not available in series %s", preferred_number, series.seriesCode)
             raise ValueError('Selected invoice number is no longer available.')
         sequence_number = preferred_number
     else:
@@ -68,4 +71,6 @@ def reserve_invoice_number(request_or_user, module, series_id, *, exclude_instan
     if series.nextNumber <= sequence_number:
         series.nextNumber = sequence_number + 1
         series.save(update_fields=['nextNumber', 'lastUpdatedOn'])
-    return series, sequence_number, format_invoice_number(series, sequence_number)
+    invoice_no = format_invoice_number(series, sequence_number)
+    logger.info("[InvoiceSeries] Reserved invoice number '%s' in series '%s'", invoice_no, series.seriesCode)
+    return series, sequence_number, invoice_no

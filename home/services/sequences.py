@@ -1,3 +1,4 @@
+from utils.logger import logger
 from django.db import transaction
 
 from home.models import TenantSequence
@@ -42,4 +43,6 @@ def next_tenant_sequence_value(request_or_user, scope):
         number = sequence.nextNumber
         sequence.nextNumber = number + 1
         sequence.save(update_fields=['nextNumber', 'lastUpdatedOn'])
-    return f"{sequence.prefix}{str(number).zfill(sequence.paddingLength)}"
+    generated_val = f"{sequence.prefix}{str(number).zfill(sequence.paddingLength)}"
+    logger.info("[Sequences] Generated sequence value '%s' for scope '%s'", generated_val, scope)
+    return generated_val

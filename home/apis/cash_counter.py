@@ -43,6 +43,7 @@ from home.services.reports import (
     xlsx_report_response as _xlsx_report_response,
 )
 from home.services.sequences import next_tenant_sequence_value as _next_tenant_sequence_value
+from utils.logger import logger
 from home.tenancy import assign_tenant, get_current_tenant, tenant_qs
 
 # Runtime legacy lookups are retained for tests and ledger/book sync monkeypatches.

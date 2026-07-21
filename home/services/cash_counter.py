@@ -1,3 +1,4 @@
+from utils.logger import logger
 from home.models import CashCounter, CollectionCashCounter
 from home.services.collections import has_any_permission
 from home.tenancy import tenant_qs

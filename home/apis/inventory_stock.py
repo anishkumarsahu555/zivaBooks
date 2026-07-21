@@ -33,6 +33,7 @@ from home.services.inventory_lines import (
     safe_local_date,
     safe_sales_float,
 )
+from utils.logger import logger
 from home.services.sequences import next_tenant_sequence_value
 from home.tenancy import assign_tenant, get_current_tenant, tenant_qs
 

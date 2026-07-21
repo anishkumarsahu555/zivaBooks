@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.utils.html import escape
 from django_datatables_view.base_datatable_view import BaseDatatableView
 
+from utils.logger import logger
 from home.models import WhatsappMessage, WhatsappMessageStatus
 from home.tenancy import tenant_qs
 

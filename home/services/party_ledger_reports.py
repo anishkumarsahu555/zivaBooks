@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.db.models import Q, Sum
 
+from utils.logger import logger
 from home.models import Collection, CollectionCashCounter, Party, PartyLedgerEntry
 from home.tenancy import tenant_qs
 

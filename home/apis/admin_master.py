@@ -25,6 +25,7 @@ from home.services.collections import has_any_permission as _has_any_permission
 from home.services.invoices import normalize_gst_number as _normalize_gst_number
 from home.services.reports import formatINR
 from home.services.sequences import next_tenant_sequence_value as _next_tenant_sequence_value
+from utils.logger import logger
 from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, tenant_object_or_superuser, tenant_qs
 
 User = get_user_model()

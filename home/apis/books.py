@@ -7,6 +7,7 @@ from django.utils.crypto import get_random_string
 from django.utils.html import escape
 from django_datatables_view.base_datatable_view import BaseDatatableView
 
+from utils.logger import logger
 from home.audit import log_audit_event, snapshot_instance
 from home.books import ensure_books_for_tenant
 from home.models import *

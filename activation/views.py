@@ -32,6 +32,9 @@ def _is_expired(validity) -> bool:
     return expiry < date.today()
 
 
+from utils.logger import logger
+
+
 def is_activated():
     def _is_activated(view_func):
         @wraps(view_func)
@@ -39,9 +42,11 @@ def is_activated():
             try:
                 val = _validity_for_request(request, Validity)
                 if _is_expired(val):
+                    logger.info("[Activation] Core license expired for path %s, redirecting to /activate/", request.path)
                     return redirect('/activate/')
                 return view_func(request, *args, **kwargs)
-            except Exception:
+            except Exception as exc:
+                logger.error("[Activation] Error checking core activation: %s", str(exc))
                 return view_func(request, *args, **kwargs)
 
         return wrapper

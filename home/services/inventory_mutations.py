@@ -1,3 +1,4 @@
+from utils.logger import logger
 from home.inventory import rebuild_inventory_stock, validate_non_negative_inventory
 from home.models import (
     CashCounter,
@@ -81,6 +82,7 @@ def sync_sales_lines(request, sale: Sales):
     affected_item_ids = set(existing_item_ids + new_item_ids)
     rebuild_inventory_stock(sale.tenant, affected_item_ids)
     validate_non_negative_inventory(sale.tenant, affected_item_ids, item_bucket_pairs=list(set(existing_pairs + new_pairs)))
+    logger.info("[InventoryMutations] Synced %d sales lines for sale %s", len(new_item_ids), sale.pk)
 
 
 def sync_proforma_lines(request, proforma: ProformaInvoice):

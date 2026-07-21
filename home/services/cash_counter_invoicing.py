@@ -1,4 +1,39 @@
+from utils.logger import logger
 from home.models import CashCounter, InvoiceSeries, InventoryItem, Sales, SalesReturnVoucher
+
+
+def apply_cash_counter_invoice_payload(request, counter: CashCounter, party, *, line_items=None) -> None:
+    line_items = line_items if line_items is not None else (
+        request_line_items_payload(request) if request_line_items_present(request) else []
+    )
+    billing_mode = str(counter.mode or '') in cash_counter_billing_modes()
+    if billing_mode and advanced_invoicing_enabled(request):
+        apply_cash_counter_buyer_payload(request, counter, party)
+    else:
+        clear_invoice_buyer_payload(counter, b2c_kind=CashCounter.InvoiceKind.B2C)
+
+    if billing_mode and line_items:
+        counter.taxableAmount, counter.gstAmount, computed_total = sales_totals_from_lines(line_items)
+        counter.roundOffAmount, payable_total = sales_round_off_from_total(computed_total)
+        if counter.mode != 'Mix':
+            counter.amount = payable_total
+        elif abs((safe_sales_float(counter.mixCashAmount) + safe_sales_float(counter.mixCardAmount)) - payable_total) > 0.01:
+            err_msg = f'Mix cash counter total must match rounded payable amount of {payable_total:.2f}.'
+            logger.error("[CashCounterInvoicing] %s", err_msg)
+            raise ValueError(err_msg)
+    else:
+        base_amount = safe_sales_float(
+            counter.amount if counter.mode != 'Mix' else (
+                safe_sales_float(counter.mixCashAmount) + safe_sales_float(counter.mixCardAmount)
+            )
+        )
+        counter.taxableAmount = round(base_amount, 2)
+        counter.gstAmount = 0.0
+        counter.roundOffAmount = 0.0
+
+    if counter.invoiceKind == CashCounter.InvoiceKind.B2C:
+        counter.buyerGstNumber = None
+    logger.info("[CashCounterInvoicing] Applied cash counter payload for entry %s: Amount=%s", counter.pk, counter.amount)
 from home.services.cash_counter import can_manage_cash_counter_records
 from home.services.inventory_lines import (
     advanced_invoicing_enabled,

@@ -5,6 +5,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
+from utils.logger import logger
 from home.models import AuditLog, Tenant
 from home.services.collections import has_any_permission
 from home.tenancy import get_current_tenant

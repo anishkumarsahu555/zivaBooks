@@ -39,6 +39,7 @@ from home.services.sales import (
     parse_sales_party,
     sales_list_base_qs,
 )
+from utils.logger import logger
 from home.services.sequences import next_tenant_sequence_value
 from home.tenancy import assign_tenant, tenant_qs
 
@@ -143,8 +144,10 @@ def add_sales_by_admin_api(request):
                         pass
                 legacy_api.sync_book_transactions(obj)
                 legacy_api.sync_party_ledger_entries_for_object(obj)
+            logger.info("[Sales] Added sale %s (Invoice: %s, Amount: %s)", obj.pk, obj.invoiceNumber, obj.amount)
             return JsonResponse({'message': 'success', 'invoiceNumber': obj.invoiceNumber}, safe=False)
         except Exception as exc:
+            logger.error("[Sales] Failed to add sale: %s", str(exc))
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
     return JsonResponse({'message': 'error'}, status=405, safe=False)
 
@@ -175,8 +178,10 @@ def update_sales_by_admin_api(request):
                 sync_sales_lines(request, obj)
             legacy_api.sync_book_transactions(obj)
             legacy_api.sync_party_ledger_entries_for_object(obj)
+            logger.info("[Sales] Updated sale %s (Invoice: %s)", obj.pk, obj.invoiceNumber)
             return JsonResponse({'message': 'success'}, safe=False)
         except Exception as exc:
+            logger.error("[Sales] Failed to update sale %s: %s", request.POST.get("ID"), str(exc))
             return JsonResponse({'message': 'error', 'error': str(exc)}, safe=False)
     return JsonResponse({'message': 'error'}, status=405, safe=False)
 
@@ -198,8 +203,10 @@ def delete_sales(request):
             validate_non_negative_inventory(obj.tenant, item_ids)
             legacy_api.sync_book_transactions(obj)
             legacy_api.sync_party_ledger_entries_for_object(obj)
+            logger.info("[Sales] Deleted sale %s", sale_id)
             return JsonResponse({'message': 'success'}, safe=False)
-        except Exception:
+        except Exception as exc:
+            logger.error("[Sales] Failed to delete sale %s: %s", request.POST.get("userID"), str(exc))
             return JsonResponse({'message': 'error'}, safe=False)
     return JsonResponse({'message': 'error'}, status=405, safe=False)
 
@@ -244,10 +251,12 @@ def send_message_sales(request):
                     send_message(number, msg, obj.partyID.name)
             except Exception:
                 send_message(obj.partyID.phone, msg, obj.partyID.name)
-        except Exception:
-            pass
+        except Exception as msg_exc:
+            logger.error("[Sales] Failed to send approval message for sale %s: %s", sale_id, str(msg_exc))
+        logger.info("[Sales] Approved sale %s (Invoice: %s)", obj.pk, obj.invoiceNumber)
         return JsonResponse({'message': 'success', 'detail': 'Sale approved successfully.'}, safe=False)
-    except Exception:
+    except Exception as exc:
+        logger.error("[Sales] Failed to approve sale %s: %s", request.POST.get("userID"), str(exc))
         return JsonResponse({'message': 'error', 'detail': 'Unable to approve sale.'}, safe=False)
 
 

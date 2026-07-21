@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from django.views.decorators.cache import cache_page
 
+from utils.logger import logger
 from home.services.collections import has_any_permission
 from home.services.dashboard_summaries import (
     admin_dashboard_summary,

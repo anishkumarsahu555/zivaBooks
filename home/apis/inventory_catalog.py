@@ -15,6 +15,7 @@ from home.services.inventory_catalog import (
     apply_inventory_tax_profile_payload,
     apply_inventory_unit_payload,
 )
+from utils.logger import logger
 from home.services.inventory_lines import safe_local_date
 from home.tenancy import assign_tenant, get_current_tenant, tenant_qs
 

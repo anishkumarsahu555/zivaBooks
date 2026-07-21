@@ -1,3 +1,4 @@
+from utils.logger import logger
 from home.models import CashCounter, InvoiceSeries, Party, ProformaInvoice, Sales
 from home.services.inventory_lines import (
     advanced_invoicing_enabled,
@@ -187,7 +188,10 @@ def apply_sales_invoice_payload(request, sale: Sales, party: Party | None, *, li
         if sale.modeOfPayment != Sales.Mode.MIX:
             sale.amount = payable_total
         elif abs(safe_sales_float(sale.amount) - payable_total) > 0.01:
-            raise ValueError(f'Mix sales total must match rounded payable amount of {payable_total:.2f}.')
+            err_msg = f'Mix sales total must match rounded payable amount of {payable_total:.2f}.'
+            logger.error("[Invoices] %s", err_msg)
+            raise ValueError(err_msg)
+        logger.info("[Invoices] Applied sales invoice payload: Taxable=%s, GST=%s, Payable=%s", sale.taxableAmount, sale.gstAmount, payable_total)
     else:
         sale.taxableAmount = round(float(sale.amount or 0.0), 2)
         sale.gstAmount = 0.0

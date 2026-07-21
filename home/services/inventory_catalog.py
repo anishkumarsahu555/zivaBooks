@@ -1,3 +1,4 @@
+from utils.logger import logger
 from home.models import InventoryCategory, InventoryItem, InventoryTaxProfile, InventoryUnit
 from home.services.inventory_lines import normalize_stock_bucket, safe_sales_float
 from home.tenancy import tenant_qs
@@ -46,6 +47,7 @@ def apply_inventory_category_payload(request, category):
     category.code = (request.POST.get('code') or '').strip() or None
     category.description = (request.POST.get('description') or '').strip() or None
     category.isActive = str(request.POST.get('isActive') or '1').lower() not in {'0', 'false', 'no', 'off'}
+    logger.info("[InventoryCatalog] Applied payload for category '%s'", category.name)
 
 
 def apply_inventory_tax_profile_payload(request, tax_profile):
@@ -59,6 +61,7 @@ def apply_inventory_tax_profile_payload(request, tax_profile):
     tax_profile.cessRate = safe_sales_float(request.POST.get('cessRate'))
     tax_profile.description = (request.POST.get('description') or '').strip() or None
     tax_profile.isActive = str(request.POST.get('isActive') or '1').lower() not in {'0', 'false', 'no', 'off'}
+    logger.info("[InventoryCatalog] Applied payload for tax profile '%s' (HSN: %s)", tax_profile.name, tax_profile.hsnCode)
 
 
 def apply_inventory_unit_payload(request, unit):
@@ -71,6 +74,7 @@ def apply_inventory_unit_payload(request, unit):
     unit.allowsDecimal = str(request.POST.get('allowsDecimal') or '').lower() in {'1', 'true', 'yes', 'on'}
     unit.description = (request.POST.get('description') or '').strip() or None
     unit.isActive = str(request.POST.get('isActive') or '1').lower() not in {'0', 'false', 'no', 'off'}
+    logger.info("[InventoryCatalog] Applied payload for unit '%s' (%s)", unit.name, unit.symbol)
 
 
 def apply_inventory_item_payload(request, item: InventoryItem):
@@ -103,3 +107,4 @@ def apply_inventory_item_payload(request, item: InventoryItem):
     item.reorderLevel = safe_sales_float(request.POST.get('reorderLevel'))
     item.requiresBatchTracking = str(request.POST.get('requiresBatchTracking') or '').lower() in {'1', 'true', 'yes', 'on'}
     item.isSaleBlocked = str(request.POST.get('isSaleBlocked') or '').lower() in {'1', 'true', 'yes', 'on'}
+    logger.info("[InventoryCatalog] Applied payload for inventory item '%s'", item.name)

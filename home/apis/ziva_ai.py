@@ -18,6 +18,7 @@ from openai import OpenAI
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
+from utils.logger import logger
 from home.tenancy import get_current_tenant
 from home.models import TenantAiUsage
 from home.navigation import has_ziva_ai_access, _effective_permission_names

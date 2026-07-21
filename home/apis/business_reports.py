@@ -12,6 +12,7 @@ from home.services.cash_counter import can_filter_all_cash_counter, cash_counter
 from home.services.collections import can_filter_all_collections
 from home.services.reports import pdf_base_context, xlsx_report_response
 from home.services.sales import can_filter_all_sales
+from utils.logger import logger
 from home.tenancy import get_current_tenant, tenant_qs
 
 

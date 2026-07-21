@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.db.models import Q, Sum
 
+from utils.logger import logger
 from home.books import ensure_books_for_tenant
 from home.models import Bank, BookAccount, BookTransaction
 from home.services.collections import has_any_permission

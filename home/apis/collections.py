@@ -37,6 +37,7 @@ from home.services.collections import (
     parse_collection_form_date,
     parse_party_id_value as _parse_party_id_value,
 )
+from utils.logger import logger
 from home.tenancy import assign_tenant, get_current_tenant, tenant_qs
 
 
@@ -74,9 +75,12 @@ def request_collection_otp_api(request):
             meta['collectDate'] = collect_date
         otp = get_random_string(length=6, allowed_chars='0123456789')
         set_collection_otp(cus.tenant_id, cus.pk, otp, ttl=OTP_TTL_SECONDS, meta=meta)
+        logger.info("[Collections] OTP requested for party %s (ID: %s)", cus.name, cus.pk)
         return JsonResponse({'message': 'success', 'expires_in': OTP_TTL_SECONDS}, safe=False)
     except Exception as exc:
+        logger.error("[Collections] Error requesting OTP: %s", str(exc))
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
+
 def verify_collection_otp_api(request):
     if request.method != 'POST':
         return JsonResponse({'message': 'error', 'error': 'Invalid request method.'}, status=405)
@@ -100,9 +104,12 @@ def verify_collection_otp_api(request):
             return JsonResponse({'message': 'error', 'error': 'Party not found.'}, status=404)
         payload = get_collection_otp_payload(party_obj.tenant_id, party_id) or {}
         if not payload or str(payload.get('otp')) != code:
+            logger.info("[Collections] Invalid OTP attempted for party ID %s", party_id)
             return JsonResponse({'message': 'otp_invalid'}, safe=False)
+        logger.info("[Collections] OTP verified successfully for party ID %s", party_id)
         return JsonResponse({'message': 'success'}, safe=False)
     except Exception as exc:
+        logger.error("[Collections] Error verifying OTP: %s", str(exc))
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
 def clear_collection_otp_api(request):
     if request.method != 'POST':

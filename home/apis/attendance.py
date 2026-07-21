@@ -11,6 +11,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.html import escape
 from django_datatables_view.base_datatable_view import BaseDatatableView
 
+from utils.logger import logger
 from home.models import *
 from home.services.attendance import (
     attendance_list_base_qs,

@@ -15,6 +15,19 @@ zivaBooks is a Django-based business operations app for tenant-scoped sales, col
 - Activation/license middleware
 - Automated tests for tenant isolation, permissions, API smoke coverage, books, reports, OTP, and key workflows
 
+## Documentation Hub
+
+Explore the project documentation:
+- 🗺️ **[INDEX.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/INDEX.md)** — Documentation Master Index & Sitemap
+- 🏗️ **[ARCHITECTURE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/ARCHITECTURE.md)** — System Architecture, Multi-Tenancy & FEFO Stock Ledger
+- 💡 **[DEVELOPMENT.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DEVELOPMENT.md)** — Step-by-step Developer Guide for adding features, APIs & models
+- 🔌 **[API.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/API.md)** — API Contracts & JSON Endpoint Specification
+- 🗄️ **[DATABASE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DATABASE.md)** — Database Schema & ER Diagrams
+- 🛠️ **[setup.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/setup.md)** — Environment & Local Setup Guide
+- 🧹 **[MAINTAINABILITY.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/MAINTAINABILITY.md)** — Code Refactoring Boundaries & Service Layer Guidelines
+- 🧪 **[TESTCASES.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/TESTCASES.md)** — QA Test Scenarios & Verification Matrix
+- 🤖 **[SKILLS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/SKILLS.md)** — AI Agent Skill & Context Guide
+
 ## Quick start
 
 ```bash

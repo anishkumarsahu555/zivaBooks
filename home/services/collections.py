@@ -84,9 +84,14 @@ def collection_datetime_with_preserved_time(raw_date, base_datetime):
         return base_datetime
 
 
+from utils.logger import logger
+
+
 def collection_payment_validation_error(payment_mode, bank, cheque_date):
     if payment_mode in BANK_REQUIRED_COLLECTION_MODES and not bank:
+        logger.error("[CollectionsService] Validation error: Bank required for payment mode %s", payment_mode)
         return 'bank_required'
     if payment_mode in CHEQUE_COLLECTION_MODES and not cheque_date:
+        logger.error("[CollectionsService] Validation error: Cheque date required for payment mode %s", payment_mode)
         return 'cheque_date_required'
     return None
