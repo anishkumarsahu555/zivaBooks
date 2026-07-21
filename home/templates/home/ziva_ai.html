@@ -710,8 +710,6 @@
             width: 260px !important;
             min-width: 260px !important;
             max-width: calc(100vw - 20px) !important;
-            transform: translateX(0) !important;
-            opacity: 1 !important;
             transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s !important;
             box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
             background: rgba(255, 255, 255, 0.75) !important; /* Matches main chat area glassmorphism */
@@ -719,6 +717,11 @@
             border-radius: 12px !important;
             backdrop-filter: blur(16px) !important;
             -webkit-backdrop-filter: blur(16px) !important;
+        }
+
+        .ai-sidebar:not(.collapsed) {
+            transform: translateX(0) !important;
+            opacity: 1 !important;
         }
 
         html[data-theme="dark"] .ai-sidebar {
@@ -1168,6 +1171,11 @@
             <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
             <!-- Left Collapsible Sidebar -->
             <div class="ai-sidebar" id="aiSidebar">
+                <script>
+                    if (window.innerWidth <= 767 || localStorage.getItem('ziva_ai_sidebar_collapsed') === 'true') {
+                        document.getElementById('aiSidebar').classList.add('collapsed');
+                    }
+                </script>
                 <div class="sidebar-header" style="display: flex; gap: 8px;">
                     <button class="ui new-chat-btn" onclick="startNewChat()">
                         <i class="plus icon"></i> New Chat
@@ -1387,18 +1395,22 @@
     
     let isWaiting = false;
 
-    // Restore sidebar collapse state preference
+    // Restore sidebar collapse state preference (always default to collapsed on mobile viewports)
     let sidebarCollapsed = localStorage.getItem('ziva_ai_sidebar_collapsed');
-    if (sidebarCollapsed === null) {
-        // Default to collapsed on mobile viewports to avoid overlapping the chat canvas
-        sidebarCollapsed = window.innerWidth <= 767 ? 'true' : 'false';
-        localStorage.setItem('ziva_ai_sidebar_collapsed', sidebarCollapsed);
+    if (window.innerWidth <= 767) {
+        sidebarCollapsed = 'true';
+    } else if (sidebarCollapsed === null) {
+        sidebarCollapsed = 'false';
     }
-    
+
     if (sidebarCollapsed === 'true') {
         document.getElementById('aiSidebar').classList.add('collapsed');
         document.getElementById('headerToggleBtn').style.display = 'block';
+        const backdrop = document.getElementById('sidebarBackdrop');
+        if (backdrop) backdrop.classList.remove('active');
     } else {
+        document.getElementById('aiSidebar').classList.remove('collapsed');
+        document.getElementById('headerToggleBtn').style.display = 'none';
         if (window.innerWidth <= 767) {
             const backdrop = document.getElementById('sidebarBackdrop');
             if (backdrop) backdrop.classList.add('active');
