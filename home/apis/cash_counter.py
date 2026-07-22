@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
+import os
 
 from django.db import transaction
 from django.db.models import Case, Q, Sum, Value, When
@@ -147,9 +148,20 @@ def print_cash_counter_thermal_challan(request):
     total_amount = float(counter.amount or 0.0)
     if counter.mode == 'Mix':
         total_amount = float(counter.mixCashAmount or 0.0) + float(counter.mixCardAmount or 0.0)
+    logo_path = None
+    if tenant.logo:
+        try:
+            if hasattr(tenant.logo, 'medium') and tenant.logo.medium and os.path.exists(tenant.logo.medium.path):
+                logo_path = 'file://' + tenant.logo.medium.path
+            elif os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
+        except Exception:
+            if os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
     context = {
         'counter': counter,
         'lines': list(counter.lines.filter(isDeleted=False).select_related('item').order_by('id')),
+        'logo_path': logo_path,
         'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
         'seller_phone': getattr(tenant, 'phone', None) or '',
         'seller_address': getattr(tenant, 'billingAddress', None) or '',
@@ -191,9 +203,20 @@ def generate_cash_counter_invoice_pdf(request):
     grand_total = round(float(counter.amount or 0.0), 2)
     if counter.mode == 'Mix':
         grand_total = round(float(counter.mixCashAmount or 0.0) + float(counter.mixCardAmount or 0.0), 2)
+    logo_path = None
+    if tenant.logo:
+        try:
+            if hasattr(tenant.logo, 'medium') and tenant.logo.medium and os.path.exists(tenant.logo.medium.path):
+                logo_path = 'file://' + tenant.logo.medium.path
+            elif os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
+        except Exception:
+            if os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
     context = {
         'counter': counter,
         'lines': lines,
+        'logo_path': logo_path,
         'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
         'seller_gst_number': getattr(tenant, 'gstNumber', None) or '',
         'seller_address': getattr(tenant, 'billingAddress', None) or '',

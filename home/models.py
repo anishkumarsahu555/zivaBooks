@@ -100,6 +100,18 @@ class Tenant(TimeStampedModel, AuditedModel):
         default='mock',
         choices=[('mock', 'Mock / Simulator'), ('nic_direct', 'NIC Direct Portal'), ('cleartax', 'ClearTax GSP')],
     )
+    logo = StdImageField(
+        upload_to='tenant_logos/',
+        blank=True,
+        null=True,
+        variations={
+            'large': (600, 400),
+            'thumbnail': (50, 50, True),
+            'medium': (200, 200),
+        },
+        delete_orphans=True,
+        help_text='Upload business logo'
+    )
 
     def set_non_gst_shadow_code(self, raw_code: str) -> None:
         self.nonGstShadowCodeHash = make_password(str(raw_code or '').strip())

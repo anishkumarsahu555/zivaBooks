@@ -1,5 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
+import os
 
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -40,9 +41,20 @@ def generate_proforma_invoice_pdf(request):
     lines = list(proforma.lines.filter(isDeleted=False).select_related('item').order_by('id'))
     gst_breakup = gst_breakup_from_invoice_subject(proforma, tenant)
     total_before_round_off = round(float(gst_breakup['taxable_total'] or 0.0) + float(gst_breakup['gst_total'] or 0.0), 2)
+    logo_path = None
+    if tenant.logo:
+        try:
+            if hasattr(tenant.logo, 'medium') and tenant.logo.medium and os.path.exists(tenant.logo.medium.path):
+                logo_path = 'file://' + tenant.logo.medium.path
+            elif os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
+        except Exception:
+            if os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
     context = {
         'proforma': proforma,
         'lines': lines,
+        'logo_path': logo_path,
         'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
         'seller_gst_number': getattr(tenant, 'gstNumber', None) or '',
         'seller_address': getattr(tenant, 'billingAddress', None) or '',

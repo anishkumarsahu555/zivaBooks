@@ -1099,6 +1099,7 @@ def build_sidebar_sections(request_or_user):
                 _nav_item('Logout', 'homeApp:logout', 'sign out alternate'),
             ] if not is_admin_like else [
                 _nav_item('My Profile', 'homeApp:my_profile', 'user'),
+                _nav_item('Business Profile', 'homeApp:business_profile_settings', 'building'),
                 _nav_item('Logout', 'homeApp:logout', 'sign out alternate'),
             ],
         },

@@ -24,6 +24,7 @@ from .apis.proforma_reports import *
 from .apis.sales import *
 from .apis.sales_reports import *
 from .apis.tenant_settings import *
+from .apis.business_profile import *
 from .apis.ziva_ai import *
 from .views import *
 from inventory.api import (
@@ -521,6 +522,10 @@ urlpatterns = [
 
     # Party Ledger
     path('party-ledger/<int:party_id>/', party_ledger, name='party_ledger'),
+
+    # Business Profile Settings
+    path('settings/business-profile/', business_profile_settings, name='business_profile_settings'),
+    path('api/settings/business-profile/update/', update_business_profile_api, name='update_business_profile_api'),
 
 ]
 

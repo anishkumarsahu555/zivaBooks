@@ -27,6 +27,11 @@
 <body>
     <div class="header">
         <div>
+            {% if logo_path %}
+                <div style="margin-bottom: 10px;">
+                    <img src="{{ logo_path }}" style="max-height: 50px; max-width: 150px; object-fit: contain;">
+                </div>
+            {% endif %}
             <div class="title">{{ seller_name }}</div>
             <div class="subtle">Cash Counter Invoice</div>
             {% if seller_address %}<div>{{ seller_address|linebreaksbr }}</div>{% endif %}

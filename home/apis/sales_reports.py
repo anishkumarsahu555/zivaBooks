@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime
 import io
+import os
 import base64
 import qrcode
 
@@ -133,9 +134,21 @@ def generate_sales_invoice_pdf(request):
         except Exception as e:
             logger.error(f"Error generating QR code for sale {sale.id}: {e}")
 
+    logo_path = None
+    if tenant.logo:
+        try:
+            if hasattr(tenant.logo, 'medium') and tenant.logo.medium and os.path.exists(tenant.logo.medium.path):
+                logo_path = 'file://' + tenant.logo.medium.path
+            elif os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
+        except Exception:
+            if os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
+
     context = {
         'sale': sale,
         'lines': lines,
+        'logo_path': logo_path,
         'qr_code_data_uri': qr_code_data_uri,
         'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
         'seller_gst_number': getattr(tenant, 'gstNumber', None) or '',
@@ -192,9 +205,20 @@ def print_sales_thermal_challan(request):
             return JsonResponse({'message': 'forbidden'}, status=403, safe=False)
 
     tenant = get_current_tenant(request)
+    logo_path = None
+    if tenant.logo:
+        try:
+            if hasattr(tenant.logo, 'medium') and tenant.logo.medium and os.path.exists(tenant.logo.medium.path):
+                logo_path = 'file://' + tenant.logo.medium.path
+            elif os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
+        except Exception:
+            if os.path.exists(tenant.logo.path):
+                logo_path = 'file://' + tenant.logo.path
     context = {
         'sale': sale,
         'lines': list(sale.lines.filter(isDeleted=False).select_related('item').order_by('id')),
+        'logo_path': logo_path,
         'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
         'seller_phone': getattr(tenant, 'phone', None) or '',
         'seller_address': getattr(tenant, 'billingAddress', None) or '',

@@ -30,6 +30,11 @@
         <button type="button" class="print-btn" onclick="window.print()">Print</button>
     </div>
     <div class="center">
+        {% if logo_path %}
+            <div style="margin-bottom: 6px;">
+                <img src="{{ logo_path }}" style="max-height: 40px; max-width: 100px; object-fit: contain;">
+            </div>
+        {% endif %}
         <div class="title">{{ seller_name }}</div>
         <div class="subtitle">Cash Counter Challan</div>
         {% if seller_address %}<div class="muted">{{ seller_address }}</div>{% endif %}
