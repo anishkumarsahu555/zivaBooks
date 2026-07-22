@@ -81,6 +81,25 @@ class Tenant(TimeStampedModel, AuditedModel):
         default=False,
         help_text='Enable reverse geolocation and map display on attendance records for this tenant.',
     )
+    einvoice_enabled = models.BooleanField(
+        default=False,
+        help_text='Enable automated GST E-Invoicing and E-Way Bill generation for B2B transactions.',
+    )
+    einvoice_environment = models.CharField(
+        max_length=20,
+        default='sandbox',
+        choices=[('sandbox', 'Sandbox'), ('production', 'Production')],
+        help_text='GST Portal environment (sandbox/testing vs production).',
+    )
+    einvoice_username = models.CharField(max_length=100, blank=True, null=True)
+    einvoice_password = models.CharField(max_length=255, blank=True, null=True)
+    einvoice_client_id = models.CharField(max_length=255, blank=True, null=True)
+    einvoice_client_secret = models.CharField(max_length=255, blank=True, null=True)
+    einvoice_gsp_provider = models.CharField(
+        max_length=50,
+        default='mock',
+        choices=[('mock', 'Mock / Simulator'), ('nic_direct', 'NIC Direct Portal'), ('cleartax', 'ClearTax GSP')],
+    )
 
     def set_non_gst_shadow_code(self, raw_code: str) -> None:
         self.nonGstShadowCodeHash = make_password(str(raw_code or '').strip())
@@ -641,6 +660,28 @@ class Sales(TenantOwnedModel):
         ONLINE = 'Online', 'Online'
         MIX = 'Mix', 'Mix'
 
+    class EInvoiceStatus(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        GENERATED = 'generated', 'Generated'
+        FAILED = 'failed', 'Failed'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    class EWayBillStatus(models.TextChoices):
+        NOT_REQUIRED = 'not_required', 'Not Required'
+        PENDING = 'pending', 'Pending'
+        GENERATED = 'generated', 'Generated'
+        CANCELLED = 'cancelled', 'Cancelled'
+
+    class TransportMode(models.TextChoices):
+        ROAD = '1', 'Road'
+        RAIL = '2', 'Rail'
+        AIR = '3', 'Air'
+        SHIP = '4', 'Ship'
+
+    class VehicleType(models.TextChoices):
+        REGULAR = 'R', 'Regular'
+        ODC = 'O', 'Over Dimensional Cargo'
+
     tenant = models.ForeignKey(Tenant, blank=True, null=True, on_delete=models.CASCADE, related_name='sales')
     partyID = models.ForeignKey(Party, blank=True, null=True, on_delete=models.SET_NULL)
     salesID = models.CharField(max_length=40, blank=True, null=True, db_index=True)
@@ -669,6 +710,28 @@ class Sales(TenantOwnedModel):
     isApproved = models.BooleanField(default=False)
     approvedBy = models.ForeignKey(StaffUser, blank=True, null=True, on_delete=models.SET_NULL,
                                    related_name='SalesApprovedBy')
+
+    # GST E-Invoice Fields
+    einvoiceStatus = models.CharField(max_length=20, choices=EInvoiceStatus.choices, default=EInvoiceStatus.PENDING)
+    irn = models.CharField(max_length=64, blank=True, null=True, db_index=True)
+    ackNo = models.CharField(max_length=50, blank=True, null=True)
+    ackDate = models.DateTimeField(blank=True, null=True)
+    signedQrCode = models.TextField(blank=True, null=True)
+    signedInvoice = models.TextField(blank=True, null=True)
+    einvoiceCancelReason = models.CharField(max_length=10, blank=True, null=True)
+    einvoiceCancelRemarks = models.CharField(max_length=255, blank=True, null=True)
+
+    # GST E-Way Bill Fields
+    ewayBillStatus = models.CharField(max_length=20, choices=EWayBillStatus.choices, default=EWayBillStatus.NOT_REQUIRED)
+    ewayBillNo = models.CharField(max_length=30, blank=True, null=True, db_index=True)
+    ewayBillDate = models.DateTimeField(blank=True, null=True)
+    validUpto = models.DateTimeField(blank=True, null=True)
+    transportMode = models.CharField(max_length=10, choices=TransportMode.choices, default=TransportMode.ROAD)
+    transporterId = models.CharField(max_length=20, blank=True, null=True)
+    transporterName = models.CharField(max_length=255, blank=True, null=True)
+    vehicleNo = models.CharField(max_length=30, blank=True, null=True)
+    vehicleType = models.CharField(max_length=10, choices=VehicleType.choices, default=VehicleType.REGULAR)
+    distanceKm = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return str(self.partyID.name)

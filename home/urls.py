@@ -14,6 +14,7 @@ from .apis.cash_counter import *
 from .apis.cash_counter_collections import *
 from .apis.collections import *
 from .apis.dashboard_summaries import *
+from .apis.einvoice import *
 from .apis.inventory_returns import *
 from .apis.orders import *
 from .apis.party_ledger_reports import *
@@ -247,6 +248,11 @@ urlpatterns = [
     path('api/add_inventory_item_api/', inventory_add_inventory_item_api, name='add_inventory_item_api'),
     path('api/add_inventory_opening_stock_api/', inventory_add_inventory_opening_stock_api, name='add_inventory_opening_stock_api'),
     path('api/add_inventory_tax_profile_api/', inventory_add_inventory_tax_profile_api, name='add_inventory_tax_profile_api'),
+    path('api/einvoice/generate/', generate_einvoice_api, name='generate_einvoice_api'),
+    path('api/einvoice/cancel/', cancel_einvoice_api, name='cancel_einvoice_api'),
+    path('api/einvoice/schema/<int:sale_id>/', export_einvoice_schema_api, name='export_einvoice_schema_api'),
+    path('api/ewaybill/generate/', generate_ewaybill_api, name='generate_ewaybill_api'),
+    path('api/ewaybill/cancel/', cancel_ewaybill_api, name='cancel_ewaybill_api'),
     path('api/add_inventory_unit_api/', inventory_add_inventory_unit_api, name='add_inventory_unit_api'),
     path('api/add_inventory_transfer_voucher_api/', inventory_add_inventory_transfer_voucher_api, name='add_inventory_transfer_voucher_api'),
     path('api/add_inventory_warehouse_api/', inventory_add_inventory_warehouse_api, name='add_inventory_warehouse_api'),

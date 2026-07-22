@@ -1,5 +1,8 @@
 from collections import defaultdict
 from datetime import datetime
+import io
+import base64
+import qrcode
 
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -115,9 +118,25 @@ def generate_sales_invoice_pdf(request):
     gst_breakup = gst_breakup_from_invoice_subject(sale, tenant)
     total_before_round_off = round(float(gst_breakup['taxable_total'] or 0.0) + float(gst_breakup['gst_total'] or 0.0), 2)
     round_off_amount = round(float(getattr(sale, 'roundOffAmount', 0.0) or 0.0), 2)
+
+    qr_code_data_uri = None
+    if sale.signedQrCode:
+        try:
+            qr = qrcode.QRCode(version=1, box_size=3, border=1)
+            qr.add_data(sale.signedQrCode)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            qr_code_data_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode('utf-8')
+        except Exception as e:
+            logger.error(f"Error generating QR code for sale {sale.id}: {e}")
+
     context = {
         'sale': sale,
         'lines': lines,
+        'qr_code_data_uri': qr_code_data_uri,
         'seller_name': getattr(tenant, 'legalName', None) or getattr(tenant, 'name', None) or 'zivabooks.in',
         'seller_gst_number': getattr(tenant, 'gstNumber', None) or '',
         'seller_address': getattr(tenant, 'billingAddress', None) or '',
