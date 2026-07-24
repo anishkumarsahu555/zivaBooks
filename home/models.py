@@ -2090,6 +2090,7 @@ class LicensePlan(TimeStampedModel):
     is_featured = models.BooleanField(default=False, help_text="Highlight as Most Popular / Featured plan")
     display_order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    is_custom = models.BooleanField(default=False, verbose_name="Custom Private Plan", help_text="Hide custom plan from public website pricing cards")
 
     # 1. Sales & Billing Subsystem Modules
     sales_billing_enabled = models.BooleanField(default=True, verbose_name="Sales & Invoicing Billing")
@@ -2148,15 +2149,19 @@ class LicensePlan(TimeStampedModel):
         return 0
 
     @classmethod
-    def get_active_plans(cls):
+    def get_active_plans(cls, include_custom=False):
         """
         Fetch active plans sorted by display order and price.
+        Excludes custom private plans by default from website public pricing grid.
         If no plans exist in DB, auto-seed default Starter, Growth, and Enterprise plans.
         """
-        plans = cls.objects.filter(is_active=True).order_by('display_order', 'price_per_year')
-        if not plans.exists():
+        qs = cls.objects.filter(is_active=True)
+        if not include_custom:
+            qs = qs.filter(is_custom=False).exclude(plan_code__istartswith='custom')
+        plans = qs.order_by('display_order', 'price_per_year')
+        if not plans.exists() and not include_custom:
             cls.seed_default_plans()
-            plans = cls.objects.filter(is_active=True).order_by('display_order', 'price_per_year')
+            plans = cls.objects.filter(is_active=True, is_custom=False).exclude(plan_code__istartswith='custom').order_by('display_order', 'price_per_year')
         return plans
 
     @classmethod
@@ -2167,8 +2172,8 @@ class LicensePlan(TimeStampedModel):
                 'plan_code': 'starter',
                 'name': 'Starter License',
                 'tagline': '',
-                'price_per_year': 9999.00,
-                'original_price_per_year': 15000.00,
+                'price_per_year': 19999.00,
+                'original_price_per_year': 25000.00,
                 'user_seats': 5,
                 'is_featured': False,
                 'display_order': 1,

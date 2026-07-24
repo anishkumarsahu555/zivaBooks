@@ -567,6 +567,7 @@ class LicensePlanAdmin(admin.ModelAdmin):
         'user_seats',
         'is_featured',
         'is_active',
+        'is_custom',
         'display_order',
         'sales_billing_enabled',
         'gst_einvoicing_enabled',
@@ -575,12 +576,12 @@ class LicensePlanAdmin(admin.ModelAdmin):
         'gps_tracking_enabled',
         'ziva_ai_enabled',
     ]
-    list_editable = ['price_per_year', 'user_seats', 'is_featured', 'is_active', 'display_order']
-    list_filter = ['is_active', 'is_featured', 'gst_einvoicing_enabled', 'ziva_ai_enabled', 'gps_tracking_enabled', 'inventory_enabled']
+    list_editable = ['price_per_year', 'user_seats', 'is_featured', 'is_active', 'is_custom', 'display_order']
+    list_filter = ['is_active', 'is_custom', 'is_featured', 'gst_einvoicing_enabled', 'ziva_ai_enabled', 'gps_tracking_enabled', 'inventory_enabled']
     search_fields = ['name', 'plan_code', 'tagline']
     fieldsets = (
         ('General Plan Information', {
-            'fields': ('plan_code', 'name', 'tagline', 'price_per_year', 'user_seats', 'is_featured', 'display_order', 'is_active')
+            'fields': ('plan_code', 'name', 'tagline', 'price_per_year', 'user_seats', 'is_featured', 'is_custom', 'display_order', 'is_active')
         }),
         ('1. Sales & Invoicing Modules', {
             'fields': (

@@ -16,8 +16,8 @@ class LicensePlanTestCase(TestCase):
         plans = LicensePlan.get_active_plans()
         self.assertGreaterEqual(plans.count(), 3)
         starter = plans.get(plan_code='starter')
-        self.assertEqual(float(starter.price_per_year), 9999.0)
-        self.assertEqual(float(starter.original_price_per_year), 15000.0)
+        self.assertEqual(float(starter.price_per_year), 19999.0)
+        self.assertEqual(float(starter.original_price_per_year), 25000.0)
         self.assertEqual(starter.user_seats, 5)
         self.assertEqual(starter.ziva_ai_max_queries_per_month, 0)
         self.assertFalse(starter.ziva_ai_enabled)
@@ -29,15 +29,16 @@ class LicensePlanTestCase(TestCase):
 
     def test_custom_dynamic_plan_creation(self):
         custom_plan = LicensePlan.objects.create(
-            plan_code='pro_unlimited',
-            name='Pro Unlimited Tier',
-            tagline='Best For Large Distributors',
+            plan_code='custom_vip_plan',
+            name='VIP Custom Plan',
+            tagline='VIP Enterprise',
             price_per_year=79999.00,
             original_price_per_year=99999.00,
             user_seats=0,
             is_featured=True,
             display_order=4,
             is_active=True,
+            is_custom=True,
             sales_billing_enabled=True,
             gst_einvoicing_enabled=True,
             eway_bill_enabled=True,
@@ -52,8 +53,10 @@ class LicensePlanTestCase(TestCase):
             features_list=["Custom Feature A", "Custom Feature B"]
         )
         self.assertIsNotNone(custom_plan.id)
-        active_plans = LicensePlan.get_active_plans()
-        self.assertIn(custom_plan, active_plans)
+        public_plans = LicensePlan.get_active_plans()
+        self.assertNotIn(custom_plan, public_plans)
+        all_plans = LicensePlan.get_active_plans(include_custom=True)
+        self.assertIn(custom_plan, all_plans)
         self.assertEqual(custom_plan.ziva_ai_max_queries_per_month, 50000)
 
     def test_tenant_license_plan_sync(self):
