@@ -3,6 +3,7 @@ from django.urls import reverse
 
 from .models import TenantMembership
 from .tenancy import get_current_tenant
+from .utils.feature_guards import tenant_has_feature
 
 
 ADMIN_LIKE_PERMS = {
@@ -37,7 +38,15 @@ def _tenant_feature_enabled(request_or_user, attr_name, default=True):
     tenant = get_current_tenant(request_or_user)
     if tenant is None:
         return default
-    return bool(getattr(tenant, attr_name, default))
+    legacy_map = {
+        'inventoryEnabled': 'inventory',
+        'advancedInvoicingEnabled': 'sales_billing',
+        'einvoice_enabled': 'gst_einvoicing',
+        'nonGstShadowEnabled': 'shadow_mode',
+        'enableAttendanceLocationMaps': 'gps_tracking',
+    }
+    feature_code = legacy_map.get(attr_name, attr_name)
+    return tenant_has_feature(tenant, feature_code)
 
 
 def _show_non_gst_control_nav(request_or_user):
@@ -171,18 +180,21 @@ def has_ziva_ai_access(request_or_user, tenant=None):
     if not getattr(user, 'is_authenticated', False):
         return False
     tenant = tenant or get_current_tenant(request_or_user)
+    if tenant and not tenant_has_feature(tenant, 'ziva_ai'):
+        return False
     role = _tenant_membership_role(request_or_user, tenant)
     if role == TenantMembership.Role.PARTY:
         return False
     return _has_any_perm(request_or_user, ZIVA_AI_PERMS)
 
 
-def _nav_item(label, url_name, icon, perm=None):
+def _nav_item(label, url_name, icon, perm=None, feature=None):
     return {
         'label': label,
         'url': reverse(url_name),
         'icon': icon,
         'perm': perm,
+        'feature': feature,
     }
 
 
@@ -196,7 +208,17 @@ def _perm_match(request_or_user, perm):
 
 
 def _filter_items(request_or_user, items):
-    return [item for item in items if _perm_match(request_or_user, item.get('perm'))]
+    tenant = get_current_tenant(request_or_user)
+    filtered = []
+    for item in items:
+        if not _perm_match(request_or_user, item.get('perm')):
+            continue
+        feature_code = item.get('feature')
+        if feature_code and tenant:
+            if not tenant_has_feature(tenant, feature_code):
+                continue
+        filtered.append(item)
+    return filtered
 
 
 def _admin_sections(user):
@@ -208,7 +230,7 @@ def _admin_sections(user):
                     'home.can_manage_staff',
                     'home.can_view_party_credentials',
                 )),
-                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS, feature='ziva_ai'),
             ]),
         },
         {
@@ -321,15 +343,15 @@ def _admin_sections(user):
                 _nav_item("Today's Attendance", 'homeApp:add_attendance', 'calendar check', (
                     'home.add_attendance',
                     'home.view_attendance',
-                )),
+                ), feature='staff_attendance'),
                 _nav_item('Attendance List', 'homeApp:attendance_list', 'calendar alternate', (
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
-                )),
-                _nav_item('Location Tracker', 'homeApp:staff_location_tracker', 'map marker alternate', 'home.can_track_staff_location'),
+                ), feature='staff_attendance'),
+                _nav_item('Location Tracker', 'homeApp:staff_location_tracker', 'map marker alternate', 'home.can_track_staff_location', feature='gps_tracking'),
                 _nav_item('Staff Route Map', 'homeApp:staff_location_map', 'map outline', (
                     'home.can_view_staff_locations',
-                )),
+                ), feature='gps_tracking'),
             ]),
         },
         {
@@ -455,7 +477,7 @@ def _admin_sections(user):
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
                     'home.can_view_party_credentials',
-                )),
+                ), feature='staff_attendance'),
                 _nav_item('Pending Approval Report', 'homeApp:report_pending_approvals', 'clipboard check', (
                     'home.can_approve_collection',
                     'home.can_approve_sales',
@@ -772,7 +794,7 @@ def build_sidebar_sections(request_or_user):
             'group_break_after': True,
             'items': _filter_items(request_or_user, [
                 _nav_item('Dashboard', 'homeApp:homepage', 'tachometer alternate'),
-                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS),
+                _nav_item('Ziva AI', 'homeApp:ziva_ai', 'magic', ZIVA_AI_PERMS, feature='ziva_ai'),
             ]),
         },
         {
@@ -944,18 +966,18 @@ def build_sidebar_sections(request_or_user):
                     'home.add_attendance',
                     'home.view_attendance',
                     'home.change_attendance',
-                )),
+                ), feature='staff_attendance'),
                 _nav_item('Attendance List', 'homeApp:attendance_list', 'calendar alternate', (
                     'home.view_attendance',
                     'home.add_attendance',
                     'home.change_attendance',
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
-                )),
-                _nav_item('Location Tracker', 'homeApp:staff_location_tracker', 'map marker alternate', 'home.can_track_staff_location'),
+                ), feature='staff_attendance'),
+                _nav_item('Location Tracker', 'homeApp:staff_location_tracker', 'map marker alternate', 'home.can_track_staff_location', feature='gps_tracking'),
                 _nav_item('Staff Route Map', 'homeApp:staff_location_map', 'map outline', (
                     'home.can_view_staff_locations',
-                )),
+                ), feature='gps_tracking'),
             ]),
         },
         {
@@ -1073,7 +1095,7 @@ def build_sidebar_sections(request_or_user):
                     'home.can_view_all_attendance',
                     'home.can_view_attendance_reports',
                     'home.can_view_party_credentials',
-                )),
+                ), feature='staff_attendance'),
                 _nav_item('Pending Approvals', 'homeApp:report_pending_approvals', 'clipboard check', (
                     'home.can_approve_collection',
                     'home.can_approve_sales',

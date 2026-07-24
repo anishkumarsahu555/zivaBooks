@@ -113,6 +113,88 @@ class Tenant(TimeStampedModel, AuditedModel):
         help_text='Upload business logo'
     )
 
+    license_plan = models.ForeignKey(
+        'LicensePlan',
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        related_name='tenants',
+        help_text='Active software license plan assigned to this tenant.',
+    )
+
+    def sync_tenant_admin_group_permissions(self):
+        """Synchronize Django Group permissions for '{slug}:Tenant Admin' based on assigned LicensePlan."""
+        from django.contrib.auth.models import Group, Permission
+        from home.permission_bundles import get_permissions_for_license_plan
+
+        group_name = f"{self.slug}:Tenant Admin"
+        group, _ = Group.objects.get_or_create(name=group_name)
+
+        perm_strings = get_permissions_for_license_plan(self.license_plan)
+        home_codenames = [p.split('.', 1)[1] for p in perm_strings if p.startswith('home.')]
+
+        perms = Permission.objects.filter(content_type__app_label='home', codename__in=home_codenames)
+        group.permissions.set(perms)
+        if hasattr(self, '_tenant_permission_names_cache'):
+            delattr(self, '_tenant_permission_names_cache')
+        return perms
+
+    def apply_license_plan(self, plan=None):
+        """Enforce feature toggles and sync tenant admin permissions from assigned LicensePlan."""
+        if plan is None:
+            plan = self.license_plan
+        if not plan:
+            return
+        self.license_plan = plan
+        self.inventoryEnabled = plan.inventory_enabled
+        self.advancedInvoicingEnabled = plan.sales_billing_enabled
+        self.einvoice_enabled = plan.gst_einvoicing_enabled
+        self.nonGstShadowEnabled = plan.custom_shadow_mode_enabled
+        self.enableAttendanceLocationMaps = plan.gps_tracking_enabled
+        self.save()
+
+        # Synchronize Tenant Admin Group permissions with the assigned LicensePlan
+        self.sync_tenant_admin_group_permissions()
+
+    def get_license_plan_summary(self):
+        """Return active license plan summary for this tenant."""
+        if not self.license_plan:
+            return {
+                'plan_name': 'Trial / Unassigned',
+                'plan_code': 'trial',
+                'user_seats': 'Unlimited',
+                'features': {
+                    'inventory_enabled': self.inventoryEnabled,
+                    'advanced_invoicing_enabled': self.advancedInvoicingEnabled,
+                    'gst_einvoicing_enabled': self.einvoice_enabled,
+                    'shadow_mode_enabled': self.nonGstShadowEnabled,
+                    'gps_tracking_enabled': self.enableAttendanceLocationMaps,
+                }
+            }
+        plan = self.license_plan
+        return {
+            'plan_name': plan.name,
+            'plan_code': plan.plan_code,
+            'price_per_year': float(plan.price_per_year),
+            'user_seats': plan.user_seats if plan.user_seats > 0 else 'Unlimited',
+            'features': {
+                'sales_billing_enabled': plan.sales_billing_enabled,
+                'gst_einvoicing_enabled': plan.gst_einvoicing_enabled,
+                'eway_bill_enabled': plan.eway_bill_enabled,
+                'inventory_enabled': plan.inventory_enabled,
+                'fefo_batch_tracking_enabled': plan.fefo_batch_tracking_enabled,
+                'multi_warehouse_enabled': plan.multi_warehouse_enabled,
+                'multi_counter_pos_enabled': plan.multi_counter_pos_enabled,
+                'dual_otp_enabled': plan.dual_otp_enabled,
+                'cashbook_bankbook_enabled': plan.cashbook_bankbook_enabled,
+                'party_ledgers_enabled': plan.party_ledgers_enabled,
+                'gps_tracking_enabled': plan.gps_tracking_enabled,
+                'ziva_ai_enabled': plan.ziva_ai_enabled,
+                'ziva_ai_max_queries_per_month': plan.ziva_ai_max_queries_per_month,
+                'shadow_mode_enabled': plan.custom_shadow_mode_enabled,
+            }
+        }
+
     def set_non_gst_shadow_code(self, raw_code: str) -> None:
         self.nonGstShadowCodeHash = make_password(str(raw_code or '').strip())
 
@@ -1969,4 +2051,256 @@ class ZivaAiChatMessage(TenantOwnedModel):
         permissions = [
             ('can_access_ziva_ai', 'Can access Ziva AI'),
         ]
+
+
+class LicenseInquiry(TimeStampedModel):
+    full_name = models.CharField(max_length=200)
+    business_name = models.CharField(max_length=200, blank=True, null=True)
+    email = models.EmailField()
+    phone = models.CharField(max_length=30)
+    license_plan = models.CharField(max_length=50, default='growth')
+    user_seats = models.IntegerField(default=1)
+    message = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=30, default='new')
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.full_name} ({self.business_name or 'N/A'}) - {self.license_plan}"
+
+    class Meta:
+        verbose_name_plural = 'License Inquiries'
+        ordering = ['-datetime']
+        indexes = [
+            models.Index(fields=['email', 'datetime'], name='licinq_email_date_idx'),
+            models.Index(fields=['status'], name='licinq_status_idx'),
+        ]
+
+
+class LicensePlan(TimeStampedModel):
+    """
+    Dynamic License Plan model with comprehensive, detailed configurable feature modules.
+    Managed via Django Admin for live pricing table & inquiry form updates.
+    """
+    plan_code = models.CharField(max_length=50, unique=True, help_text="Unique code e.g. starter, growth, enterprise, pro")
+    name = models.CharField(max_length=100)
+    tagline = models.CharField(max_length=100, blank=True, null=True, help_text="Badge e.g. Most Popular, Best Value")
+    price_per_year = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    original_price_per_year = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, blank=True, null=True, help_text="Original strikethrough price")
+    user_seats = models.IntegerField(default=2, help_text="Included user seats (0 for Unlimited)")
+    is_featured = models.BooleanField(default=False, help_text="Highlight as Most Popular / Featured plan")
+    display_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    # 1. Sales & Billing Subsystem Modules
+    sales_billing_enabled = models.BooleanField(default=True, verbose_name="Sales & Invoicing Billing")
+    proforma_estimates_enabled = models.BooleanField(default=True, verbose_name="Proforma Estimates & Quotes")
+    custom_invoice_series_enabled = models.BooleanField(default=True, verbose_name="Custom Invoice Series & Prefix")
+    sales_returns_credit_notes_enabled = models.BooleanField(default=True, verbose_name="Sales Returns & Credit Notes")
+    thermal_printing_enabled = models.BooleanField(default=True, verbose_name="3-inch Thermal POS Printing")
+    pdf_excel_exports_enabled = models.BooleanField(default=True, verbose_name="A4 PDF & Excel Export Reports")
+
+    # 2. GST Compliance Subsystem Modules
+    gst_einvoicing_enabled = models.BooleanField(default=False, verbose_name="GST Portal IRN E-Invoicing")
+    eway_bill_enabled = models.BooleanField(default=False, verbose_name="E-Way Bill Generation")
+
+    # 3. Inventory & Warehouse Subsystem Modules
+    inventory_enabled = models.BooleanField(default=True, verbose_name="FEFO Inventory Batch Control")
+    fefo_batch_tracking_enabled = models.BooleanField(default=True, verbose_name="Batch Manufacturing & Expiry Ledger")
+    multi_warehouse_enabled = models.BooleanField(default=False, verbose_name="Multi-Warehouse Stock Transfers")
+    stock_adjustment_vouchers_enabled = models.BooleanField(default=False, verbose_name="Stock Adjustment Vouchers")
+    zero_stock_alerts_enabled = models.BooleanField(default=True, verbose_name="Zero & Expiry Risk Alerts")
+
+    # 4. Counter & Cash Control Subsystem Modules
+    multi_counter_pos_enabled = models.BooleanField(default=True, verbose_name="Multi-Counter POS (Cash/Card/Credit)")
+    dual_otp_enabled = models.BooleanField(default=False, verbose_name="Customer Collection & Delivery OTP")
+
+    # 5. Financial Accounting Subsystem Modules
+    cashbook_bankbook_enabled = models.BooleanField(default=True, verbose_name="Cashbook & Bankbook Accounts")
+    party_ledgers_enabled = models.BooleanField(default=True, verbose_name="Party & Customer Ledgers")
+    double_entry_journals_enabled = models.BooleanField(default=False, verbose_name="Double-Entry Journal Entries")
+
+    # 6. Field Operations & GPS Tracking Subsystem Modules
+    gps_tracking_enabled = models.BooleanField(default=False, verbose_name="Field Staff Real-Time GPS Tracking")
+    route_history_map_enabled = models.BooleanField(default=False, verbose_name="Interactive Daily Route Mapping")
+    geofenced_attendance_enabled = models.BooleanField(default=False, verbose_name="Geofenced Photo Attendance Check-in")
+
+    # 7. Ziva AI Subsystem Modules
+    ziva_ai_enabled = models.BooleanField(default=False, verbose_name="Ziva AI Business Assistant")
+    ziva_ai_max_queries_per_month = models.IntegerField(default=500, verbose_name="Ziva AI Max Monthly Queries")
+
+    # 8. Security & Multi-Branch Subsystem Modules
+    multi_branch_isolation_enabled = models.BooleanField(default=True, verbose_name="Multi-Branch Organization Access")
+    custom_shadow_mode_enabled = models.BooleanField(default=False, verbose_name="Passcode Category Control")
+    role_based_permissions_enabled = models.BooleanField(default=True, verbose_name="Custom Staff Role Permissions")
+
+    # Custom Feature List (JSON list of feature string bullets)
+    features_list = models.JSONField(default=list, blank=True, help_text="List of feature bullet points (JSON array)")
+
+    def __str__(self):
+        seats_display = f"{self.user_seats} seats" if self.user_seats > 0 else "Unlimited seats"
+        return f"{self.name} - ₹{self.price_per_year:,.0f}/yr ({seats_display})"
+
+    @property
+    def savings_amount(self):
+        """Calculate discount savings amount if original strikethrough price is specified."""
+        if self.original_price_per_year and self.original_price_per_year > self.price_per_year:
+            return self.original_price_per_year - self.price_per_year
+        return 0
+
+    @classmethod
+    def get_active_plans(cls):
+        """
+        Fetch active plans sorted by display order and price.
+        If no plans exist in DB, auto-seed default Starter, Growth, and Enterprise plans.
+        """
+        plans = cls.objects.filter(is_active=True).order_by('display_order', 'price_per_year')
+        if not plans.exists():
+            cls.seed_default_plans()
+            plans = cls.objects.filter(is_active=True).order_by('display_order', 'price_per_year')
+        return plans
+
+    @classmethod
+    def seed_default_plans(cls):
+        """Seed and update default Starter, Growth, and Enterprise plans based on official pricing specs."""
+        default_plans = [
+            {
+                'plan_code': 'starter',
+                'name': 'Starter License',
+                'tagline': '',
+                'price_per_year': 9999.00,
+                'original_price_per_year': 15000.00,
+                'user_seats': 5,
+                'is_featured': False,
+                'display_order': 1,
+                'sales_billing_enabled': True,
+                'proforma_estimates_enabled': True,
+                'custom_invoice_series_enabled': True,
+                'sales_returns_credit_notes_enabled': True,
+                'thermal_printing_enabled': True,
+                'pdf_excel_exports_enabled': True,
+                'gst_einvoicing_enabled': True,
+                'eway_bill_enabled': True,
+                'inventory_enabled': True,
+                'fefo_batch_tracking_enabled': True,
+                'multi_warehouse_enabled': True,
+                'stock_adjustment_vouchers_enabled': True,
+                'zero_stock_alerts_enabled': True,
+                'multi_counter_pos_enabled': True,
+                'dual_otp_enabled': True,
+                'cashbook_bankbook_enabled': True,
+                'party_ledgers_enabled': True,
+                'double_entry_journals_enabled': True,
+                'gps_tracking_enabled': False,
+                'route_history_map_enabled': False,
+                'geofenced_attendance_enabled': False,
+                'ziva_ai_enabled': False,
+                'ziva_ai_max_queries_per_month': 0,
+                'multi_branch_isolation_enabled': True,
+                'custom_shadow_mode_enabled': True,
+                'role_based_permissions_enabled': True,
+                'features_list': [
+                    "Sales & GST E-Invoicing & E-Way Bill",
+                    "FEFO Inventory & Cash Counter POS",
+                    "Cashbook, Bankbook & Ledgers",
+                    "Collections & Orders Management",
+                    "Pro Reports & Analytics",
+                    "Upto 5 Users",
+                ],
+            },
+            {
+                'plan_code': 'growth',
+                'name': 'Growth License',
+                'tagline': 'Most Popular',
+                'price_per_year': 24999.00,
+                'original_price_per_year': 35000.00,
+                'user_seats': 20,
+                'is_featured': True,
+                'display_order': 2,
+                'sales_billing_enabled': True,
+                'proforma_estimates_enabled': True,
+                'custom_invoice_series_enabled': True,
+                'sales_returns_credit_notes_enabled': True,
+                'thermal_printing_enabled': True,
+                'pdf_excel_exports_enabled': True,
+                'gst_einvoicing_enabled': True,
+                'eway_bill_enabled': True,
+                'inventory_enabled': True,
+                'fefo_batch_tracking_enabled': True,
+                'multi_warehouse_enabled': True,
+                'stock_adjustment_vouchers_enabled': True,
+                'zero_stock_alerts_enabled': True,
+                'multi_counter_pos_enabled': True,
+                'dual_otp_enabled': True,
+                'cashbook_bankbook_enabled': True,
+                'party_ledgers_enabled': True,
+                'double_entry_journals_enabled': True,
+                'gps_tracking_enabled': False,
+                'route_history_map_enabled': False,
+                'geofenced_attendance_enabled': True,
+                'ziva_ai_enabled': True,
+                'ziva_ai_max_queries_per_month': 50,
+                'multi_branch_isolation_enabled': True,
+                'custom_shadow_mode_enabled': True,
+                'role_based_permissions_enabled': True,
+                'features_list': [
+                    "All in Starter",
+                    "Staff Attendance",
+                    "Upto 20 Users",
+                    "Ziva AI (upto 50 monthly credits)",
+                ],
+            },
+            {
+                'plan_code': 'enterprise',
+                'name': 'Enterprise License',
+                'tagline': 'All Unlocked',
+                'price_per_year': 49999.00,
+                'original_price_per_year': 65000.00,
+                'user_seats': 100,
+                'is_featured': False,
+                'display_order': 3,
+                'sales_billing_enabled': True,
+                'proforma_estimates_enabled': True,
+                'custom_invoice_series_enabled': True,
+                'sales_returns_credit_notes_enabled': True,
+                'thermal_printing_enabled': True,
+                'pdf_excel_exports_enabled': True,
+                'gst_einvoicing_enabled': True,
+                'eway_bill_enabled': True,
+                'inventory_enabled': True,
+                'fefo_batch_tracking_enabled': True,
+                'multi_warehouse_enabled': True,
+                'stock_adjustment_vouchers_enabled': True,
+                'zero_stock_alerts_enabled': True,
+                'multi_counter_pos_enabled': True,
+                'dual_otp_enabled': True,
+                'cashbook_bankbook_enabled': True,
+                'party_ledgers_enabled': True,
+                'double_entry_journals_enabled': True,
+                'gps_tracking_enabled': True,
+                'route_history_map_enabled': True,
+                'geofenced_attendance_enabled': True,
+                'ziva_ai_enabled': True,
+                'ziva_ai_max_queries_per_month': 1000,
+                'multi_branch_isolation_enabled': True,
+                'custom_shadow_mode_enabled': True,
+                'role_based_permissions_enabled': True,
+                'features_list': [
+                    "All in Growth",
+                    "Ziva AI (upto 1,000 monthly credits)",
+                    "GPS Staff Geolocation Route Maps",
+                    "Upto 100 Users",
+                ],
+            },
+        ]
+        for itemData in default_plans:
+            plan_code = itemData.pop('plan_code')
+            cls.objects.update_or_create(plan_code=plan_code, defaults=itemData)
+            itemData['plan_code'] = plan_code
+
+    class Meta:
+        verbose_name = 'License Plan'
+        verbose_name_plural = 'License Plans'
+        ordering = ['display_order', 'price_per_year']
+
+
 

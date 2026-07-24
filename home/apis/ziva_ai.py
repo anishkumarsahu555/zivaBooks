@@ -23,6 +23,7 @@ from home.tenancy import get_current_tenant
 from home.models import TenantAiUsage
 from home.navigation import has_ziva_ai_access, _effective_permission_names
 from home.services.ai_context import AI_MODEL_PERMISSIONS, can_access_ai_model, get_tenant_business_data_snapshot
+from home.utils.feature_guards import require_tenant_feature
 
 
 def _ai_provider_timeout_seconds():
@@ -647,6 +648,7 @@ def _ziva_ai_generate_in_background(tenant_id, user_id, user_message, session_id
 
 @require_POST
 @login_required
+@require_tenant_feature('ziva_ai')
 @check_ziva_ai_access
 def ziva_ai_chat_api(request):
     import threading

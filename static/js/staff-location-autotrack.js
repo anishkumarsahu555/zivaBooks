@@ -61,13 +61,28 @@
         }).catch(function () {});
     }
 
+    function getCookieToken() {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== "") {
+            var cookies = document.cookie.split(";");
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                if (cookie.substring(0, 10) === "csrftoken=") {
+                    cookieValue = decodeURIComponent(cookie.substring(10));
+                    break;
+                }
+            }
+        }
+        return cookieValue || config.csrfToken || "";
+    }
+
     function postJson(url, payload) {
         return fetch(url, {
             method: "POST",
             credentials: "same-origin",
             headers: {
                 "Content-Type": "application/json",
-                "X-CSRFToken": config.csrfToken,
+                "X-CSRFToken": getCookieToken(),
                 "X-Requested-With": "XMLHttpRequest"
             },
             body: JSON.stringify(payload)

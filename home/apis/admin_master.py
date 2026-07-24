@@ -27,6 +27,7 @@ from home.services.reports import formatINR
 from home.services.sequences import next_tenant_sequence_value as _next_tenant_sequence_value
 from utils.logger import logger
 from home.tenancy import assign_tenant, ensure_membership, get_current_tenant, tenant_object_or_superuser, tenant_qs
+from home.utils.feature_guards import check_staff_user_limit
 
 User = get_user_model()
 DEFAULT_AVATAR_URL = "/static/images/default-avatar.svg"
@@ -830,6 +831,12 @@ def add_staff_api(request):
             UserGroup = request.POST.get("UserGroup")
             UserStatus = request.POST.get("UserStatus")
             UserPwd = request.POST.get("UserPwd")
+
+            tenant = get_current_tenant(request)
+            target_is_active = UserStatus == 'Active' or str(UserStatus).lower() in ('true', '1', 'active')
+            is_allowed, error_msg, max_seats, active_count = check_staff_user_limit(tenant, target_will_be_active=target_is_active)
+            if not is_allowed:
+                return JsonResponse({'message': 'error', 'error': error_msg, 'code': 'USER_LIMIT_EXCEEDED'}, safe=False, status=400)
             # PartyGroup = request.POST.get("PartyGroup")
             imageUpload = request.FILES.get("imageUpload")
             imageUploadID = request.FILES.get("imageUploadID")
@@ -867,8 +874,8 @@ def add_staff_api(request):
                 ensure_membership(new_user, staff.tenant, TenantMembership.Role.STAFF)
                 _sync_staff_user_group_membership(staff)
             return JsonResponse({'message': 'success'}, safe=False)
-        except Exception:
-            return JsonResponse({'message': 'error'}, safe=False)
+        except Exception as e:
+            return JsonResponse({'message': 'error', 'error': f"Failed to save staff user: {str(e)}"}, safe=False, status=400)
 
 
 @transaction.atomic
@@ -1008,6 +1015,16 @@ def edit_staff_api(request):
             UserGroup = request.POST.get("UserGroup")
             UserStatus = request.POST.get("UserStatus")
             UserPwd = request.POST.get("UserPwd")
+
+            tenant = get_current_tenant(request)
+            target_is_active = UserStatus == 'Active' or str(UserStatus).lower() in ('true', '1', 'active')
+            is_allowed, error_msg, max_seats, active_count = check_staff_user_limit(
+                tenant,
+                target_will_be_active=target_is_active,
+                editing_staff_id=EditUserId
+            )
+            if not is_allowed:
+                return JsonResponse({'message': 'error', 'error': error_msg, 'code': 'USER_LIMIT_EXCEEDED'}, safe=False, status=400)
             # PartyGroup = request.POST.get("PartyGroup")
             staff = tenant_qs(request, StaffUser).select_related().get(pk=int(EditUserId))
             old_password = staff.userPassword
@@ -1054,8 +1071,8 @@ def edit_staff_api(request):
             ensure_membership(new_user, staff.tenant, TenantMembership.Role.STAFF)
             _sync_staff_user_group_membership(staff)
             return JsonResponse({'message': 'success'}, safe=False)
-        except Exception:
-            return JsonResponse({'message': 'error'}, safe=False)
+        except Exception as e:
+            return JsonResponse({'message': 'error', 'error': f"Failed to update staff user: {str(e)}"}, safe=False, status=400)
 #
 # # ---------------------------------Party Groups ----------------------------------------------------
 #

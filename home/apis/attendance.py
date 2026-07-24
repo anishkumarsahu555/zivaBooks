@@ -11,6 +11,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.html import escape
 from django_datatables_view.base_datatable_view import BaseDatatableView
 
+from django.views.decorators.csrf import csrf_exempt
 from utils.logger import logger
 from home.models import *
 from home.services.attendance import (
@@ -20,8 +21,10 @@ from home.services.attendance import (
     tenant_attendance_location_enabled,
 )
 from home.tenancy import assign_tenant, get_staff_user_for_request, tenant_qs
+from home.utils.feature_guards import require_tenant_feature
 
 
+@require_tenant_feature('staff_attendance')
 def get_attendance_dashboard_report_api(request):
     today = datetime.today().date()
     monthly_start = today.replace(day=1)
@@ -57,6 +60,7 @@ def get_attendance_dashboard_report_api(request):
     return JsonResponse({'data': data}, safe=False)
 
 
+@require_tenant_feature('staff_attendance')
 @transaction.atomic
 def add_attendance_api(request):
     if request.method == 'POST':
@@ -201,6 +205,8 @@ def _save_staff_location_sample(request, staff, sample):
     return obj, True
 
 
+@csrf_exempt
+@require_tenant_feature('gps_tracking')
 @transaction.atomic
 def add_staff_location_ping_api(request):
     if request.method != 'POST':
@@ -224,6 +230,8 @@ def add_staff_location_ping_api(request):
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
 
 
+@csrf_exempt
+@require_tenant_feature('gps_tracking')
 @transaction.atomic
 def bulk_staff_location_sync_api(request):
     if request.method != 'POST':
@@ -253,6 +261,7 @@ def bulk_staff_location_sync_api(request):
         return JsonResponse({'message': 'error', 'error': str(exc)}, status=500)
 
 
+@require_tenant_feature('gps_tracking')
 def staff_location_daily_route_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401)
@@ -302,6 +311,7 @@ def staff_location_daily_route_api(request):
     })
 
 
+@require_tenant_feature('gps_tracking')
 def staff_location_staff_options_api(request):
     if not request.user.is_authenticated:
         return JsonResponse({'message': 'unauthorized'}, status=401)

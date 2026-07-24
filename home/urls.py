@@ -26,6 +26,7 @@ from .apis.sales_reports import *
 from .apis.tenant_settings import *
 from .apis.business_profile import *
 from .apis.ziva_ai import *
+from .apis.contact_inquiry import contact_inquiry_api, list_license_plans_api
 from .views import *
 from inventory.api import (
     add_inventory_category_api as inventory_add_inventory_category_api,
@@ -526,6 +527,8 @@ urlpatterns = [
     # Business Profile Settings
     path('settings/business-profile/', business_profile_settings, name='business_profile_settings'),
     path('api/settings/business-profile/update/', update_business_profile_api, name='update_business_profile_api'),
+    path('api/contact-inquiry/', contact_inquiry_api, name='contact_inquiry_api'),
+    path('api/license-plans/', list_license_plans_api, name='list_license_plans_api'),
 
 ]
 

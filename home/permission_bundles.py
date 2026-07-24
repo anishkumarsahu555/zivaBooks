@@ -189,16 +189,43 @@ TENANT_PERMISSION_BUNDLE_DEFS = [
         ],
     },
     {
-        'key': 'tenant_audit',
-        'label': 'Enable Audit',
-        'description': 'Access tenant audit reports and audit export.',
+        'key': 'tenant_inventory',
+        'label': 'Enable Inventory & Stock Control',
+        'description': 'Manage items, stock masters, adjustment vouchers, purchases, and stock reports.',
         'permissions': [
-            'home.view_auditlog',
-            'home.add_auditlog',
-            'home.change_auditlog',
-            'home.delete_auditlog',
-            'home.can_view_audit_logs',
-            'home.can_export_audit_logs',
+            'home.view_inventoryitem',
+            'home.add_inventoryitem',
+            'home.change_inventoryitem',
+            'home.delete_inventoryitem',
+            'home.can_manage_inventory',
+            'home.can_view_inventory_reports',
+            'home.view_purchaseinvoice',
+            'home.add_purchaseinvoice',
+            'home.change_purchaseinvoice',
+            'home.delete_purchaseinvoice',
+        ],
+    },
+    {
+        'key': 'tenant_proforma',
+        'label': 'Enable Proforma Invoices',
+        'description': 'Manage proforma invoices, quotes, and estimate conversions.',
+        'permissions': [
+            'home.view_proformainvoice',
+            'home.add_proformainvoice',
+            'home.change_proformainvoice',
+            'home.delete_proformainvoice',
+            'home.can_manage_proforma_invoice',
+            'home.can_convert_proforma_invoice',
+            'home.can_view_proforma_invoice_reports',
+        ],
+    },
+    {
+        'key': 'tenant_gps_tracking',
+        'label': 'Enable Field Staff GPS Location Tracking',
+        'description': 'Access staff real-time location tracker and interactive route mapping.',
+        'permissions': [
+            'home.can_track_staff_location',
+            'home.can_view_staff_locations',
         ],
     },
 ]
@@ -206,3 +233,63 @@ TENANT_PERMISSION_BUNDLE_DEFS = [
 
 def tenant_permission_bundle_definitions():
     return TENANT_PERMISSION_BUNDLE_DEFS
+
+
+def get_bundle_keys_for_license_plan(plan):
+    """
+    Returns the list of preset bundle keys corresponding to an active LicensePlan's enabled features.
+    """
+    if not plan:
+        return [b['key'] for b in TENANT_PERMISSION_BUNDLE_DEFS]
+
+    keys = [
+        'tenant_messages',
+        'tenant_collections',
+        'tenant_orders',
+        'tenant_audit',
+    ]
+
+    if getattr(plan, 'geofenced_attendance_enabled', False):
+        keys.append('tenant_attendance')
+
+    if getattr(plan, 'role_based_permissions_enabled', True):
+        keys.extend(['tenant_staff_groups', 'tenant_staff_users'])
+
+    if getattr(plan, 'party_ledgers_enabled', True):
+        keys.extend(['tenant_party_groups', 'tenant_parties'])
+
+    if getattr(plan, 'sales_billing_enabled', True):
+        keys.extend(['tenant_sales', 'tenant_invoice_series'])
+
+    if getattr(plan, 'proforma_estimates_enabled', True):
+        keys.append('tenant_proforma')
+
+    if getattr(plan, 'inventory_enabled', True):
+        keys.append('tenant_inventory')
+
+    if getattr(plan, 'multi_counter_pos_enabled', True):
+        keys.append('tenant_cash_counter')
+
+    if getattr(plan, 'cashbook_bankbook_enabled', True):
+        keys.extend(['tenant_books', 'tenant_banks'])
+
+    if getattr(plan, 'ziva_ai_enabled', False):
+        keys.append('tenant_ziva_ai')
+
+    if getattr(plan, 'gps_tracking_enabled', False):
+        keys.append('tenant_gps_tracking')
+
+    return list(dict.fromkeys(keys))
+
+
+def get_permissions_for_license_plan(plan):
+    """
+    Returns the set of permission string names (e.g. 'home.can_access_ziva_ai') for a LicensePlan.
+    """
+    bundle_keys = get_bundle_keys_for_license_plan(plan)
+    bundle_map = {b['key']: b['permissions'] for b in TENANT_PERMISSION_BUNDLE_DEFS}
+    perm_strings = set()
+    for key in bundle_keys:
+        perm_strings.update(bundle_map.get(key, []))
+    return perm_strings
+

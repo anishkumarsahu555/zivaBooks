@@ -38,6 +38,7 @@ from .models import *
 from .books import ensure_books_for_tenant
 from .credential_links import credential_share_token_status, consume_credential_share_token
 from .navigation import build_sidebar_sections, has_ziva_ai_access, _has_any_perm as _has_tenant_any_perm
+from .utils.feature_guards import require_tenant_feature, tenant_has_feature
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_object_or_superuser, tenant_qs
 from .otp import get_collection_otp_payload, get_collection_status_payload, get_order_delivery_otp_payload, get_order_delivery_status_payload, OTP_TTL_SECONDS
 from utils.logger import logger
@@ -1194,8 +1195,12 @@ def preview_500(request):
     return custom_server_error(request)
 @ensure_csrf_cookie
 def loginPage(request):
-    # if not request.user.is_authenticated:
-    return render(request, 'home/login.html')
+    try:
+        from .models import LicensePlan
+        license_plans = LicensePlan.get_active_plans()
+    except Exception:
+        license_plans = []
+    return render(request, 'home/login.html', {'license_plans': license_plans})
 
 
 PASSWORD_RESET_SUCCESS_MESSAGE = 'If an account exists, reset instructions have been sent.'
@@ -3058,6 +3063,7 @@ def staff_home(request):
     }
     return render(request, 'home/NormalStaff/indexStaff.html', context)
 # ---------------------------attendance-------------------
+@require_tenant_feature('staff_attendance')
 @permission_required_any('home.add_attendance', 'home.view_attendance', 'home.change_attendance')
 def add_attendance(request):
     if request.user.is_authenticated:
@@ -3086,6 +3092,7 @@ def _attendance_report_capabilities(user):
     return {
         'can_filter_staff': can_filter_staff,
     }
+@require_tenant_feature('staff_attendance')
 @permission_required_any('home.view_attendance', 'home.add_attendance', 'home.change_attendance', 'home.can_view_all_attendance', 'home.can_view_attendance_reports')
 def attendance_list(request):
     if request.user.is_authenticated:
@@ -3097,20 +3104,24 @@ def attendance_list(request):
         return render(request, 'home/attendanceList.html', context)
     else:
         return redirect('/')
+@require_tenant_feature('staff_attendance')
 @permission_required_any('home.view_attendance', 'home.add_attendance', 'home.change_attendance')
 def attendance_report(request):
     return redirect('homeApp:attendance_list')
+@require_tenant_feature('staff_attendance')
 @permission_required_any('home.can_view_all_attendance', 'home.can_view_attendance_reports')
 def attendance_report_admin(request):
     return redirect('homeApp:attendance_list')
 
 
+@require_tenant_feature('gps_tracking')
 @permission_required_any('home.can_track_staff_location')
 def staff_location_tracker(request):
     staff = get_object_or_404(tenant_qs(request, StaffUser), user_ID__pk=request.user.pk)
     return render(request, 'home/staffLocationTracker.html', {'staff': staff})
 
 
+@require_tenant_feature('gps_tracking')
 @permission_required_any(
     'home.can_view_staff_locations',
 )
@@ -3711,6 +3722,7 @@ def report_order_status(request):
     return render(request, 'home/business/order_status_report.html', context)
 
 
+@require_tenant_feature('staff_attendance')
 @is_activated()
 @permission_required_any('home.can_view_all_attendance', 'home.can_view_attendance_reports', 'home.can_view_party_credentials')
 def report_attendance_business(request):
@@ -4221,6 +4233,7 @@ def quick_search(request):
     return JsonResponse({'results': results})
 
 
+@require_tenant_feature('ziva_ai')
 @ensure_csrf_cookie
 def ziva_ai_page(request):
     if not request.user.is_authenticated:
