@@ -133,6 +133,54 @@
             color: #0f172a;
         }
 
+        /* Light Mode High-Contrast Overrides for Customer Portal Hero */
+        html[data-theme="light"] .customer-portal-hero {
+            border-bottom-color: rgba(15, 23, 42, 0.1) !important;
+        }
+
+        html[data-theme="light"] .portal-highlight-card {
+            background: #ffffff !important;
+            border-color: rgba(15, 23, 42, 0.15) !important;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+        }
+
+        html[data-theme="light"] .portal-highlight-card .card-text {
+            color: #334155 !important;
+        }
+
+        html[data-theme="light"] .portal-mockup-card {
+            background: #ffffff !important;
+            border-color: rgba(6, 182, 212, 0.4) !important;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12) !important;
+        }
+
+        html[data-theme="light"] .portal-mockup-header {
+            background: rgba(241, 245, 249, 0.95) !important;
+            border-bottom-color: rgba(15, 23, 42, 0.12) !important;
+        }
+
+        html[data-theme="light"] .portal-mockup-header-title {
+            color: #0284c7 !important;
+        }
+
+        html[data-theme="light"] .portal-svg-card-bg {
+            fill: #ffffff !important;
+            stroke-opacity: 0.7 !important;
+        }
+
+        html[data-theme="light"] .portal-svg-otp-box {
+            fill: #f8fafc !important;
+            stroke: #a855f7 !important;
+        }
+
+        html[data-theme="light"] .portal-svg-text-heading {
+            fill: #0f172a !important;
+        }
+
+        html[data-theme="light"] .portal-svg-text-sub {
+            fill: #475569 !important;
+        }
+
         html[data-theme="light"] .pricing-card.featured .price-sub {
             color: #475569;
         }
@@ -1382,6 +1430,177 @@
             </div>
         </section>
 
+        <!-- Dedicated Customer Portal Showcase Hero Section -->
+        <section class="hero-section customer-portal-hero" id="customer-portal-hero" style="padding-top: 20px; padding-bottom: 60px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <div class="hero-text-col">
+                <div class="badge-pill" style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.3);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    24/7 Self-Service B2B Customer Portal
+                </div>
+                <h2 class="hero-title" style="font-size: 3.1rem;">
+                    Empower Clients. <br>
+                    <span style="background: linear-gradient(135deg, #06b6d4, #38bdf8, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Live Ledgers & Bills.</span> <br>
+                    Instant OTP Clearance.
+                </h2>
+                <p class="hero-subtitle">
+                    Give your clients 24/7 self-service access to check real-time account ledger balances, download PDF sales & POS invoices, track live sales order dispatches, inspect collection receipts, and access active OTP codes anytime.
+                </p>
+
+                <!-- Portal Feature Highlights Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 32px;">
+                    <div class="portal-highlight-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(8px);">
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #38bdf8; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line></svg>
+                            Real-Time Ledger & KPIs
+                        </div>
+                        <div class="card-text" style="font-size: 0.82rem; color: var(--text-body); line-height: 1.4;">Live opening balance, debits, credits, running balance & 1-click A4 PDF/Excel exports.</div>
+                    </div>
+
+                    <div class="portal-highlight-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(8px);">
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #10b981; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Purchases & PDF Downloads
+                        </div>
+                        <div class="card-text" style="font-size: 0.82rem; color: var(--text-body); line-height: 1.4;">Complete sales & POS purchase bills with instant PDF downloads & GST IRN details.</div>
+                    </div>
+
+                    <div class="portal-highlight-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(8px);">
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #f59e0b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                            Collection Receipts
+                        </div>
+                        <div class="card-text" style="font-size: 0.82rem; color: var(--text-body); line-height: 1.4;">Transparent record of Cash, UPI, Cheque & Bank Transfer payment receipts.</div>
+                    </div>
+
+                    <div class="portal-highlight-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(8px);">
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #c084fc; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                            Live Orders & Dual OTP
+                        </div>
+                        <div class="card-text" style="font-size: 0.82rem; color: var(--text-body); line-height: 1.4;">Track sales order dispatches and view active OTP codes for counter pickups & handovers.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Beautiful Generative SVG Graphics Illustration Container -->
+            <div class="mockup-container">
+                <div class="mockup-card portal-mockup-card" style="border: 1px solid rgba(6, 182, 212, 0.35); box-shadow: 0 24px 60px rgba(6, 182, 212, 0.15); background: linear-gradient(145deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95)); padding: 0; overflow: hidden; position: relative;">
+                    <!-- Generative SVG Illustration Header -->
+                    <div class="portal-mockup-header" style="padding: 14px 18px; background: rgba(2, 132, 199, 0.15); border-bottom: 1px solid rgba(6, 182, 212, 0.2); display: flex; align-items: center; justify-content: space-between;">
+                        <div class="window-dots">
+                            <div class="dot dot-red"></div>
+                            <div class="dot dot-yellow"></div>
+                            <div class="dot dot-green"></div>
+                        </div>
+                        <div class="portal-mockup-header-title" style="font-size: 0.85rem; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></span>
+                            zivaBooks Customer Self-Service Portal (`/customer_home/`)
+                        </div>
+                    </div>
+
+                    <!-- Beautiful Generative Vector SVG Illustration -->
+                    <div style="padding: 16px; position: relative;">
+                        <svg viewBox="0 0 540 360" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block;">
+                            <defs>
+                                <linearGradient id="svgBgGrad" x1="0" y1="0" x2="540" y2="360" gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#0f172a"/>
+                                    <stop offset="1" stop-color="#1e293b"/>
+                                </linearGradient>
+                                <linearGradient id="cyanPillGrad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop stop-color="#06b6d4"/>
+                                    <stop offset="1" stop-color="#0284c7"/>
+                                </linearGradient>
+                                <linearGradient id="emeraldGrad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop stop-color="#10b981"/>
+                                    <stop offset="1" stop-color="#059669"/>
+                                </linearGradient>
+                                <linearGradient id="amberGrad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop stop-color="#f59e0b"/>
+                                    <stop offset="1" stop-color="#d97706"/>
+                                </linearGradient>
+                                <linearGradient id="purpleGrad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop stop-color="#c084fc"/>
+                                    <stop offset="1" stop-color="#9333ea"/>
+                                </linearGradient>
+                                <linearGradient id="lineChartGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop stop-color="#38bdf8" stop-opacity="0.4"/>
+                                    <stop offset="1" stop-color="#38bdf8" stop-opacity="0.0"/>
+                                </linearGradient>
+                                <filter id="glowDrop" x="-10%" y="-10%" width="120%" height="120%">
+                                    <feGaussianBlur stdDeviation="6" result="blur"/>
+                                    <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+                                </filter>
+                            </defs>
+
+                            <!-- Ambient Mesh Glow Circles -->
+                            <circle cx="100" cy="80" r="90" fill="#06b6d4" opacity="0.08" filter="url(#glowDrop)"/>
+                            <circle cx="440" cy="280" r="100" fill="#10b981" opacity="0.08" filter="url(#glowDrop)"/>
+
+                            <!-- Card 1: Account Ledger Summary Card (Top Left) -->
+                            <rect class="portal-svg-card-bg" x="20" y="20" width="240" height="150" rx="14" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.4"/>
+                            <text class="portal-svg-text-sub" x="36" y="46" fill="#94a3b8" font-size="11" font-weight="600" font-family="-apple-system, sans-serif">ACCOUNT LEDGER BALANCE</text>
+                            <text class="portal-svg-text-heading" x="36" y="74" fill="#38bdf8" font-size="22" font-weight="800" font-family="-apple-system, sans-serif">₹ 42,500.00 <tspan font-size="12" fill="#06b6d4">Dr</tspan></text>
+                            <text class="portal-svg-text-sub" x="36" y="96" fill="#64748b" font-size="10" font-family="-apple-system, sans-serif">Credit Limit: ₹ 2,00,000 • Available: ₹ 1,57,500</text>
+                            
+                            <!-- Vector Curve Ledger Graph -->
+                            <path d="M 36 145 C 70 135, 100 148, 130 120 C 160 92, 190 125, 236 105 L 236 150 L 36 150 Z" fill="url(#lineChartGrad)"/>
+                            <path d="M 36 145 C 70 135, 100 148, 130 120 C 160 92, 190 125, 236 105" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+                            <circle cx="130" cy="120" r="4" fill="#0284c7" stroke="#38bdf8" stroke-width="2"/>
+                            <circle cx="236" cy="105" r="4" fill="#38bdf8" stroke="#ffffff" stroke-width="2"/>
+
+                            <!-- Card 2: Purchase & Bill PDF Downloads Card (Top Right) -->
+                            <rect class="portal-svg-card-bg" x="280" y="20" width="240" height="150" rx="14" fill="#0f172a" stroke="#10b981" stroke-width="1.5" stroke-opacity="0.4"/>
+                            <rect x="296" y="34" width="80" height="20" rx="10" fill="#10b981" fill-opacity="0.15"/>
+                            <text x="306" y="48" fill="#10b981" font-size="10" font-weight="700" font-family="-apple-system, sans-serif">PURCHASES & BILLS</text>
+
+                            <!-- Document PDF Icon -->
+                            <rect x="296" y="66" width="34" height="42" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+                            <path d="M 304 78 L 322 78 M 304 84 L 322 84 M 304 90 L 316 90" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                            
+                            <text class="portal-svg-text-heading" x="340" y="80" fill="#f8fafc" font-size="13" font-weight="700" font-family="-apple-system, sans-serif">INV-2026-0842</text>
+                            <text x="340" y="96" fill="#10b981" font-size="12" font-weight="700" font-family="-apple-system, sans-serif">₹ 14,200.00 <tspan font-size="9" fill="#94a3b8">(Paid)</tspan></text>
+                            <text class="portal-svg-text-sub" x="340" y="110" fill="#64748b" font-size="9" font-family="-apple-system, sans-serif">IRN GST E-Invoice Verified</text>
+
+                            <!-- PDF Download CTA Button inside Graphic -->
+                            <rect x="296" y="122" width="208" height="34" rx="8" fill="url(#emeraldGrad)"/>
+                            <text x="400" y="143" fill="#ffffff" font-size="11" font-weight="700" text-anchor="middle" font-family="-apple-system, sans-serif">📄 Download PDF Sales Bill</text>
+
+                            <!-- Card 3: Live Sales Order Tracking (Bottom Left) -->
+                            <rect class="portal-svg-card-bg" x="20" y="190" width="240" height="150" rx="14" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5" stroke-opacity="0.4"/>
+                            <text class="portal-svg-text-sub" x="36" y="216" fill="#94a3b8" font-size="11" font-weight="600" font-family="-apple-system, sans-serif">LIVE SALES ORDERS</text>
+                            <text class="portal-svg-text-heading" x="36" y="240" fill="#f8fafc" font-size="14" font-weight="700" font-family="-apple-system, sans-serif">Order #ORD-2026-842</text>
+                            <text class="portal-svg-text-sub" x="36" y="256" fill="#64748b" font-size="10" font-family="-apple-system, sans-serif">Items: 12 Units • Dispatch Date: Today</text>
+
+                            <!-- Status Stepper Bar -->
+                            <rect x="36" y="272" width="208" height="6" rx="3" fill="#334155"/>
+                            <rect x="36" y="272" width="150" height="6" rx="3" fill="url(#amberGrad)"/>
+                            <circle cx="36" cy="275" r="6" fill="#f59e0b"/>
+                            <circle cx="110" cy="275" r="6" fill="#f59e0b"/>
+                            <circle cx="186" cy="275" r="8" fill="#f59e0b" stroke="#ffffff" stroke-width="2"/>
+                            <circle cx="244" cy="275" r="6" fill="#334155"/>
+
+                            <rect x="36" y="294" width="208" height="28" rx="6" fill="#f59e0b" fill-opacity="0.12" stroke="#f59e0b" stroke-opacity="0.3"/>
+                            <text x="140" y="312" fill="#fbbf24" font-size="11" font-weight="700" text-anchor="middle" font-family="-apple-system, sans-serif">🚚 In Transit • Dispatched to Location</text>
+
+                            <!-- Card 4: Collection & Delivery OTP Clearance (Bottom Right) -->
+                            <rect class="portal-svg-card-bg" x="280" y="190" width="240" height="150" rx="14" fill="#0f172a" stroke="#c084fc" stroke-width="1.5" stroke-opacity="0.4"/>
+                            <text class="portal-svg-text-sub" x="296" y="216" fill="#94a3b8" font-size="11" font-weight="600" font-family="-apple-system, sans-serif">SECURITY DUAL OTP CODE</text>
+                            <text x="296" y="238" fill="#c084fc" font-size="13" font-weight="700" font-family="-apple-system, sans-serif">Active Pickup OTP:</text>
+
+                            <!-- OTP Box -->
+                            <rect class="portal-svg-otp-box" x="296" y="248" width="208" height="42" rx="8" fill="#1e1b4b" stroke="#c084fc" stroke-width="1.5"/>
+                            <text x="400" y="276" fill="#a855f7" font-size="22" font-weight="900" letter-spacing="6" text-anchor="middle" font-family="monospace">8 4 9   2 0 1</text>
+
+                            <text x="296" y="312" fill="#10b981" font-size="10" font-weight="700" font-family="-apple-system, sans-serif">✓ Verified for Counter Pickup & Handover</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Detailed Feature Matrix Showcase Section -->
         <section class="section-container" id="features">
             <div class="section-header">
@@ -1488,6 +1707,18 @@
                     <h3>Field Staff GPS & Route Tracking</h3>
                     <p>Real-time location updates for field staff, customer visit verification, daily route mapping, and monthly attendance reports.</p>
                 </div>
+
+                <div class="feature-card">
+                    <span class="feature-badge-small">B2B Portal</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                    <h3>24/7 Dedicated Customer Portal</h3>
+                    <p>Empower your B2B clients with a self-service portal for live ledger statements, purchase invoice downloads, collection receipts, order tracking, and security OTP clearance.</p>
+                </div>
             </div>
         </section>
 
@@ -1501,6 +1732,7 @@
 
             <div class="demo-tabs-nav">
                 <button class="demo-tab-btn active" onclick="switchDemoTab('salesTab', this)">Sales & E-Invoicing</button>
+                <button class="demo-tab-btn" onclick="switchDemoTab('customerPortalTab', this)">Customer Portal</button>
                 <button class="demo-tab-btn" onclick="switchDemoTab('fefoTab', this)">FEFO Inventory</button>
                 <button class="demo-tab-btn" onclick="switchDemoTab('otpTab', this)">Dual OTP Clearance</button>
                 <button class="demo-tab-btn" onclick="switchDemoTab('gpsTab', this)">GPS Route Tracker</button>
@@ -1539,6 +1771,67 @@
                         </div>
                         <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-heading); margin-top: 12px;">
                             Total: ₹ 1,42,800.00
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="demo-content-panel" id="customerPortalTab">
+                <div class="demo-info">
+                    <h3>24/7 Self-Service B2B Customer Portal</h3>
+                    <p>Provide your B2B buyers with a secure, 24/7 self-service portal to view ledger balances, download purchase invoices, track live orders, inspect payment collection records, and clear OTP pickups.</p>
+                    <ul class="demo-feature-list">
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Real-Time Ledger & Statements:</strong> Live opening balance, debits, credits, running balance, and 1-click A4 PDF/Excel downloads
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Purchase History & Bill Downloads:</strong> Complete sales & POS purchase bills with instant PDF downloads & GST IRN details
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Collection & Payment Receipts:</strong> Full record of past payments, payment modes (Cash, UPI, Cheque, Bank Transfer), and receipts
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Live Sales Order Tracking:</strong> Real-time status updates on active orders, items pending dispatch, and order breakdowns
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Dual Collection & Delivery OTPs:</strong> Active OTP code display for counter pickups and verified order handovers
+                        </li>
+                    </ul>
+                </div>
+                <div class="demo-visual-preview">
+                    <div style="font-family: monospace; color: var(--accent-cyan); font-size: 0.9rem; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>CUSTOMER SELF-SERVICE PORTAL</span>
+                        <span style="background: rgba(6, 182, 212, 0.15); color: #06b6d4; font-size: 0.75rem; padding: 3px 8px; border-radius: 999px; font-weight: 700;">24/7 ONLINE ACCESS</span>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); font-size: 0.85rem;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+                            <div>
+                                <div style="color: var(--text-muted); font-size: 0.75rem;">Account Ledger Balance</div>
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #38bdf8;">₹ 42,500.00 Dr</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--text-muted); font-size: 0.75rem;">Credit Limit & Available</div>
+                                <div style="font-size: 0.85rem; font-weight: 700; color: #10b981;">₹ 2,00,000 / Available: ₹ 1,57,500</div>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem; margin-bottom: 12px;">
+                            <div style="background: rgba(15, 23, 42, 0.6); padding: 8px 10px; border-radius: 6px;">
+                                <span style="color: var(--text-muted);">Active Order:</span> <strong style="color: #f59e0b;">#ORD-2026-842</strong>
+                                <div style="color: #10b981; font-size: 0.75rem; margin-top: 2px;">● Dispatched • In Transit</div>
+                            </div>
+                            <div style="background: rgba(15, 23, 42, 0.6); padding: 8px 10px; border-radius: 6px;">
+                                <span style="color: var(--text-muted);">Live Collection OTP:</span> <strong style="color: #06b6d4;">849 201</strong>
+                                <div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 2px;">Valid for Counter Pickup</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items: center; font-size: 0.78rem; background: rgba(6, 182, 212, 0.08); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(6, 182, 212, 0.2);">
+                            <span style="color: var(--text-heading); font-weight: 600;">Latest Invoice: INV-2026-0842 (₹ 14,200)</span>
+                            <span style="color: #06b6d4; font-weight: 700; cursor: pointer;">[Download PDF 📄]</span>
                         </div>
                     </div>
                 </div>
@@ -1782,6 +2075,16 @@
                     </div>
                     <div class="faq-answer">
                         Whenever your field staff or cashier collects a payment or delivers an order, an instant One-Time Password (OTP) is sent to the customer's mobile phone. Verifying this code ensures every transaction is authentic and immediately updates your accounts.
+                    </div>
+                </div>
+
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>How does the 24/7 Dedicated Customer Portal work for my clients?</span>
+                        <svg class="faq-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="faq-answer">
+                        zivaBooks includes a 24/7 dedicated Customer Self-Service Portal (`/customer_home/`). Your B2B clients can log in anytime to view real-time account ledger statements, download PDF sales & POS invoices, track live sales order statuses, inspect payment collection records, and access active collection & delivery OTP codes without contacting your support team.
                     </div>
                 </div>
 

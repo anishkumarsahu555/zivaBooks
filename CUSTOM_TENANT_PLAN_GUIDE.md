@@ -61,6 +61,10 @@ Navigate to **Django Admin** -> **License Plans** (`/admin/home/licenseplan/add/
 | | `geofenced_attendance_enabled` | Geofenced photo attendance check-in |
 | **Ziva AI Assistant** | `ziva_ai_enabled` | Ziva AI business intelligence assistant |
 | | `ziva_ai_max_queries_per_month` | Custom monthly AI credit quota (e.g. `10000`) |
+| **Customer Portal** | `customer_portal_enabled` | 24/7 B2B Customer Self-Service Portal |
+| | `customer_ledger_enabled` | Real-time Customer Ledger & KPI statements |
+| | `customer_invoice_downloads` | Purchase Bills & PDF invoice downloads |
+| | `customer_order_tracking` | Live Sales Order tracking & item dispatch status |
 | **Security & Multi-Branch**| `multi_branch_isolation_enabled` | Multi-branch organization data isolation |
 | | `custom_shadow_mode_enabled` | Category passcode control (Shadow Mode) |
 | | `role_based_permissions_enabled` | Custom staff group role permissions |
