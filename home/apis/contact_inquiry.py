@@ -1,11 +1,14 @@
-"""
-API endpoint for processing software license purchase contact inquiries from the website.
-"""
-
 import json
+import logging
+from threading import Thread
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from django.http import JsonResponse
+from django.template.loader import render_to_string
 from django.views.decorators.http import require_http_methods
 from home.models import LicenseInquiry
+
+logger = logging.getLogger(__name__)
 
 
 def _get_client_ip(request):
@@ -13,6 +16,90 @@ def _get_client_ip(request):
     if x_forwarded_for:
         return x_forwarded_for.split(',')[0].strip()
     return request.META.get('REMOTE_ADDR', '')
+
+
+def _extract_email_address(raw_email):
+    if not raw_email:
+        return 'admin@zivabooks.com'
+    if '<' in str(raw_email) and '>' in str(raw_email):
+        return str(raw_email).split('<')[-1].split('>')[0].strip()
+    return str(raw_email).strip()
+
+
+def _resolve_admin_emails():
+    default_from = getattr(settings, 'DEFAULT_FROM_EMAIL', 'admin@zivabooks.com')
+    clean_email = _extract_email_address(default_from)
+    return [clean_email]
+
+
+def send_license_inquiry_admin_email(inquiry, request=None):
+    """
+    Sends an email notification to system admins when a new License Inquiry is submitted.
+    Both from_email and to_email are derived from DEFAULT_FROM_EMAIL.
+    Dispatched asynchronously in a daemon thread so API responses stay instantaneous.
+    """
+    if not getattr(settings, 'LICENSE_INQUIRY_NOTIFY_ADMIN', True):
+        return
+
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'zivaBooks <admin@zivabooks.com>')
+    admin_recipients = _resolve_admin_emails()
+    if not admin_recipients:
+        admin_recipients = [_extract_email_address(from_email)]
+
+    admin_url = None
+    if request:
+        try:
+            admin_url = request.build_absolute_uri(f"/admin/home/licenseinquiry/{inquiry.id}/change/")
+        except Exception:
+            admin_url = f"/admin/home/licenseinquiry/{inquiry.id}/change/"
+    else:
+        admin_url = f"/admin/home/licenseinquiry/{inquiry.id}/change/"
+
+    context = {
+        'inquiry': inquiry,
+        'admin_url': admin_url,
+    }
+
+    try:
+        subject = render_to_string('home/emails/license_inquiry_admin_subject.txt', context).strip()
+    except Exception:
+        subject = f"[zivaBooks Admin] New License Request: {inquiry.full_name} ({inquiry.license_plan.title()} Plan)"
+
+    try:
+        body = render_to_string('home/emails/license_inquiry_admin_email.txt', context)
+    except Exception:
+        body = f"New License Request from {inquiry.full_name} ({inquiry.email}, Phone: {inquiry.phone}). Plan: {inquiry.license_plan}."
+
+    try:
+        html_body = render_to_string('home/emails/license_inquiry_admin_email.html', context)
+    except Exception:
+        html_body = None
+
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'zivaBooks <admin@zivabooks.com>')
+
+    def worker():
+        try:
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=body,
+                from_email=from_email,
+                to=admin_recipients,
+            )
+            if html_body:
+                msg.attach_alternative(html_body, 'text/html')
+            sent_count = msg.send(fail_silently=False)
+            if sent_count:
+                logger.info('[License Inquiry Email] Admin notification sent to %s for inquiry #%s', admin_recipients, inquiry.id)
+            else:
+                logger.warning('[License Inquiry Email] Send returned 0 for inquiry #%s', inquiry.id)
+        except Exception as err:
+            logger.warning('[License Inquiry Email] Exception sending email for inquiry #%s: %s', inquiry.id, str(err))
+
+    # Synchronous dispatch in test environment or when testing
+    if getattr(settings, 'EMAIL_BACKEND', '').endswith('locmem.EmailBackend'):
+        worker()
+    else:
+        Thread(target=worker, daemon=True).start()
 
 
 @require_http_methods(["POST"])
@@ -54,6 +141,9 @@ def contact_inquiry_api(request):
             status='new',
             ip_address=_get_client_ip(request)
         )
+
+        # Trigger Admin Email Notification
+        send_license_inquiry_admin_email(inquiry, request=request)
 
         return JsonResponse({
             'status': 'success',

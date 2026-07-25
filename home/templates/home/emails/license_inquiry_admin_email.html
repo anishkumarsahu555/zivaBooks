@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New License Request - zivaBooks Admin Notification</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;background:#f1f5f9;padding:32px 16px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;max-width:600px;border-collapse:collapse;">
+                    <!-- Badge Header -->
+                    <tr>
+                        <td style="padding:0 0 16px 0;text-align:center;">
+                            <div style="display:inline-block;padding:8px 16px;border-radius:999px;background:#e0f2fe;color:#0369a1;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;">
+                                zivaBooks License System • Admin Alert
+                            </div>
+                        </td>
+                    </tr>
+                    <!-- Main Email Card -->
+                    <tr>
+                        <td style="background:#ffffff;border:1px solid #cbd5e1;border-radius:20px;box-shadow:0 20px 40px rgba(15,23,42,.08);overflow:hidden;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                <!-- Header Banner -->
+                                <tr>
+                                    <td style="padding:32px 32px 24px;background:linear-gradient(135deg,#0284c7,#0f766e);color:#ffffff;">
+                                        <div style="font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.9;">Inquiry Notification</div>
+                                        <h1 style="margin:8px 0 0;font-size:26px;line-height:1.2;font-weight:800;">New Software License Request</h1>
+                                    </td>
+                                </tr>
+                                <!-- Body Content -->
+                                <tr>
+                                    <td style="padding:32px;">
+                                        <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#334155;">
+                                            Hello Admin, a prospective client has just submitted a new software license inquiry on the <strong>zivaBooks</strong> website.
+                                        </p>
+
+                                        <!-- Details Grid Card -->
+                                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:20px;margin-0 0 24px;">
+                                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                                                <tr>
+                                                    <td style="padding:8px 0;font-size:14px;color:#64748b;width:140px;font-weight:600;">Full Name:</td>
+                                                    <td style="padding:8px 0;font-size:14px;color:#0f172a;font-weight:700;">{{ inquiry.full_name }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;font-size:14px;color:#64748b;font-weight:600;">Business / Org:</td>
+                                                    <td style="padding:8px 0;font-size:14px;color:#0f172a;font-weight:600;">{{ inquiry.business_name|default:"Not specified" }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;font-size:14px;color:#64748b;font-weight:600;">Email Address:</td>
+                                                    <td style="padding:8px 0;font-size:14px;color:#0284c7;font-weight:700;"><a href="mailto:{{ inquiry.email }}" style="color:#0284c7;text-decoration:none;">{{ inquiry.email }}</a></td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;font-size:14px;color:#64748b;font-weight:600;">Phone Number:</td>
+                                                    <td style="padding:8px 0;font-size:14px;color:#0f172a;font-weight:700;"><a href="tel:{{ inquiry.phone }}" style="color:#0f172a;text-decoration:none;">{{ inquiry.phone }}</a></td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;font-size:14px;color:#64748b;font-weight:600;">Requested Plan:</td>
+                                                    <td style="padding:8px 0;font-size:14px;color:#0f766e;font-weight:800;text-transform:uppercase;">{{ inquiry.license_plan }} Plan</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;font-size:14px;color:#64748b;font-weight:600;">Requested Seats:</td>
+                                                    <td style="padding:8px 0;font-size:14px;color:#0f172a;font-weight:700;">{{ inquiry.user_seats }} staff seat(s)</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;font-size:14px;color:#64748b;font-weight:600;">Submitted Date:</td>
+                                                    <td style="padding:8px 0;font-size:13px;color:#475569;">{{ inquiry.created_at }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:8px 0;font-size:14px;color:#64748b;font-weight:600;">IP Address:</td>
+                                                    <td style="padding:8px 0;font-size:13px;color:#64748b;font-family:monospace;">{{ inquiry.ip_address|default:"N/A" }}</td>
+                                                </tr>
+                                            </table>
+                                        </div>
+
+                                        {% if inquiry.message %}
+                                        <!-- Message Box -->
+                                        <div style="margin:0 0 24px;">
+                                            <div style="font-size:13px;font-weight:700;color:#475569;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">Customer Note / Message:</div>
+                                            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:16px;font-size:14px;line-height:1.6;color:#78350f;">
+                                                "{{ inquiry.message }}"
+                                            </div>
+                                        </div>
+                                        {% endif %}
+
+                                        <!-- Action Button -->
+                                        {% if admin_url %}
+                                        <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0 16px;">
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ admin_url }}" style="display:inline-block;background:#0284c7;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 26px;border-radius:12px;box-shadow:0 10px 20px rgba(2,132,199,.25);">
+                                                        Review Inquiry in Django Admin →
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding:20px 12px 0;text-align:center;color:#64748b;font-size:12px;line-height:1.5;">
+                            This is an automated administrative notification sent by zivaBooks core system.
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

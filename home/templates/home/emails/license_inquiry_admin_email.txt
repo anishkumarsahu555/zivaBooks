@@ -1,0 +1,19 @@
+New Software License Request - zivaBooks
+
+A new software license inquiry has been submitted on the zivaBooks website.
+
+Applicant Details:
+- Full Name: {{ inquiry.full_name }}
+- Business/Organization: {{ inquiry.business_name|default:"Not specified" }}
+- Email: {{ inquiry.email }}
+- Phone: {{ inquiry.phone }}
+- Requested Plan: {{ inquiry.license_plan|title }}
+- Requested User Seats: {{ inquiry.user_seats }}
+- Submission Date: {{ inquiry.created_at }}
+- IP Address: {{ inquiry.ip_address|default:"N/A" }}
+
+Customer Message:
+{{ inquiry.message|default:"No additional message provided." }}
+
+Manage this inquiry in Django Admin:
+{{ admin_url }}

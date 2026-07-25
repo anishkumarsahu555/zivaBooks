@@ -1,4 +1,6 @@
 import json
+from django.conf import settings
+from django.core import mail
 from django.test import TestCase, Client
 from django.urls import reverse
 from home.models import LicenseInquiry
@@ -9,7 +11,7 @@ class ContactInquiryTestCase(TestCase):
         self.client = Client()
         self.url = reverse('homeApp:contact_inquiry_api')
 
-    def test_successful_form_submission(self):
+    def test_successful_form_submission_and_admin_email(self):
         payload = {
             'full_name': 'Sarah Connor',
             'business_name': 'Cyberdyne Systems',
@@ -33,6 +35,16 @@ class ContactInquiryTestCase(TestCase):
         self.assertEqual(inquiry.user_seats, 15)
         self.assertEqual(inquiry.status, 'new')
 
+        # Verify Admin Email Notification (from and to both derived from DEFAULT_FROM_EMAIL)
+        self.assertEqual(len(mail.outbox), 1)
+        sent_email = mail.outbox[0]
+        self.assertIn('[zivaBooks Admin] New License Request: Sarah Connor', sent_email.subject)
+        self.assertIn('sarah@cyberdyne.com', sent_email.body)
+        self.assertIn('Cyberdyne Systems', sent_email.body)
+        self.assertEqual(sent_email.from_email, getattr(settings, 'DEFAULT_FROM_EMAIL'))
+        expected_to_email = getattr(settings, 'DEFAULT_FROM_EMAIL').split('<')[-1].replace('>', '').strip()
+        self.assertEqual(sent_email.to, [expected_to_email])
+
     def test_form_data_encoded_submission(self):
         response = self.client.post(self.url, {
             'full_name': 'John Doe',
@@ -45,6 +57,7 @@ class ContactInquiryTestCase(TestCase):
         data = response.json()
         self.assertEqual(data['status'], 'success')
         self.assertTrue(LicenseInquiry.objects.filter(email='john@example.com').exists())
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_missing_required_fields_validation(self):
         # Missing name
@@ -59,3 +72,4 @@ class ContactInquiryTestCase(TestCase):
         # Invalid phone
         res3 = self.client.post(self.url, {'full_name': 'Alex', 'email': 'alex@example.com', 'phone': '123'})
         self.assertEqual(res3.status_code, 400)
+
