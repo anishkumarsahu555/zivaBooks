@@ -363,18 +363,7 @@ class SalesByAdminListJson(BaseDatatableView):
             if can_edit_sales(self.request.user):
                 action_parts.append('''<a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
             
-            # E-Invoice & E-Way Bill Integration Buttons
-            if item.isApproved and item.invoiceKind == Sales.InvoiceKind.B2B:
-                if item.einvoiceStatus in [Sales.EInvoiceStatus.PENDING, Sales.EInvoiceStatus.FAILED]:
-                    action_parts.append('''<button data-inverted="" data-tooltip="Generate E-Invoice" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="generateEInvoice('{}')" class="ui circular icon button orange"><i class="file alternate outline icon"></i></button>'''.format(item.pk))
-                elif item.einvoiceStatus == Sales.EInvoiceStatus.GENERATED:
-                    action_parts.append('''<button data-inverted="" data-tooltip="Cancel E-Invoice" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="cancelEInvoice('{}')" class="ui circular icon button red"><i class="cancel icon"></i></button>'''.format(item.pk))
-                    action_parts.append('''<a href="/api/einvoice/schema/{}/" data-inverted="" data-tooltip="Download Schema JSON" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular icon button grey"><i class="download icon"></i></a>'''.format(item.pk))
-                
-                if item.ewayBillStatus in [Sales.EWayBillStatus.PENDING, Sales.EWayBillStatus.NOT_REQUIRED]:
-                    action_parts.append('''<button data-inverted="" data-tooltip="Generate E-Way Bill" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="openEWayBillModal('{}')" class="ui circular icon button teal"><i class="truck icon"></i></button>'''.format(item.pk))
-                elif item.ewayBillStatus == Sales.EWayBillStatus.GENERATED:
-                    action_parts.append('''<button data-inverted="" data-tooltip="Cancel E-Way Bill" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="cancelEWayBill('{}')" class="ui circular icon button red"><i class="minus circle icon"></i></button>'''.format(item.pk))
+            # E-Invoice & E-Way Bill Integration Buttons (Disabled)
 
             action_parts.append('''<button data-inverted="" data-tooltip="Download Invoice" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="downloadSalesInvoice('{}')" class="ui circular blue icon button"><i class="file pdf outline icon"></i></button>'''.format(item.pk))
             if can_delete_sales(self.request.user):
@@ -489,18 +478,7 @@ class SalesByStaffListJson(BaseDatatableView):
                     action_parts.append('''<a href="/edit_sales/{}/" data-inverted="" data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular facebook icon button green"><i class="pen icon"></i></a>'''.format(item.pk))
             action_parts.append('''<button data-inverted="" data-tooltip="Download Invoice" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="downloadSalesInvoice('{}')" class="ui circular blue icon button"><i class="file pdf outline icon"></i></button>'''.format(item.pk))
             
-            # E-Invoice & E-Way Bill Integration Buttons
-            if item.isApproved and item.invoiceKind == Sales.InvoiceKind.B2B:
-                if item.einvoiceStatus in [Sales.EInvoiceStatus.PENDING, Sales.EInvoiceStatus.FAILED]:
-                    action_parts.append('''<button data-inverted="" data-tooltip="Generate E-Invoice" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="generateEInvoice('{}')" class="ui circular icon button orange"><i class="file alternate outline icon"></i></button>'''.format(item.pk))
-                elif item.einvoiceStatus == Sales.EInvoiceStatus.GENERATED:
-                    action_parts.append('''<button data-inverted="" data-tooltip="Cancel E-Invoice" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="cancelEInvoice('{}')" class="ui circular icon button red"><i class="cancel icon"></i></button>'''.format(item.pk))
-                    action_parts.append('''<a href="/api/einvoice/schema/{}/" data-inverted="" data-tooltip="Download Schema JSON" data-position="left center" data-variation="mini" style="font-size:10px;" class="ui circular icon button grey"><i class="download icon"></i></a>'''.format(item.pk))
-                
-                if item.ewayBillStatus in [Sales.EWayBillStatus.PENDING, Sales.EWayBillStatus.NOT_REQUIRED]:
-                    action_parts.append('''<button data-inverted="" data-tooltip="Generate E-Way Bill" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="openEWayBillModal('{}')" class="ui circular icon button teal"><i class="truck icon"></i></button>'''.format(item.pk))
-                elif item.ewayBillStatus == Sales.EWayBillStatus.GENERATED:
-                    action_parts.append('''<button data-inverted="" data-tooltip="Cancel E-Way Bill" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="cancelEWayBill('{}')" class="ui circular icon button red"><i class="minus circle icon"></i></button>'''.format(item.pk))
+            # E-Invoice & E-Way Bill Integration Buttons (Disabled)
 
             if can_delete_sales(self.request.user):
                 action_parts.append('''<button data-inverted="" data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="delUser('{}')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button>'''.format(item.pk))
