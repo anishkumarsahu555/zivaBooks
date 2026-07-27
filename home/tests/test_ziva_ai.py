@@ -14,6 +14,7 @@ class ZivaAiTests(SeededTenantMixin, TestCase):
         self._orig_nvidia_key = os.environ.get('NVIDIA_API_KEY')
         os.environ['GEMINI_API_KEY'] = 'dummy_gemini_key'
         os.environ['NVIDIA_API_KEY'] = 'dummy_nvidia_key'
+        TenantAiUsage.objects.filter(tenant=self.tenant).update(queries_used_this_month=0)
 
     def tearDown(self):
         import os
@@ -582,6 +583,7 @@ class ZivaAiConcurrencyTests(SeededTenantMixin, TransactionTestCase):
         self._orig_nvidia_key = os.environ.get('NVIDIA_API_KEY')
         os.environ['GEMINI_API_KEY'] = 'dummy_gemini_key'
         os.environ['NVIDIA_API_KEY'] = 'dummy_nvidia_key'
+        TenantAiUsage.objects.filter(tenant=self.tenant).update(queries_used_this_month=0)
 
     def tearDown(self):
         import os
