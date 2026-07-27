@@ -657,20 +657,38 @@ def ziva_ai_chat_api(request):
         if not tenant:
             return JsonResponse({'error': 'No active tenant workspace found.'}, status=400)
 
+        plan = getattr(tenant, 'license_plan', None)
+        plan_name = plan.name if plan else 'Free'
+        plan_limit = plan.ziva_ai_max_queries_per_month if plan else 5
+
         ai_usage, created = TenantAiUsage.objects.get_or_create(
             tenant=tenant,
             defaults={
-                'plan_name': 'Free',
-                'max_queries_per_month': 5,
+                'plan_name': plan_name,
+                'max_queries_per_month': plan_limit,
                 'queries_used_this_month': 0
             }
         )
+        if not created and plan:
+            if ai_usage.max_queries_per_month != plan_limit or ai_usage.plan_name != plan_name:
+                ai_usage.plan_name = plan_name
+                ai_usage.max_queries_per_month = plan_limit
+                ai_usage.save()
+
         ai_usage.check_and_reset_usage()
 
-        if ai_usage.max_queries_per_month >= 0 and ai_usage.queries_used_this_month >= ai_usage.max_queries_per_month:
+        if plan is not None and plan_limit == 0:
             return JsonResponse({
                 'error': 'Quota Exceeded',
-                'message': f"You have exhausted your monthly limit of {ai_usage.max_queries_per_month} free queries.",
+                'message': f"Ziva AI is not included in your current plan ({ai_usage.plan_name}). Please upgrade to Growth, Enterprise, or a Custom Plan to access Ziva AI queries.",
+                'used': ai_usage.queries_used_this_month,
+                'limit': ai_usage.max_queries_per_month,
+                'plan': ai_usage.plan_name
+            }, status=403)
+        elif ai_usage.max_queries_per_month > 0 and ai_usage.queries_used_this_month >= ai_usage.max_queries_per_month:
+            return JsonResponse({
+                'error': 'Quota Exceeded',
+                'message': f"You have reached your monthly Ziva AI query limit of {ai_usage.max_queries_per_month} queries for your {ai_usage.plan_name} plan. Your quota will automatically reset on the 1st of next month, or you can upgrade your plan for higher limits.",
                 'used': ai_usage.queries_used_this_month,
                 'limit': ai_usage.max_queries_per_month,
                 'plan': ai_usage.plan_name

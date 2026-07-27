@@ -1537,6 +1537,11 @@
 
     // Initialize Quota percentage bar
     updateQuotaUI({{ ai_usage.queries_used_this_month }}, {{ ai_usage.max_queries_per_month }}, '{{ ai_usage.plan_name }}');
+    {% if ai_usage.max_queries_per_month > 0 and ai_usage.queries_used_this_month >= ai_usage.max_queries_per_month %}
+        renderBlockedScreen("You have reached your monthly Ziva AI query limit of {{ ai_usage.max_queries_per_month }} queries for your {{ ai_usage.plan_name }} plan. Your quota will automatically reset on the 1st of next month, or you can contact your administrator to upgrade your plan.", '{{ ai_usage.plan_name }}', {{ ai_usage.queries_used_this_month }}, {{ ai_usage.max_queries_per_month }});
+    {% elif ai_usage.max_queries_per_month == 0 %}
+        renderBlockedScreen("Ziva AI is not included in your current plan ({{ ai_usage.plan_name }}). Please upgrade to Growth, Enterprise, or a Custom Plan to access Ziva AI queries.", '{{ ai_usage.plan_name }}', 0, 0);
+    {% endif %}
 
     // Initialize provider dropdown from localStorage
     const providerDropdown = document.getElementById('providerDropdown');
@@ -2260,29 +2265,35 @@
         }
     }
 
-    // Show Blocked Screen
+    // Show Blocked Screen (Full Usage / Limit Reached)
     function renderBlockedScreen(message, plan, used, limit) {
         chatBody.innerHTML = `
-            <div class="ai-blocked-card animate fade-in">
-                <i class="exclamation triangle icon"></i>
-                <h3>Monthly Limit Reached</h3>
-                <p style="color: var(--app-muted); font-weight: 600; line-height: 1.5;">
-                    ${message || "You have used up all your free monthly AI queries. Please contact your manager to upgrade your subscription."}
+            <div class="ai-blocked-card animate fade-in" style="max-width: 520px; margin: 50px auto; text-align: center; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 16px; padding: 32px 24px; backdrop-filter: blur(12px); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);">
+                <div style="width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 50%; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); display: flex; align-items: center; justify-content: center;">
+                    <i class="exclamation triangle icon" style="font-size: 24px; color: #ef4444; margin: 0;"></i>
+                </div>
+                <h3 style="font-size: 1.4rem; font-weight: 700; color: #f8fafc; margin-bottom: 10px;">Monthly AI Limit Reached</h3>
+                <p style="color: #94a3b8; font-weight: 500; line-height: 1.6; font-size: 0.95rem; margin-bottom: 20px;">
+                    ${message || "You have reached your monthly Ziva AI query quota. Your quota will automatically reset on the 1st of next month, or you can upgrade your plan for higher limits."}
                 </p>
-                <div class="ui statistics" style="margin-top: 15px; justify-content: center;">
-                    <div class="statistic">
-                        <div class="value" style="color: var(--app-primary);">${plan || 'Free'}</div>
-                        <div class="label" style="font-weight: 700; text-transform: uppercase;">Current Plan</div>
+                <div class="ui statistics" style="margin-top: 15px; justify-content: center; display: flex; gap: 24px;">
+                    <div class="statistic" style="margin: 0;">
+                        <div class="value" style="color: #38bdf8; font-size: 1.3rem; font-weight: 700;">${plan || 'Free'}</div>
+                        <div class="label" style="font-weight: 700; text-transform: uppercase; font-size: 0.72rem; color: #64748b; margin-top: 4px;">Current Plan</div>
                     </div>
-                    <div class="statistic">
-                        <div class="value" style="color: #ef4444;">${used}/${limit}</div>
-                        <div class="label" style="font-weight: 700; text-transform: uppercase;">Queries Used</div>
+                    <div class="statistic" style="margin: 0;">
+                        <div class="value" style="color: #ef4444; font-size: 1.3rem; font-weight: 700;">${used} / ${limit}</div>
+                        <div class="label" style="font-weight: 700; text-transform: uppercase; font-size: 0.72rem; color: #64748b; margin-top: 4px;">Monthly Quota</div>
                     </div>
+                </div>
+                <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.85rem; color: #10b981; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                    <i class="sync icon"></i> Quota automatically resets on the 1st of every month
                 </div>
             </div>
         `;
         // Disable input
-        document.getElementById('aiFooter').style.display = 'none';
+        const footer = document.getElementById('aiFooter');
+        if (footer) footer.style.display = 'none';
     }
 
     // Poll Task Status AJAX Handler

@@ -4253,14 +4253,24 @@ def ziva_ai_page(request):
     if not has_ziva_ai_access(request, tenant):
         return custom_permission_denied(request, message="Access denied. You do not have permission to view Ziva AI.")
 
+    plan = getattr(tenant, 'license_plan', None)
+    plan_name = plan.name if plan else 'Free'
+    plan_limit = plan.ziva_ai_max_queries_per_month if plan else 5
+
     ai_usage, created = TenantAiUsage.objects.get_or_create(
         tenant=tenant,
         defaults={
-            'plan_name': 'Free',
-            'max_queries_per_month': 5,
+            'plan_name': plan_name,
+            'max_queries_per_month': plan_limit,
             'queries_used_this_month': 0
         }
     )
+    if not created and plan:
+        if ai_usage.max_queries_per_month != plan_limit or ai_usage.plan_name != plan_name:
+            ai_usage.plan_name = plan_name
+            ai_usage.max_queries_per_month = plan_limit
+            ai_usage.save()
+
     ai_usage.check_and_reset_usage()
 
     from .models import ZivaAiChatMessage

@@ -156,6 +156,28 @@ class Tenant(TimeStampedModel, AuditedModel):
         # Synchronize Tenant Admin Group permissions with the assigned LicensePlan
         self.sync_tenant_admin_group_permissions()
 
+        # Synchronize Ziva AI Usage limits with the assigned LicensePlan
+        try:
+            from home.models import TenantAiUsage
+            from datetime import date
+            ai_usage, created = TenantAiUsage.objects.get_or_create(
+                tenant=self,
+                defaults={
+                    'plan_name': plan.name,
+                    'max_queries_per_month': plan.ziva_ai_max_queries_per_month,
+                    'queries_used_this_month': 0,
+                    'last_reset_date': date.today()
+                }
+            )
+            if not created:
+                ai_usage.plan_name = plan.name
+                ai_usage.max_queries_per_month = plan.ziva_ai_max_queries_per_month
+                ai_usage.queries_used_this_month = 0  # Fresh query allocation on plan activation/renewal
+                ai_usage.last_reset_date = date.today()
+                ai_usage.save()
+        except Exception:
+            pass
+
     def get_license_plan_summary(self):
         """Return active license plan summary for this tenant."""
         if not self.license_plan:
