@@ -206,6 +206,8 @@
 {% block js %}
     <script>
 
+        var chequeUrlParams = new URLSearchParams(window.location.search);
+        var chequeDueFilter = chequeUrlParams.get('due') || '';
         var today = new Date();
         $('#rangestart').calendar({
             initialDate: today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear(),
@@ -243,6 +245,21 @@
 
 
         // user Details
+
+        var defaultChequeDate = today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear();
+        var initialChequeStartDate = chequeUrlParams.get('startDate') || (chequeDueFilter ? '' : defaultChequeDate);
+        var initialChequeEndDate = chequeUrlParams.get('endDate') || (chequeDueFilter ? '' : defaultChequeDate);
+        $('#startDateF').val(initialChequeStartDate);
+        $('#endDateF').val(initialChequeEndDate);
+        var initialChequeParams = new URLSearchParams();
+        if (initialChequeStartDate && initialChequeEndDate) {
+            initialChequeParams.set('startDate', initialChequeStartDate);
+            initialChequeParams.set('endDate', initialChequeEndDate);
+        }
+        initialChequeParams.set('staffID', $('#staffID').val() || 'All');
+        if (chequeDueFilter) {
+            initialChequeParams.set('due', chequeDueFilter);
+        }
 
         userTab = $('#UserTable').DataTable({
             dom: 'Blfrtip',
@@ -289,7 +306,7 @@
             "pageLength": 10,
             "processing": true,
             "serverSide": true,
-            "ajax": "{% url 'homeApp:ChequeReminderCollectionListJson' %}"
+            "ajax": "{% url 'homeApp:ChequeReminderCollectionListJson' %}?" + initialChequeParams.toString()
         });
 
 
@@ -355,7 +372,16 @@
             var startDate = $('#startDateF').val();
             var endDate = $('#endDateF').val();
             var staffID = $('#staffID').val();
-            userTab.ajax.url('{% url 'homeApp:ChequeReminderCollectionListJson' %}?startDate=' + startDate + '&endDate=' + endDate + '&staffID=' + staffID).load();
+            var params = new URLSearchParams();
+            if (startDate && endDate) {
+                params.set('startDate', startDate);
+                params.set('endDate', endDate);
+            }
+            params.set('staffID', staffID || 'All');
+            if (chequeDueFilter) {
+                params.set('due', chequeDueFilter);
+            }
+            userTab.ajax.url('{% url 'homeApp:ChequeReminderCollectionListJson' %}?' + params.toString()).load();
 
         }
 

@@ -7,7 +7,11 @@ from django.utils.html import format_html, format_html_join
 
 # Register your models here.
 from .models import *
-from .permission_bundles import tenant_permission_bundle_definitions
+from .permission_bundles import (
+    tenant_permission_bundle_definitions,
+    get_bundle_keys_for_license_plan,
+    get_permissions_for_license_plan,
+)
 from .tenancy import ensure_membership
 
 
@@ -50,7 +54,7 @@ class TenantAdminForm(forms.ModelForm):
         choices=_tenant_bundle_choices(),
         required=False,
         widget=forms.CheckboxSelectMultiple,
-        help_text='Use these module presets first, then fine-tune the raw permission list below if needed.',
+        help_text='Module presets auto-sync with the selected License Plan, or select manually to fine-tune.',
         label='Tenant admin permission presets',
     )
 
@@ -77,19 +81,31 @@ class TenantAdminForm(forms.ModelForm):
                     f'{permission.content_type.app_label}.{permission.codename}'
                     for permission in group.permissions.select_related('content_type')
                 }
-                self.initial['preset_bundles'] = [
+                presets = [
                     bundle['key']
                     for bundle in tenant_permission_bundle_definitions()
                     if set(bundle['permissions']).issubset(selected_perm_names)
                 ]
+                if not presets and self.instance.license_plan:
+                    presets = get_bundle_keys_for_license_plan(self.instance.license_plan)
+                self.initial['preset_bundles'] = presets
+            elif self.instance.license_plan:
+                self.initial['preset_bundles'] = get_bundle_keys_for_license_plan(self.instance.license_plan)
 
     def clean_admin_permissions(self):
         permissions = list(self.cleaned_data.get('admin_permissions') or [])
-        selected_bundle_keys = self.cleaned_data.get('preset_bundles') or []
+        selected_bundle_keys = list(self.cleaned_data.get('preset_bundles') or [])
+
+        # Auto-derive preset bundles from license_plan if none were manually specified
+        license_plan = self.cleaned_data.get('license_plan') or getattr(self.instance, 'license_plan', None)
+        if not selected_bundle_keys and license_plan:
+            selected_bundle_keys = get_bundle_keys_for_license_plan(license_plan)
+
         bundle_permission_map = _tenant_bundle_permissions()
         extra_perm_names = set()
         for bundle_key in selected_bundle_keys:
             extra_perm_names.update(bundle_permission_map.get(bundle_key, []))
+
         if extra_perm_names:
             bundle_permissions = list(
                 Permission.objects.select_related('content_type').filter(
@@ -320,23 +336,30 @@ class CashCounterAdmin(admin.ModelAdmin):
                     'lastUpdatedOn', 'isDeleted']
 
 
+class TenantAiUsageInline(admin.StackedInline):
+    model = TenantAiUsage
+    extra = 0
+    can_delete = False
+
+
 class TenantAdmin(admin.ModelAdmin):
     form = TenantAdminForm
+    inlines = [TenantAiUsageInline]
     list_display = [
         'name',
         'slug',
+        'license_plan',
         'legalName',
-        'gstNumber',
         'phone',
         'inventoryEnabled',
         'advancedInvoicingEnabled',
         'nonGstShadowEnabled',
         'isActive',
         'datetime',
-        'lastUpdatedOn',
     ]
     search_fields = ['name', 'slug', 'legalName', 'gstNumber', 'phone']
     list_filter = [
+        'license_plan',
         'isActive',
         'inventoryEnabled',
         'advancedInvoicingEnabled',
@@ -347,18 +370,19 @@ class TenantAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (None, {
-            'fields': ('name', 'slug', 'isActive'),
+            'fields': ('name', 'slug', 'license_plan', 'isActive'),
         }),
         ('Business Details', {
             'fields': ('legalName', 'gstNumber', 'phone', 'billingAddress'),
         }),
-        ('Tenant Features', {
+        ('Tenant Features & Plan Sync', {
             'fields': (
                 'inventoryEnabled',
                 'advancedInvoicingEnabled',
                 'nonGstShadowEnabled',
                 'enableAttendanceLocationMaps',
             ),
+            'description': 'Feature flags automatically synchronize when a License Plan is assigned.',
         }),
         ('Tenant Admin Access', {
             'fields': ('tenant_admin_user', 'preset_bundles', 'admin_permissions'),
@@ -379,7 +403,10 @@ class TenantAdmin(admin.ModelAdmin):
             rows.append(f'{membership.user.username} - {membership.get_role_display()}{default_badge}')
         return format_html_join('\n', '{}<br>', ((row,) for row in rows))
 
-    membership_summary.short_description = 'Tenant Memberships'
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if obj.license_plan:
+            obj.apply_license_plan()
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
@@ -484,8 +511,145 @@ class JournalLineAdmin(admin.ModelAdmin):
     entryDateTime.short_description = 'Entry Date'
 
 
+class TenantAiUsageAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'plan_name', 'max_queries_per_month', 'queries_used_this_month', 'last_reset_date']
+    list_filter = ['plan_name', 'last_reset_date']
+    search_fields = ['tenant__name', 'plan_name']
+
+
 admin.site.register(BookAccount, BookAccountAdmin)
 admin.site.register(BookTransaction, BookTransactionAdmin)
 admin.site.register(InvoiceSeries, InvoiceSeriesAdmin)
 admin.site.register(JournalEntry, JournalEntryAdmin)
 admin.site.register(JournalLine, JournalLineAdmin)
+admin.site.register(TenantAiUsage, TenantAiUsageAdmin)
+
+
+class ZivaAiChatMessageAdmin(admin.ModelAdmin):
+    list_display = ['tenant', 'user', 'role', 'timestamp', 'message_snippet']
+    list_filter = ['role', 'timestamp', 'tenant']
+    search_fields = ['user__username', 'message']
+
+    def message_snippet(self, obj):
+        return obj.message[:50] + '...' if len(obj.message) > 50 else obj.message
+    message_snippet.short_description = 'Message'
+
+admin.site.register(ZivaAiChatMessage, ZivaAiChatMessageAdmin)
+
+
+class LicenseInquiryAdmin(admin.ModelAdmin):
+    list_display = [
+        'full_name',
+        'business_name',
+        'email',
+        'phone',
+        'license_plan',
+        'user_seats',
+        'status',
+        'datetime',
+        'ip_address',
+    ]
+    list_filter = ['license_plan', 'status', 'datetime']
+    search_fields = ['full_name', 'business_name', 'email', 'phone', 'message']
+    readonly_fields = ['datetime', 'lastUpdatedOn', 'ip_address']
+    date_hierarchy = 'datetime'
+    list_editable = ['status']
+
+
+admin.site.register(LicenseInquiry, LicenseInquiryAdmin)
+
+
+class LicensePlanAdmin(admin.ModelAdmin):
+    list_display = [
+        'name',
+        'plan_code',
+        'price_per_year',
+        'user_seats',
+        'is_featured',
+        'is_active',
+        'is_custom',
+        'display_order',
+        'sales_billing_enabled',
+        'gst_einvoicing_enabled',
+        'inventory_enabled',
+        'dual_otp_enabled',
+        'gps_tracking_enabled',
+        'ziva_ai_enabled',
+    ]
+    list_editable = ['price_per_year', 'user_seats', 'is_featured', 'is_active', 'is_custom', 'display_order']
+    list_filter = ['is_active', 'is_custom', 'is_featured', 'gst_einvoicing_enabled', 'ziva_ai_enabled', 'gps_tracking_enabled', 'inventory_enabled']
+    search_fields = ['name', 'plan_code', 'tagline']
+    fieldsets = (
+        ('General Plan Information', {
+            'fields': ('plan_code', 'name', 'tagline', 'price_per_year', 'user_seats', 'is_featured', 'is_custom', 'display_order', 'is_active')
+        }),
+        ('1. Sales & Invoicing Modules', {
+            'fields': (
+                'sales_billing_enabled',
+                'proforma_estimates_enabled',
+                'custom_invoice_series_enabled',
+                'sales_returns_credit_notes_enabled',
+                'thermal_printing_enabled',
+                'pdf_excel_exports_enabled',
+            )
+        }),
+        ('2. GST & Tax Compliance Modules', {
+            'fields': (
+                'gst_einvoicing_enabled',
+                'eway_bill_enabled',
+            )
+        }),
+        ('3. Inventory & FEFO Stock Modules', {
+            'fields': (
+                'inventory_enabled',
+                'fefo_batch_tracking_enabled',
+                'multi_warehouse_enabled',
+                'stock_adjustment_vouchers_enabled',
+                'zero_stock_alerts_enabled',
+            )
+        }),
+        ('4. Counter POS & OTP Clearance Modules', {
+            'fields': (
+                'multi_counter_pos_enabled',
+                'dual_otp_enabled',
+            )
+        }),
+        ('5. Financial Accounting Modules', {
+            'fields': (
+                'cashbook_bankbook_enabled',
+                'party_ledgers_enabled',
+                'double_entry_journals_enabled',
+            )
+        }),
+        ('6. Field Staff GPS & Attendance Modules', {
+            'fields': (
+                'gps_tracking_enabled',
+                'route_history_map_enabled',
+                'geofenced_attendance_enabled',
+            )
+        }),
+        ('7. Ziva AI Assistant Modules', {
+            'fields': (
+                'ziva_ai_enabled',
+                'ziva_ai_max_queries_per_month',
+            )
+        }),
+        ('8. Security & Multi-Branch Modules', {
+            'fields': (
+                'multi_branch_isolation_enabled',
+                'custom_shadow_mode_enabled',
+                'role_based_permissions_enabled',
+            )
+        }),
+        ('Custom Feature Bullet Points', {
+            'fields': ('features_list',),
+            'description': 'Enter human-readable feature bullets as a JSON array e.g. ["Sales System", "FEFO Stock Control"]'
+        })
+    )
+
+
+admin.site.register(LicensePlan, LicensePlanAdmin)
+
+
+
+

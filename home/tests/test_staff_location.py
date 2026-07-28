@@ -15,6 +15,8 @@ from home.tests.utils import SeededTenantMixin
 class StaffLocationApiTests(SeededTenantMixin, TestCase):
     def setUp(self):
         super().setUp()
+        self.tenant.enableAttendanceLocationMaps = True
+        self.tenant.save()
         self.collector_staff = StaffUser.objects.get(tenant=self.tenant, user_ID=self.collector)
         StaffLocationLog.objects.filter(tenant=self.tenant).delete()
         self.request_factory = RequestFactory()

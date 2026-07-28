@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,8 +22,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 
@@ -34,13 +33,37 @@ def _env_flag(name, default=False):
     return value.strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
+def _env_list(name, default=None):
+    value = os.getenv(name)
+    if value is None:
+        return default or []
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = _env_flag('DEBUG', True)
 
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'zivabooks-local-dev-insecure-key'
+    else:
+        raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG is false.')
 
 
+ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '[::1]', '*'] if DEBUG else [])
+if not ALLOWED_HOSTS:
+    raise ImproperlyConfigured('ALLOWED_HOSTS must be set when DEBUG is false.')
 
-ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS')
+
+SESSION_COOKIE_SECURE = _env_flag('SESSION_COOKIE_SECURE', not DEBUG)
+CSRF_COOKIE_SECURE = _env_flag('CSRF_COOKIE_SECURE', not DEBUG)
+SECURE_SSL_REDIRECT = _env_flag('SECURE_SSL_REDIRECT', False)
+SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '0' if DEBUG else '31536000'))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_flag('SECURE_HSTS_INCLUDE_SUBDOMAINS', not DEBUG)
+SECURE_HSTS_PRELOAD = _env_flag('SECURE_HSTS_PRELOAD', False)
 
 # Application definition
 
@@ -67,6 +90,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'activation.middleware.TenantActivationMiddleware',
     'home.middleware.AuditUserMiddleware',
+    'home.middleware.RequestLoggingMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -250,15 +274,17 @@ PWA_SERVICE_WORKER_PATH = os.path.join(BASE_DIR, 'home', '../static/sw/servicewo
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
-EMAIL_USE_SSL = _env_flag('EMAIL_USE_SSL', True)
-EMAIL_USE_TLS = _env_flag('EMAIL_USE_TLS', True)
+EMAIL_USE_SSL = _env_flag('EMAIL_USE_SSL', False)
+EMAIL_USE_TLS = _env_flag('EMAIL_USE_TLS', not EMAIL_USE_SSL)
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'dummy-email@gmail.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'dummy-app-password')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', f'zivaBooks <{EMAIL_HOST_USER}>')
 PASSWORD_RESET_TIMEOUT = int(os.environ.get('PASSWORD_RESET_TIMEOUT', '3600'))
 PASSWORD_RESET_EMAIL_ASYNC = _env_flag('PASSWORD_RESET_EMAIL_ASYNC', True)
+ADMIN_NOTIFICATION_EMAIL = os.environ.get('ADMIN_NOTIFICATION_EMAIL', DEFAULT_FROM_EMAIL)
+LICENSE_INQUIRY_NOTIFY_ADMIN = _env_flag('LICENSE_INQUIRY_NOTIFY_ADMIN', True)
 
-if _env_flag('USE_REDIS_CACHE', True):
+if _env_flag('USE_REDIS_CACHE', not DEBUG):
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
@@ -277,3 +303,18 @@ else:
             "TIMEOUT": int(os.environ.get("CACHE_DEFAULT_TIMEOUT", "300")),
         }
     }
+
+# Celery Configuration
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/1')
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://127.0.0.1:6379/1')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+# Run tasks synchronously during unit testing
+import sys
+if 'test' in sys.argv or _env_flag('TESTING', False):
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+

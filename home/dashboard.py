@@ -2,6 +2,8 @@ from datetime import date
 
 from django.urls import reverse
 
+from .dashboard_alerts import build_action_alerts
+from .dashboard_charts import build_dashboard_chart_cards
 from .navigation import _effective_permission_names
 
 
@@ -531,7 +533,9 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             ],
         })
 
-    if _has_any_perm(request, ['home.view_attendance', 'home.add_attendance', 'home.change_attendance']):
+    from .utils.feature_guards import tenant_has_feature
+    has_attendance_feature = tenant_has_feature(tenant, 'staff_attendance') if tenant else True
+    if has_attendance_feature and _has_any_perm(request, ['home.view_attendance', 'home.add_attendance', 'home.change_attendance']):
         metric_groups.append({
             'title': 'Attendance',
             'subtitle': 'Attendance state and current month activity for this user.',
@@ -577,9 +581,14 @@ def build_dashboard_state(request, sidebar_sections, tenant=None, staff_user=Non
             ],
         })
 
+    charts = build_dashboard_chart_cards(request)
+
     dashboard_state = {
         'hero': hero,
         'metric_groups': metric_groups,
+        'action_alerts': build_action_alerts(request),
+        'charts': charts,
+        'charts_endpoint': reverse('homeApp:get_dashboard_charts_api') if charts else '',
         'action_sections': action_sections,
         'license_message': (
             (getattr(request, 'dashboard_license_message', '') or _build_license_message(tenant))

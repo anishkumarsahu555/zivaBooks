@@ -1,0 +1,720 @@
+{% extends 'home/admin/index.html' %}
+{% load static %}
+
+{% block title %}
+    <title>Business Profile Settings</title>
+{% endblock %}
+
+{% block css %}
+<style>
+    :root {
+        --profile-ink: #0f172a;
+        --profile-slate: #475569;
+        --profile-line: rgba(15, 23, 42, 0.08);
+        --profile-surface: rgba(255, 255, 255, 0.92);
+        --profile-accent: #0f766e;
+        --profile-accent-soft: rgba(15, 118, 110, 0.12);
+        --profile-warm: #c2410c;
+        --profile-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+    }
+
+    html[data-theme="dark"] {
+        --profile-ink: #f8fafc;
+        --profile-slate: #94a3b8;
+        --profile-line: rgba(71, 85, 105, 0.42);
+        --profile-surface: rgba(15, 23, 42, 0.92);
+        --profile-accent: #5eead4;
+        --profile-accent-soft: rgba(20, 184, 166, 0.14);
+        --profile-warm: #fdba74;
+        --profile-shadow: 0 24px 60px rgba(2, 6, 23, 0.28);
+    }
+
+    .profile-shell {
+        padding: 1.5rem;
+    }
+
+    .profile-hero {
+        position: relative;
+        overflow: hidden;
+        border-radius: 28px;
+        padding: 24px 28px;
+        color: #f8fafc;
+        background:
+            radial-gradient(circle at top left, rgba(251, 191, 36, 0.24), transparent 28%),
+            radial-gradient(circle at bottom right, rgba(45, 212, 191, 0.20), transparent 34%),
+            linear-gradient(135deg, #0f172a 0%, #123b45 55%, #7c2d12 100%);
+        box-shadow: var(--profile-shadow);
+        margin-bottom: 2rem;
+    }
+
+    .profile-hero::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 32%),
+            linear-gradient(300deg, rgba(255, 255, 255, 0.05), transparent 24%);
+        pointer-events: none;
+    }
+
+    .profile-hero-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(200px, 0.9fr);
+        gap: 12px;
+        align-items: center;
+    }
+
+    .profile-kicker {
+        font-size: 0.78rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(248, 250, 252, 0.72);
+        margin-bottom: 6px;
+    }
+
+    .profile-title {
+        font-size: 2.2rem;
+        font-weight: 900;
+        line-height: 1;
+        margin: 0;
+        letter-spacing: -0.03em;
+        color: #fff;
+    }
+
+    .profile-subtitle {
+        margin-top: 8px;
+        max-width: 620px;
+        color: rgba(248, 250, 252, 0.84);
+        font-size: 0.88rem;
+        line-height: 1.45;
+    }
+
+    .profile-hero-actions {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .profile-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 800;
+        background: rgba(15, 23, 42, 0.05);
+        color: var(--profile-ink);
+    }
+
+    .profile-chip.is-accent {
+        background: var(--profile-accent-soft);
+        color: var(--profile-accent);
+    }
+
+    .profile-card {
+        border-radius: 28px;
+        border: 1px solid var(--profile-line);
+        background: var(--profile-surface);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        box-shadow: var(--profile-shadow);
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .profile-card:hover {
+        box-shadow: 0 30px 70px rgba(15, 23, 42, 0.16);
+    }
+
+    .profile-card-header {
+        padding: 24px 28px 18px;
+        border-bottom: 1px solid var(--profile-line);
+    }
+
+    .profile-card-title {
+        font-size: 1.25rem;
+        font-weight: 900;
+        color: var(--profile-ink);
+        letter-spacing: -0.02em;
+    }
+
+    .profile-card-body {
+        padding: 28px;
+    }
+
+    .logo-upload-zone {
+        border: 2px dashed var(--profile-line);
+        border-radius: 20px;
+        padding: 2.5rem 1.5rem;
+        text-align: center;
+        background: rgba(15, 23, 42, 0.02);
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .logo-upload-zone:hover {
+        border-color: var(--profile-accent);
+        background-color: var(--profile-accent-soft);
+    }
+
+    .logo-upload-icon {
+        color: var(--profile-slate);
+        transition: transform 0.2s ease;
+    }
+
+    .logo-upload-zone:hover .logo-upload-icon {
+        transform: translateY(-4px) scale(1.05);
+        color: var(--profile-accent);
+    }
+
+    /* Cropper Styles similar to add staff */
+    .cropper-modal .content {
+        padding-top: 0.5rem !important;
+    }
+
+    .cropper-stage-wrap {
+        border-radius: 22px;
+        padding: 1rem;
+        background: linear-gradient(180deg, #f8fafc, #eef2ff);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .cropper-stage {
+        position: relative;
+        width: min(100%, 420px);
+        margin: 0 auto;
+        background:
+            linear-gradient(45deg, rgba(148, 163, 184, 0.12) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.12) 75%),
+            linear-gradient(45deg, rgba(148, 163, 184, 0.12) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.12) 75%);
+        background-size: 18px 18px;
+        background-position: 0 0, 9px 9px;
+        border-radius: 18px;
+        overflow: hidden;
+        touch-action: none;
+    }
+
+    .cropper-stage.is-square {
+        aspect-ratio: 1 / 1;
+    }
+
+    .cropper-stage.is-document {
+        aspect-ratio: 4 / 3;
+    }
+
+    .cropper-stage img {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform-origin: center;
+        max-width: none;
+        user-select: none;
+        -webkit-user-drag: none;
+        cursor: grab;
+    }
+
+    .cropper-stage.is-dragging img {
+        cursor: grabbing;
+    }
+
+    .cropper-toolbar {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.85rem;
+        align-items: end;
+        margin-top: 1rem;
+    }
+
+    .cropper-slider-label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 0.45rem;
+    }
+
+    .cropper-toolbar input[type=range] {
+        width: 100%;
+    }
+
+    .cropper-meta {
+        color: #64748b;
+        font-size: 0.8rem;
+        line-height: 1.45;
+        margin-top: 0.85rem;
+    }
+
+    html[data-theme="dark"] .cropper-stage-wrap {
+        background: linear-gradient(180deg, #162338, #111b2e) !important;
+        border-color: var(--profile-line) !important;
+    }
+
+    html[data-theme="dark"] .cropper-slider-label {
+        color: var(--profile-ink) !important;
+    }
+
+    html[data-theme="dark"] .cropper-meta {
+        color: var(--profile-slate) !important;
+    }
+
+    html[data-theme="dark"] .cropper-stage {
+        background:
+            linear-gradient(45deg, rgba(148, 163, 184, 0.10) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.10) 75%),
+            linear-gradient(45deg, rgba(148, 163, 184, 0.10) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.10) 75%);
+        background-size: 18px 18px;
+        background-position: 0 0, 9px 9px;
+    }
+
+    .avatar-preview-box {
+        width: 120px;
+        height: 120px;
+        border-radius: 20px;
+        border: 2px solid var(--profile-line);
+        background-position: center;
+        background-size: cover;
+        background-repeat: no-repeat;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.05);
+        margin: 0 auto;
+    }
+
+    .styled-input {
+        border: 1.5px solid var(--profile-line) !important;
+        background: transparent !important;
+        color: var(--profile-ink) !important;
+        border-radius: 12px !important;
+        padding: 12px 16px !important;
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .styled-input:focus {
+        border-color: var(--profile-accent) !important;
+        box-shadow: 0 0 0 4px var(--profile-accent-soft) !important;
+    }
+
+    .styled-label {
+        font-size: 0.8rem !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+        color: var(--profile-slate) !important;
+        margin-bottom: 6px !important;
+    }
+
+    .save-profile-btn {
+        background: var(--profile-accent) !important;
+        color: #fff !important;
+        border-radius: 12px !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.08em !important;
+        padding: 14px 28px !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 8px 20px var(--profile-accent-soft) !important;
+    }
+
+    .save-profile-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 24px rgba(15, 118, 110, 0.24) !important;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="profile-shell">
+    <div class="ui breadcrumb" style="margin-bottom: 1rem;">
+        <a href="{% url 'homeApp:homepage' %}" class="section" style="color: var(--profile-accent);">Dashboard</a>
+        <i class="right angle icon divider" style="color: var(--profile-slate);"></i>
+        <div class="active section" style="color: var(--profile-slate);">Business Profile</div>
+    </div>
+
+    <!-- Hero Header -->
+    <div class="profile-hero">
+        <div class="profile-hero-grid">
+            <div>
+                <div class="profile-kicker">Settings</div>
+                <h1 class="profile-title">Business Profile</h1>
+                <div class="profile-subtitle">Configure your firm's registration details, contacts, billing details, and customize your invoice logo.</div>
+            </div>
+            <div class="profile-hero-actions">
+                <span class="profile-chip is-accent">
+                    <i class="building icon"></i>
+                    {{ tenant.name }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <form class="ui form" id="profileForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" id="logoDataInput" name="logo_data">
+
+        <div class="ui stackable grid">
+            <!-- Left Side: Firm Details -->
+            <div class="ten wide column">
+                <div class="profile-card">
+                    <div class="profile-card-header">
+                        <div class="profile-card-title">
+                            <i class="building outline icon" style="color: var(--profile-accent); margin-right: 8px;"></i>
+                            Firm Information
+                        </div>
+                    </div>
+                    <div class="profile-card-body">
+                        <div class="field" style="margin-bottom: 1.5rem;">
+                            <label class="styled-label">Business / Legal Name</label>
+                            <input class="styled-input" type="text" name="legalName" value="{{ tenant.legalName|default:tenant.name|default:'' }}" placeholder="e.g. Acme Solutions Pvt Ltd" required>
+                        </div>
+
+                        <div class="two fields" style="gap: 1.5rem; margin-bottom: 1.5rem;">
+                            <div class="field">
+                                <label class="styled-label">GSTIN (GST Number)</label>
+                                <input class="styled-input" type="text" name="gstNumber" value="{{ tenant.gstNumber|default:'' }}" placeholder="e.g. 27AAAAA0000A1Z5">
+                            </div>
+                            <div class="field">
+                                <label class="styled-label">Phone / Contact Number</label>
+                                <input class="styled-input" type="text" name="phone" value="{{ tenant.phone|default:'' }}" placeholder="e.g. +91 98765 43210">
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="styled-label">Billing / Registered Address</label>
+                            <textarea class="styled-input" name="billingAddress" rows="4" placeholder="e.g. 102, Business Plaza, Mumbai, Maharashtra - 400001">{{ tenant.billingAddress|default:'' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Logo Uploader -->
+            <div class="six wide column">
+                <div class="profile-card" style="height: 100%;">
+                    <div class="profile-card-header">
+                        <div class="profile-card-title">
+                            <i class="image outline icon" style="color: var(--profile-accent); margin-right: 8px;"></i>
+                            Business Logo
+                        </div>
+                    </div>
+                    <div class="profile-card-body" style="display: flex; flex-direction: column; justify-content: space-between; align-items: center; min-height: 310px;">
+                        
+                        <div style="width: 100%;">
+                            <div class="logo-upload-zone" onclick="document.getElementById('logoFileInput').click()">
+                                <i class="cloud upload alternate huge icon logo-upload-icon"></i>
+                                <div>
+                                    <div style="font-weight: 800; color: var(--profile-ink); font-size: 0.95rem;">
+                                        Click to upload logo
+                                    </div>
+                                    <div style="font-size: 0.75rem; color: var(--profile-slate); margin-top: 4px;">
+                                        PNG, JPG or GIF (max 2MB)
+                                    </div>
+                                </div>
+                                <input type="file" id="logoFileInput" style="display: none;" accept="image/*">
+                            </div>
+                        </div>
+
+                        <div style="text-align: center; width: 100%; margin-top: 1.5rem;">
+                            <label class="styled-label" style="display: block; margin-bottom: 12px !important;">Logo Preview</label>
+                            <div>
+                                <div class="avatar-preview-box" id="logoPreviewBox" style="background-image: url('{% if tenant.logo %}{{ tenant.logo.url }}{% else %}{% static "images/placeholder-logo.png" %}{% endif %}');"></div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 2rem; display: flex; justify-content: flex-end;">
+            <button class="ui button save-profile-btn" type="submit" id="saveProfileBtn">
+                <i class="save icon" style="margin-right: 6px;"></i>
+                Save Business Profile
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Draggable Cropper Modal (similar to add staff) -->
+<div class="ui tiny modal cropper-modal" id="imageCropModal" style="border-radius: 20px; overflow: hidden;">
+    <div class="header" style="background: var(--profile-surface); color: var(--profile-ink); font-weight: 900; border-bottom: 1px solid var(--profile-line);">
+        Crop Business Logo
+    </div>
+    <div class="content" style="background: var(--profile-surface); padding: 1.5rem;">
+        <div class="cropper-stage-wrap">
+            <div class="cropper-stage is-document" id="cropperStage">
+                <img id="cropperImage" alt="Crop preview">
+            </div>
+            <div class="cropper-toolbar">
+                <div>
+                    <label class="cropper-slider-label" for="cropperZoom">Zoom</label>
+                    <input type="range" id="cropperZoom" min="1" max="3" step="0.01" value="1">
+                </div>
+                <button class="ui basic button" type="button" id="cropperResetBtn" style="border-radius: 10px;">Reset</button>
+            </div>
+            <div class="cropper-meta">
+                Drag the image to position it inside the frame. Logo uses a landscape crop frame.
+            </div>
+        </div>
+    </div>
+    <div class="actions" style="background: var(--profile-surface); border-top: 1px solid var(--profile-line); padding: 1rem 1.5rem;">
+        <div class="ui button" style="border-radius: 12px; font-weight: 700;" onclick="$('#imageCropModal').modal('hide')">Cancel</div>
+        <button class="ui teal right labeled icon button" type="button" id="cropperApplyBtn" style="border-radius: 12px; font-weight: 800;">
+            Apply Crop
+            <i class="checkmark icon" style="margin-left: 6px;"></i>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+    var uploadTargets = {
+        'logo': {inputId: 'logoFileInput', previewId: 'logoPreviewBox', type: 'document', fallbackUrl: '{% static "images/placeholder-logo.png" %}', outputName: 'tenant-logo.jpg'}
+    };
+    var croppedFiles = {};
+    var cropState = {
+        targetKey: null,
+        imageSrc: null,
+        imageElement: null,
+        naturalWidth: 0,
+        naturalHeight: 0,
+        minScale: 1,
+        zoomValue: 1,
+        x: 0,
+        y: 0,
+        applied: false,
+        previousFile: null,
+        previousPreviewUrl: '',
+        dragging: false,
+        dragStartX: 0,
+        dragStartY: 0,
+        dragOriginX: 0,
+        dragOriginY: 0
+    };
+
+    function setPreviewImage(previewId, imageUrl) {
+        var $preview = $('#' + previewId);
+        if (imageUrl) {
+            $preview.css('background-image', 'url(' + imageUrl + ')');
+            $preview.css('background-color', 'transparent');
+        } else {
+            $preview.css('background-image', 'none');
+        }
+    }
+
+    function openCropper(targetKey, file) {
+        if (!file) return;
+        if (!file.type || file.type.indexOf('image/') !== 0) {
+            $('body').toast({class: 'orange', message: 'Please choose an image file.'});
+            return;
+        }
+
+        var target = uploadTargets[targetKey];
+        var reader = new FileReader();
+        cropState.previousFile = croppedFiles[targetKey] || null;
+        cropState.previousPreviewUrl = $('#' + target.previewId).css('background-image');
+        cropState.applied = false;
+
+        reader.onload = function (e) {
+            var previewImage = document.getElementById('cropperImage');
+            var img = new Image();
+            img.onload = function () {
+                cropState.targetKey = targetKey;
+                cropState.imageSrc = e.target.result;
+                cropState.naturalWidth = img.naturalWidth;
+                cropState.naturalHeight = img.naturalHeight;
+                cropState.imageElement = previewImage;
+                cropState.x = 0;
+                cropState.y = 0;
+                cropState.zoomValue = 1;
+
+                previewImage.src = e.target.result;
+                $('#cropperZoom').val(1);
+                $('#imageCropModal').modal('show');
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function renderCropperImage() {
+        if (!cropState.imageElement) return;
+        var scale = cropState.minScale * cropState.zoomValue;
+        cropState.imageElement.style.transform =
+            'translate(-50%, -50%) translate(' + cropState.x + 'px, ' + cropState.y + 'px) scale(' + scale + ')';
+    }
+
+    function clampCropPosition() {
+        var stage = document.getElementById('cropperStage');
+        var stageRect = stage.getBoundingClientRect();
+        var scale = cropState.minScale * cropState.zoomValue;
+        var scaledWidth = cropState.naturalWidth * scale;
+        var scaledHeight = cropState.naturalHeight * scale;
+        var limitX = Math.max(0, (scaledWidth - stageRect.width) / 2);
+        var limitY = Math.max(0, (scaledHeight - stageRect.height) / 2);
+        cropState.x = Math.min(limitX, Math.max(-limitX, cropState.x));
+        cropState.y = Math.min(limitY, Math.max(-limitY, cropState.y));
+    }
+
+    function applyCrop() {
+        var stage = document.getElementById('cropperStage');
+        var target = uploadTargets[cropState.targetKey];
+        if (!target || !cropState.imageSrc) return;
+        var stageRect = stage.getBoundingClientRect();
+        var scale = cropState.minScale * cropState.zoomValue;
+        var renderWidth = cropState.naturalWidth * scale;
+        var renderHeight = cropState.naturalHeight * scale;
+        var left = (stageRect.width / 2) + cropState.x - (renderWidth / 2);
+        var top = (stageRect.height / 2) + cropState.y - (renderHeight / 2);
+
+        var canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 600;
+
+        var img = new Image();
+        img.onload = function () {
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            var scaleX = canvas.width / stageRect.width;
+            var scaleY = canvas.height / stageRect.height;
+            ctx.drawImage(
+                img,
+                left * scaleX,
+                top * scaleY,
+                renderWidth * scaleX,
+                renderHeight * scaleY
+            );
+            
+            var dataUrl = canvas.toDataURL('image/png');
+            document.getElementById('logoDataInput').value = dataUrl;
+            setPreviewImage(target.previewId, dataUrl);
+            cropState.applied = true;
+            $('#imageCropModal').modal('hide');
+        };
+        img.src = cropState.imageSrc;
+    }
+
+    $('#logoFileInput').on('change', function () {
+        if (this.files && this.files[0]) {
+            openCropper('logo', this.files[0]);
+        }
+    });
+
+    $('#cropperZoom').on('input', function () {
+        cropState.zoomValue = parseFloat($(this).val());
+        clampCropPosition();
+        renderCropperImage();
+    });
+
+    $('#cropperResetBtn').on('click', function () {
+        cropState.x = 0;
+        cropState.y = 0;
+        cropState.zoomValue = 1;
+        $('#cropperZoom').val(1);
+        renderCropperImage();
+    });
+
+    $('#cropperApplyBtn').on('click', function () {
+        applyCrop();
+    });
+
+    $('#cropperStage').on('mousedown touchstart', function (event) {
+        if (!cropState.imageElement) return;
+        var point = event.type === 'touchstart' ? event.originalEvent.touches[0] : event;
+        cropState.dragging = true;
+        cropState.dragStartX = point.clientX;
+        cropState.dragStartY = point.clientY;
+        cropState.dragOriginX = cropState.x;
+        cropState.dragOriginY = cropState.y;
+        $(this).addClass('is-dragging');
+    });
+
+    $(document).on('mousemove touchmove', function (event) {
+        if (!cropState.dragging) return;
+        var point = event.type === 'touchmove' ? event.originalEvent.touches[0] : event;
+        cropState.x = cropState.dragOriginX + (point.clientX - cropState.dragStartX);
+        cropState.y = cropState.dragOriginY + (point.clientY - cropState.dragStartY);
+        clampCropPosition();
+        renderCropperImage();
+    });
+
+    $(document).on('mouseup touchend touchcancel', function () {
+        cropState.dragging = false;
+        $('#cropperStage').removeClass('is-dragging');
+    });
+
+    $('#imageCropModal').modal({
+        autofocus: false,
+        allowMultiple: true,
+        closable: false,
+        detachable: false,
+        onVisible: function () {
+            if (!cropState.imageElement) return;
+            var stage = document.getElementById('cropperStage');
+            var stageRect = stage.getBoundingClientRect();
+            if (!stageRect.width || !stageRect.height) return;
+            cropState.minScale = Math.min(
+                stageRect.width / cropState.naturalWidth,
+                stageRect.height / cropState.naturalHeight
+            );
+            cropState.x = 0;
+            cropState.y = 0;
+            cropState.zoomValue = 1;
+            $('#cropperZoom').val(1);
+            clampCropPosition();
+            renderCropperImage();
+        },
+        onHidden: function () {
+            cropState.dragging = false;
+            $('#cropperStage').removeClass('is-dragging');
+        }
+    });
+
+    $('#profileForm').on('submit', function (e) {
+        e.preventDefault();
+        showLoading();
+        
+        var formData = new FormData(this);
+        
+        $.ajax({
+            url: "{% url 'homeApp:update_business_profile_api' %}",
+            type: "POST",
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (response) {
+                hideLoading();
+                if (response.message === 'success') {
+                    $('body').toast({
+                        class: 'success',
+                        message: 'Business Profile updated successfully!'
+                    });
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    $('body').toast({
+                        class: 'error',
+                        message: response.error || 'Failed to update profile.'
+                    });
+                }
+            },
+            error: function (xhr) {
+                hideLoading();
+                var msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : 'An error occurred.';
+                $('body').toast({
+                    class: 'error',
+                    message: msg
+                });
+            }
+        });
+    });
+</script>
+{% endblock %}

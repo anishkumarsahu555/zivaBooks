@@ -4,14 +4,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width,  initial-scale=1.0, maximum-scale=5.0, minimum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
     <link rel="stylesheet" href="{% static 'css/app-loader.css' %}">
     <link rel="stylesheet" href="{% static 'css/ui-polish.css' %}">
-    <title>Login</title>
+    <title>zivaBooks — Intelligent Business Operations & Management ERP</title>
     {% progressive_web_app_meta %}
     <script>
         (function () {
@@ -39,916 +38,2549 @@
             integrity="sha512-t5mAtfZZmR2gl5LK7WEkJoyHCfyzoy10MlerMGhxsXl3J7uSSNTAW6FK/wvGBC8ua9AFazwMaC0LxsMTMiM5gg=="
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="{% static 'sw/app.js' %}"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-0: #09101d;
-            --bg-1: #0f1728;
-            --bg-2: #16233c;
-            --card: #f7f2ea;
-            --panel: rgba(255, 255, 255, 0.05);
-            --line: rgba(18, 24, 38, 0.1);
-            --ink: #172033;
-            --muted: #677088;
-            --accent: #d97549;
-            --accent-deep: #a94a2a;
-            --teal: #2b7a78;
-            --cream: #f3ddcb;
-            --shadow: 0 34px 80px rgba(4, 8, 18, 0.42);
+            --bg-dark: #070b14;
+            --bg-dark-card: rgba(15, 23, 42, 0.7);
+            --bg-dark-glass: rgba(15, 23, 42, 0.85);
+            --accent-cyan: #06b6d4;
+            --accent-glow: #0284c7;
+            --accent-orange: #f59e0b;
+            --accent-purple: #8b5cf6;
+            --accent-emerald: #10b981;
+            --border-glow: rgba(6, 182, 212, 0.25);
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --text-heading: #f8fafc;
+            --text-body: #94a3b8;
+            --text-muted: #64748b;
+            --card-radius: 20px;
+            --btn-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        html[data-theme="light"] {
+            --bg-dark: #f1f5f9;
+            --bg-dark-card: rgba(255, 255, 255, 0.92);
+            --bg-dark-glass: rgba(255, 255, 255, 0.96);
+            --border-glow: rgba(6, 182, 212, 0.35);
+            --border-subtle: rgba(15, 23, 42, 0.12);
+            --text-heading: #0f172a;
+            --text-body: #334155;
+            --text-muted: #64748b;
+        }
+
+        html[data-theme="light"] .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            border-bottom-color: rgba(15, 23, 42, 0.12);
+        }
+
+        html[data-theme="light"] .form-control {
+            background: #ffffff;
+            border-color: rgba(15, 23, 42, 0.2);
+            color: #0f172a;
+        }
+
+        html[data-theme="light"] .form-control:focus {
+            background: #ffffff;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
+        }
+
+        html[data-theme="light"] .feature-card,
+        html[data-theme="light"] .pricing-card,
+        html[data-theme="light"] .contact-box,
+        html[data-theme="light"] .demo-content-panel,
+        html[data-theme="light"] .faq-item,
+        html[data-theme="light"] .login-modal-card {
+            box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+        }
+
+        html[data-theme="light"] .mockup-card {
+            background: #ffffff;
+            border-color: rgba(6, 182, 212, 0.3);
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+        }
+
+        html[data-theme="light"] .mock-widget,
+        html[data-theme="light"] .demo-visual-preview {
+            background: #f8fafc;
+            border-color: rgba(15, 23, 42, 0.1);
+        }
+
+        html[data-theme="light"] .login-modal-backdrop {
+            background: rgba(15, 23, 42, 0.6);
+        }
+
+        /* Light Mode High-Contrast Overrides for Most Popular Pricing Card & Badge */
+        html[data-theme="light"] .pricing-card.featured {
+            background: linear-gradient(180deg, rgba(6, 182, 212, 0.12), #ffffff);
+            border: 2px solid #06b6d4;
+            box-shadow: 0 20px 45px rgba(6, 182, 212, 0.22);
+        }
+
+        html[data-theme="light"] .popular-badge {
+            background: linear-gradient(135deg, #0284c7, #7e22ce);
+            color: #ffffff;
+            font-weight: 800;
+            box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
+        }
+
+        html[data-theme="light"] .pricing-card.featured h3,
+        html[data-theme="light"] .pricing-card.featured .price {
+            color: #0f172a;
+        }
+
+        /* Light Mode High-Contrast Overrides for Customer Portal Hero */
+        html[data-theme="light"] .customer-portal-hero {
+            border-bottom-color: rgba(15, 23, 42, 0.1) !important;
+        }
+
+        html[data-theme="light"] .portal-highlight-card {
+            background: #ffffff !important;
+            border-color: rgba(15, 23, 42, 0.15) !important;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+        }
+
+        html[data-theme="light"] .portal-highlight-card .card-text {
+            color: #334155 !important;
+        }
+
+        html[data-theme="light"] .portal-mockup-card {
+            background: #ffffff !important;
+            border-color: rgba(6, 182, 212, 0.4) !important;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12) !important;
+        }
+
+        html[data-theme="light"] .portal-mockup-header {
+            background: rgba(241, 245, 249, 0.95) !important;
+            border-bottom-color: rgba(15, 23, 42, 0.12) !important;
+        }
+
+        html[data-theme="light"] .portal-mockup-header-title {
+            color: #0284c7 !important;
+        }
+
+        html[data-theme="light"] .portal-svg-card-bg {
+            fill: #ffffff !important;
+            stroke-opacity: 0.7 !important;
+        }
+
+        html[data-theme="light"] .portal-svg-otp-box {
+            fill: #f8fafc !important;
+            stroke: #a855f7 !important;
+        }
+
+        html[data-theme="light"] .portal-svg-text-heading {
+            fill: #0f172a !important;
+        }
+
+        html[data-theme="light"] .portal-svg-text-sub {
+            fill: #475569 !important;
+        }
+
+        html[data-theme="light"] .pricing-card.featured .price-sub {
+            color: #475569;
+        }
+
+        html[data-theme="light"] .pricing-card.featured .pricing-features li {
+            color: #1e293b;
+            border-bottom-color: rgba(15, 23, 42, 0.12);
+        }
+
+        html[data-theme="light"] .pricing-card.featured .pricing-features li svg {
+            color: #0284c7;
+        }
+
+        html[data-theme="light"] .pricing-card.featured .original-price {
+            color: #64748b;
+        }
+
+        html[data-theme="light"] .pricing-card.featured .savings-badge {
+            background: rgba(16, 185, 129, 0.12);
+            color: #047857;
+            border-color: rgba(16, 185, 129, 0.35);
+        }
+
+        html[data-theme="light"] .pricing-card.featured .btn-select-plan {
+            background: linear-gradient(135deg, #0284c7, #06b6d4);
+            color: #ffffff;
+            border-color: #0284c7;
+            box-shadow: 0 8px 22px rgba(6, 182, 212, 0.35);
+        }
+
+        html[data-theme="light"] .pricing-card.featured .btn-select-plan:hover {
+            background: linear-gradient(135deg, #0369a1, #0284c7);
+            box-shadow: 0 10px 28px rgba(6, 182, 212, 0.45);
         }
 
         * {
             box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            min-height: 100vh;
-            color: var(--ink);
-            background:
-                radial-gradient(circle at 12% 16%, rgba(217, 117, 73, 0.18), transparent 24%),
-                radial-gradient(circle at 84% 18%, rgba(43, 122, 120, 0.16), transparent 24%),
-                linear-gradient(140deg, var(--bg-0) 0%, var(--bg-1) 42%, var(--bg-2) 100%);
-            font-family: "Avenir Next", "Segoe UI", sans-serif;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            overflow-x: hidden;
-            position: relative;
-        }
-
-        html[data-theme="light"] body {
-            color: #172033;
-            background:
-                radial-gradient(circle at 10% 14%, rgba(13, 148, 136, 0.14), transparent 25%),
-                radial-gradient(circle at 88% 16%, rgba(37, 99, 235, 0.12), transparent 25%),
-                linear-gradient(140deg, #edf7f5 0%, #f8fbff 45%, #eef4ff 100%);
-        }
-
-        body::before {
-            content: "";
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            background:
-                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-            background-size: 62px 62px;
-            mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 92%);
-        }
-
-        html[data-theme="light"] body::before {
-            background:
-                linear-gradient(rgba(15, 23, 42, 0.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px);
-        }
-
-        fieldset {
-            border: none;
             margin: 0;
             padding: 0;
         }
 
-        .container {
-            min-height: 100vh;
-            display: grid;
-            place-items: center;
-            padding: 16px;
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-body);
+            overflow-x: hidden;
+            line-height: 1.6;
+            position: relative;
+        }
+
+        /* Canvas Particle Background */
+        #motionCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .relative-content {
             position: relative;
             z-index: 1;
         }
 
-        .ui.grid {
-            width: 100%;
-            margin: 0 !important;
-        }
-
-        .login-panel {
-            width: min(1040px, 100%);
-            overflow: hidden;
-            border-radius: 32px;
-            background: var(--panel);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            box-shadow: var(--shadow);
-            animation: panelIn .4s ease-out both;
-            display: flex;
-            flex-wrap: wrap;
-        }
-
-        html[data-theme="light"] .login-panel {
-            background: rgba(255, 255, 255, 0.64);
-            border-color: rgba(14, 116, 144, 0.14);
-            box-shadow: 0 30px 70px rgba(15, 23, 42, 0.13);
-        }
-
-        .column_1,
-        .column_2 {
-            width: 100%;
-        }
-
-        .column_1 {
-            padding: 22px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: transparent;
-        }
-
-        .column_2 {
-            padding: 26px 28px;
-            color: #f8f1e8;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.015));
-        }
-
-        html[data-theme="light"] .column_2 {
-            color: #172033;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.54), rgba(236, 253, 245, 0.34));
-        }
-
-        .hero-tag {
-            display: inline-block;
-            padding: 8px 14px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: rgba(248, 241, 232, 0.78);
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            align-self: center;
-        }
-
-        html[data-theme="light"] .hero-tag,
-        html[data-theme="light"] .hero-pill {
-            background: rgba(255, 255, 255, 0.62);
-            border-color: rgba(14, 116, 144, 0.12);
-            color: rgba(15, 23, 42, 0.66);
-        }
-
-        .hero-title {
-            margin: 14px 0 10px;
-            font-size: clamp(38px, 5vw, 60px);
-            line-height: 0.92;
-            letter-spacing: -0.06em;
-            font-weight: 800;
-            color: #fbf5ed;
-        }
-
-        html[data-theme="light"] .hero-title {
-            color: #0f172a;
-        }
-
-        .hero-copy {
-            max-width: 360px;
-            margin: 0;
-            color: rgba(248, 241, 232, 0.7);
-            font-size: 14px;
-            line-height: 1.6;
-            align-self: flex-start;
-        }
-
-        html[data-theme="light"] .hero-copy {
-            color: rgba(15, 23, 42, 0.68);
-        }
-
-        .hero-list {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin-top: 16px;
-            align-self: flex-start;
-        }
-
-        .hero-pill {
-            padding: 7px 10px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: rgba(251, 245, 237, 0.82);
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-        }
-
-        .hero-visual {
-            margin-top: 18px;
-            overflow: hidden;
-            border-radius: 22px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-
-        html[data-theme="light"] .hero-visual {
-            background: rgba(255, 255, 255, 0.58);
-            border-color: rgba(14, 116, 144, 0.12);
-            box-shadow: 0 18px 36px rgba(14, 116, 144, 0.08);
-        }
-
-        .hero-visual svg {
-            display: block;
-            width: 100%;
-            height: auto;
-        }
-
-        .login-form-container {
-            width: 100%;
-            max-width: 460px;
-            padding: 38px 34px 32px;
-            border-radius: 28px;
-            background: var(--card);
-            box-shadow: 0 18px 50px rgba(7, 11, 22, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.58);
-        }
-
-        html[data-theme="light"] .login-form-container {
-            background: rgba(255, 255, 255, 0.94);
-            border-color: rgba(14, 116, 144, 0.12);
-            box-shadow: 0 20px 52px rgba(15, 23, 42, 0.12);
-        }
-
-        .form-badge {
-            width: 28px;
-            height: 28px;
-            display: inline-grid;
-            place-items: center;
-            margin-top: 0;
-            border-radius: 10px;
-            background: linear-gradient(135deg, rgba(217, 117, 73, 0.16), rgba(43, 122, 120, 0.12));
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
-            flex: 0 0 auto;
-        }
-
-        .form-badge svg {
-            width: 16px;
-            height: 16px;
-        }
-
-        .eyebrow {
-            display: inline-block;
-            color: var(--accent-deep);
-            font-size: 11px;
-            font-weight: 800;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-        }
-
-        .brand-name {
-            margin: 0;
-            color: var(--ink);
-            font-size: 28px;
-            line-height: 1;
-            letter-spacing: -0.04em;
-            font-weight: 800;
-            display: inline-flex;
-            align-items: center;
-        }
-
-        .brand-header {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            margin-bottom: 14px;
-            line-height: 1;
-        }
-
-        .brand-logo {
-            width: 56px;
-            height: 56px;
-            border-radius: 14px;
-            display: block;
-            box-shadow: 0 8px 18px rgba(7, 11, 22, 0.12);
-        }
-
-        .login-title {
-            margin: 0 0 8px;
-            color: var(--ink);
-            font-size: 34px;
-            line-height: 1;
-            letter-spacing: -0.05em;
-            font-weight: 800;
-        }
-
-        .login-subtitle {
-            margin: 0 0 22px;
-            color: var(--muted);
-            font-size: 15px;
-            line-height: 1.65;
-        }
-
-        .field-label {
-            display: block;
-            margin: 0 0 9px 4px;
-            color: #717a8d;
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            text-align: left;
-        }
-
-        .field {
-            margin-bottom: 14px;
-        }
-
-        .input-wrapper {
-            border-radius: 14px;
-            border: 1px solid var(--line);
-            background: rgba(255, 255, 255, 0.94);
-            display: flex;
-            align-items: center;
-            transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
-        }
-
-        .input-wrapper:focus-within {
-            border-color: rgba(217, 117, 73, 0.44);
-            box-shadow: 0 0 0 4px rgba(217, 117, 73, 0.12);
-            transform: translateY(-1px);
-        }
-
-        .input-icon {
-            width: 48px;
-            height: 48px;
-            display: grid;
-            place-items: center;
-            color: #9aa2b2;
-            flex: 0 0 48px;
-        }
-
-        .input-icon svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        input {
-            width: 100%;
-            border: none;
-            outline: 0;
-            background: transparent;
-            color: var(--ink);
-            font-size: 15px;
-            padding: 14px 15px 14px 4px;
-        }
-
-        input::placeholder {
-            color: #a2a9b6;
-        }
-
-        button {
-            width: 100%;
-            margin-top: 14px;
-            border: none;
-            outline: 0;
-            border-radius: 14px;
-            padding: 14px 0;
-            background: linear-gradient(90deg, var(--accent-deep), var(--accent));
-            color: #fffaf6;
-            font-size: 13px;
-            font-weight: 800;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            box-shadow: 0 16px 34px rgba(217, 117, 73, 0.24);
-            transition: transform .14s ease, filter .14s ease;
-        }
-
-        .login-theme-toggle {
+        /* Navigation Bar */
+        .navbar {
             position: fixed;
-            right: 18px;
-            top: 18px;
-            z-index: 2;
-            width: auto;
-            min-width: 44px;
-            min-height: 40px;
-            margin: 0;
-            padding: 0 13px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            border-radius: 999px;
-            background: rgba(255, 255, 255, 0.10);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            color: #fbf5ed;
-            box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            letter-spacing: 0;
-            text-transform: none;
-            font-size: 13px;
-            cursor: pointer;
-        }
-
-        .login-theme-toggle svg {
-            width: 17px;
-            height: 17px;
-        }
-
-        html[data-theme="light"] .login-theme-toggle {
-            background: rgba(255, 255, 255, 0.74);
-            border-color: rgba(14, 116, 144, 0.14);
-            color: #0f172a;
-            box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
-        }
-
-        .form-footer {
-            margin-top: 16px;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
-            color: #8a92a1;
-            font-size: 12px;
+            padding: 0 40px;
+            background: var(--bg-dark-glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-subtle);
+            z-index: 1000;
+            transition: var(--transition);
         }
 
-        .forgot-password-link {
-            display: inline-flex;
+        .brand-logo-wrap {
+            display: flex;
             align-items: center;
-            justify-content: center;
-            margin: 4px 0 0;
-            color: var(--accent-deep);
-            font-size: 12px;
-            font-weight: 800;
+            gap: 12px;
             text-decoration: none;
         }
 
-        .forgot-password-link:hover {
-            color: var(--accent);
-            text-decoration: underline;
+        .brand-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
         }
 
-        html[data-theme="light"] .forgot-password-link {
-            color: #0f766e;
+        .brand-icon img {
+            width: 28px;
+            height: 28px;
         }
 
-        .form-status {
+        .brand-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            letter-spacing: -0.5px;
+        }
+
+        .brand-title span {
+            color: var(--accent-cyan);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-body);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: var(--transition);
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-cyan);
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .theme-toggle-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-heading);
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .theme-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-cyan);
+        }
+
+        .btn-nav-login {
+            background: linear-gradient(135deg, var(--accent-cyan), #0284c7);
+            color: #fff;
+            padding: 10px 22px;
+            border-radius: var(--btn-radius);
+            font-weight: 600;
+            font-size: 0.95rem;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 4px 18px rgba(6, 182, 212, 0.35);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-nav-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 24px rgba(6, 182, 212, 0.5);
+        }
+
+        /* Hero Section */
+        .hero-section {
+            padding: 120px 24px 60px;
+            max-width: 1300px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+        }
+
+        .badge-pill {
             display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 30px;
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid var(--border-glow);
+            color: var(--accent-cyan);
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-bottom: 24px;
+            animation: pulseGlow 3s infinite alternate;
+        }
+
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 0 5px rgba(6, 182, 212, 0.2); }
+            100% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.5); }
+        }
+
+        .hero-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 3.6rem;
+            font-weight: 700;
+            line-height: 1.15;
+            color: var(--text-heading);
+            margin-bottom: 24px;
+            letter-spacing: -1.5px;
+        }
+
+        .hero-title .gradient-text {
+            background: linear-gradient(135deg, #38bdf8, #818cf8, #f43f5e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-subtitle {
+            font-size: 1.15rem;
+            color: var(--text-body);
+            margin-bottom: 36px;
+            max-width: 540px;
+        }
+
+        .hero-cta-group {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary-hero {
+            background: linear-gradient(135deg, var(--accent-cyan), #2563eb);
+            color: #ffffff;
+            padding: 16px 36px;
+            border-radius: var(--btn-radius);
+            font-size: 1.05rem;
+            font-weight: 700;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(6, 182, 212, 0.4);
+            transition: var(--transition);
+        }
+
+        .btn-primary-hero:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(6, 182, 212, 0.6);
+            color: #fff;
+        }
+
+        .btn-secondary-hero {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-heading);
+            padding: 16px 32px;
+            border-radius: var(--btn-radius);
+            font-size: 1.05rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
             align-items: center;
             gap: 10px;
         }
 
-        .session-note {
-            display: inline-flex;
+        .btn-secondary-hero:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 32px;
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .stat-item h4 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-heading);
+        }
+
+        .stat-item p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Motion Interactive Mockup Frame */
+        .mockup-container {
+            position: relative;
+            perspective: 1000px;
+        }
+
+        .mockup-card {
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-glow);
+            border-radius: var(--card-radius);
+            padding: 24px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transform: rotateY(-6deg) rotateX(4deg);
+            transition: var(--transition);
+        }
+
+        .mockup-container:hover .mockup-card {
+            transform: rotateY(0deg) rotateX(0deg) scale(1.02);
+            box-shadow: 0 40px 80px rgba(6, 182, 212, 0.25);
+        }
+
+        .mockup-header {
+            display: flex;
             align-items: center;
+            justify-content: space-between;
+            padding-bottom: 16px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .window-dots {
+            display: flex;
             gap: 8px;
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
+        .dot {
+            width: 12px;
+            height: 12px;
             border-radius: 50%;
-            background: var(--teal);
-            box-shadow: 0 0 0 6px rgba(43, 122, 120, 0.1);
         }
 
-        button:hover {
-            filter: brightness(1.04);
+        .dot-red { background: #ef4444; }
+        .dot-yellow { background: #f59e0b; }
+        .dot-green { background: #10b981; }
+
+        .mockup-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
         }
 
-        button:active {
-            transform: translateY(1px);
+        .mock-widget {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 16px;
         }
 
-        .micro-copy {
-            margin-top: 0;
-            color: #8a92a1;
-            font-size: 13px;
+        .mock-widget-title {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .mock-widget-value {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-heading);
+        }
+
+        .mock-widget-sub {
+            font-size: 0.75rem;
+            color: var(--accent-emerald);
+            margin-top: 4px;
+        }
+
+        .live-chart-bar {
+            height: 60px;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .chart-col {
+            flex: 1;
+            background: linear-gradient(180deg, var(--accent-cyan), rgba(6, 182, 212, 0.1));
+            border-radius: 4px;
+            animation: barGrow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes barGrow {
+            0% { transform: scaleY(0.4); transform-origin: bottom; }
+            100% { transform: scaleY(1); transform-origin: bottom; }
+        }
+
+        /* Section Layouts */
+        .section-container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 36px;
+        }
+
+        .section-tag {
+            color: var(--accent-cyan);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 16px;
+        }
+
+        .section-desc {
+            color: var(--text-body);
+            font-size: 1.05rem;
+        }
+
+        /* Live Feature Interactive Demo Tabs */
+        .demo-tabs-nav {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .demo-tab-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-body);
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .demo-tab-btn.active, .demo-tab-btn:hover {
+            background: var(--accent-cyan);
+            color: #ffffff;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 4px 20px rgba(6, 182, 212, 0.4);
+        }
+
+        .demo-content-panel {
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-glow);
+            border-radius: var(--card-radius);
+            padding: 40px;
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            align-items: center;
+            backdrop-filter: blur(16px);
+        }
+
+        .demo-content-panel.active {
+            display: grid;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .demo-info h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            color: var(--text-heading);
+            margin-bottom: 16px;
+        }
+
+        .demo-info p {
+            margin-bottom: 24px;
+            line-height: 1.7;
+        }
+
+        .demo-feature-list {
+            list-style: none;
+        }
+
+        .demo-feature-list li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            color: var(--text-heading);
+            font-weight: 500;
+        }
+
+        .demo-feature-list li svg {
+            color: var(--accent-emerald);
+            flex-shrink: 0;
+        }
+
+        .demo-visual-preview {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        /* Features Grid - 4 Columns for Expanded Detail */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--card-radius);
+            padding: 28px 24px;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(16px);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--border-glow);
+            box-shadow: 0 20px 40px rgba(6, 182, 212, 0.15);
+        }
+
+        .feature-icon-wrapper {
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background: rgba(6, 182, 212, 0.1);
+            border: 1px solid var(--border-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent-cyan);
+            margin-bottom: 20px;
+        }
+
+        .feature-card h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            font-size: 0.9rem;
+            color: var(--text-body);
             line-height: 1.55;
         }
 
-        .credit {
-            margin: 0;
-            padding: 0 8px 12px;
-            text-align: center;
-            color: rgba(240, 232, 222, 0.66);
-            font-size: 12px;
-        }
-
-        html[data-theme="light"] .credit {
-            color: rgba(15, 23, 42, 0.62);
-        }
-
-        .credit a {
-            color: #ffd7c5;
+        .feature-badge-small {
+            font-size: 0.72rem;
             font-weight: 700;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            display: block;
         }
 
-        html[data-theme="light"] .credit a {
-            color: #0f766e;
+        /* Software License Plans / Pricing */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            align-items: center;
         }
 
-        @media (min-width: 768px) {
-            .column_1,
-            .column_2 {
-                min-height: 620px;
-            }
+        .pricing-card {
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--card-radius);
+            padding: 40px 32px;
+            text-align: center;
+            transition: var(--transition);
+            position: relative;
+            backdrop-filter: blur(16px);
+        }
 
-            .column_1 {
-                width: 44%;
-            }
+        .pricing-card.featured {
+            border-color: var(--accent-cyan);
+            background: linear-gradient(180deg, rgba(6, 182, 212, 0.12), rgba(15, 23, 42, 0.9));
+            box-shadow: 0 25px 50px rgba(6, 182, 212, 0.25);
+            transform: scale(1.05);
+        }
 
-            .column_2 {
-                width: 56%;
+        .popular-badge {
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 4px 16px;
+            border-radius: 20px;
+            letter-spacing: 1px;
+        }
+
+        .pricing-card h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            color: var(--text-heading);
+            margin-bottom: 12px;
+        }
+
+        .original-price-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .original-price {
+            text-decoration: line-through;
+            color: #94a3b8;
+            font-size: 1.15rem;
+            font-weight: 600;
+            opacity: 0.8;
+        }
+
+        .savings-badge {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .pricing-card .price {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.8rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 8px;
+        }
+
+        .pricing-card .price-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .pricing-features {
+            list-style: none;
+            margin-bottom: 32px;
+            text-align: left;
+        }
+
+        .pricing-features li {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pricing-features li svg {
+            color: var(--accent-cyan);
+        }
+
+        .btn-select-plan {
+            width: 100%;
+            padding: 14px;
+            border-radius: var(--btn-radius);
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            border: 1px solid var(--accent-cyan);
+            background: rgba(6, 182, 212, 0.1);
+            color: var(--accent-cyan);
+            transition: var(--transition);
+        }
+
+        .btn-select-plan:hover, .pricing-card.featured .btn-select-plan {
+            background: var(--accent-cyan);
+            color: #ffffff;
+            box-shadow: 0 10px 25px rgba(6, 182, 212, 0.4);
+        }
+
+        /* FAQ Accordion Section */
+        .faq-grid {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .faq-item {
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: var(--transition);
+            backdrop-filter: blur(12px);
+        }
+
+        .faq-item.active {
+            border-color: var(--border-glow);
+        }
+
+        .faq-question {
+            padding: 20px 24px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text-heading);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .faq-answer {
+            padding: 0 24px 20px;
+            color: var(--text-body);
+            font-size: 0.95rem;
+            line-height: 1.65;
+            display: none;
+        }
+
+        .faq-item.active .faq-answer {
+            display: block;
+        }
+
+        .faq-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .faq-item.active .faq-icon {
+            transform: rotate(180deg);
+            color: var(--accent-cyan);
+        }
+
+        /* Contact Us Form Section */
+        .contact-section-wrap {
+            background: linear-gradient(180deg, transparent, rgba(6, 182, 212, 0.05), transparent);
+            padding: 60px 24px;
+        }
+
+        .contact-box {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-glow);
+            border-radius: var(--card-radius);
+            padding: 36px 28px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-heading);
+        }
+
+        .form-control {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 14px 18px;
+            color: var(--text-heading);
+            font-family: inherit;
+            font-size: 0.95rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .form-control:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+        }
+
+        .form-control.invalid-field {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
+        }
+
+        textarea.form-control {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .btn-submit-inquiry {
+            grid-column: span 2;
+            background: linear-gradient(135deg, var(--accent-cyan), #2563eb);
+            color: #fff;
+            padding: 16px;
+            border-radius: var(--btn-radius);
+            font-size: 1.1rem;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(6, 182, 212, 0.4);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-submit-inquiry:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(6, 182, 212, 0.6);
+        }
+
+        /* Glassmorphic Login Modal */
+        .login-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 7, 18, 0.8);
+            backdrop-filter: blur(12px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: var(--transition);
+        }
+
+        .login-modal-backdrop.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .login-modal-card {
+            background: var(--bg-dark-glass);
+            border: 1px solid var(--border-glow);
+            border-radius: 24px;
+            width: 100%;
+            max-width: 440px;
+            padding: 40px;
+            position: relative;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+            transform: scale(0.9);
+            transition: var(--transition);
+        }
+
+        .login-modal-backdrop.active .login-modal-card {
+            transform: scale(1);
+        }
+
+        .modal-close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .modal-close-btn:hover {
+            color: var(--text-heading);
+            border-color: var(--accent-cyan);
+        }
+
+        .modal-header-brand {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+
+        .modal-header-brand img {
+            width: 54px;
+            height: 54px;
+            margin-bottom: 12px;
+        }
+
+        .modal-header-brand h2 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            color: var(--text-heading);
+        }
+
+        .modal-header-brand p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* Footer */
+        .footer {
+            border-top: 1px solid var(--border-subtle);
+            padding: 60px 40px 30px;
+            text-align: center;
+            max-width: 1300px;
+            margin: 0 auto;
+        }
+
+        .footer-brand {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            margin-bottom: 16px;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 24px;
+            list-style: none;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .footer-links a:hover {
+            color: var(--accent-cyan);
+        }
+
+        .copyright {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1100px) {
+            .features-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 1024px) {
+            .hero-section, .demo-content-panel {
+                grid-template-columns: 1fr;
+                gap: 28px;
+            }
+            .pricing-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+            }
+            .pricing-card.featured {
+                transform: none;
             }
         }
 
-        @media (max-width: 767px) {
-            .container {
-                padding: 18px 14px;
-                place-items: center;
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 0 16px;
+                height: 68px;
             }
-
-            .login-panel {
-                width: 100%;
-                max-width: 420px;
-                background: transparent;
-                border: none;
-                box-shadow: none;
+            .brand-title {
+                font-size: 1.2rem;
             }
-
-            .column_1 {
-                display: none;
+            .brand-icon {
+                width: 36px;
+                height: 36px;
             }
-
-            .column_2 {
-                order: 1;
-                padding: 0;
-                background: transparent;
-                width: 100%;
+            .brand-icon img {
+                width: 24px;
+                height: 24px;
             }
-
-            .login-form-container {
-                max-width: none;
-                padding: 28px 20px 20px;
-                border-radius: 24px;
-                box-shadow: 0 18px 46px rgba(7, 11, 22, 0.28);
+            .btn-nav-login {
+                padding: 8px 14px;
+                font-size: 0.85rem;
             }
-
-            .form-badge {
-                width: 26px;
-                height: 26px;
-                border-radius: 9px;
+            .nav-links { display: none; }
+            .hero-section {
+                padding: 96px 16px 36px;
+                gap: 24px;
             }
-
-            .form-badge svg {
-                width: 14px;
-                height: 14px;
-            }
-
-            .eyebrow {
-                font-size: 10px;
-                letter-spacing: 0.16em;
-            }
-
-            .login-title {
-                font-size: 30px;
-            }
-
-            .brand-logo {
-                width: 48px;
-                height: 48px;
-                border-radius: 12px;
-            }
-
-            .login-subtitle {
+            .hero-title {
+                font-size: 2.2rem;
                 margin-bottom: 16px;
-                font-size: 14px;
-                line-height: 1.5;
             }
-
-            .field-label {
-                font-size: 11px;
-                margin-bottom: 7px;
+            .hero-subtitle {
+                font-size: 1rem;
+                margin-bottom: 24px;
             }
-
-            .input-wrapper {
-                border-radius: 13px;
+            .hero-stats {
+                gap: 16px;
+                margin-top: 24px;
+                padding-top: 20px;
             }
-
-            .input-icon {
-                width: 42px;
-                height: 42px;
-                flex-basis: 42px;
+            .stat-item h4 {
+                font-size: 1.4rem;
             }
-
-            .input-icon svg {
-                width: 17px;
-                height: 17px;
+            .section-container, .contact-section-wrap {
+                padding: 40px 16px;
             }
-
-            input {
-                font-size: 16px;
-                padding: 14px 14px 14px 2px;
+            .section-title {
+                font-size: 1.8rem;
             }
-
-            button {
-                margin-top: 12px;
-                padding: 14px 0;
-                font-size: 12px;
+            .section-header {
+                margin-bottom: 28px;
             }
-
-            .login-theme-toggle {
-                right: 14px;
-                top: 14px;
-                min-height: 36px;
-                min-width: 40px;
-                padding: 0 10px;
+            .features-grid, .pricing-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
             }
-
-            .form-footer {
-                margin-top: 12px;
-                display: block;
+            .feature-card {
+                padding: 20px 16px;
             }
-
-            .form-status {
-                margin-bottom: 8px;
+            .pricing-card {
+                padding: 24px 18px;
             }
-
-            .micro-copy {
-                font-size: 12px;
+            .demo-content-panel {
+                padding: 20px 16px;
+                border-radius: 16px;
             }
-        }
-
-        @keyframes panelIn {
-            from {
-                opacity: 0;
-                transform: translateY(12px);
+            .demo-info h3 {
+                font-size: 1.4rem;
             }
-            to {
-                opacity: 1;
-                transform: translateY(0);
+            .form-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            .form-group.full-width, .btn-submit-inquiry {
+                grid-column: span 1;
+            }
+            .contact-box {
+                padding: 20px 16px;
+                border-radius: 16px;
+            }
+            .login-modal-card {
+                max-width: 92vw;
+                padding: 28px 18px;
+                border-radius: 20px;
+            }
+            .footer {
+                padding: 40px 16px 20px;
             }
         }
 
-        @media (prefers-reduced-motion: reduce) {
-            * {
-                animation: none !important;
-                transition: none !important;
+        @media (max-width: 480px) {
+            .hero-title {
+                font-size: 1.85rem;
+            }
+            .hero-cta-group {
+                flex-direction: column;
+                width: 100%;
+            }
+            .btn-primary-hero, .btn-secondary-hero {
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+                padding: 14px 20px;
+            }
+            .mockup-card {
+                padding: 16px;
+                transform: none;
+            }
+            .mockup-grid {
+                grid-template-columns: 1fr;
+            }
+            .mock-widget {
+                grid-column: span 1 !important;
+            }
+            .demo-tabs-nav {
+                gap: 6px;
+            }
+            .demo-tab-btn {
+                padding: 8px 16px;
+                font-size: 0.82rem;
             }
         }
     </style>
 </head>
 <body>
-<button class="login-theme-toggle" type="button" id="loginThemeToggle" aria-label="Switch theme">
-    <svg id="loginThemeIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M12 3.5V5.5M12 18.5V20.5M4.93 4.93L6.34 6.34M17.66 17.66L19.07 19.07M3.5 12H5.5M18.5 12H20.5M4.93 19.07L6.34 17.66M17.66 6.34L19.07 4.93" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-        <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/>
-    </svg>
-    <span id="loginThemeLabel">Light</span>
-</button>
-<div class="app-loader" data-app-loader>
-    <div class="app-loader__panel">
-        <div class="app-loader__logo-wrap">
-            <img class="app-loader__logo" src="{% static 'sw/images/icon-192.png' %}" alt="zivaBooks logo">
-        </div>
-        <p class="app-loader__title">zivaBooks</p>
-        <p class="app-loader__subtitle" data-app-loader-subtitle>Preparing sign in...</p>
-        <div class="app-loader__progress" aria-hidden="true"></div>
-    </div>
-</div>
-<div class="container">
-    <div class="ui equal width center aligned padded grid">
-        <div class="ui basic segment" style="width: 100%; max-width: 1040px; padding: 0; box-shadow: none; background: transparent;">
-            <div class="ui two column centered stackable grid login-panel" style="padding: 0;">
-                <div class="column_1">
-                    <div class="hero-tag">Operations Platform</div>
-                    <h1 class="hero-title">zivaBooks</h1>
-                    <p class="hero-copy">A unified workspace for collections, sales, attendance, and cash counter movement with clearer daily visibility.</p>
-                    <div class="hero-list">
-                        <div class="hero-pill">Collections</div>
-                        <div class="hero-pill">Sales</div>
-                        <div class="hero-pill">Attendance</div>
-                        <div class="hero-pill">Orders</div>
-                        <div class="hero-pill">Ledger</div>
-                        <div class="hero-pill">Cashbook</div>
-                        <div class="hero-pill">Bankbook</div>
-                        <div class="hero-pill">Cash Counter</div>
-                        <div class="hero-pill">Banks</div>
-                        <div class="hero-pill">Parties</div>
-                        <div class="hero-pill">Staff</div>
-                        <div class="hero-pill">Audit</div>
-                        <div class="hero-pill">Customer Login</div>
-                        <div class="hero-pill">More</div>
+
+    <!-- Interactive Motion Canvas -->
+    <canvas id="motionCanvas"></canvas>
+
+    <div class="relative-content">
+
+        <!-- Sticky Glass Navbar -->
+        <nav class="navbar">
+            <a href="#" class="brand-logo-wrap">
+                <div class="brand-icon">
+                    <img src="{% static 'sw/images/icon-192.png' %}" alt="zivaBooks Logo">
+                </div>
+                <div class="brand-title">ziva<span>Books</span></div>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#demo">Live Demo</a></li>
+                <li><a href="#pricing">License Plans</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="#contact">Contact Us</a></li>
+            </ul>
+            <div class="nav-actions">
+                <button class="theme-toggle-btn" id="loginThemeToggle" aria-label="Toggle Theme">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+                    </svg>
+                </button>
+                <button class="btn-nav-login" onclick="openLoginModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                        <polyline points="10 17 15 12 10 7"></polyline>
+                        <line x1="15" y1="12" x2="3" y2="12"></line>
+                    </svg>
+                    Existing User Login
+                </button>
+            </div>
+        </nav>
+
+        <!-- Hero Section -->
+        <section class="hero-section" id="overview">
+            <div class="hero-text-col">
+                <div class="badge-pill">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    Enterprise Business Operations Platform
+                </div>
+                <h1 class="hero-title">
+                    Intelligent Operations. <br>
+                    <span class="gradient-text">Real-Time Books.</span> <br>
+                    Autonomous AI.
+                </h1>
+                <p class="hero-subtitle">
+                    Streamline sales billing, FEFO inventory, secure customer OTP verification, complete financial ledgers, and real-time field staff tracking in one unified platform.
+                </p>
+                <div class="hero-cta-group">
+                    <a href="#contact" class="btn-primary-hero">Get License / Buy Now</a>
+                    <button class="btn-secondary-hero" onclick="openLoginModal()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        Existing User Login
+                    </button>
+                </div>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <h4>99.9%</h4>
+                        <p>System Uptime</p>
                     </div>
-                    <div class="hero-visual" aria-hidden="true">
-                        <svg viewBox="0 0 620 400" xmlns="http://www.w3.org/2000/svg" role="img">
+                    <div class="stat-item">
+                        <h4>FEFO</h4>
+                        <p>Stock Precision</p>
+                    </div>
+                    <div class="stat-item">
+                        <h4>Dual-OTP</h4>
+                        <p>Clearance Security</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Interactive Motion Mockup Card -->
+            <div class="mockup-container">
+                <div class="mockup-card">
+                    <div class="mockup-header">
+                        <div class="window-dots">
+                            <div class="dot dot-red"></div>
+                            <div class="dot dot-yellow"></div>
+                            <div class="dot dot-green"></div>
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">zivaBooks Executive Operations Dashboard</div>
+                    </div>
+                    <div class="mockup-grid">
+                        <div class="mock-widget">
+                            <div class="mock-widget-title">Daily Reconciled Revenue</div>
+                            <div class="mock-widget-value">₹ 4,85,200</div>
+                            <div class="mock-widget-sub">↑ 18.4% vs last week</div>
+                        </div>
+                        <div class="mock-widget">
+                            <div class="mock-widget-title">Active FEFO Batches</div>
+                            <div class="mock-widget-value">1,420</div>
+                            <div class="mock-widget-sub">0 Expiry Risk</div>
+                        </div>
+                        <div class="mock-widget" style="grid-column: span 2;">
+                            <div class="mock-widget-title">Live Revenue Trend & Real-Time Cash Position</div>
+                            <div class="live-chart-bar">
+                                <div class="chart-col" style="height: 40%;"></div>
+                                <div class="chart-col" style="height: 65%;"></div>
+                                <div class="chart-col" style="height: 50%;"></div>
+                                <div class="chart-col" style="height: 85%;"></div>
+                                <div class="chart-col" style="height: 70%;"></div>
+                                <div class="chart-col" style="height: 95%;"></div>
+                                <div class="chart-col" style="height: 80%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dedicated Customer Portal Showcase Hero Section -->
+        <section class="hero-section customer-portal-hero" id="customer-portal-hero" style="padding-top: 20px; padding-bottom: 60px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <div class="hero-text-col">
+                <div class="badge-pill" style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.3);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    24/7 Self-Service B2B Customer Portal
+                </div>
+                <h2 class="hero-title" style="font-size: 3.1rem;">
+                    Empower Clients. <br>
+                    <span style="background: linear-gradient(135deg, #06b6d4, #38bdf8, #10b981); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Live Ledgers & Bills.</span> <br>
+                    Instant OTP Clearance.
+                </h2>
+                <p class="hero-subtitle">
+                    Give your clients 24/7 self-service access to check real-time account ledger balances, download PDF sales & POS invoices, track live sales order dispatches, inspect collection receipts, and access active OTP codes anytime.
+                </p>
+
+                <!-- Portal Feature Highlights Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 32px;">
+                    <div class="portal-highlight-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(6, 182, 212, 0.2); border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(8px);">
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #38bdf8; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="20" x2="12" y2="10"></line><line x1="18" y1="20" x2="18" y2="4"></line><line x1="6" y1="20" x2="6" y2="16"></line></svg>
+                            Real-Time Ledger & KPIs
+                        </div>
+                        <div class="card-text" style="font-size: 0.82rem; color: var(--text-body); line-height: 1.4;">Live opening balance, debits, credits, running balance & 1-click A4 PDF/Excel exports.</div>
+                    </div>
+
+                    <div class="portal-highlight-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(8px);">
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #10b981; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                            Purchases & PDF Downloads
+                        </div>
+                        <div class="card-text" style="font-size: 0.82rem; color: var(--text-body); line-height: 1.4;">Complete sales & POS purchase bills with instant PDF downloads & GST details.</div>
+                    </div>
+
+                    <div class="portal-highlight-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(8px);">
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #f59e0b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                            Collection Receipts
+                        </div>
+                        <div class="card-text" style="font-size: 0.82rem; color: var(--text-body); line-height: 1.4;">Transparent record of Cash, UPI, Cheque & Bank Transfer payment receipts.</div>
+                    </div>
+
+                    <div class="portal-highlight-card" style="background: rgba(15, 23, 42, 0.65); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(8px);">
+                        <div style="font-size: 0.92rem; font-weight: 700; color: #c084fc; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                            Live Orders & Dual OTP
+                        </div>
+                        <div class="card-text" style="font-size: 0.82rem; color: var(--text-body); line-height: 1.4;">Track sales order dispatches and view active OTP codes for counter pickups & handovers.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Beautiful Generative SVG Graphics Illustration Container -->
+            <div class="mockup-container">
+                <div class="mockup-card portal-mockup-card" style="border: 1px solid rgba(6, 182, 212, 0.35); box-shadow: 0 24px 60px rgba(6, 182, 212, 0.15); background: linear-gradient(145deg, rgba(15,23,42,0.95), rgba(30,41,59,0.95)); padding: 0; overflow: hidden; position: relative;">
+                    <!-- Generative SVG Illustration Header -->
+                    <div class="portal-mockup-header" style="padding: 14px 18px; background: rgba(2, 132, 199, 0.15); border-bottom: 1px solid rgba(6, 182, 212, 0.2); display: flex; align-items: center; justify-content: space-between;">
+                        <div class="window-dots">
+                            <div class="dot dot-red"></div>
+                            <div class="dot dot-yellow"></div>
+                            <div class="dot dot-green"></div>
+                        </div>
+                        <div class="portal-mockup-header-title" style="font-size: 0.85rem; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#10b981; box-shadow:0 0 8px #10b981;"></span>
+                            zivaBooks Customer Self-Service Portal (`/customer_home/`)
+                        </div>
+                    </div>
+
+                    <!-- Beautiful Generative Vector SVG Illustration -->
+                    <div style="padding: 16px; position: relative;">
+                        <svg viewBox="0 0 540 360" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block;">
                             <defs>
-                                <linearGradient id="cardFill" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stop-color="#f9f1e8"/>
-                                    <stop offset="100%" stop-color="#efd7c6"/>
+                                <linearGradient id="svgBgGrad" x1="0" y1="0" x2="540" y2="360" gradientUnits="userSpaceOnUse">
+                                    <stop stop-color="#0f172a"/>
+                                    <stop offset="1" stop-color="#1e293b"/>
                                 </linearGradient>
-                                <linearGradient id="lineA" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="#d97549"/>
-                                    <stop offset="100%" stop-color="#f1b190"/>
+                                <linearGradient id="cyanPillGrad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop stop-color="#06b6d4"/>
+                                    <stop offset="1" stop-color="#0284c7"/>
                                 </linearGradient>
-                                <linearGradient id="lineB" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="#2b7a78"/>
-                                    <stop offset="100%" stop-color="#90d4c5"/>
+                                <linearGradient id="emeraldGrad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop stop-color="#10b981"/>
+                                    <stop offset="1" stop-color="#059669"/>
                                 </linearGradient>
-                                <filter id="sheetShadow" x="-20%" y="-20%" width="140%" height="140%">
-                                    <feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#020611" flood-opacity="0.24"/>
+                                <linearGradient id="amberGrad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop stop-color="#f59e0b"/>
+                                    <stop offset="1" stop-color="#d97706"/>
+                                </linearGradient>
+                                <linearGradient id="purpleGrad" x1="0" y1="0" x2="1" y2="1">
+                                    <stop stop-color="#c084fc"/>
+                                    <stop offset="1" stop-color="#9333ea"/>
+                                </linearGradient>
+                                <linearGradient id="lineChartGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop stop-color="#38bdf8" stop-opacity="0.4"/>
+                                    <stop offset="1" stop-color="#38bdf8" stop-opacity="0.0"/>
+                                </linearGradient>
+                                <filter id="glowDrop" x="-10%" y="-10%" width="120%" height="120%">
+                                    <feGaussianBlur stdDeviation="6" result="blur"/>
+                                    <feComposite in="SourceGraphic" in2="blur" operator="over"/>
                                 </filter>
                             </defs>
-                            <rect x="0" y="0" width="620" height="400" fill="#10192c"/>
-                            <circle cx="98" cy="72" r="88" fill="rgba(255,255,255,0.04)"/>
-                            <circle cx="540" cy="82" r="78" fill="rgba(217,117,73,0.12)"/>
-                            <g filter="url(#sheetShadow)">
-                                <rect x="86" y="68" width="448" height="264" rx="28" fill="url(#cardFill)"/>
-                            </g>
-                            <rect x="114" y="100" width="392" height="24" rx="12" fill="#ecddd1"/>
-                            <rect x="114" y="148" width="154" height="116" rx="24" fill="#fffaf4"/>
-                            <rect x="286" y="148" width="220" height="116" rx="24" fill="#fffaf4"/>
-                            <text x="136" y="178" fill="#778099" font-size="14" font-family="Avenir Next, Segoe UI, sans-serif">Daily overview</text>
-                            <text x="136" y="221" fill="#172033" font-size="40" font-weight="800" font-family="Avenir Next, Segoe UI, sans-serif">₹ 4.8L</text>
-                            <text x="136" y="244" fill="#d97549" font-size="13" font-weight="700" font-family="Avenir Next, Segoe UI, sans-serif">Collections reconciled</text>
-                            <path d="M308 225C330 204 352 210 375 192C400 171 427 173 452 197C469 213 483 213 494 206" fill="none" stroke="url(#lineA)" stroke-width="8" stroke-linecap="round"/>
-                            <path d="M308 244C332 252 352 248 374 236C397 223 424 227 447 238C468 248 483 246 494 242" fill="none" stroke="url(#lineB)" stroke-width="8" stroke-linecap="round"/>
-                            <circle cx="375" cy="192" r="7" fill="#d97549"/>
-                            <circle cx="447" cy="238" r="7" fill="#2b7a78"/>
-                            <rect x="114" y="288" width="392" height="14" rx="7" fill="#eadcd0"/>
-                            <rect x="114" y="288" width="244" height="14" rx="7" fill="#d97549"/>
+
+                            <!-- Ambient Mesh Glow Circles -->
+                            <circle cx="100" cy="80" r="90" fill="#06b6d4" opacity="0.08" filter="url(#glowDrop)"/>
+                            <circle cx="440" cy="280" r="100" fill="#10b981" opacity="0.08" filter="url(#glowDrop)"/>
+
+                            <!-- Card 1: Account Ledger Summary Card (Top Left) -->
+                            <rect class="portal-svg-card-bg" x="20" y="20" width="240" height="150" rx="14" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.4"/>
+                            <text class="portal-svg-text-sub" x="36" y="46" fill="#94a3b8" font-size="11" font-weight="600" font-family="-apple-system, sans-serif">ACCOUNT LEDGER BALANCE</text>
+                            <text class="portal-svg-text-heading" x="36" y="74" fill="#38bdf8" font-size="22" font-weight="800" font-family="-apple-system, sans-serif">₹ 42,500.00 <tspan font-size="12" fill="#06b6d4">Dr</tspan></text>
+                            <text class="portal-svg-text-sub" x="36" y="96" fill="#64748b" font-size="10" font-family="-apple-system, sans-serif">Credit Limit: ₹ 2,00,000 • Available: ₹ 1,57,500</text>
+                            
+                            <!-- Vector Curve Ledger Graph -->
+                            <path d="M 36 145 C 70 135, 100 148, 130 120 C 160 92, 190 125, 236 105 L 236 150 L 36 150 Z" fill="url(#lineChartGrad)"/>
+                            <path d="M 36 145 C 70 135, 100 148, 130 120 C 160 92, 190 125, 236 105" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+                            <circle cx="130" cy="120" r="4" fill="#0284c7" stroke="#38bdf8" stroke-width="2"/>
+                            <circle cx="236" cy="105" r="4" fill="#38bdf8" stroke="#ffffff" stroke-width="2"/>
+
+                            <!-- Card 2: Purchase & Bill PDF Downloads Card (Top Right) -->
+                            <rect class="portal-svg-card-bg" x="280" y="20" width="240" height="150" rx="14" fill="#0f172a" stroke="#10b981" stroke-width="1.5" stroke-opacity="0.4"/>
+                            <rect x="296" y="34" width="80" height="20" rx="10" fill="#10b981" fill-opacity="0.15"/>
+                            <text x="306" y="48" fill="#10b981" font-size="10" font-weight="700" font-family="-apple-system, sans-serif">PURCHASES & BILLS</text>
+
+                            <!-- Document PDF Icon -->
+                            <rect x="296" y="66" width="34" height="42" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="1"/>
+                            <path d="M 304 78 L 322 78 M 304 84 L 322 84 M 304 90 L 316 90" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+                            
+                            <text class="portal-svg-text-heading" x="340" y="80" fill="#f8fafc" font-size="13" font-weight="700" font-family="-apple-system, sans-serif">INV-2026-0842</text>
+                            <text x="340" y="96" fill="#10b981" font-size="12" font-weight="700" font-family="-apple-system, sans-serif">₹ 14,200.00 <tspan font-size="9" fill="#94a3b8">(Paid)</tspan></text>
+                            <text class="portal-svg-text-sub" x="340" y="110" fill="#64748b" font-size="9" font-family="-apple-system, sans-serif">GST Invoice Verified</text>
+
+                            <!-- PDF Download CTA Button inside Graphic -->
+                            <rect x="296" y="122" width="208" height="34" rx="8" fill="url(#emeraldGrad)"/>
+                            <text x="400" y="143" fill="#ffffff" font-size="11" font-weight="700" text-anchor="middle" font-family="-apple-system, sans-serif">📄 Download PDF Sales Bill</text>
+
+                            <!-- Card 3: Live Sales Order Tracking (Bottom Left) -->
+                            <rect class="portal-svg-card-bg" x="20" y="190" width="240" height="150" rx="14" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5" stroke-opacity="0.4"/>
+                            <text class="portal-svg-text-sub" x="36" y="216" fill="#94a3b8" font-size="11" font-weight="600" font-family="-apple-system, sans-serif">LIVE SALES ORDERS</text>
+                            <text class="portal-svg-text-heading" x="36" y="240" fill="#f8fafc" font-size="14" font-weight="700" font-family="-apple-system, sans-serif">Order #ORD-2026-842</text>
+                            <text class="portal-svg-text-sub" x="36" y="256" fill="#64748b" font-size="10" font-family="-apple-system, sans-serif">Items: 12 Units • Dispatch Date: Today</text>
+
+                            <!-- Status Stepper Bar -->
+                            <rect x="36" y="272" width="208" height="6" rx="3" fill="#334155"/>
+                            <rect x="36" y="272" width="150" height="6" rx="3" fill="url(#amberGrad)"/>
+                            <circle cx="36" cy="275" r="6" fill="#f59e0b"/>
+                            <circle cx="110" cy="275" r="6" fill="#f59e0b"/>
+                            <circle cx="186" cy="275" r="8" fill="#f59e0b" stroke="#ffffff" stroke-width="2"/>
+                            <circle cx="244" cy="275" r="6" fill="#334155"/>
+
+                            <rect x="36" y="294" width="208" height="28" rx="6" fill="#f59e0b" fill-opacity="0.12" stroke="#f59e0b" stroke-opacity="0.3"/>
+                            <text x="140" y="312" fill="#fbbf24" font-size="11" font-weight="700" text-anchor="middle" font-family="-apple-system, sans-serif">🚚 In Transit • Dispatched to Location</text>
+
+                            <!-- Card 4: Collection & Delivery OTP Clearance (Bottom Right) -->
+                            <rect class="portal-svg-card-bg" x="280" y="190" width="240" height="150" rx="14" fill="#0f172a" stroke="#c084fc" stroke-width="1.5" stroke-opacity="0.4"/>
+                            <text class="portal-svg-text-sub" x="296" y="216" fill="#94a3b8" font-size="11" font-weight="600" font-family="-apple-system, sans-serif">SECURITY DUAL OTP CODE</text>
+                            <text x="296" y="238" fill="#c084fc" font-size="13" font-weight="700" font-family="-apple-system, sans-serif">Active Pickup OTP:</text>
+
+                            <!-- OTP Box -->
+                            <rect class="portal-svg-otp-box" x="296" y="248" width="208" height="42" rx="8" fill="#1e1b4b" stroke="#c084fc" stroke-width="1.5"/>
+                            <text x="400" y="276" fill="#a855f7" font-size="22" font-weight="900" letter-spacing="6" text-anchor="middle" font-family="monospace">8 4 9   2 0 1</text>
+
+                            <text x="296" y="312" fill="#10b981" font-size="10" font-weight="700" font-family="-apple-system, sans-serif">✓ Verified for Counter Pickup & Handover</text>
                         </svg>
                     </div>
                 </div>
-                <div class="column_2">
-                    <form id="userLoginForm" action="{% url 'homeApp:UserLogin' %}" method="post">{% csrf_token %}
-                        <div class="login-form-container">
-                            <div class="brand-header">
-                                <img class="brand-logo" src="{% static 'sw/images/icon-192.png' %}" alt="zivaBooks logo">
-                                <div class="brand-name">zivaBooks</div>
-                            </div>
-                            <span class="eyebrow">Secure Access</span>
-                            <h2 class="login-title">Welcome back</h2>
-                            <div class="login-subtitle">Sign in to continue to your operations dashboard.</div>
-                            <fieldset>
-                                <div class="field">
-                                    <label class="field-label" for="userName">Username</label>
-                                    <div class="input-wrapper">
-                                        <span class="input-icon" aria-hidden="true">
-                                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M12 12C14.4853 12 16.5 9.98528 16.5 7.5C16.5 5.01472 14.4853 3 12 3C9.51472 3 7.5 5.01472 7.5 7.5C7.5 9.98528 9.51472 12 12 12Z" stroke="currentColor" stroke-width="1.8"/>
-                                                <path d="M4.5 20C5.4 16.9 8.2 15.2 12 15.2C15.8 15.2 18.6 16.9 19.5 20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                            </svg>
-                                        </span>
-                                        <input type="text" placeholder="Username" name="userName" id="userName"/>
-                                    </div>
-                                </div>
-                                <div class="field">
-                                    <label class="field-label" for="password">Password</label>
-                                    <div class="input-wrapper">
-                                        <span class="input-icon" aria-hidden="true">
-                                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <rect x="5.5" y="10.5" width="13" height="9" rx="2.5" stroke="currentColor" stroke-width="1.8"/>
-                                                <path d="M8.5 10.5V8.5C8.5 6.567 10.067 5 12 5C13.933 5 15.5 6.567 15.5 8.5V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                            </svg>
-                                        </span>
-                                        <input type="password" placeholder="Password" name="password" id="password"/>
-                                    </div>
-                                </div>
-                                <a class="forgot-password-link" href="{% url 'homeApp:forgot_password' %}">Forgot password?</a>
-                                <button style="cursor: pointer" id="continue" type="button" onclick="UserLogin()">
-                                    Sign In
-                                </button>
-                                <div class="form-footer">
-                                    <div class="form-status">
-                                        <span class="status-dot" aria-hidden="true"></span>
-                                        <span>Role-based access active</span>
-                                    </div>
-                                    <div class="session-note">
-                                        <div class="form-badge" aria-hidden="true">
-                                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M12 3L18.5 5.8V11.9C18.5 16.1 15.7 19.9 12 21C8.3 19.9 5.5 16.1 5.5 11.9V5.8L12 3Z" stroke="#A94A2A" stroke-width="1.8" stroke-linejoin="round"/>
-                                                <path d="M9.4 11.9L11.2 13.7L14.9 10" stroke="#2B7A78" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                                            </svg>
-                                        </div>
-                                        <div class="micro-copy">Protected session</div>
-                                    </div>
-                                </div>
-                            </fieldset>
-                        </div>
-                    </form>
+            </div>
+        </section>
+
+        <!-- Detailed Feature Matrix Showcase Section -->
+        <section class="section-container" id="features">
+            <div class="section-header">
+                <span class="section-tag">Enterprise Capabilities</span>
+                <h2 class="section-title">Built for Modern High-Growth Businesses</h2>
+                <p class="section-desc">Explore the core operational capabilities that make zivaBooks the premier choice for retail, wholesale, and multi-branch enterprises.</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="feature-badge-small">Multi-Branch Control</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <h3>Multi-Branch & Custom User Roles</h3>
+                    <p>Manage multiple business branches with custom role permissions for sales staff, collectors, cashiers, and managers.</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-badge-small">Inventory Management</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        </svg>
+                    </div>
+                    <h3>FEFO Batch & Stock Control</h3>
+                    <p>Automated First-Expiry-First-Out batch tracking, multi-location stock transfers, inventory adjustments, and automated expiry risk alerts.</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-badge-small">Tax Compliance</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                    </div>
+                    <h3>GST Invoicing & Billing</h3>
+                    <p>Seamless invoice creation with GST compliance, tax calculations, and instant receipt generation.</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-badge-small">Security</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </div>
+                    <h3>Passcode-Protected Category Control</h3>
+                    <p>Secure admin passcode protection to selectively manage and separate custom billing categories.</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-badge-small">POS Counter</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                            <path d="M7 15h0M2 9.5h20"></path>
+                        </svg>
+                    </div>
+                    <h3>Multi-Counter POS & Customer OTP</h3>
+                    <p>Manage sales counters for cash, card, credit, and return transactions with secure OTP verification for customer collections and order delivery.</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-badge-small">Financial Accounting</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                    </div>
+                    <h3>Complete Financial Ledgers & Reports</h3>
+                    <p>Real-time cashbook, bankbook, and customer ledgers with instant A4 PDF printing, thermal receipts, and Excel exports.</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-badge-small">AI Intelligence</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path>
+                            <path d="M12 12L2.1 12A10 10 0 0 1 12 2v10z"></path>
+                        </svg>
+                    </div>
+                    <h3>Ziva AI Business Assistant</h3>
+                    <p>Ask business questions in natural language to get instant sales analysis, stock alerts, and customer ledger summaries.</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-badge-small">Field Operations</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                            <circle cx="12" cy="10" r="3"></circle>
+                        </svg>
+                    </div>
+                    <h3>Field Staff GPS & Route Tracking</h3>
+                    <p>Real-time location updates for field staff, customer visit verification, daily route mapping, and monthly attendance reports.</p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-badge-small">B2B Portal</span>
+                    <div class="feature-icon-wrapper">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                    <h3>24/7 Dedicated Customer Portal</h3>
+                    <p>Empower your B2B clients with a self-service portal for live ledger statements, purchase invoice downloads, collection receipts, order tracking, and security OTP clearance.</p>
                 </div>
             </div>
+        </section>
+
+        <!-- Live Demo Tab Section -->
+        <section class="section-container" id="demo">
+            <div class="section-header">
+                <span class="section-tag">Interactive Experience</span>
+                <h2 class="section-title">See zivaBooks Subsystems in Action</h2>
+                <p class="section-desc">Switch between modules to preview the power of zivaBooks live workflows.</p>
+            </div>
+
+            <div class="demo-tabs-nav">
+                <button class="demo-tab-btn active" onclick="switchDemoTab('salesTab', this)">Sales Billing</button>
+                <button class="demo-tab-btn" onclick="switchDemoTab('customerPortalTab', this)">Customer Portal</button>
+                <button class="demo-tab-btn" onclick="switchDemoTab('fefoTab', this)">FEFO Inventory</button>
+                <button class="demo-tab-btn" onclick="switchDemoTab('otpTab', this)">Dual OTP Clearance</button>
+                <button class="demo-tab-btn" onclick="switchDemoTab('gpsTab', this)">GPS Route Tracker</button>
+                <button class="demo-tab-btn" onclick="switchDemoTab('aiTab', this)">Ziva AI Assistant</button>
+            </div>
+
+            <div class="demo-content-panel active" id="salesTab">
+                <div class="demo-info">
+                    <h3>High-Speed Invoicing & Billing</h3>
+                    <p>Generate customizable invoice series and convert Proforma estimates to Sales in 1-click.</p>
+                    <ul class="demo-feature-list">
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Invoice series prefix/suffix customization & B2B/B2C nature control
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Instant invoice generation & automated tax calculations
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            High-quality A4 PDF invoices and thermal receipt printing
+                        </li>
+                    </ul>
+                </div>
+                <div class="demo-visual-preview">
+                    <div style="font-family: monospace; color: var(--accent-cyan); font-size: 0.9rem; margin-bottom: 12px;">LIVE SALES & BILLING</div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; font-size: 0.85rem;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
+                            <span>Invoice #: INV-2026-0842</span>
+                            <span style="color: var(--accent-emerald);">[INVOICE ISSUED]</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
+                            <span>Party: Apex Traders Pvt Ltd</span>
+                            <span>GSTIN: 27AAAAA0000A1Z5</span>
+                        </div>
+                        <div style="font-size: 1.2rem; font-weight: 700; color: var(--text-heading); margin-top: 12px;">
+                            Total: ₹ 1,42,800.00
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="demo-content-panel" id="customerPortalTab">
+                <div class="demo-info">
+                    <h3>24/7 Self-Service B2B Customer Portal</h3>
+                    <p>Provide your B2B buyers with a secure, 24/7 self-service portal to view ledger balances, download purchase invoices, track live orders, inspect payment collection records, and clear OTP pickups.</p>
+                    <ul class="demo-feature-list">
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Real-Time Ledger & Statements:</strong> Live opening balance, debits, credits, running balance, and 1-click A4 PDF/Excel downloads
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Purchase History & Bill Downloads:</strong> Complete sales & POS purchase bills with instant PDF downloads & GST details
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Collection & Payment Receipts:</strong> Full record of past payments, payment modes (Cash, UPI, Cheque, Bank Transfer), and receipts
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Live Sales Order Tracking:</strong> Real-time status updates on active orders, items pending dispatch, and order breakdowns
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <strong>Dual Collection & Delivery OTPs:</strong> Active OTP code display for counter pickups and verified order handovers
+                        </li>
+                    </ul>
+                </div>
+                <div class="demo-visual-preview">
+                    <div style="font-family: monospace; color: var(--accent-cyan); font-size: 0.9rem; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>CUSTOMER SELF-SERVICE PORTAL</span>
+                        <span style="background: rgba(6, 182, 212, 0.15); color: #06b6d4; font-size: 0.75rem; padding: 3px 8px; border-radius: 999px; font-weight: 700;">24/7 ONLINE ACCESS</span>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); font-size: 0.85rem;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px;">
+                            <div>
+                                <div style="color: var(--text-muted); font-size: 0.75rem;">Account Ledger Balance</div>
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #38bdf8;">₹ 42,500.00 Dr</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: var(--text-muted); font-size: 0.75rem;">Credit Limit & Available</div>
+                                <div style="font-size: 0.85rem; font-weight: 700; color: #10b981;">₹ 2,00,000 / Available: ₹ 1,57,500</div>
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem; margin-bottom: 12px;">
+                            <div style="background: rgba(15, 23, 42, 0.6); padding: 8px 10px; border-radius: 6px;">
+                                <span style="color: var(--text-muted);">Active Order:</span> <strong style="color: #f59e0b;">#ORD-2026-842</strong>
+                                <div style="color: #10b981; font-size: 0.75rem; margin-top: 2px;">● Dispatched • In Transit</div>
+                            </div>
+                            <div style="background: rgba(15, 23, 42, 0.6); padding: 8px 10px; border-radius: 6px;">
+                                <span style="color: var(--text-muted);">Live Collection OTP:</span> <strong style="color: #06b6d4;">849 201</strong>
+                                <div style="color: var(--text-muted); font-size: 0.75rem; margin-top: 2px;">Valid for Counter Pickup</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items: center; font-size: 0.78rem; background: rgba(6, 182, 212, 0.08); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(6, 182, 212, 0.2);">
+                            <span style="color: var(--text-heading); font-weight: 600;">Latest Invoice: INV-2026-0842 (₹ 14,200)</span>
+                            <span style="color: #06b6d4; font-weight: 700; cursor: pointer;">[Download PDF 📄]</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="demo-content-panel" id="fefoTab">
+                <div class="demo-info">
+                    <h3>Automated FEFO Stock Ledger</h3>
+                    <p>Prevent inventory stock obsolescence by automatically picking oldest active batch numbers during billing.</p>
+                    <ul class="demo-feature-list">
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Batch-wise manufacturing & expiry date ledger tracking
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Multi-warehouse stock transfer vouchers & adjustment logs
+                        </li>
+                    </ul>
+                </div>
+                <div class="demo-visual-preview">
+                    <div style="font-family: monospace; color: var(--accent-orange); font-size: 0.9rem; margin-bottom: 12px;">LIVE FEFO STOCK MONITOR</div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; font-size: 0.85rem;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                            <span>Batch: BT-9941 (Expiry: Oct 2026)</span>
+                            <span style="color: var(--accent-cyan);">Dispatch Priority 1</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>Batch: BT-9942 (Expiry: Dec 2026)</span>
+                            <span>Dispatch Priority 2</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="demo-content-panel" id="otpTab">
+                <div class="demo-info">
+                    <h3>Dual OTP Verification System</h3>
+                    <p>Eliminate revenue leakage with mandatory OTP verification for both customer payment collections and order delivery clearance.</p>
+                    <ul class="demo-feature-list">
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Instant SMS & Email OTP dispatch to customer phone
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Automated cash counter balance reconciliation upon verification
+                        </li>
+                    </ul>
+                </div>
+                <div class="demo-visual-preview">
+                    <div style="font-family: monospace; color: var(--accent-emerald); font-size: 0.9rem; margin-bottom: 12px;">PAYMENT & DELIVERY VERIFICATION</div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; font-size: 0.85rem; text-align: center;">
+                        <div style="margin-bottom: 8px;">Enter Customer Delivery / Payment OTP</div>
+                        <div style="font-size: 1.8rem; font-weight: 800; letter-spacing: 8px; color: var(--accent-cyan);">849 201</div>
+                        <div style="color: var(--accent-emerald); margin-top: 8px; font-size: 0.8rem;">✓ Collection Verified & Cashbook Updated</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="demo-content-panel" id="gpsTab">
+                <div class="demo-info">
+                    <h3>Field Staff GPS & Route Tracker</h3>
+                    <p>Track field sales executive pings, view verified visit locations, and inspect daily route history maps.</p>
+                    <ul class="demo-feature-list">
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Automated location updates & address verification
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Interactive visual route mapping & location history
+                        </li>
+                    </ul>
+                </div>
+                <div class="demo-visual-preview">
+                    <div style="font-family: monospace; color: var(--accent-purple); font-size: 0.9rem; margin-bottom: 12px;">LIVE FIELD STAFF TRACKER</div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; font-size: 0.85rem;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom: 6px;">
+                            <span>Executive: Rahul S.</span>
+                            <span style="color: var(--accent-cyan);">Status: Active Route</span>
+                        </div>
+                        <div style="color: var(--text-muted);">Last Location: Mumbai Central Branch</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="demo-content-panel" id="aiTab">
+                <div class="demo-info">
+                    <h3>Ziva AI Business Intelligence</h3>
+                    <p>Ask complex business questions in natural language to get immediate insights and data summaries.</p>
+                    <ul class="demo-feature-list">
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Instant natural language answers to sales & stock queries
+                        </li>
+                        <li>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Automated enterprise business analytics
+                        </li>
+                    </ul>
+                </div>
+                <div class="demo-visual-preview">
+                    <div style="font-family: monospace; color: var(--accent-cyan); font-size: 0.9rem; margin-bottom: 12px;">ZIVA AI BUSINESS ASSISTANT</div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; font-size: 0.85rem;">
+                        <div style="color: var(--text-muted); margin-bottom: 6px;">User: What are our total outstanding receivables above 30 days?</div>
+                        <div style="color: var(--text-heading); font-weight: 600;">Ziva AI: Outstanding receivables > 30 days total ₹ 8,42,150 across 12 parties.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Software License Plans & Pricing Section -->
+        <section class="section-container" id="pricing">
+            <div class="section-header">
+                <span class="section-tag">Flexible Licensing</span>
+                <h2 class="section-title">Choose your software plan</h2>
+                <p class="section-desc">Select the license tier tailored to your business scale. Upgrade or add user seats anytime.</p>
+            </div>
+
+            <div class="pricing-grid">
+                {% if license_plans %}
+                    {% for plan in license_plans %}
+                    {% if not plan.is_custom and not 'custom' in plan.plan_code %}
+                    <div class="pricing-card {% if plan.is_featured %}featured{% endif %}">
+                        {% if plan.tagline %}
+                        <div class="popular-badge">{{ plan.tagline }}</div>
+                        {% endif %}
+                        <h3>{{ plan.name }}</h3>
+                        {% if plan.original_price_per_year and plan.original_price_per_year > plan.price_per_year %}
+                        <div class="original-price-wrap">
+                            <span class="original-price">₹ {{ plan.original_price_per_year|floatformat:0 }}</span>
+                            <span class="savings-badge">Save ₹ {{ plan.savings_amount|floatformat:0 }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="price">₹ {{ plan.price_per_year|floatformat:0 }}</div>
+                        <div class="price-sub">per year / {% if plan.user_seats > 0 %}upto {{ plan.user_seats }} users{% else %}Unlimited seats{% endif %}</div>
+                        <ul class="pricing-features">
+                            {% for feature in plan.features_list %}
+                            <li>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                {{ feature }}
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        <button class="btn-select-plan" onclick="selectLicensePlan('{{ plan.plan_code }}')">Select {{ plan.name }}</button>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                {% else %}
+                    <div class="pricing-card">
+                        <h3>Starter License</h3>
+                        <div class="original-price-wrap">
+                            <span class="original-price">₹ 25,000</span>
+                            <span class="savings-badge">Save ₹ 5,001</span>
+                        </div>
+                        <div class="price">₹ 19,999</div>
+                        <div class="price-sub">per year / upto 5 users</div>
+                        <ul class="pricing-features">
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Sales & GST Invoicing</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> FEFO Inventory & Cash Counter POS</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Cashbook, Bankbook & Ledgers</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Collections & Orders Management</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Pro Reports & Analytics</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Upto 5 Users</li>
+                        </ul>
+                        <button class="btn-select-plan" onclick="selectLicensePlan('starter')">Select Starter Plan</button>
+                    </div>
+
+                    <div class="pricing-card featured">
+                        <div class="popular-badge">Most Popular</div>
+                        <h3>Growth License</h3>
+                        <div class="original-price-wrap">
+                            <span class="original-price">₹ 35,000</span>
+                            <span class="savings-badge">Save ₹ 10,001</span>
+                        </div>
+                        <div class="price">₹ 24,999</div>
+                        <div class="price-sub">per year / upto 20 users</div>
+                        <ul class="pricing-features">
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> All in Starter</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Staff Attendance</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Upto 20 Users</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Ziva AI (upto 50 monthly credits)</li>
+                        </ul>
+                        <button class="btn-select-plan" onclick="selectLicensePlan('growth')">Select Growth Plan</button>
+                    </div>
+
+                    <div class="pricing-card">
+                        <h3>Enterprise License</h3>
+                        <div class="original-price-wrap">
+                            <span class="original-price">₹ 65,000</span>
+                            <span class="savings-badge">Save ₹ 15,001</span>
+                        </div>
+                        <div class="price">₹ 49,999</div>
+                        <div class="price-sub">per year / upto 100 users</div>
+                        <ul class="pricing-features">
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> All in Growth</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Ziva AI (upto 1,000 monthly credits)</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> GPS Staff Geolocation Route Maps</li>
+                            <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Upto 100 Users</li>
+                        </ul>
+                        <button class="btn-select-plan" onclick="selectLicensePlan('enterprise')">Select Enterprise Plan</button>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section class="section-container" id="faq">
+            <div class="section-header">
+                <span class="section-tag">Got Questions?</span>
+                <h2 class="section-title">Frequently Asked Questions</h2>
+                <p class="section-desc">Find answers to common questions about zivaBooks operations, licensing, and business features.</p>
+            </div>
+
+            <div class="faq-grid">
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>Can I manage multiple business branches or separate companies in zivaBooks?</span>
+                        <svg class="faq-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="faq-answer">
+                        Yes! zivaBooks is built to manage multiple branches or distinct company profiles under one organization. Each branch operates independently with its own sales, inventory, and staff permissions, keeping all business records strictly private and organized.
+                    </div>
+                </div>
+
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>What is FEFO inventory and how does it protect my profit margin?</span>
+                        <svg class="faq-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="faq-answer">
+                        FEFO stands for First-Expiry-First-Out. zivaBooks automatically tracks product batch numbers and expiration dates, ensuring your billing staff dispatches older inventory first. This prevents product spoilage, minimizes waste, and protects your margins.
+                    </div>
+                </div>
+
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>How does customer OTP verification prevent cash collection discrepancies?</span>
+                        <svg class="faq-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="faq-answer">
+                        Whenever your field staff or cashier collects a payment or delivers an order, an instant One-Time Password (OTP) is sent to the customer's mobile phone. Verifying this code ensures every transaction is authentic and immediately updates your accounts.
+                    </div>
+                </div>
+
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>How does the 24/7 Dedicated Customer Portal work for my clients?</span>
+                        <svg class="faq-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="faq-answer">
+                        zivaBooks includes a 24/7 dedicated Customer Self-Service Portal (`/customer_home/`). Your B2B clients can log in anytime to view real-time account ledger statements, download PDF sales & POS invoices, track live sales order statuses, inspect payment collection records, and access active collection & delivery OTP codes without contacting your support team.
+                    </div>
+                </div>
+
+
+
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>What receipt and invoice formats are supported for printing?</span>
+                        <svg class="faq-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="faq-answer">
+                        zivaBooks supports fast 3-inch (80mm) thermal POS receipts for busy billing counters as well as professional full-page A4 PDF invoices and downloadable Excel statements for accountants.
+                    </div>
+                </div>
+
+                <div class="faq-item" onclick="toggleFaq(this)">
+                    <div class="faq-question">
+                        <span>Can my team use zivaBooks on mobile phones and tablets?</span>
+                        <svg class="faq-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div class="faq-answer">
+                        Absolutely. zivaBooks works smoothly across smartphones, tablets, laptops, and desktop computers. You can also install it directly onto your phone for quick 1-tap app access.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- License Purchase Contact Us Form Section -->
+        <section class="contact-section-wrap" id="contact">
+            <div class="section-header">
+                <span class="section-tag">Get Started Today</span>
+                <h2 class="section-title">Purchase Software License</h2>
+                <p class="section-desc">Submit your details below to purchase or inquire about a zivaBooks license. Our sales team will assist you with onboarding.</p>
+            </div>
+
+            <div class="contact-box">
+                <form id="contactInquiryForm" onsubmit="handleInquirySubmit(event)">
+                    {% csrf_token %}
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="inquiryName">Full Name *</label>
+                            <input type="text" id="inquiryName" name="full_name" class="form-control" placeholder="e.g. Rahul Sharma" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="inquiryBusiness">Business / Company Name</label>
+                            <input type="text" id="inquiryBusiness" name="business_name" class="form-control" placeholder="e.g. Acme Enterprises">
+                        </div>
+                        <div class="form-group">
+                            <label for="inquiryEmail">Email Address *</label>
+                            <input type="email" id="inquiryEmail" name="email" class="form-control" placeholder="rahul@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="inquiryPhone">Phone Number *</label>
+                            <input type="tel" id="inquiryPhone" name="phone" class="form-control" placeholder="+91 98765 43210" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="inquiryPlan">Preferred License Plan</label>
+                            <select id="inquiryPlan" name="license_plan" class="form-control">
+                                {% if license_plans %}
+                                    {% for plan in license_plans %}
+                                    <option value="{{ plan.plan_code }}" {% if plan.is_featured %}selected{% endif %}>
+                                        {{ plan.name }} (₹ {{ plan.price_per_year|floatformat:0 }}/yr)
+                                    </option>
+                                    {% endfor %}
+                                    <option value="custom">Custom Enterprise Setup</option>
+                                {% else %}
+                                    <option value="starter">Starter License (₹ 19,999/yr)</option>
+                                    <option value="growth" selected>Growth License (₹ 24,999/yr)</option>
+                                    <option value="enterprise">Enterprise License (₹ 49,999/yr)</option>
+                                    <option value="custom">Custom Enterprise Setup</option>
+                                {% endif %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="inquirySeats">Estimated User Seats</label>
+                            <input type="number" id="inquirySeats" name="user_seats" class="form-control" value="5" min="1" max="500">
+                        </div>
+                        <div class="form-group full-width">
+                            <label for="inquiryMessage">Additional Requirements / Notes</label>
+                            <textarea id="inquiryMessage" name="message" class="form-control" placeholder="Tell us about your multi-tenant setup, existing software, or custom needs..."></textarea>
+                        </div>
+                        <button type="submit" id="btnSubmitInquiry" class="btn-submit-inquiry">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                            Submit License Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-brand">zivaBooks</div>
+            <ul class="footer-links">
+                <li><a href="#overview">Overview</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="#demo">Live Demo</a></li>
+                <li><a href="#pricing">Licensing</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="#contact">Contact</a></li>
+                <li><a href="javascript:void(0)" onclick="openLoginModal()">Existing User Login</a></li>
+            </ul>
+            <p class="copyright">
+                © {% now "Y" %} zivaBooks. Developed with pride by <a href="http://zivainfotech.com" target="_blank" style="color: var(--accent-cyan);">Ziva Infotech</a>. All rights reserved.
+            </p>
+        </footer>
+
+    </div>
+
+    <!-- Glassmorphic Existing User Login Modal -->
+    <div class="login-modal-backdrop" id="loginModal" onclick="handleModalBackdropClick(event)">
+        <div class="login-modal-card">
+            <button class="modal-close-btn" onclick="closeLoginModal()" aria-label="Close Modal">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <div class="modal-header-brand">
+                <img src="{% static 'sw/images/icon-192.png' %}" alt="zivaBooks Logo">
+                <h2>Welcome Back</h2>
+                <p>Sign in to access your zivaBooks operational dashboard</p>
+            </div>
+
+            <form id="userLoginForm" action="{% url 'homeApp:UserLogin' %}" method="post">
+                {% csrf_token %}
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="userName">Username</label>
+                    <input type="text" class="form-control" name="userName" id="userName" placeholder="Enter your username" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="password">Password</label>
+                    <input type="password" class="form-control" name="password" id="password" placeholder="Enter your password" required>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                    <a href="{% url 'homeApp:forgot_password' %}" style="color: var(--accent-cyan); font-size: 0.85rem; text-decoration: none; font-weight: 500;">Forgot Password?</a>
+                </div>
+                <button type="button" id="continue" class="btn-submit-inquiry" style="grid-column: span 1; width: 100%;" onclick="UserLogin()">
+                    Sign In to Dashboard
+                </button>
+            </form>
         </div>
     </div>
-</div>
-<p class="credit" style="">Developed by <a href="http://zivainfotech.com" target="_blank">Ziva Infotech</a></p>
-<script src="{% static 'js/app-loader.js' %}"></script>
-<script src="{% static 'js/ui-polish.js' %}"></script>
-<script>
-    function applyLoginTheme(theme, persist) {
-        var normalized = theme === 'light' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', normalized);
-        if (persist !== false) {
-            try {
-                localStorage.setItem('ziva-theme', normalized);
-            } catch (e) {}
-        }
-        var label = document.getElementById('loginThemeLabel');
-        var button = document.getElementById('loginThemeToggle');
-        if (label) {
-            label.textContent = normalized === 'dark' ? 'Light' : 'Dark';
-        }
-        if (button) {
-            button.setAttribute('aria-label', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-            button.setAttribute('title', normalized === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-        }
-    }
 
-    $('#loginThemeToggle').on('click', function () {
-        var nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        applyLoginTheme(nextTheme, true);
-    });
+    <!-- Scripts -->
+    <script src="{% static 'js/app-loader.js' %}"></script>
+    <script src="{% static 'js/ui-polish.js' %}"></script>
 
-    applyLoginTheme(document.documentElement.getAttribute('data-theme'), false);
+    <script>
+        // Interactive Particle Canvas Background
+        (function initCanvasMotion() {
+            var canvas = document.getElementById('motionCanvas');
+            if (!canvas) return;
+            var ctx = canvas.getContext('2d');
+            var width = canvas.width = window.innerWidth;
+            var height = canvas.height = window.innerHeight;
 
-    function getCookie(name) {
-        var cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            var cookies = document.cookie.split(';');
-            for (var i = 0; i < cookies.length; i++) {
-                var cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
+            var particles = [];
+            var particleCount = Math.min(Math.floor(width / 20), 80);
+            var mouse = { x: null, y: null, radius: 150 };
+
+            window.addEventListener('resize', function() {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+            });
+
+            window.addEventListener('mousemove', function(e) {
+                mouse.x = e.x;
+                mouse.y = e.y;
+            });
+
+            function Particle() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.6;
+                this.vy = (Math.random() - 0.5) * 0.6;
+                this.radius = Math.random() * 2 + 1;
+            }
+
+            Particle.prototype.update = function() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < 0 || this.x > width) this.vx = -this.vx;
+                if (this.y < 0 || this.y > height) this.vy = -this.vy;
+
+                if (mouse.x && mouse.y) {
+                    var dx = mouse.x - this.x;
+                    var dy = mouse.y - this.y;
+                    var dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < mouse.radius) {
+                        this.x -= dx * 0.02;
+                        this.y -= dy * 0.02;
+                    }
+                }
+            };
+
+            Particle.prototype.draw = function() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(6, 182, 212, 0.6)';
+                ctx.fill();
+            };
+
+            for (var i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+
+                for (var i = 0; i < particles.length; i++) {
+                    particles[i].update();
+                    particles[i].draw();
+
+                    for (var j = i + 1; j < particles.length; j++) {
+                        var dx = particles[i].x - particles[j].x;
+                        var dy = particles[i].y - particles[j].y;
+                        var dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist < 120) {
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = 'rgba(6, 182, 212, ' + (0.2 - dist / 600) + ')';
+                            ctx.lineWidth = 0.8;
+                            ctx.stroke();
+                        }
+                    }
+                }
+                requestAnimationFrame(animate);
+            }
+            animate();
+        })();
+
+        // Login Modal Controls
+        function openLoginModal() {
+            var modal = document.getElementById('loginModal');
+            if (modal) modal.classList.add('active');
+        }
+
+        function closeLoginModal() {
+            var modal = document.getElementById('loginModal');
+            if (modal) modal.classList.remove('active');
+        }
+
+        function handleModalBackdropClick(e) {
+            if (e.target.id === 'loginModal') {
+                closeLoginModal();
+            }
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeLoginModal();
+        });
+
+        // Auto-open modal if URL contains #login or ?login=true
+        if (window.location.hash === '#login' || window.location.search.indexOf('login=true') !== -1) {
+            openLoginModal();
+        }
+
+        // Live Demo Tab Switching
+        function switchDemoTab(tabId, btn) {
+            document.querySelectorAll('.demo-tab-btn').forEach(function(b) { b.classList.remove('active'); });
+            document.querySelectorAll('.demo-content-panel').forEach(function(p) { p.classList.remove('active'); });
+
+            if (btn) btn.classList.add('active');
+            var target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
+        }
+
+        // Toggle FAQ Accordion Item
+        function toggleFaq(elem) {
+            var isActive = elem.classList.contains('active');
+            document.querySelectorAll('.faq-item').forEach(function(item) {
+                item.classList.remove('active');
+            });
+            if (!isActive) {
+                elem.classList.add('active');
+            }
+        }
+
+        // Select License Plan & Scroll to Contact Form
+        function selectLicensePlan(planValue) {
+            var select = document.getElementById('inquiryPlan');
+            if (select) select.value = planValue;
+            var contactSection = document.getElementById('contact');
+            if (contactSection) {
+                contactSection.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Theme Toggle Handler
+        function applyLoginTheme(theme, persist) {
+            var normalized = theme === 'light' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', normalized);
+            if (persist !== false) {
+                try {
+                    localStorage.setItem('ziva-theme', normalized);
+                } catch (e) {}
+            }
+        }
+
+        $('#loginThemeToggle').on('click', function () {
+            var nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            applyLoginTheme(nextTheme, true);
+        });
+
+        applyLoginTheme(document.documentElement.getAttribute('data-theme'), false);
+
+        // CSRF Token Helper
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
                 }
             }
+            return cookieValue;
         }
-        return cookieValue;
-    }
 
-    var csrftoken = getCookie('csrftoken');
-    $.ajaxSetup({
-        beforeSend: function (xhr, settings) {
-            var method = (settings.type || settings.method || 'GET').toUpperCase();
-            if (!(/^(GET|HEAD|OPTIONS|TRACE)$/).test(method) && !this.crossDomain) {
-                xhr.setRequestHeader('X-CSRFToken', csrftoken);
+        var csrftoken = getCookie('csrftoken');
+        $.ajaxSetup({
+            beforeSend: function (xhr, settings) {
+                var method = (settings.type || settings.method || 'GET').toUpperCase();
+                if (!(/^(GET|HEAD|OPTIONS|TRACE)$/).test(method) && !this.crossDomain) {
+                    xhr.setRequestHeader('X-CSRFToken', csrftoken);
+                }
             }
-        }
-    });
+        });
 
-    function UserLogin() {
-        var username = $('#userName').val();
-        var password = $('#password').val();
+        // Auto-clear invalid field styling on typing/change
+        $(document).on('input change', '#contactInquiryForm .form-control', function() {
+            $(this).removeClass('invalid-field');
+        });
 
-        if (username === "" || password === "") {
+        // Submit License Inquiry via AJAX with full client-side validation
+        function handleInquirySubmit(e) {
+            e.preventDefault();
 
+            // Clear previous invalid highlights
+            $('#contactInquiryForm .form-control').removeClass('invalid-field');
 
-            $('body')
-                .toast({
+            var fullName = ($('#inquiryName').val() || '').trim();
+            var businessName = ($('#inquiryBusiness').val() || '').trim();
+            var email = ($('#inquiryEmail').val() || '').trim();
+            var phone = ($('#inquiryPhone').val() || '').trim();
+            var plan = $('#inquiryPlan').val();
+            var seats = parseInt($('#inquirySeats').val(), 10);
+            var message = ($('#inquiryMessage').val() || '').trim();
+
+            var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            var phoneRegex = /^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]{6,15}$/;
+
+            // Strict Validation Checks with Toast Notifications
+            if (!fullName || fullName.length < 2) {
+                $('#inquiryName').addClass('invalid-field').focus();
+                $('body').toast({
                     class: 'error',
-                    message: 'Username and Password is required !'
-                })
-            ;
+                    message: 'Full Name is required (at least 2 characters)!'
+                });
+                return false;
+            }
 
-        } else {
-            if (window.AppLoader) window.AppLoader.show('Signing you in...');
-            data = new FormData();
-            data.append('userName', username);
-            data.append('password', password);
+            if (!email || !emailRegex.test(email)) {
+                $('#inquiryEmail').addClass('invalid-field').focus();
+                $('body').toast({
+                    class: 'error',
+                    message: 'Please enter a valid email address!'
+                });
+                return false;
+            }
+
+            if (!phone || !phoneRegex.test(phone)) {
+                $('#inquiryPhone').addClass('invalid-field').focus();
+                $('body').toast({
+                    class: 'error',
+                    message: 'Please enter a valid phone number!'
+                });
+                return false;
+            }
+
+            if (isNaN(seats) || seats < 1) {
+                $('#inquirySeats').addClass('invalid-field').focus();
+                $('body').toast({
+                    class: 'error',
+                    message: 'Estimated user seats must be at least 1!'
+                });
+                return false;
+            }
+
+            var btn = $('#btnSubmitInquiry');
+            btn.prop('disabled', true).html('Submitting License Request...');
+            if (window.AppLoader) window.AppLoader.show('Submitting license request...');
+
+            var payload = {
+                full_name: fullName,
+                business_name: businessName,
+                email: email,
+                phone: phone,
+                license_plan: plan,
+                user_seats: seats,
+                message: message
+            };
 
             $.ajax({
-                type: 'post',
-                url: '{% url 'homeApp:UserLogin' %}',
-                data: data,
-                contentType: false,
-                cache: false,
-                processData: false,
-
-
-                success: function (response) {
-                    if (response.message === 'success') {
-                        $('body')
-                            .toast({
-                                class: 'success',
-                                message: 'Login Successful.'
-                            });
-                        document.location.href = "" + response.data;
-                    } else {
-                        if (window.AppLoader) window.AppLoader.hide();
-                        $('body')
-                            .toast({
-                                class: 'warning',
-                                message: 'Incorrect username or password. Please try again.'
-                            })
-                        ;
-
-                    }
-
-                    return response;
-                },
-                error: function () {
+                type: 'POST',
+                url: '{% url "homeApp:contact_inquiry_api" %}',
+                data: JSON.stringify(payload),
+                contentType: 'application/json',
+                success: function(res) {
+                    btn.prop('disabled', false).html('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> Submit License Request');
                     if (window.AppLoader) window.AppLoader.hide();
-                    $('body')
-                        .toast({
+
+                    if (res.status === 'success') {
+                        $('body').toast({
+                            class: 'success',
+                            message: res.message || 'License Inquiry Submitted Successfully!'
+                        });
+                        $('#contactInquiryForm')[0].reset();
+                    } else {
+                        $('body').toast({
                             class: 'error',
-                            message: 'An error occurred !'
-                        })
-                    ;
+                            message: res.message || 'Submission failed. Please check your form inputs.'
+                        });
+                    }
+                },
+                error: function(err) {
+                    btn.prop('disabled', false).html('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> Submit License Request');
+                    if (window.AppLoader) window.AppLoader.hide();
+
+                    var msg = err.responseJSON && err.responseJSON.message ? err.responseJSON.message : 'An error occurred during submission.';
+                    $('body').toast({
+                        class: 'error',
+                        message: msg
+                    });
                 }
             });
         }
-    }
-</script>
+
+        // Standard User Login Function
+        function UserLogin() {
+            var username = $('#userName').val();
+            var password = $('#password').val();
+
+            if (username === "" || password === "") {
+                $('body').toast({
+                    class: 'error',
+                    message: 'Username and Password are required!'
+                });
+            } else {
+                if (window.AppLoader) window.AppLoader.show('Signing you in...');
+                var data = new FormData();
+                data.append('userName', username);
+                data.append('password', password);
+
+                $.ajax({
+                    type: 'post',
+                    url: '{% url "homeApp:UserLogin" %}',
+                    data: data,
+                    contentType: false,
+                    cache: false,
+                    processData: false,
+                    success: function (response) {
+                        if (response.message === 'success') {
+                            $('body').toast({
+                                class: 'success',
+                                message: 'Login Successful. Redirecting...'
+                            });
+                            document.location.href = "" + response.data;
+                        } else {
+                            if (window.AppLoader) window.AppLoader.hide();
+                            $('body').toast({
+                                class: 'warning',
+                                message: 'Incorrect username or password. Please try again.'
+                            });
+                        }
+                    },
+                    error: function () {
+                        if (window.AppLoader) window.AppLoader.hide();
+                        $('body').toast({
+                            class: 'error',
+                            message: 'An error occurred during authentication.'
+                        });
+                    }
+                });
+            }
+        }
+    </script>
 </body>
 </html>

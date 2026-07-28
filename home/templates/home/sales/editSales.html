@@ -362,6 +362,7 @@
             lockInvoiceNature: {{ obj.invoiceSeries.lockInvoiceNature|yesno:"true,false" }}
         };
         var partyCatalog = [];
+        var salesInventoryWidget = null;
         var salesInitialLineItems = JSON.parse(document.getElementById('sales-line-items-data').textContent || '[]').map(function (row) {
             return {
                 itemId: row.item_id,
@@ -727,7 +728,7 @@
             if (!window.SalesInvoiceLines || !$('#salesLineItemBox').length) {
                 return;
             }
-            window.SalesInvoiceLines.init({
+            salesInventoryWidget = window.SalesInvoiceLines.init({
                 containerSelector: '#salesLineItemBox',
                 hiddenInputSelector: '#salesLineItems',
                 catalogUrl: '{% url "homeApp:list_inventory_items_api" %}',

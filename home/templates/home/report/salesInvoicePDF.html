@@ -27,6 +27,11 @@
 <body>
     <div class="header">
         <div>
+            {% if logo_path %}
+                <div style="margin-bottom: 10px;">
+                    <img src="{{ logo_path }}" style="max-height: 50px; max-width: 150px; object-fit: contain;">
+                </div>
+            {% endif %}
             <div class="title">{{ seller_name }}</div>
             <div class="subtle">Tax Invoice</div>
             {% if seller_address %}<div>{{ seller_address|linebreaksbr }}</div>{% endif %}
@@ -67,6 +72,32 @@
             </div>
         </div>
     </div>
+
+    {% if sale.irn or sale.ewayBillNo %}
+    <div class="panel" style="margin-top: 10px; background: #f8fafc; border-color: #cbd5e1;">
+        <div class="label" style="color: #0f172a;">GST E-Invoice & E-Way Bill Details</div>
+        <div style="display: table; width: 100%; margin-top: 4px;">
+            <div style="display: table-cell; vertical-align: top;">
+                {% if sale.irn %}
+                <div><strong>IRN:</strong> <span style="font-family: monospace; font-size: 9px; word-break: break-all;">{{ sale.irn }}</span></div>
+                <div><strong>Ack No:</strong> {{ sale.ackNo|default:"-" }} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>Ack Date:</strong> {{ sale.ackDate|date:"d M Y H:i" }}</div>
+                <div><strong>Status:</strong> <span style="color: #16a34a; font-weight: 700;">{{ sale.get_einvoiceStatus_display|upper }}</span></div>
+                {% endif %}
+                {% if sale.ewayBillNo %}
+                <div style="margin-top: 6px;"><strong>E-Way Bill No:</strong> {{ sale.ewayBillNo }} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>Valid Upto:</strong> {{ sale.validUpto|date:"d M Y H:i" }}</div>
+                <div><strong>Transport Mode:</strong> {{ sale.get_transportMode_display }} &nbsp;&nbsp;|&nbsp;&nbsp; <strong>Vehicle:</strong> {{ sale.vehicleNo|default:"-" }}</div>
+                {% endif %}
+            </div>
+            {% if qr_code_data_uri %}
+            <div style="display: table-cell; width: 80px; text-align: right; vertical-align: top;">
+                <div style="display: inline-block; padding: 4px; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 8px; text-align: center;">
+                    <img src="{{ qr_code_data_uri }}" style="width: 72px; height: 72px; display: block; margin: 0 auto 2px;"><span style="font-size: 7px; color: #475569;">IRP Verified</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <table>
         <thead>

@@ -25,12 +25,25 @@ def app_navigation(request):
         user and any(user.has_perm(perm_name) for perm_name in STAFF_LOCATION_ADMIN_PERMS)
     )
     dashboard_state = build_dashboard_state(request, sidebar_sections, tenant=tenant, staff_user=staff_user)
+    is_customer_login = False
+    if is_authenticated and tenant:
+        from .navigation import _tenant_membership_role
+        from .models import TenantMembership
+        is_customer_login = (_tenant_membership_role(request, tenant) == TenantMembership.Role.PARTY)
+    from .utils.feature_guards import tenant_has_feature, check_staff_user_limit
+    has_gps_tracking = tenant_has_feature(tenant, 'gps_tracking') if tenant else True
+    seat_allowed, seat_msg, max_seats, active_count = check_staff_user_limit(tenant, target_will_be_active=True) if tenant else (True, None, 0, 0)
+
     context = {
         'sidebar_sections': sidebar_sections,
         'current_tenant': tenant,
         'current_staff_user': staff_user,
-        'staff_location_autotrack_enabled': bool(staff_user and not is_staff_location_admin),
+        'staff_location_autotrack_enabled': bool(staff_user and not is_staff_location_admin and has_gps_tracking),
         'dashboard_state': dashboard_state,
+        'is_customer_login': is_customer_login,
+        'has_gps_tracking_feature': has_gps_tracking,
+        'staff_seat_limit_reached': not seat_allowed,
+        'staff_seat_limit_msg': seat_msg or '',
     }
     request._app_navigation_context_cache = context
     return context

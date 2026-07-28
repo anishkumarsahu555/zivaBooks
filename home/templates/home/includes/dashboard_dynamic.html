@@ -23,6 +23,59 @@
     </div>
 </section>
 
+{% if dashboard_state.action_alerts %}
+    <section class="dashboard-alert-group">
+        <div class="dashboard-group-header">
+            <div>
+                <h2 class="dashboard-group-title">Action Alerts</h2>
+                <div class="dashboard-group-subtitle">Items that may need review today, based on the modules available to this user.</div>
+            </div>
+        </div>
+        <div class="dashboard-alert-grid">
+            {% for alert in dashboard_state.action_alerts %}
+                <article class="dashboard-alert-card tone-{{ alert.tone }}">
+                    <div class="dashboard-alert-icon">
+                        <i class="{{ alert.icon }} icon"></i>
+                    </div>
+                    <div class="dashboard-alert-main">
+                        <div class="dashboard-alert-label">{{ alert.label }}</div>
+                        <div class="dashboard-alert-description">{{ alert.description }}</div>
+                        <a class="dashboard-alert-link" href="{{ alert.action_url }}">{{ alert.action_label }}</a>
+                    </div>
+                    <div class="dashboard-alert-value">{{ alert.value }}</div>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+{% endif %}
+
+{% if dashboard_state.charts %}
+    <section class="dashboard-chart-group">
+        <div class="dashboard-group-header">
+            <div>
+                <h2 class="dashboard-group-title">Business Charts</h2>
+                <div class="dashboard-group-subtitle">Visual trends and health checks from the modules available to this user.</div>
+            </div>
+        </div>
+        <div class="dashboard-chart-grid">
+            {% for chart in dashboard_state.charts %}
+                <article class="dashboard-chart-card{% if chart.size == 'wide' %} is-wide{% endif %}">
+                    <div class="dashboard-chart-head">
+                        <div>
+                            <div class="dashboard-chart-title">{{ chart.title }}</div>
+                            <div class="dashboard-chart-copy">{{ chart.subtitle }}</div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-shell{% if chart.size == 'wide' %} is-wide{% endif %}">
+                        <canvas id="{{ chart.id }}" data-chart-key="{{ chart.key }}" data-chart-type="{{ chart.type }}"></canvas>
+                        <div class="dashboard-chart-empty" data-chart-empty-for="{{ chart.id }}">No chart data yet</div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+{% endif %}
+
 {% for group in dashboard_state.metric_groups %}
     <section class="dashboard-metric-group tone-{{ group.tone }}">
         <div class="dashboard-group-header">

@@ -1,52 +1,171 @@
 {% extends base_template %}
+{% load static %}
 
 {% block title %}
-    <title>Access Denied</title>
+    <title>403 - Access Denied | zivaBooks</title>
 {% endblock %}
 
 {% block css %}
     <style>
         .denied-shell {
-            min-height: calc(100vh - 120px);
+            min-height: calc(100vh - 140px);
             display: grid;
             place-items: center;
-            padding: 24px;
+            padding: 32px 20px;
+            background:
+                radial-gradient(circle at 12% 18%, rgba(20, 184, 166, 0.15), transparent 32%),
+                radial-gradient(circle at 88% 82%, rgba(15, 23, 42, 0.08), transparent 30%),
+                var(--app-bg, #f8fafc);
         }
 
         .denied-card {
-            width: min(100%, 560px);
-            background: #ffffff;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-            border-radius: 24px;
-            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
-            padding: 28px;
+            width: min(100%, 580px);
+            background: var(--app-surface, rgba(255, 255, 255, 0.96));
+            border: 1px solid var(--app-line, rgba(15, 23, 42, 0.08));
+            border-radius: 28px;
+            box-shadow: var(--app-shadow, 0 24px 60px rgba(15, 23, 42, 0.1));
+            padding: 36px 32px;
             text-align: center;
+            backdrop-filter: blur(12px);
+        }
+
+        .denied-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 16px;
+            border-radius: 999px;
+            background: rgba(239, 68, 68, 0.12);
+            color: #dc2626;
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 20px;
         }
 
         .denied-icon {
-            width: 68px;
-            height: 68px;
-            margin: 0 auto 16px;
-            border-radius: 20px;
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 20px;
+            border-radius: 22px;
             display: grid;
             place-items: center;
-            background: rgba(239, 68, 68, 0.12);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.14), rgba(220, 38, 38, 0.06));
             color: #dc2626;
-            font-size: 28px;
+            border: 1px solid rgba(239, 68, 68, 0.18);
         }
 
         .denied-title {
-            margin: 0 0 10px;
-            font-size: 1.5rem;
+            margin: 0 0 12px;
+            font-size: 1.85rem;
             font-weight: 800;
-            color: #0f172a;
+            line-height: 1.15;
+            letter-spacing: -0.03em;
+            color: var(--app-text, #0f172a);
         }
 
         .denied-copy {
-            margin: 0;
-            color: #475569;
+            margin: 0 0 28px;
+            color: var(--app-muted, #475569);
             font-size: 1rem;
-            line-height: 1.6;
+            line-height: 1.65;
+        }
+
+        .denied-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .denied-btn {
+            border: 0;
+            text-decoration: none !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-radius: 14px;
+            min-height: 48px;
+            padding: 0 22px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .denied-btn-primary {
+            background: linear-gradient(135deg, #0f766e, #0d9488);
+            color: #ffffff !important;
+            box-shadow: 0 8px 20px rgba(15, 118, 110, 0.24);
+        }
+
+        .denied-btn-primary:hover {
+            background: linear-gradient(135deg, #115e59, #0f766e);
+            transform: translateY(-1px);
+        }
+
+        .denied-btn-secondary {
+            background: rgba(15, 23, 42, 0.06);
+            color: var(--app-text, #0f172a) !important;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .denied-btn-secondary:hover {
+            background: rgba(15, 23, 42, 0.1);
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 576px) {
+            .denied-shell {
+                padding: 16px 12px;
+                min-height: calc(100vh - 100px);
+            }
+            .denied-card {
+                padding: 24px 18px;
+                border-radius: 20px;
+            }
+            .denied-title {
+                font-size: 1.45rem;
+            }
+            .denied-icon {
+                width: 60px;
+                height: 60px;
+                border-radius: 16px;
+                margin-bottom: 14px;
+            }
+            .denied-icon svg {
+                width: 28px;
+                height: 28px;
+            }
+            .denied-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+            .denied-btn {
+                width: 100%;
+                min-height: 46px;
+            }
+        }
+
+        html[data-theme="dark"] .denied-shell {
+            background:
+                radial-gradient(circle at 12% 18%, rgba(20, 184, 166, 0.12), transparent 32%),
+                radial-gradient(circle at 88% 82%, rgba(2, 6, 23, 0.4), transparent 30%),
+                #0b1220;
+        }
+
+        html[data-theme="dark"] .denied-card {
+            background: rgba(17, 27, 46, 0.95);
+            border-color: rgba(148, 163, 184, 0.15);
+            box-shadow: 0 24px 60px rgba(2, 6, 23, 0.4);
+        }
+
+        html[data-theme="dark"] .denied-btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e5edf7 !important;
+            border-color: rgba(255, 255, 255, 0.12);
         }
     </style>
 {% endblock %}
@@ -54,11 +173,41 @@
 {% block body %}
     <div class="denied-shell">
         <div class="denied-card">
-            <div class="denied-icon">
-                <i class="lock icon"></i>
+            <div class="denied-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                403 &bull; Access Denied
             </div>
+
+            <div class="denied-icon">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+            </div>
+
             <h1 class="denied-title">Access Denied</h1>
-            <p class="denied-copy">{{ access_denied_message }}</p>
+
+            <p class="denied-copy">{{ access_denied_message|default:"You do not have sufficient permissions to access this page. Please contact your workspace administrator." }}</p>
+
+            <div class="denied-actions">
+                <a href="{% url 'homeApp:homepage' %}" class="denied-btn denied-btn-primary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    Go To Dashboard
+                </a>
+                <a href="javascript:history.back()" class="denied-btn denied-btn-secondary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Go Back
+                </a>
+            </div>
         </div>
     </div>
 {% endblock %}

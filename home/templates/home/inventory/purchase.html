@@ -913,7 +913,7 @@
                 return {
                     invoice: ((item.PurchaseID || '-') + '<div class="purchase-inline-subtext">' + (item.InvoiceNumber || '-') + '</div>'),
                     date: item.InvoiceDate || '-',
-                    party: item.Party || '-',
+                    party: item.PartyID ? ('<span class="lookup-detail-link" onclick="showGeneralLookup(\'party\', \'' + item.PartyID + '\')" style="cursor: pointer;">' + (item.Party || '-') + '</span>') : (item.Party || '-'),
                     gstTreatment: item.GSTTreatment || '-',
                     claimStatus: item.ClaimStatus || '-',
                     amount: '₹ ' + Number(item.TotalAmount || 0).toFixed(2),

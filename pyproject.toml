@@ -5,14 +5,17 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "celery>=5.4.0",
     "django>=6.0.3",
     "django-datatables-view>=1.20.0",
     "django-pwa>=2.0.1",
     "django-redis>=6.0.0",
     "django-stdimage>=6.0.2",
+    "openai>=2.44.0",
     "openpyxl>=3.1.5",
     "psycopg[binary]>=3.2.10",
     "python-dotenv>=1.2.2",
+    "qrcode>=8.2",
     "requests>=2.32.5",
     "uvicorn>=0.42.0",
     "weasyprint>=68.1",

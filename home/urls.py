@@ -2,6 +2,31 @@ from django.conf import settings
 from django.urls import path
 
 from .apiView import *
+from .apis.admin_master import *
+from .apis.analytics_reports import *
+from .apis.attendance import *
+from .apis.attendance_reports import *
+from .apis.audit import *
+from .apis.book_reports import *
+from .apis.books import *
+from .apis.business_reports import *
+from .apis.cash_counter import *
+from .apis.cash_counter_collections import *
+from .apis.collections import *
+from .apis.dashboard_summaries import *
+from .apis.einvoice import *
+from .apis.inventory_returns import *
+from .apis.orders import *
+from .apis.party_ledger_reports import *
+from .apis.messages import *
+from .apis.proforma import *
+from .apis.proforma_reports import *
+from .apis.sales import *
+from .apis.sales_reports import *
+from .apis.tenant_settings import *
+from .apis.business_profile import *
+from .apis.ziva_ai import *
+from .apis.contact_inquiry import contact_inquiry_api, list_license_plans_api
 from .views import *
 from inventory.api import (
     add_inventory_category_api as inventory_add_inventory_category_api,
@@ -75,6 +100,13 @@ from inventory.views import (
 urlpatterns = [
     # pages
     path('home/', homepage, name='homepage'),
+    path('ziva-ai/', ziva_ai_page, name='ziva_ai'),
+    path('api/ziva-ai/chat/', ziva_ai_chat_api, name='ziva_ai_chat_api'),
+    path('api/ziva-ai/chat/status/<int:message_id>/', ziva_ai_chat_status_api, name='ziva_ai_chat_status_api'),
+    path('api/ziva-ai/history/', ziva_ai_history_api, name='ziva_ai_history_api'),
+    path('api/ziva-ai/sessions/', ziva_ai_sessions_list_api, name='ziva_ai_sessions_list_api'),
+    path('api/ziva-ai/sessions/delete/', ziva_ai_sessions_delete_api, name='ziva_ai_sessions_delete_api'),
+    path('api/ziva-ai/sessions/rename/', ziva_ai_sessions_rename_api, name='ziva_ai_sessions_rename_api'),
     path('', loginPage, name='loginPage'),
     path('claim-access/<str:token>/', claim_access, name='claim_access'),
     path('forgot_password/', forgot_password, name='forgot_password'),
@@ -96,6 +128,7 @@ urlpatterns = [
     path('customer/download-cash-counter-invoice/', customer_download_cash_counter_invoice_pdf, name='customer_download_cash_counter_invoice_pdf'),
     path('customer/change-password/', customer_change_password, name='customer_change_password'),
     path('api/save_recovery_email/', save_recovery_email, name='save_recovery_email'),
+    path('api/quick-search/', quick_search, name='quick_search_api'),
     path('api/customer_ledger_kpis/', customer_ledger_kpis, name='customer_ledger_kpis'),
     path('api/customer_active_collection_otp/', customer_active_collection_otp, name='customer_active_collection_otp'),
     path('api/customer_active_delivery_otp/', customer_active_delivery_otp, name='customer_active_delivery_otp'),
@@ -182,6 +215,7 @@ urlpatterns = [
     path('api/PartyLedgerListJson/', PartyLedgerListJson.as_view(), name='PartyLedgerListJson'),
     path('api/generate_party_ledger_pdf/<int:party_id>/', generate_party_ledger_pdf, name='generate_party_ledger_pdf'),
     path('api/generate_party_ledger_excel/<int:party_id>/', generate_party_ledger_excel, name='generate_party_ledger_excel'),
+    path('api/get_party_ledger_entry_source_detail_api/', get_party_ledger_entry_source_detail_api, name='get_party_ledger_entry_source_detail_api'),
     path('api/get_party_detail/', get_party_detail, name='get_party_detail'),
     path('api/edit_party_api/', edit_party_api, name='edit_party_api'),
     path('api/delete_party/', delete_party, name='delete_party'),
@@ -208,6 +242,7 @@ urlpatterns = [
     path('api/get_staff_dashboard_report_api/', get_staff_dashboard_report_api, name='get_staff_dashboard_report_api'),
     path('api/get_party_dashboard_report_api/', get_party_dashboard_report_api, name='get_party_dashboard_report_api'),
     path('api/get_bank_dashboard_report_api/', get_bank_dashboard_report_api, name='get_bank_dashboard_report_api'),
+    path('api/get_dashboard_charts_api/', get_dashboard_charts_api, name='get_dashboard_charts_api'),
     path('api/get_bank_balances_api/', get_bank_balances_api, name='get_bank_balances_api'),
     path('api/invoice_series_suggestions_api/', invoice_series_suggestions_api, name='invoice_series_suggestions_api'),
     path('api/add_inventory_category_api/', inventory_add_inventory_category_api, name='add_inventory_category_api'),
@@ -215,6 +250,11 @@ urlpatterns = [
     path('api/add_inventory_item_api/', inventory_add_inventory_item_api, name='add_inventory_item_api'),
     path('api/add_inventory_opening_stock_api/', inventory_add_inventory_opening_stock_api, name='add_inventory_opening_stock_api'),
     path('api/add_inventory_tax_profile_api/', inventory_add_inventory_tax_profile_api, name='add_inventory_tax_profile_api'),
+    path('api/einvoice/generate/', generate_einvoice_api, name='generate_einvoice_api'),
+    path('api/einvoice/cancel/', cancel_einvoice_api, name='cancel_einvoice_api'),
+    path('api/einvoice/schema/<int:sale_id>/', export_einvoice_schema_api, name='export_einvoice_schema_api'),
+    path('api/ewaybill/generate/', generate_ewaybill_api, name='generate_ewaybill_api'),
+    path('api/ewaybill/cancel/', cancel_ewaybill_api, name='cancel_ewaybill_api'),
     path('api/add_inventory_unit_api/', inventory_add_inventory_unit_api, name='add_inventory_unit_api'),
     path('api/add_inventory_transfer_voucher_api/', inventory_add_inventory_transfer_voucher_api, name='add_inventory_transfer_voucher_api'),
     path('api/add_inventory_warehouse_api/', inventory_add_inventory_warehouse_api, name='add_inventory_warehouse_api'),
@@ -271,6 +311,8 @@ urlpatterns = [
     path('api/transfer_books_api/', transfer_books_api, name='transfer_books_api'),
     path('api/transfer_cash_to_bank_api/', transfer_cash_to_bank_api, name='transfer_cash_to_bank_api'),
     path('api/get_book_tx_detail_api/', get_book_tx_detail_api, name='get_book_tx_detail_api'),
+    path('api/get_book_tx_source_detail_api/', get_book_tx_source_detail_api, name='get_book_tx_source_detail_api'),
+    path('api/get_generic_object_detail_api/', get_generic_object_detail_api, name='get_generic_object_detail_api'),
     path('api/edit_book_tx_api/', edit_book_tx_api, name='edit_book_tx_api'),
     path('api/delete_book_tx_api/', delete_book_tx_api, name='delete_book_tx_api'),
     path('api/generate_cashbook_pdf/', generate_cashbook_pdf, name='generate_cashbook_pdf'),
@@ -481,6 +523,12 @@ urlpatterns = [
 
     # Party Ledger
     path('party-ledger/<int:party_id>/', party_ledger, name='party_ledger'),
+
+    # Business Profile Settings
+    path('settings/business-profile/', business_profile_settings, name='business_profile_settings'),
+    path('api/settings/business-profile/update/', update_business_profile_api, name='update_business_profile_api'),
+    path('api/contact-inquiry/', contact_inquiry_api, name='contact_inquiry_api'),
+    path('api/license-plans/', list_license_plans_api, name='list_license_plans_api'),
 
 ]
 

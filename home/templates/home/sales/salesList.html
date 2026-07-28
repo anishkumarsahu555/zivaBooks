@@ -283,6 +283,84 @@
             </div>
         </div>
     {% endif %}
+
+    <!-- E-Way Bill Modal -->
+    <div class="ui tiny modal" id="ewayBillModal">
+        <div class="header">Generate E-Way Bill</div>
+        <div class="content">
+            <form class="ui form" id="ewayBillForm">
+                <input type="hidden" id="ewbSaleID">
+                <div class="field">
+                    <label>Transport Mode</label>
+                    <select class="ui dropdown" id="ewbTransportMode">
+                        <option value="1">Road</option>
+                        <option value="2">Rail</option>
+                        <option value="3">Air</option>
+                        <option value="4">Ship</option>
+                    </select>
+                </div>
+                <div class="two fields">
+                    <div class="field">
+                        <label>Vehicle Number</label>
+                        <input type="text" id="ewbVehicleNo" placeholder="e.g. MH12AB1234">
+                    </div>
+                    <div class="field">
+                        <label>Distance (KM)</label>
+                        <input type="number" id="ewbDistance" value="100">
+                    </div>
+                </div>
+                <div class="two fields">
+                    <div class="field">
+                        <label>Transporter ID (GSTIN)</label>
+                        <input type="text" id="ewbTransporterID" placeholder="e.g. 27ABCDE1234F1Z1">
+                    </div>
+                    <div class="field">
+                        <label>Transporter Name</label>
+                        <input type="text" id="ewbTransporterName" placeholder="e.g. VRL Logistics">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="actions">
+            <div class="ui negative button">Cancel</div>
+            <button class="ui teal right labeled icon button" onclick="generateEWayBillSubmit()">
+                Generate
+                <i class="truck icon"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Cancel E-Invoice Modal -->
+    <div class="ui mini modal" id="cancelEInvoiceModal">
+        <div class="header">Cancel E-Invoice?</div>
+        <div class="content">
+            <p>Are you sure you want to cancel the generated E-Invoice IRN for this sale?</p>
+        </div>
+        <input type="hidden" id="cancelEInvoiceSaleID">
+        <div class="actions">
+            <div class="ui negative button">No</div>
+            <button class="ui green right labeled icon button" onclick="confirmCancelEInvoice()">
+                Yes
+                <i class="checkmark icon"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Cancel E-Way Bill Modal -->
+    <div class="ui mini modal" id="cancelEWayBillModal">
+        <div class="header">Cancel E-Way Bill?</div>
+        <div class="content">
+            <p>Are you sure you want to cancel the generated E-Way Bill for this sale?</p>
+        </div>
+        <input type="hidden" id="cancelEWayBillSaleID">
+        <div class="actions">
+            <div class="ui negative button">No</div>
+            <button class="ui green right labeled icon button" onclick="confirmCancelEWayBill()">
+                Yes
+                <i class="checkmark icon"></i>
+            </button>
+        </div>
+    </div>
 {% endblock %}
 
 {% block js %}
@@ -490,6 +568,161 @@
             });
         }
         {% endif %}
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function generateEInvoice(id) {
+            showLoading();
+            $.ajax({
+                url: "/api/einvoice/generate/",
+                type: "POST",
+                headers: { "X-CSRFToken": getCookie('csrftoken') },
+                data: JSON.stringify({ sale_id: id }),
+                contentType: "application/json",
+                success: function (response) {
+                    hideLoading();
+                    if (response.status === 'success') {
+                        $('body').toast({class: 'success', message: 'E-Invoice IRN generated successfully!'});
+                        userTab.ajax.reload(null, false);
+                    } else {
+                        $('body').toast({class: 'error', message: response.message || 'Generation failed.'});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = xhr.responseJSON ? xhr.responseJSON.message : 'Error generating E-Invoice';
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function cancelEInvoice(id) {
+            $('#cancelEInvoiceSaleID').val(id);
+            $('#cancelEInvoiceModal').modal('show');
+        }
+
+        function confirmCancelEInvoice() {
+            var id = $('#cancelEInvoiceSaleID').val();
+            showLoading();
+            $('#cancelEInvoiceModal').modal('hide');
+            $.ajax({
+                url: "/api/einvoice/cancel/",
+                type: "POST",
+                headers: { "X-CSRFToken": getCookie('csrftoken') },
+                data: JSON.stringify({ sale_id: id, reason: "1", remarks: "Customer Request" }),
+                contentType: "application/json",
+                success: function (response) {
+                    hideLoading();
+                    if (response.status === 'success') {
+                        $('body').toast({class: 'success', message: 'E-Invoice IRN cancelled successfully!'});
+                        userTab.ajax.reload(null, false);
+                    } else {
+                        $('body').toast({class: 'error', message: response.message || 'Cancellation failed.'});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = xhr.responseJSON ? xhr.responseJSON.message : 'Error cancelling E-Invoice';
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function openEWayBillModal(id) {
+            $('#ewbSaleID').val(id);
+            $('#ewayBillModal').modal('show');
+        }
+
+        function generateEWayBillSubmit() {
+            var id = $('#ewbSaleID').val();
+            var mode = $('#ewbTransportMode').val();
+            var veh = $('#ewbVehicleNo').val();
+            var dist = $('#ewbDistance').val();
+            var transId = $('#ewbTransporterID').val();
+            var transName = $('#ewbTransporterName').val();
+
+            if (!veh && mode === '1') {
+                $('body').toast({class: 'warning', message: 'Vehicle number is required for Road transport.'});
+                return;
+            }
+
+            showLoading();
+            $('#ewayBillModal').modal('hide');
+
+            $.ajax({
+                url: "/api/ewaybill/generate/",
+                type: "POST",
+                headers: { "X-CSRFToken": getCookie('csrftoken') },
+                data: JSON.stringify({
+                    sale_id: id,
+                    transportMode: mode,
+                    vehicleNo: veh,
+                    distanceKm: dist,
+                    transporterId: transId,
+                    transporterName: transName
+                }),
+                contentType: "application/json",
+                success: function (response) {
+                    hideLoading();
+                    if (response.status === 'success') {
+                        $('body').toast({class: 'success', message: 'E-Way Bill generated successfully!'});
+                        userTab.ajax.reload(null, false);
+                    } else {
+                        $('body').toast({class: 'error', message: response.message || 'E-Way Bill generation failed.'});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = xhr.responseJSON ? xhr.responseJSON.message : 'Error generating E-Way Bill';
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function cancelEWayBill(id) {
+            $('#cancelEWayBillSaleID').val(id);
+            $('#cancelEWayBillModal').modal('show');
+        }
+
+        function confirmCancelEWayBill() {
+            var id = $('#cancelEWayBillSaleID').val();
+            showLoading();
+            $('#cancelEWayBillModal').modal('hide');
+            $.ajax({
+                url: "/api/ewaybill/cancel/",
+                type: "POST",
+                headers: { "X-CSRFToken": getCookie('csrftoken') },
+                data: JSON.stringify({ sale_id: id, reason: "1", remarks: "Order Cancelled" }),
+                contentType: "application/json",
+                success: function (response) {
+                    hideLoading();
+                    if (response.status === 'success') {
+                        $('body').toast({class: 'success', message: 'E-Way Bill cancelled successfully!'});
+                        userTab.ajax.reload(null, false);
+                    } else {
+                        $('body').toast({class: 'error', message: response.message || 'E-Way Bill cancellation failed.'});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = xhr.responseJSON ? xhr.responseJSON.message : 'Error cancelling E-Way Bill';
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
 
         $(ChangeDate());
 

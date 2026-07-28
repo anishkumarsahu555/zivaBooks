@@ -105,6 +105,32 @@ class StaffGroupPermissionCatalogTests(SeededTenantMixin, TestCase):
         self.assertEqual(create.status_code, 200)
         self.assertEqual(create.json().get('message'), 'success')
 
+    def test_ziva_ai_permission_is_assignable_to_staff_groups(self):
+        manage_groups_perm = Permission.objects.get(content_type__app_label='home', codename='can_manage_staff_groups')
+        ziva_ai_perm = Permission.objects.get(content_type__app_label='home', codename='can_access_ziva_ai')
+        self._set_tenant_scope(manage_groups_perm)
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse('homeApp:staff_group_create'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'can_access_ziva_ai')
+        self.assertContains(response, 'Can access Ziva AI')
+        self.assertContains(response, 'Ziva AI')
+        self.assertContains(response, 'Ziva AI Access')
+
+        create = self.client.post(
+            reverse('homeApp:add_staff_group_api'),
+            data={
+                'groupName': 'Ziva AI Enabled Group',
+                'description': 'Can open Ziva AI',
+                'permission_ids[]': [str(ziva_ai_perm.pk)],
+            },
+        )
+
+        self.assertEqual(create.status_code, 200)
+        self.assertEqual(create.json().get('message'), 'success')
+
     def test_api_rejects_permissions_outside_tenant_admin_scope(self):
         limited_admin = User.objects.create_user(
             username='limited.staffgroups.api',

@@ -45,6 +45,10 @@ class TenantAdminPermissionTests(TestCase):
                 'isActive': 'on',
                 'tenant_admin_user': str(self.tenant_admin.pk),
                 'admin_permissions': [str(self.party_perm.pk), str(self.collection_perm.pk)],
+                'ai_usage-TOTAL_FORMS': '0',
+                'ai_usage-INITIAL_FORMS': '0',
+                'ai_usage-MIN_NUM_FORMS': '0',
+                'ai_usage-MAX_NUM_FORMS': '1000',
                 '_save': 'Save',
             },
         )
@@ -82,6 +86,10 @@ class TenantAdminPermissionTests(TestCase):
                 'isActive': 'on',
                 'tenant_admin_user': str(self.other_admin.pk),
                 'admin_permissions': [str(self.audit_perm.pk)],
+                'ai_usage-TOTAL_FORMS': '0',
+                'ai_usage-INITIAL_FORMS': '0',
+                'ai_usage-MIN_NUM_FORMS': '0',
+                'ai_usage-MAX_NUM_FORMS': '1000',
                 '_save': 'Save',
             },
         )
@@ -138,6 +146,10 @@ class TenantAdminPermissionTests(TestCase):
                 'isActive': 'on',
                 'tenant_admin_user': str(self.tenant_admin.pk),
                 'preset_bundles': ['tenant_invoice_series'],
+                'ai_usage-TOTAL_FORMS': '0',
+                'ai_usage-INITIAL_FORMS': '0',
+                'ai_usage-MIN_NUM_FORMS': '0',
+                'ai_usage-MAX_NUM_FORMS': '1000',
                 '_save': 'Save',
             },
         )

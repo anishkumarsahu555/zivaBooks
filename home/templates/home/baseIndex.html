@@ -15,6 +15,7 @@
     <link rel="icon" href="{% static 'sw/images/favicon.ico' %}" sizes="any">
     <link rel="apple-touch-icon" href="{% static 'sw/images/apple-touch-icon.png' %}">
     <link rel="stylesheet" href="{% static 'css/app-loader.css' %}">
+    <link rel="stylesheet" href="{% static 'css/ui-polish.css' %}">
     <script>
         (function () {
             var theme = 'light';
@@ -339,13 +340,29 @@
         }
 
         .ui.vertical.menu.sidebar-menu .nav-section-title-wrap::before {
-            content: "";
-            width: 7px;
-            min-width: 7px;
-            height: 7px;
-            border-radius: 2px;
-            background: linear-gradient(135deg, rgba(125, 211, 252, 0.92), rgba(34, 197, 94, 0.82));
-            box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.06);
+            display: none !important;
+        }
+
+        .ui.vertical.menu.sidebar-menu .nav-section-icon-main {
+            width: 25px !important;
+            min-width: 25px !important;
+            height: 25px !important;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: rgba(226, 232, 240, 0.78);
+            font-size: 0.84rem !important;
+            margin: 0 8px 0 0 !important;
+            transition: background 0.22s ease, color 0.22s ease;
+        }
+
+        .ui.vertical.menu.sidebar-menu .nav-section-header:hover .nav-section-icon-main,
+        .ui.vertical.menu.sidebar-menu .nav-section-header[aria-expanded="true"] .nav-section-icon-main,
+        .ui.vertical.menu.sidebar-menu .nav-section.has-active-item .nav-section-icon-main {
+            background: rgba(255, 255, 255, 0.16) !important;
+            color: #ffffff !important;
         }
 
         .ui.vertical.menu.sidebar-menu .nav-section-title {
@@ -501,7 +518,7 @@
             padding: 8px 9px !important;
             min-height: 36px;
             border: 1px solid transparent;
-            transition: background 0.2s ease, color 0.2s ease, transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         .ui.vertical.menu.sidebar-menu .nav-link-icon {
@@ -533,7 +550,7 @@
         .ui.vertical.menu.sidebar-menu .nav-link.item:hover {
             background: rgba(255, 255, 255, 0.045) !important;
             border-color: rgba(125, 211, 252, 0.08);
-            transform: translateX(2px);
+            transform: translateX(4px);
         }
 
         .ui.vertical.menu.sidebar-menu .nav-link.item:hover .nav-link-icon {
@@ -770,7 +787,7 @@
         .ui.vertical.menu.sidebar-menu .nav-link.item:hover {
             background: rgba(45, 212, 191, 0.08) !important;
             border-color: rgba(45, 212, 191, 0.10);
-            transform: translateX(3px);
+            transform: translateX(4px);
         }
 
         .ui.vertical.menu.sidebar-menu .active.item {
@@ -926,8 +943,19 @@
         }
 
         html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section-title-wrap::before {
-            background: linear-gradient(135deg, #0d9488, #2563eb);
-            box-shadow: 0 0 0 4px rgba(20, 184, 166, 0.10);
+            display: none !important;
+        }
+
+        html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section-icon-main {
+            background: rgba(14, 116, 144, 0.08);
+            color: rgba(15, 118, 110, 0.82);
+        }
+
+        html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section-header:hover .nav-section-icon-main,
+        html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section-header[aria-expanded="true"] .nav-section-icon-main,
+        html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section.has-active-item .nav-section-icon-main {
+            background: rgba(13, 148, 136, 0.16) !important;
+            color: #0f766e !important;
         }
 
         html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section-chevron {
@@ -940,11 +968,8 @@
             color: #0f172a;
         }
 
-        html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section.has-active-item .nav-section-title-wrap::before {
-            background: #0d9488;
-            box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.12);
-        }
-
+        html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section-header:hover .nav-section-chevron,
+        html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section-header[aria-expanded="true"] .nav-section-chevron,
         html:not([data-theme="dark"]) .ui.vertical.menu.sidebar-menu .nav-section.has-active-item .nav-section-chevron {
             background: rgba(13, 148, 136, 0.12);
             color: #0f766e;
@@ -1076,18 +1101,267 @@
 
         @media (min-width: 768px) {
             .ui.vertical.menu.sidebar-menu {
-                visibility: visible;
-                -webkit-transform: translate3d(0, 0, 0);
-                transform: translate3d(0, 0, 0);
+                visibility: visible !important;
+                -webkit-transform: translate3d(0, 0, 0) !important;
+                transform: translate3d(0, 0, 0) !important;
                 width: 16.5rem !important;
+                opacity: 1;
+                transition: 
+                    width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                    transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                    opacity 0.25s ease,
+                    box-shadow 0.3s ease;
             }
 
             .main-content {
                 margin-left: 16.5rem;
+                transition: margin-left 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             }
 
             .sidebar-menu-toggler {
+                display: flex !important;
+            }
+
+            .sidebar-workspace-badge {
+                display: none;
+            }
+
+            /* Transitions for layout sub-elements on hover/toggle */
+            .sidebar-workspace-badge,
+            .sidebar-workspace-title,
+            .sidebar-workspace-kicker,
+            .sidebar-workspace-meta,
+            .sidebar-search,
+            .sidebar-search input,
+            .nav-section-title,
+            .nav-section-chevron,
+            .nav-link-label,
+            .nav-link.item,
+            .sidebar-meta,
+            .sidebar-meta-copy,
+            .sidebar-meta-version,
+            .nav-section-icon-main {
+                transition: 
+                    opacity 0.2s ease, 
+                    width 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                    height 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                    padding 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                    margin 0.25s cubic-bezier(0.25, 0.8, 0.25, 1),
+                    transform 0.2s ease;
+            }
+
+            /* Collapsed State Styles (Minified Sidebar) */
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu {
+                width: 4.5rem !important;
+            }
+
+            body.sidebar-collapsed .main-content {
+                margin-left: 4.5rem;
+            }
+
+            /* Hide/center rules when collapsed */
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-workspace {
+                padding: 10px 0 !important;
+                margin-bottom: 8px !important;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-workspace-title,
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-workspace-kicker,
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-workspace-meta {
                 display: none !important;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-workspace-badge {
+                display: inline-flex;
+                width: 34px;
+                height: 34px;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #0d9488, #2563eb);
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 0.92rem;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-search {
+                padding: 8px 0 !important;
+                justify-content: center;
+                background: rgba(255, 255, 255, 0.04);
+                border-radius: 50%;
+                width: 36px;
+                height: 36px;
+                margin: 0 auto 12px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-search input {
+                display: none !important;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-search-clear {
+                display: none !important;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-search-icon {
+                margin-right: 0 !important;
+                font-size: 1rem;
+                color: rgba(255, 255, 255, 0.7);
+            }
+
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-section-header {
+                padding: 10px 0 !important;
+                justify-content: center;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-section-title {
+                display: none !important;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-section-chevron {
+                display: none !important;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-section-title-wrap {
+                justify-content: center;
+                gap: 0;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-section-icon-main {
+                margin: 0 !important;
+                font-size: 0.95rem !important;
+            }
+
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-link-label {
+                display: none !important;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-link.item {
+                justify-content: center !important;
+                padding: 8px 0 !important;
+            }
+
+            /* Submenu vertical path track when collapsed */
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-section-menu {
+                position: relative;
+                padding: 4px 0 !important;
+                background: transparent !important;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-section-menu::before {
+                content: "";
+                position: absolute;
+                left: 50%;
+                top: 0;
+                bottom: 0;
+                width: 1px;
+                background: linear-gradient(180deg, rgba(45, 212, 191, 0.25), rgba(45, 212, 191, 0.02));
+                z-index: 1;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-link-icon {
+                position: relative;
+                z-index: 2;
+                background: rgba(3, 10, 24, 0.95) !important;
+                border: 1px solid rgba(45, 212, 191, 0.12);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+                width: 22px !important;
+                min-width: 22px !important;
+                height: 22px !important;
+                font-size: 0.72rem !important;
+            }
+            html:not([data-theme="dark"]) body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .nav-link-icon {
+                background: #ffffff !important;
+                border-color: rgba(20, 184, 166, 0.18);
+            }
+            html:not([data-theme="dark"]) body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-search {
+                background: rgba(15, 23, 42, 0.04);
+                border-color: rgba(15, 23, 42, 0.08);
+            }
+            html:not([data-theme="dark"]) body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-search-icon {
+                color: rgba(15, 23, 42, 0.7);
+            }
+
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-meta {
+                padding: 0 !important;
+                margin: 12px auto 20px !important;
+                width: 36px;
+                height: 36px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50% !important;
+                background: linear-gradient(135deg, #111827, #1f2937) !important;
+                border: 1px solid rgba(255, 255, 255, 0.08) !important;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1) !important;
+            }
+            html:not([data-theme="dark"]) body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-meta {
+                background: linear-gradient(135deg, #f8fafc, #f1f5f9) !important;
+                border: 1px solid rgba(15, 23, 42, 0.08) !important;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-meta-brand {
+                font-size: 0 !important; /* Hides the original text "zivaBooks" */
+                margin: 0 !important;
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-meta-brand::after {
+                content: "zB";
+                font-size: 0.85rem !important;
+                font-weight: 900 !important;
+                color: #2dd4bf !important;
+                display: block;
+            }
+            html:not([data-theme="dark"]) body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-meta-brand::after {
+                color: #0d9488 !important; /* Teal in light theme */
+            }
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-meta-copy,
+            body.sidebar-collapsed .ui.vertical.menu.sidebar-menu .sidebar-meta-version {
+                display: none !important;
+            }
+
+            /* Custom Floating Tooltip Styles */
+            .sidebar-tooltip-floating {
+                position: fixed;
+                pointer-events: none;
+                background: rgba(15, 23, 42, 0.96);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                color: #ffffff;
+                padding: 6px 12px;
+                border-radius: 8px;
+                font-size: 0.8rem;
+                font-weight: 600;
+                white-space: nowrap;
+                z-index: 99999;
+                box-shadow: 
+                    0 10px 25px -5px rgba(0, 0, 0, 0.3),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                transform: translateY(-50%) scale(0.9) translateX(4px);
+                opacity: 0;
+                transition: 
+                    top 0.22s cubic-bezier(0.25, 1, 0.5, 1),
+                    opacity 0.15s ease, 
+                    transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                transform-origin: left center;
+                display: block !important; /* Keep active in layout to enable top transition */
+            }
+            .sidebar-tooltip-floating.is-active {
+                opacity: 1;
+                transform: translateY(-50%) scale(1) translateX(8px);
+            }
+            .sidebar-tooltip-floating::before {
+                content: "";
+                position: absolute;
+                left: -6px;
+                top: 50%;
+                transform: translateY(-50%);
+                border-width: 5px 6px 5px 0;
+                border-style: solid;
+                border-color: transparent rgba(15, 23, 42, 0.96) transparent transparent;
+                pointer-events: none;
+            }
+
+            /* Tooltip Light Theme adapt */
+            html:not([data-theme="dark"]) .sidebar-tooltip-floating {
+                background: rgba(255, 255, 255, 0.96);
+                color: #0f172a;
+                box-shadow: 
+                    0 10px 25px -5px rgba(15, 23, 42, 0.15),
+                    0 0 0 1px rgba(15, 23, 42, 0.08);
+            }
+            html:not([data-theme="dark"]) .sidebar-tooltip-floating::before {
+                border-color: transparent rgba(255, 255, 255, 0.96) transparent transparent;
             }
         }
 
@@ -1266,16 +1540,51 @@
             color: #94a3b8;
         }
 
-        @media (max-width: 520px) {
+        @media (max-width: 767px) {
+            .ui.modal.recovery-email-modal,
+            .recovery-email-modal {
+                width: calc(100% - 24px) !important;
+                max-width: calc(100% - 24px) !important;
+                margin: 0 auto !important;
+                left: 12px !important;
+                right: 12px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                box-sizing: border-box !important;
+            }
+
+            .recovery-email-modal .header {
+                padding: 14px 16px !important;
+                font-size: 1.1rem !important;
+                box-sizing: border-box !important;
+            }
+
+            .recovery-email-modal .content {
+                padding: 16px !important;
+                box-sizing: border-box !important;
+                width: 100% !important;
+            }
+
             .recovery-email-modal .actions {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
+                display: flex !important;
+                flex-direction: column-reverse !important;
+                gap: 8px !important;
+                padding: 12px 16px !important;
+                margin-top: 12px !important;
+                margin-bottom: 12px !important;
+                box-sizing: border-box !important;
+                width: 100% !important;
             }
 
             .recovery-email-modal .actions .button {
                 margin: 0 !important;
-                width: 100%;
+                width: 100% !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding-left: 12px !important;
+                padding-right: 12px !important;
+                box-sizing: border-box !important;
             }
         }
 
@@ -1421,6 +1730,43 @@
             background: var(--app-surface) !important;
         }
 
+        /* Align DataTables pagination and info stacked on the right */
+        .dataTables_wrapper .dataTables_info,
+        .dataTables_wrapper .dataTables_paginate {
+            float: right !important;
+            clear: right !important;
+            text-align: right !important;
+            margin-top: 0.5rem !important;
+        }
+        
+        .dataTables_wrapper table,
+        .dataTables_wrapper .dataTables_scroll,
+        .dataTables_wrapper .dataTables_scrollWrapper {
+            clear: both !important;
+        }
+        
+        .dataTables_wrapper {
+            clear: both !important;
+            zoom: 1 !important;
+        }
+        .dataTables_wrapper::after {
+            content: "" !important;
+            display: table !important;
+            clear: both !important;
+        }
+        
+        /* Mobile responsive center alignments */
+        @media (max-width: 767px) {
+            .dataTables_wrapper .dataTables_info,
+            .dataTables_wrapper .dataTables_paginate {
+                float: none !important;
+                text-align: center !important;
+                margin-left: auto !important;
+                margin-right: auto !important;
+                display: block !important;
+            }
+        }
+
         html[data-theme="dark"] .ui.message,
         html[data-theme="dark"] .ui.menu,
         html[data-theme="dark"] .ui.dropdown .menu {
@@ -1438,6 +1784,22 @@
         html[data-theme="dark"] .ui.message,
         html[data-theme="dark"] .ui.label {
             color: var(--app-text) !important;
+        }
+
+        /* High-specificity overrides for dark-mode dropdown menus */
+        html[data-theme="dark"] .ui.menu .ui.dropdown .menu > .item,
+        html[data-theme="dark"] .ui.menu:not(.inverted) .ui.dropdown .menu > .item {
+            color: var(--app-text) !important;
+            background: var(--app-surface) !important;
+        }
+        html[data-theme="dark"] .ui.menu .ui.dropdown .menu > .item:hover,
+        html[data-theme="dark"] .ui.menu:not(.inverted) .ui.dropdown .menu > .item:hover {
+            color: var(--app-text) !important;
+            background: var(--app-surface-soft) !important;
+        }
+        html[data-theme="dark"] .ui.menu .ui.dropdown .menu > .item > i.icon,
+        html[data-theme="dark"] .ui.menu:not(.inverted) .ui.dropdown .menu > .item > i.icon {
+            color: inherit !important;
         }
 
         html[data-theme="dark"] .ui.basic.segment,
@@ -1682,6 +2044,8 @@
         }
 
         .dashboard-metric-group,
+        .dashboard-alert-group,
+        .dashboard-chart-group,
         .dashboard-actions-shell {
             background: #ffffff;
             border: 1px solid #dce7f3;
@@ -1800,6 +2164,170 @@
             opacity: 0.92;
         }
 
+        .dashboard-alert-grid {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            padding: 18px;
+        }
+
+        .dashboard-alert-card {
+            align-items: center;
+            border: 1px solid #e2ebf3;
+            border-radius: 18px;
+            display: grid;
+            gap: 12px;
+            grid-template-columns: 38px minmax(0, 1fr) auto;
+            min-height: 112px;
+            padding: 14px;
+        }
+
+        .dashboard-alert-card.tone-green {
+            background: linear-gradient(180deg, #f0fdf4, #ecfdf5);
+            border-color: rgba(16, 185, 129, 0.22);
+        }
+
+        .dashboard-alert-card.tone-amber {
+            background: linear-gradient(180deg, #fffbeb, #fff7ed);
+            border-color: rgba(245, 158, 11, 0.32);
+        }
+
+        .dashboard-alert-card.tone-red {
+            background: linear-gradient(180deg, #fff1f2, #fff7f7);
+            border-color: rgba(244, 63, 94, 0.28);
+        }
+
+        .dashboard-alert-icon {
+            align-items: center;
+            background: rgba(15, 23, 42, 0.06);
+            border-radius: 14px;
+            color: #0f766e;
+            display: inline-flex;
+            height: 38px;
+            justify-content: center;
+            width: 38px;
+        }
+
+        .dashboard-alert-card.tone-amber .dashboard-alert-icon {
+            color: #b45309;
+        }
+
+        .dashboard-alert-card.tone-red .dashboard-alert-icon {
+            color: #be123c;
+        }
+
+        .dashboard-alert-main {
+            min-width: 0;
+        }
+
+        .dashboard-alert-label {
+            color: #0f172a;
+            font-size: 0.9rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .dashboard-alert-description {
+            color: #64748b;
+            font-size: 0.74rem;
+            line-height: 1.35;
+            margin-top: 4px;
+        }
+
+        .dashboard-alert-value {
+            color: #0f172a;
+            font-size: 1.55rem;
+            font-weight: 900;
+            line-height: 1;
+            text-align: right;
+        }
+
+        .dashboard-alert-link {
+            color: #0f172a;
+            display: inline-flex;
+            font-size: 0.72rem;
+            font-weight: 800;
+            margin-top: 8px;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .dashboard-chart-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            padding: 18px;
+        }
+
+        .dashboard-chart-card {
+            background:
+                radial-gradient(circle at top right, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0) 34%),
+                linear-gradient(180deg, #fbfdff, #f5f9fc);
+            border: 1px solid #e2ebf3;
+            border-radius: 20px;
+            min-width: 0;
+            padding: 14px;
+        }
+
+        .dashboard-chart-card.is-wide {
+            grid-column: span 2;
+        }
+
+        .dashboard-chart-head {
+            align-items: flex-start;
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .dashboard-chart-title {
+            color: #0f172a;
+            font-size: 0.98rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .dashboard-chart-copy {
+            color: #64748b;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            margin-top: 4px;
+        }
+
+        .dashboard-chart-shell {
+            height: 260px;
+            position: relative;
+        }
+
+        .dashboard-chart-shell.is-wide {
+            height: 310px;
+        }
+
+        .dashboard-chart-shell canvas {
+            height: 100% !important;
+            width: 100% !important;
+        }
+
+        .dashboard-chart-empty {
+            align-items: center;
+            background: rgba(248, 250, 252, 0.88);
+            border: 1px dashed rgba(100, 116, 139, 0.28);
+            border-radius: 16px;
+            color: #64748b;
+            display: none;
+            font-size: 0.82rem;
+            font-weight: 800;
+            inset: 0;
+            justify-content: center;
+            position: absolute;
+            text-align: center;
+        }
+
+        .dashboard-chart-empty.is-visible {
+            display: flex;
+        }
+
         html[data-theme="dark"] .dashboard-license-banner {
             background: rgba(120, 53, 15, 0.28) !important;
             color: #f8e3b3 !important;
@@ -1845,6 +2373,8 @@
         }
 
         html[data-theme="dark"] .dashboard-metric-group,
+        html[data-theme="dark"] .dashboard-alert-group,
+        html[data-theme="dark"] .dashboard-chart-group,
         html[data-theme="dark"] .dashboard-actions-shell {
             background: var(--app-surface);
             border-color: var(--app-line);
@@ -1889,6 +2419,70 @@
         html[data-theme="dark"] .dashboard-stat-link {
             background: #1d3653;
             color: #eff6ff;
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card {
+            border-color: rgba(71, 85, 105, 0.4);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-green {
+            background: linear-gradient(180deg, #052e2b, #0f172a);
+            border-color: rgba(16, 185, 129, 0.34);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-amber {
+            background: linear-gradient(180deg, #3a2a08, #111827);
+            border-color: rgba(245, 158, 11, 0.34);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-red {
+            background: linear-gradient(180deg, #3f1220, #111827);
+            border-color: rgba(244, 63, 94, 0.34);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-icon {
+            background: rgba(148, 163, 184, 0.10);
+            color: #5eead4;
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-amber .dashboard-alert-icon {
+            color: #fbbf24;
+        }
+
+        html[data-theme="dark"] .dashboard-alert-card.tone-red .dashboard-alert-icon {
+            color: #fb7185;
+        }
+
+        html[data-theme="dark"] .dashboard-alert-label,
+        html[data-theme="dark"] .dashboard-alert-value,
+        html[data-theme="dark"] .dashboard-alert-link {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .dashboard-alert-description {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .dashboard-chart-card {
+            background:
+                radial-gradient(circle at top right, rgba(148, 163, 184, 0.10), rgba(255, 255, 255, 0) 34%),
+                linear-gradient(180deg, #162338, #111b2e);
+            border-color: var(--app-line);
+            box-shadow: 0 14px 30px rgba(2, 6, 23, 0.18);
+        }
+
+        html[data-theme="dark"] .dashboard-chart-title {
+            color: var(--app-text);
+        }
+
+        html[data-theme="dark"] .dashboard-chart-copy {
+            color: var(--app-muted);
+        }
+
+        html[data-theme="dark"] .dashboard-chart-empty {
+            background: rgba(17, 27, 46, 0.9);
+            border-color: rgba(148, 163, 184, 0.24);
+            color: var(--app-muted);
         }
 
         .dashboard-action-grid {
@@ -2011,6 +2605,8 @@
             .dashboard-hero,
             .dashboard-group-header,
             .dashboard-stat-grid,
+            .dashboard-alert-grid,
+            .dashboard-chart-grid,
             .dashboard-action-grid {
                 padding-left: 12px;
                 padding-right: 12px;
@@ -2024,6 +2620,8 @@
             }
 
             .dashboard-metric-group,
+            .dashboard-alert-group,
+            .dashboard-chart-group,
             .dashboard-actions-shell {
                 border-radius: 16px;
                 margin-bottom: 12px;
@@ -2106,6 +2704,59 @@
             .dashboard-stat-link {
                 font-size: 0.68rem;
                 padding: 6px 10px;
+            }
+
+            .dashboard-alert-grid {
+                gap: 10px;
+                grid-template-columns: 1fr;
+                padding-top: 12px;
+                padding-bottom: 12px;
+            }
+
+            .dashboard-alert-card {
+                border-radius: 16px;
+                min-height: 96px;
+                padding: 12px;
+            }
+
+            .dashboard-alert-label {
+                font-size: 0.84rem;
+            }
+
+            .dashboard-alert-description,
+            .dashboard-alert-link {
+                font-size: 0.68rem;
+            }
+
+            .dashboard-alert-value {
+                font-size: 1.35rem;
+            }
+
+            .dashboard-chart-grid {
+                gap: 10px;
+                grid-template-columns: 1fr;
+                padding-top: 12px;
+                padding-bottom: 12px;
+            }
+
+            .dashboard-chart-card,
+            .dashboard-chart-card.is-wide {
+                border-radius: 16px;
+                grid-column: auto;
+                padding: 12px;
+            }
+
+            .dashboard-chart-title {
+                font-size: 0.9rem;
+            }
+
+            .dashboard-chart-copy {
+                font-size: 0.72rem;
+            }
+
+            .dashboard-chart-shell,
+            .dashboard-chart-shell.is-wide {
+                height: 220px;
             }
 
             .dashboard-action-grid {
@@ -2231,6 +2882,426 @@
                 padding: 0 9px;
             }
         }
+
+        /* General Lookup Styles */
+        .lookup-detail-link {
+            color: #2185d0;
+            font-weight: 600;
+            cursor: pointer;
+            transition: color 0.2s ease, border-bottom 0.2s ease;
+            border-bottom: 1px dashed transparent;
+            display: inline-flex;
+            align-items: center;
+        }
+        .lookup-detail-link:hover {
+            color: #1678c2;
+            border-bottom: 1px dashed #1678c2;
+        }
+        /* Dark mode support */
+        html[data-theme="dark"] .lookup-detail-link {
+            color: #64b5f6;
+        }
+        html[data-theme="dark"] .lookup-detail-link:hover {
+            color: #90caf9;
+            border-bottom-color: #90caf9;
+        }
+
+        /* General Lookup Modal Adjustments */
+        #generalLookupModal {
+            max-width: 650px;
+        }
+        
+        .general-lookup-section {
+            display: none;
+        }
+
+        .lookup-meta-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            display: block;
+            margin-bottom: 2px;
+        }
+        html[data-theme="dark"] .lookup-meta-label {
+            color: #94a3b8;
+        }
+
+        /* Quick Search Styles with Motion CSS */
+        /* Quick Search Styles with Motion CSS */
+        .nav-search-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            max-width: 440px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1010;
+        }
+
+        .nav-search-wrapper {
+            position: relative;
+            width: 260px;
+            max-width: 100%;
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 99px;
+            padding: 4px 12px;
+            transition: 
+                width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), 
+                background-color 0.25s, 
+                border-color 0.25s, 
+                box-shadow 0.25s;
+        }
+
+        .nav-search-wrapper input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            width: 100%;
+            font-size: 0.88rem;
+            padding: 2px 6px;
+            font-weight: 500;
+            font-family: inherit;
+            transition: color 0.25s;
+        }
+
+        .nav-search-wrapper input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+            transition: color 0.25s;
+        }
+
+        .nav-search-icon {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.92rem;
+            margin-right: 2px;
+            transition: color 0.25s;
+        }
+
+        .nav-search-shortcut {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.65);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 6px;
+            padding: 2px 6px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.1s ease;
+        }
+
+        .nav-search-clear {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+            padding: 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s;
+        }
+
+        .nav-search-clear:hover {
+            color: #ffffff;
+        }
+
+        /* Active / Focused State Styles */
+        .nav-search-wrapper.is-focused {
+            width: 380px;
+            background: var(--app-surface);
+            border-color: var(--app-line);
+            box-shadow: 
+                0 0 0 3px rgba(37, 99, 235, 0.18),
+                0 10px 25px -5px rgba(15, 23, 42, 0.12), 
+                0 8px 10px -6px rgba(15, 23, 42, 0.08);
+        }
+
+        html[data-theme="dark"] .nav-search-wrapper.is-focused {
+            box-shadow: 
+                0 0 0 3px rgba(59, 130, 246, 0.22),
+                0 12px 30px rgba(0, 0, 0, 0.45);
+        }
+
+        .nav-search-wrapper.is-focused input {
+            color: var(--app-text);
+        }
+
+        .nav-search-wrapper.is-focused input::placeholder {
+            color: var(--app-muted);
+        }
+
+        .nav-search-wrapper.is-focused .nav-search-icon {
+            color: var(--app-muted);
+        }
+
+        .nav-search-wrapper.is-focused .nav-search-shortcut {
+            opacity: 0;
+        }
+
+        .nav-search-wrapper.is-focused .nav-search-clear {
+            color: var(--app-muted);
+        }
+
+        .nav-search-wrapper.is-focused .nav-search-clear:hover {
+            color: var(--app-text);
+        }
+
+        /* Backdrop with Modern Blur & Entry/Exit Animations */
+        .nav-search-backdrop {
+            position: fixed;
+            inset: 40px 0 0 0;
+            background: rgba(15, 23, 42, 0.35);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            z-index: 1005;
+            display: block;
+            opacity: 1;
+            transition: display 0.25s, opacity 0.25s ease-out;
+            transition-behavior: allow-discrete;
+        }
+
+        @starting-style {
+            .nav-search-backdrop {
+                opacity: 0;
+            }
+        }
+
+        .nav-search-backdrop[hidden] {
+            display: none;
+            opacity: 0;
+        }
+
+        /* Spotlight Glassmorphic Dropdown with Elastic Transition */
+        .nav-search-results-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.86);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            border-radius: 16px;
+            box-shadow: 
+                0 10px 30px -10px rgba(15, 23, 42, 0.1),
+                0 20px 40px -15px rgba(15, 23, 42, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            max-height: 420px;
+            overflow-y: auto;
+            z-index: 1015;
+            display: block;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            transition: 
+                display 0.25s, 
+                opacity 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), 
+                transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition-behavior: allow-discrete;
+        }
+
+        html[data-theme="dark"] .nav-search-results-dropdown {
+            background: rgba(17, 27, 46, 0.82);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 
+                0 10px 30px -10px rgba(0, 0, 0, 0.3),
+                0 25px 50px -12px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        @starting-style {
+            .nav-search-results-dropdown {
+                opacity: 0;
+                transform: translateY(-8px) scale(0.97);
+            }
+        }
+
+        .nav-search-results-dropdown[hidden] {
+            display: none;
+            opacity: 0;
+            transform: translateY(-8px) scale(0.97);
+        }
+
+        /* Results content styles */
+        .nav-search-category-title {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--app-muted);
+            padding: 10px 14px 4px;
+            background: rgba(15, 23, 42, 0.02);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+        }
+
+        html[data-theme="dark"] .nav-search-category-title {
+            background: rgba(255, 255, 255, 0.015);
+            border-bottom-color: rgba(255, 255, 255, 0.04);
+        }
+
+        /* Staggered entry animation */
+        @keyframes searchItemFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .nav-search-item {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: 11px 16px;
+            color: var(--app-text) !important;
+            text-decoration: none !important;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.025);
+            animation: searchItemFadeIn 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) both;
+            animation-delay: calc(var(--i, 0) * 0.025s);
+            transition: background 0.18s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        html[data-theme="dark"] .nav-search-item {
+            border-bottom-color: rgba(255, 255, 255, 0.025);
+        }
+
+        .nav-search-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Dynamic left gradient indicator bar on hover */
+        .nav-search-item::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%) scaleY(0);
+            width: 4px;
+            height: 60%;
+            background: linear-gradient(180deg, #3b82f6, #10b981);
+            border-radius: 0 4px 4px 0;
+            transition: transform 0.2s ease;
+        }
+
+        .nav-search-item:hover::before,
+        .nav-search-item.is-selected::before {
+            transform: translateY(-50%) scaleY(1);
+        }
+
+        .nav-search-item:hover,
+        .nav-search-item.is-selected {
+            background: rgba(37, 99, 235, 0.08);
+            transform: translateX(4px);
+            outline: none;
+        }
+
+        html[data-theme="dark"] .nav-search-item:hover,
+        html[data-theme="dark"] .nav-search-item.is-selected {
+            background: rgba(59, 130, 246, 0.15);
+        }
+
+        .nav-search-item-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .nav-search-item-desc {
+            font-size: 0.78rem;
+            color: var(--app-muted);
+            margin-top: 2px;
+        }
+
+        .nav-search-empty-state {
+            padding: 28px 24px;
+            text-align: center;
+            color: var(--app-muted);
+            font-size: 0.88rem;
+        }
+
+        .nav-search-empty-state i.icon {
+            font-size: 1.6rem;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        @media (max-width: 767px) {
+            .nav-search-container {
+                max-width: 140px;
+                transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .nav-search-wrapper {
+                width: 110px;
+                background: rgba(255, 255, 255, 0.08);
+                padding: 4px 8px;
+            }
+            /* Expand to cover full navbar on focus on mobile devices */
+            .nav-search-container.is-active-mobile {
+                position: absolute;
+                inset: 0;
+                width: 100vw;
+                max-width: none;
+                height: 100%;
+                background: var(--app-surface);
+                padding: 0 12px;
+                margin: 0;
+                display: flex;
+                align-items: center;
+                z-index: 1020;
+            }
+            .nav-search-container.is-active-mobile .nav-search-wrapper {
+                width: 100%;
+                height: 30px;
+                border-radius: 8px;
+                background: var(--app-bg);
+            }
+            .nav-search-container.is-active-mobile .nav-search-results-dropdown {
+                top: 40px;
+                border-radius: 0 0 12px 12px;
+                border-left: none;
+                border-right: none;
+            }
+            .nav-search-shortcut {
+                display: none;
+            }
+        }
+
+        /* View Transition circular clip-path ripple animation for theme toggling */
+        ::view-transition-group(root) {
+            animation: none !important;
+        }
+        ::view-transition-old(root),
+        ::view-transition-new(root) {
+            animation: none !important;
+            mix-blend-mode: normal !important;
+            height: 100vh !important;
+            width: 100vw !important;
+            object-fit: cover !important;
+        }
+        
+        ::view-transition-old(root) {
+            z-index: 1;
+        }
+        ::view-transition-new(root) {
+            z-index: 9999;
+        }
+        
+        .theme-transition-reverse::view-transition-old(root) {
+            z-index: 9999;
+        }
+        .theme-transition-reverse::view-transition-new(root) {
+            z-index: 1;
+        }
     </style>
 
 </head>
@@ -2256,6 +3327,21 @@
             zivaBooks
         </a>
     </div>
+
+    {% if not is_customer_login %}
+    <div class="nav-search-container">
+        <div class="nav-search-wrapper" id="navSearchWrapper">
+            <i class="search icon nav-search-icon"></i>
+            <input type="text" id="navSearchInput" placeholder="Quick search..." autocomplete="off">
+            <span class="nav-search-shortcut">/</span>
+            <button class="nav-search-clear" id="navSearchClear" type="button" aria-label="Clear search" hidden>
+                <i class="times icon"></i>
+            </button>
+            <div id="navSearchResults" class="nav-search-results-dropdown" hidden></div>
+        </div>
+    </div>
+    <div class="nav-search-backdrop" id="navSearchBackdrop" hidden></div>
+    {% endif %}
 
     <div class="right menu">
         <a href="#" class="item theme-toggle" id="themeToggleBtn" title="Toggle theme">
@@ -2334,6 +3420,493 @@
 </div>
 {% endif %}
 
+    <!-- Unified General Lookup Modal -->
+    <div class="ui modal" id="generalLookupModal">
+        <i class="close icon"></i>
+        <div class="header">
+            <i class="info circle icon" id="lookupModalHeaderIcon"></i>
+            <span id="lookupModalTitle">Entity Details</span>
+            <span class="ui tiny label" id="lookupModalBadge" style="margin-left: 10px; vertical-align: middle;">Details</span>
+        </div>
+        
+        <div class="content">
+            <!-- PANEL A: STAFF PROFILE -->
+            <div id="lookupStaffContent" class="general-lookup-section" style="width: 100%;">
+                <div class="ui grid stackable divided">
+                    <div class="four wide column center aligned">
+                        <img id="modalStaffPhoto" class="ui circular image centered" src="/static/images/default-avatar.svg" style="width: 100px; height: 100px; object-fit: cover; border: 2px solid var(--app-line);">
+                        <div style="margin-top: 1rem;">
+                            <span class="lookup-meta-label">Role Group</span>
+                            <div class="ui blue mini label" id="modalStaffGroup">N/A</div>
+                        </div>
+                    </div>
+                    <div class="twelve wide column">
+                        <div class="ui stackable two column grid">
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="phone icon"></i> Phone Number</span>
+                                            <strong id="modalStaffPhone" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="envelope icon"></i> Email Address</span>
+                                            <strong id="modalStaffEmail" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="users icon"></i> Party Group</span>
+                                            <strong id="modalStaffPartyGroup" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="map marker alternate icon"></i> Address</span>
+                                            <strong id="modalStaffAddress" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="modalStaffIdProofContainer" style="display: none; border-top: 1px dashed var(--app-line); padding-top: 1.5rem; margin-top: 1.5rem; text-align: center;">
+                    <div class="ui tiny header" style="margin-bottom: 0.75rem;"><i class="id card icon"></i> ID Proof Document</div>
+                    <img id="modalStaffIdProof" class="ui rounded centered image" src="" style="max-height: 200px; border: 1px solid var(--app-line); object-fit: contain;">
+                </div>
+            </div>
+
+            <!-- PANEL B: PARTY LEDGER DETAIL -->
+            <div id="lookupPartyContent" class="general-lookup-section" style="width: 100%;">
+                <div class="ui grid stackable divided">
+                    <div class="five wide column">
+                        <div class="ui segment center aligned" style="box-shadow: none !important; border: 1px solid var(--app-line); background: transparent; padding: 1rem;">
+                            <span class="lookup-meta-label">Opening Balance</span>
+                            <div class="ui header" id="modalPartyBalance" style="margin: 5px 0 10px 0; font-size: 1.6rem; font-weight: 700;">₹ 0</div>
+                            <div class="ui divider" style="margin: 10px 0;"></div>
+                            <span class="lookup-meta-label">GST Number</span>
+                            <strong id="modalPartyGST" style="font-family: monospace; font-size: 0.95rem;">N/A</strong>
+                        </div>
+                    </div>
+                    <div class="eleven wide column">
+                        <div class="ui stackable two column grid">
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="building outline icon"></i> Legal Name</span>
+                                            <strong id="modalPartyLegalName" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="phone icon"></i> Phone Number</span>
+                                            <strong id="modalPartyPhone" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="map marker alternate icon"></i> Address</span>
+                                            <strong id="modalPartyAddress" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="truck icon"></i> Billing Address</span>
+                                            <strong id="modalPartyBillingAddress" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL C: BANK DETAILS -->
+            <div id="lookupBankContent" class="general-lookup-section" style="width: 100%;">
+                <div class="ui grid stackable divided">
+                    <div class="five wide column">
+                        <div class="ui segment center aligned" style="box-shadow: none !important; border: 1px solid var(--app-line); background: transparent; padding: 1rem;">
+                            <span class="lookup-meta-label">Available Balance</span>
+                            <div class="ui header" id="modalBankBalance" style="margin: 5px 0 0 0; font-size: 1.6rem; font-weight: 700;">₹ 0</div>
+                        </div>
+                    </div>
+                    <div class="eleven wide column">
+                        <div class="ui stackable two column grid">
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="credit card icon"></i> Account Number</span>
+                                            <strong id="modalBankAccount" style="font-family: monospace; font-size: 1.1rem; color: var(--app-text); font-weight: 600; letter-spacing: 0.5px;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="column">
+                                <div class="ui list">
+                                    <div class="item" style="padding: 0.5rem 0;">
+                                        <div class="content">
+                                            <span class="lookup-meta-label"><i class="file alternate outline icon"></i> Description</span>
+                                            <strong id="modalBankDesc" style="font-size: 0.95rem; color: var(--app-text); font-weight: 600;">-</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="actions">
+            <a href="" id="lookupDetailLinkBtn" class="ui primary tiny button">
+                View Full Details
+                <i class="external alternate icon"></i>
+            </a>
+            <div class="ui cancel secondary tiny button">Close</div>
+        </div>
+    </div>
+
+    <!-- Source Transaction Lookup Modal -->
+    <div class="ui small modal" id="sourceTxLookupModal">
+        <i class="close icon"></i>
+        <div class="header">
+            <i class="file alternate outline icon" style="margin-right: 5px;"></i>
+            <span id="sourceTxLookupTitle">Source Document Details</span>
+        </div>
+        <div class="content" style="max-height: 400px; overflow-y: auto;">
+            <table class="ui celled definition table small compact" style="margin-bottom: 0;">
+                <tbody id="sourceTxLookupTableBody">
+                    <!-- Dynamic details rows go here -->
+                </tbody>
+            </table>
+        </div>
+        <div class="actions">
+            <a href="" id="sourceTxDetailLinkBtn" class="ui primary tiny button" style="display: none;">
+                View Full Details
+                <i class="external alternate icon"></i>
+            </a>
+            <div class="ui cancel tiny button">Close</div>
+        </div>
+    </div>
+
+    <script>
+        function showGeneralLookup(modelType, id) {
+            showLoading();
+            
+            // Hide all layout sections initially
+            $('.general-lookup-section').hide();
+            
+            var apiUrl = '';
+            if (modelType === 'staff') {
+                apiUrl = "{% url 'homeApp:get_staff_user_detail' %}";
+            } else if (modelType === 'party') {
+                apiUrl = "{% url 'homeApp:get_party_detail' %}";
+            } else if (modelType === 'bank') {
+                apiUrl = "{% url 'homeApp:get_bank_detail' %}";
+            }
+            
+            $.ajax({
+                url: apiUrl,
+                type: "get",
+                data: { 'id': id },
+                success: function (response) {
+                    hideLoading();
+                    if (response.data) {
+                        var data = response.data;
+                        
+                        if (modelType === 'staff') {
+                            // Header customizations
+                            $('#lookupModalHeaderIcon').attr('class', 'user outline icon');
+                            $('#lookupModalTitle').text(data.UserName || 'Staff Profile');
+                            
+                            var badgeEl = $('#lookupModalBadge');
+                            if (data.IsActive === 'Active' || data.IsActive === 'True' || data.IsActive === true) {
+                                badgeEl.text('Active').removeClass('grey red purple teal').addClass('green');
+                            } else {
+                                badgeEl.text('Inactive').removeClass('green red purple teal').addClass('grey');
+                            }
+                            
+                            // Body populate
+                            if (data.UserPhone) {
+                                $('#modalStaffPhone').html('<a href="tel:' + data.UserPhone + '" style="color: inherit;"><i class="phone call icon"></i> ' + data.UserPhone + '</a>');
+                            } else {
+                                $('#modalStaffPhone').text('-');
+                            }
+                            
+                            if (data.UserEmail) {
+                                $('#modalStaffEmail').html('<a href="mailto:' + data.UserEmail + '" style="color: inherit;"><i class="envelope outline icon"></i> ' + data.UserEmail + '</a>');
+                            } else {
+                                $('#modalStaffEmail').text('-');
+                            }
+                            
+                            $('#modalStaffAddress').text(data.UserAddress || '-');
+                            $('#modalStaffGroup').text(data.UserGroupName || 'N/A');
+                            $('#modalStaffPartyGroup').text(data.PartyGroupName || 'N/A');
+                            
+                            var photoUrl = data.ImgUrl || '/static/images/default-avatar.svg';
+                            $('#modalStaffPhoto').attr('src', photoUrl);
+                            
+                            if (data.IDUrl && data.IDUrl !== '/static/images/default-avatar.svg') {
+                                $('#modalStaffIdProof').attr('src', data.IDUrl);
+                                $('#modalStaffIdProofContainer').show();
+                            } else {
+                                $('#modalStaffIdProofContainer').hide();
+                            }
+                            
+                            // Redirection button
+                            $('#lookupDetailLinkBtn').attr('href', "{% url 'homeApp:user_list' %}?search=" + encodeURIComponent(data.UserName || ''));
+                            
+                            // Show panel
+                            $('#lookupStaffContent').show();
+                            
+                        } else if (modelType === 'party') {
+                            // Header customizations
+                            $('#lookupModalHeaderIcon').attr('class', 'briefcase icon');
+                            $('#lookupModalTitle').text(data.Name || 'Party Details');
+                            
+                            var badgeEl = $('#lookupModalBadge');
+                            if (data.IsB2B) {
+                                badgeEl.text('B2B Business').removeClass('grey green red teal').addClass('purple');
+                            } else {
+                                badgeEl.text('Regular Party').removeClass('purple green red teal').addClass('grey');
+                            }
+                            
+                            // Body populate
+                            $('#modalPartyLegalName').text(data.LegalName || '-');
+                            if (data.PhoneNumber) {
+                                $('#modalPartyPhone').html('<a href="tel:' + data.PhoneNumber + '" style="color: inherit;"><i class="phone call icon"></i> ' + data.PhoneNumber + '</a>');
+                            } else {
+                                $('#modalPartyPhone').text('-');
+                            }
+                            $('#modalPartyAddress').text(data.Address || '-');
+                            $('#modalPartyBillingAddress').text(data.BillingAddress || '-');
+                            $('#modalPartyGST').text(data.GSTNumber || 'N/A');
+                            
+                            var balance = parseFloat(data.OpeningBalance || 0);
+                            var balanceText = '₹ ' + balance.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                            $('#modalPartyBalance').text(balanceText);
+                            if (balance >= 0) {
+                                $('#modalPartyBalance').css('color', '');
+                            } else {
+                                $('#modalPartyBalance').css('color', '#dc2626');
+                            }
+                            
+                            // Redirection button
+                            $('#lookupDetailLinkBtn').attr('href', "{% url 'homeApp:party_list' %}?search=" + encodeURIComponent(data.Name || ''));
+                            
+                            // Show panel
+                            $('#lookupPartyContent').show();
+                            
+                        } else if (modelType === 'bank') {
+                            // Header customizations
+                            $('#lookupModalHeaderIcon').attr('class', 'university icon');
+                            $('#lookupModalTitle').text(data.Name || 'Bank Details');
+                            
+                            $('#lookupModalBadge').text('Bank Account').removeClass('purple green red grey').addClass('teal');
+                            
+                            // Body populate
+                            $('#modalBankAccount').text(data.AccountNumber || '-');
+                            $('#modalBankDesc').text(data.Description || '-');
+                            
+                            var balance = parseFloat(data.OpeningBalance || 0);
+                            var balanceText = '₹ ' + balance.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                            $('#modalBankBalance').text(balanceText);
+                            if (balance >= 0) {
+                                $('#modalBankBalance').css('color', '');
+                            } else {
+                                $('#modalBankBalance').css('color', '#dc2626');
+                            }
+                            
+                            // Redirection button
+                            $('#lookupDetailLinkBtn').attr('href', "{% url 'homeApp:bank_list' %}?search=" + encodeURIComponent(data.Name || ''));
+                            
+                            // Show panel
+                            $('#lookupBankContent').show();
+                        }
+                        
+                        // Show unified modal
+                        $('#generalLookupModal').modal('show');
+                    } else {
+                        var msg = response.error || 'Could not fetch lookup details.';
+                        if (response.message === 'forbidden' || response.message === 'unauthorized') {
+                            msg = 'You do not have the required permissions to view these details.';
+                        }
+                        $('body').toast({class: 'error', message: msg});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = 'An error occurred while fetching details.';
+                    if (xhr.status === 403 || xhr.status === 401) {
+                        msg = 'You do not have the required permissions to view these details.';
+                    }
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function showSourceTxLookup(txId) {
+            showLoading();
+            $.ajax({
+                url: "/api/get_book_tx_source_detail_api/",
+                type: "get",
+                data: { 'id': txId },
+                success: function (response) {
+                    hideLoading();
+                    if (response.message === 'success') {
+                        $('#sourceTxLookupTitle').text(response.title);
+                        var html = '';
+                        response.details.forEach(function (item) {
+                            html += '<tr><td class="four wide font-semibold" style="font-weight: 600; color: var(--app-text);">' + escapeHtml(item[0]) + '</td><td style="color: var(--app-text);">' + item[1] + '</td></tr>';
+                        });
+                        $('#sourceTxLookupTableBody').html(html);
+                        
+                        if (response.detail_url) {
+                            $('#sourceTxDetailLinkBtn').attr('href', response.detail_url).show();
+                        } else {
+                            $('#sourceTxDetailLinkBtn').hide();
+                        }
+                        
+                        $('#sourceTxLookupModal').modal('show');
+                    } else {
+                        var msg = response.error || 'Unable to retrieve source details.';
+                        if (response.message === 'forbidden' || response.message === 'unauthorized') {
+                            msg = 'You do not have the required permissions to view these details.';
+                        }
+                        $('body').toast({class: 'error', message: msg});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = 'An error occurred while fetching source details.';
+                    if (xhr.status === 403 || xhr.status === 401) {
+                        msg = 'You do not have the required permissions to view these details.';
+                    }
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function showPartyLedgerSourceLookup(entryId) {
+            showLoading();
+            $.ajax({
+                url: "/api/get_party_ledger_entry_source_detail_api/",
+                type: "get",
+                data: { 'id': entryId },
+                success: function (response) {
+                    hideLoading();
+                    if (response.message === 'success') {
+                        $('#sourceTxLookupTitle').text(response.title);
+                        var html = '';
+                        response.details.forEach(function (item) {
+                            html += '<tr><td class="four wide font-semibold" style="font-weight: 600; color: var(--app-text);">' + escapeHtml(item[0]) + '</td><td style="color: var(--app-text);">' + item[1] + '</td></tr>';
+                        });
+                        $('#sourceTxLookupTableBody').html(html);
+
+                        if (response.detail_url) {
+                            $('#sourceTxDetailLinkBtn').attr('href', response.detail_url).show();
+                        } else {
+                            $('#sourceTxDetailLinkBtn').hide();
+                        }
+
+                        $('#sourceTxLookupModal').modal('show');
+                    } else {
+                        var msg = response.error || 'Unable to retrieve source details.';
+                        if (response.message === 'forbidden' || response.message === 'unauthorized') {
+                            msg = 'You do not have the required permissions to view these details.';
+                        }
+                        $('body').toast({class: 'error', message: msg});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = 'An error occurred while fetching source details.';
+                    if (xhr.status === 403 || xhr.status === 401) {
+                        msg = 'You do not have the required permissions to view these details.';
+                    }
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function showGenericObjectLookup(modelName, objectId) {
+            showLoading();
+            $.ajax({
+                url: "/api/get_generic_object_detail_api/",
+                type: "get",
+                data: { 'model': modelName, 'id': objectId },
+                success: function (response) {
+                    hideLoading();
+                    if (response.message === 'success') {
+                        $('#sourceTxLookupTitle').text(response.title);
+                        var html = '';
+                        response.details.forEach(function (item) {
+                            html += '<tr><td class="four wide font-semibold" style="font-weight: 600; color: var(--app-text);">' + escapeHtml(item[0]) + '</td><td style="color: var(--app-text);">' + item[1] + '</td></tr>';
+                        });
+                        $('#sourceTxLookupTableBody').html(html);
+
+                        if (response.detail_url) {
+                            $('#sourceTxDetailLinkBtn').attr('href', response.detail_url).show();
+                        } else {
+                            $('#sourceTxDetailLinkBtn').hide();
+                        }
+
+                        $('#sourceTxLookupModal').modal('show');
+                    } else {
+                        var msg = response.error || 'Unable to retrieve document details.';
+                        if (response.message === 'forbidden' || response.message === 'unauthorized') {
+                            msg = 'You do not have the required permissions to view these details.';
+                        }
+                        $('body').toast({class: 'error', message: msg});
+                    }
+                },
+                error: function (xhr) {
+                    hideLoading();
+                    var msg = 'An error occurred while fetching details.';
+                    if (xhr.status === 403 || xhr.status === 401) {
+                        msg = 'You do not have the required permissions to view these details.';
+                    }
+                    $('body').toast({class: 'error', message: msg});
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        $(document).ready(function() {
+            var searchParams = new URLSearchParams(window.location.search);
+            var qSearch = searchParams.get('search');
+            if (qSearch && qSearch.trim()) {
+                $(document).on('init.dt', function(e, settings) {
+                    var api = new $.fn.dataTable.Api(settings);
+                    api.search(qSearch).draw();
+                });
+            }
+        });
+    </script>
+
 
 <script src="https://frontendfunn.github.io/semantic-ui-admin-dashboard-template/js/script.js"></script>
 <script src="{% static 'js/app-loader.js' %}"></script>
@@ -2381,7 +3954,62 @@
     function toggleTheme(event) {
         if (event) event.preventDefault();
         var nextTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        applyThemeUi(nextTheme, true);
+
+        // Fallback for browsers that don't support document.startViewTransition
+        if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            applyThemeUi(nextTheme, true);
+            return;
+        }
+
+        // Get coordinates of click or center of the screen
+        var x = event ? event.clientX : window.innerWidth / 2;
+        var y = event ? event.clientY : window.innerHeight / 2;
+
+        if (!x && !y && event && event.target) {
+            var rect = event.target.getBoundingClientRect();
+            x = rect.left + rect.width / 2;
+            y = rect.top + rect.height / 2;
+        }
+
+        var endRadius = Math.hypot(
+            Math.max(x, window.innerWidth - x),
+            Math.max(y, window.innerHeight - y)
+        );
+
+        if (nextTheme === 'light') {
+            document.documentElement.classList.add('theme-transition-reverse');
+        } else {
+            document.documentElement.classList.remove('theme-transition-reverse');
+        }
+
+        var transition = document.startViewTransition(function () {
+            applyThemeUi(nextTheme, true);
+        });
+
+        transition.ready.then(function () {
+            var clipPath = [
+                'circle(0px at ' + x + 'px ' + y + 'px)',
+                'circle(' + endRadius + 'px at ' + x + 'px ' + y + 'px)'
+            ];
+
+            document.documentElement.animate(
+                {
+                    clipPath: nextTheme === 'dark' ? clipPath : clipPath.reverse()
+                },
+                {
+                    duration: 480,
+                    easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                    fill: 'both',
+                    pseudoElement: nextTheme === 'dark' 
+                        ? '::view-transition-new(root)' 
+                        : '::view-transition-old(root)'
+                }
+            );
+        });
+
+        transition.finished.then(function () {
+            document.documentElement.classList.remove('theme-transition-reverse');
+        });
     }
 
     function getCookie(name) {
@@ -2793,6 +4421,12 @@
                 sidebar.classList.remove('animating', 'visible');
             }
 
+            // Persist desktop sidebar collapse state in localStorage
+            var desktopCollapsed = localStorage.getItem('zivaBooks-sidebar-collapsed') === 'true';
+            if (desktopCollapsed && window.innerWidth >= 768) {
+                document.body.classList.add('sidebar-collapsed');
+            }
+
             function setDrawerOpen(shouldOpen) {
                 resetLegacySidebarMotion();
                 document.body.classList.toggle('sidebar-fallback-open', shouldOpen);
@@ -2807,6 +4441,12 @@
                 }
             }
 
+            window.zivaSidebar = {
+                open: function () { setDrawerOpen(true); },
+                close: function () { setDrawerOpen(false); },
+                isOpen: function () { return document.body.classList.contains('sidebar-fallback-open'); }
+            };
+
             if (toggler) {
                 toggler.setAttribute('aria-controls', 'sidebar');
                 toggler.setAttribute('aria-expanded', 'false');
@@ -2817,7 +4457,12 @@
                     if (event.stopImmediatePropagation) {
                         event.stopImmediatePropagation();
                     }
-                    setDrawerOpen(!document.body.classList.contains('sidebar-fallback-open'));
+                    if (window.innerWidth >= 768) {
+                        var isCollapsed = document.body.classList.toggle('sidebar-collapsed');
+                        localStorage.setItem('zivaBooks-sidebar-collapsed', isCollapsed);
+                    } else {
+                        setDrawerOpen(!document.body.classList.contains('sidebar-fallback-open'));
+                    }
                 }, true);
             }
 
@@ -2855,6 +4500,58 @@
             window.setTimeout(function () {
                 centerActiveItem(sidebar, activeLink || sidebar.querySelector('a.nav-link.active'));
             }, 120);
+
+            // Floating Tooltips for Collapsed Sidebar
+            var tooltipTimeout = null;
+            $(document).on('mouseenter', 'body.sidebar-collapsed [data-sidebar-tooltip]', function (e) {
+                if (tooltipTimeout) {
+                    clearTimeout(tooltipTimeout);
+                    tooltipTimeout = null;
+                }
+                var text = $(this).attr('data-sidebar-tooltip');
+                if (!text) return;
+                var $tip = $('#sidebarTooltip');
+                if (!$tip.length) {
+                    $tip = $('<div id="sidebarTooltip" class="sidebar-tooltip-floating"></div>').appendTo('body');
+                }
+                $tip.text(text);
+                var rect = this.getBoundingClientRect();
+                $tip.css({
+                    top: rect.top + (rect.height / 2),
+                    left: rect.right + 8
+                });
+                $tip.addClass('is-active');
+            }).on('mouseleave', 'body.sidebar-collapsed [data-sidebar-tooltip]', function () {
+                tooltipTimeout = setTimeout(function () {
+                    var $tip = $('#sidebarTooltip');
+                    if ($tip.length) {
+                        $tip.removeClass('is-active');
+                    }
+                }, 80); // 80ms buffer allows sliding between adjacent menu items!
+            });
+
+            // Collapsed sidebar search click: expand sidebar and focus search input
+            $(document).on('click', 'body.sidebar-collapsed .sidebar-search', function (event) {
+                if (event.target.closest('.sidebar-search-clear')) return;
+                
+                document.body.classList.remove('sidebar-collapsed');
+                localStorage.setItem('zivaBooks-sidebar-collapsed', 'false');
+                
+                var input = document.getElementById('sidebarSearchInput');
+                if (input) {
+                    window.setTimeout(function () {
+                        input.focus();
+                    }, 120);
+                }
+            });
+
+            // Dismiss tooltip immediately on toggler or any element click
+            $(document).on('click', '[data-sidebar-tooltip], .sidebar-menu-toggler', function () {
+                var $tip = $('#sidebarTooltip');
+                if ($tip.length) {
+                    $tip.removeClass('is-active');
+                }
+            });
         }
 
         onReady(initSmoothSidebar);
@@ -2905,6 +4602,11 @@
 
 {% block js %}
     {{ dashboard_state.metric_groups|json_script:"dashboard-metric-groups-data" }}
+    {{ dashboard_state.charts|json_script:"dashboard-charts-data" }}
+    {{ dashboard_state.charts_endpoint|json_script:"dashboard-charts-endpoint" }}
+    {% if dashboard_state.charts %}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    {% endif %}
     <script>
         $('.message .close')
             .on('click', function () {
@@ -2936,6 +4638,179 @@
             });
         }
 
+        function dashboardMoneyTick(value) {
+            try {
+                return '₹ ' + Number(value || 0).toLocaleString('en-IN', {maximumFractionDigits: 0});
+            } catch (e) {
+                return '₹ ' + value;
+            }
+        }
+
+        function dashboardHasValues(values) {
+            return (values || []).some(function (value) {
+                return Number(value || 0) !== 0;
+            });
+        }
+
+        function dashboardSetEmpty(canvasId, visible) {
+            $('[data-chart-empty-for="' + canvasId + '"]').toggleClass('is-visible', !!visible);
+            $('#' + canvasId).toggle(!visible);
+        }
+
+        function dashboardChartDefaults() {
+            var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            var axisColor = isDark ? '#a7b8cd' : '#64748b';
+            var gridColor = isDark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(148, 163, 184, 0.18)';
+            var tooltipBg = isDark ? 'rgba(15, 23, 42, 0.96)' : 'rgba(255, 255, 255, 0.96)';
+            var tooltipText = isDark ? '#e5edf7' : '#0f172a';
+            Chart.defaults.color = axisColor;
+            Chart.defaults.font.family = 'inherit';
+            Chart.defaults.plugins.legend.labels.boxWidth = 10;
+            Chart.defaults.plugins.legend.labels.usePointStyle = true;
+            Chart.defaults.plugins.tooltip.backgroundColor = tooltipBg;
+            Chart.defaults.plugins.tooltip.titleColor = tooltipText;
+            Chart.defaults.plugins.tooltip.bodyColor = tooltipText;
+            Chart.defaults.plugins.tooltip.borderColor = gridColor;
+            Chart.defaults.plugins.tooltip.borderWidth = 1;
+            return {axisColor: axisColor, gridColor: gridColor};
+        }
+
+        function renderDashboardChart(chart, payload, theme) {
+            var canvas = document.getElementById(chart.id);
+            if (!canvas || !payload) {
+                return;
+            }
+            if (chart.key === 'revenue_trend') {
+                var trendValues = (payload.sales || []).concat(payload.collections || []);
+                if (!dashboardHasValues(trendValues)) {
+                    dashboardSetEmpty(chart.id, true);
+                    return;
+                }
+                dashboardSetEmpty(chart.id, false);
+                new Chart(canvas, {
+                    type: 'line',
+                    data: {
+                        labels: payload.labels || [],
+                        datasets: [
+                            {
+                                label: 'Sales',
+                                data: payload.sales || [],
+                                borderColor: '#2563eb',
+                                backgroundColor: 'rgba(37, 99, 235, 0.14)',
+                                fill: true,
+                                tension: 0.36,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#2563eb'
+                            },
+                            {
+                                label: 'Collections',
+                                data: payload.collections || [],
+                                borderColor: '#0f766e',
+                                backgroundColor: 'rgba(15, 118, 110, 0.12)',
+                                fill: true,
+                                tension: 0.36,
+                                pointRadius: 3,
+                                pointBackgroundColor: '#0f766e'
+                            }
+                        ]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        interaction: {mode: 'index', intersect: false},
+                        scales: {
+                            x: {grid: {display: false}, ticks: {color: theme.axisColor}},
+                            y: {grid: {color: theme.gridColor}, ticks: {callback: dashboardMoneyTick}}
+                        }
+                    }
+                });
+                return;
+            }
+
+            if (!dashboardHasValues(payload.values || [])) {
+                dashboardSetEmpty(chart.id, true);
+                return;
+            }
+            dashboardSetEmpty(chart.id, false);
+
+            if (chart.type === 'bar') {
+                new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: payload.labels || [],
+                        datasets: [{
+                            label: chart.title,
+                            data: payload.values || [],
+                            borderRadius: 10,
+                            backgroundColor: ['#0f766e', '#2563eb', '#f59e0b', '#e11d48', '#8b5cf6', '#06b6d4']
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        plugins: {legend: {display: false}},
+                        scales: {
+                            x: {grid: {display: false}, ticks: {color: theme.axisColor}},
+                            y: {beginAtZero: true, grid: {color: theme.gridColor}, ticks: {callback: dashboardMoneyTick}}
+                        }
+                    }
+                });
+                return;
+            }
+
+            new Chart(canvas, {
+                type: chart.type || 'doughnut',
+                data: {
+                    labels: payload.labels || [],
+                    datasets: [{
+                        data: payload.values || [],
+                        backgroundColor: [
+                            '#2563eb',
+                            '#14b8a6',
+                            '#f59e0b',
+                            '#f97316',
+                            '#22c55e',
+                            '#ef4444',
+                            '#8b5cf6'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    cutout: chart.type === 'doughnut' ? '64%' : undefined,
+                    plugins: {legend: {position: 'bottom'}}
+                }
+            });
+        }
+
+        function loadDashboardCharts() {
+            if (typeof Chart === 'undefined') {
+                return;
+            }
+            var chartScript = document.getElementById('dashboard-charts-data');
+            var endpointScript = document.getElementById('dashboard-charts-endpoint');
+            var charts = chartScript ? JSON.parse(chartScript.textContent || '[]') : [];
+            var endpoint = endpointScript ? JSON.parse(endpointScript.textContent || '""') : '';
+            if (!charts.length || !endpoint) {
+                return;
+            }
+            $.ajax({
+                type: 'get',
+                url: endpoint,
+                success: function (response) {
+                    var theme = dashboardChartDefaults();
+                    charts.forEach(function (chart) {
+                        var payload = (response.charts || {})[chart.key];
+                        if (!payload) {
+                            dashboardSetEmpty(chart.id, true);
+                            return;
+                        }
+                        renderDashboardChart(chart, payload, theme);
+                    });
+                },
+                error: showDashboardError
+            });
+        }
+
         if ($('#dashboard-home-root').length) {
             var dashboardMetricGroups = JSON.parse(document.getElementById('dashboard-metric-groups-data').textContent);
             dashboardMetricGroups.forEach(function (group) {
@@ -2951,6 +4826,7 @@
                 });
                 loadDashboardMetrics(group.endpoint, fieldMap);
             });
+            loadDashboardCharts();
         }
 
     </script>
@@ -2959,5 +4835,189 @@
 
 <script src="{% static 'js/pullToRefresh.js' %}"></script>
 <script src="{% static 'js/waves.js' %}"></script>
+<script src="{% static 'js/ui-polish.js' %}"></script>
+
+<!-- Quick Search Interactive Script -->
+<script>
+    (function() {
+        const $input = $('#navSearchInput');
+        if ($input.length === 0) return;
+
+        const $wrapper = $('#navSearchWrapper');
+        const $backdrop = $('#navSearchBackdrop');
+        const $dropdown = $('#navSearchResults');
+        const $clearBtn = $('#navSearchClear');
+        const $container = $('.nav-search-container');
+
+        let searchTimeout = null;
+        let selectedIndex = -1;
+        let resultItems = [];
+
+        function updateClearBtnVisibility() {
+            const val = $input.val().trim();
+            if (val.length > 0 || $wrapper.hasClass('is-focused')) {
+                $clearBtn.removeAttr('hidden');
+            } else {
+                $clearBtn.attr('hidden', true);
+            }
+        }
+
+        function showSearch() {
+            $wrapper.addClass('is-focused');
+            $container.addClass('is-active-mobile');
+            $backdrop.removeAttr('hidden');
+            $dropdown.removeAttr('hidden');
+            updateClearBtnVisibility();
+            const val = $input.val().trim();
+            fetchResults(val);
+        }
+
+        function hideSearch() {
+            $wrapper.removeClass('is-focused');
+            $container.removeClass('is-active-mobile');
+            $backdrop.attr('hidden', true);
+            $dropdown.attr('hidden', true);
+            $clearBtn.attr('hidden', true);
+            selectedIndex = -1;
+        }
+
+        function fetchResults(query) {
+            if (searchTimeout) clearTimeout(searchTimeout);
+            
+            searchTimeout = setTimeout(function() {
+                $.ajax({
+                    url: '/api/quick-search/',
+                    data: { q: query },
+                    success: function(data) {
+                        renderResults(data.results);
+                    },
+                    error: function() {
+                        $dropdown.html('<div class="nav-search-empty-state"><i class="exclamation triangle icon"></i>Failed to fetch results</div>');
+                    }
+                });
+            }, 150);
+        }
+
+        function renderResults(results) {
+            $dropdown.empty();
+            selectedIndex = -1;
+            resultItems = [];
+
+            if (!results || results.length === 0) {
+                $dropdown.html('<div class="nav-search-empty-state"><i class="search icon"></i>No matches found</div>');
+                return;
+            }
+
+            // Group results by category
+            const grouped = {};
+            results.forEach(item => {
+                if (!grouped[item.category]) {
+                    grouped[item.category] = [];
+                }
+                grouped[item.category].push(item);
+            });
+
+            // Render categories
+            let itemIndex = 0;
+            Object.keys(grouped).forEach(category => {
+                const $catTitle = $('<div class="nav-search-category-title"></div>').text(category);
+                $dropdown.append($catTitle);
+
+                grouped[category].forEach(item => {
+                    const $itemLink = $('<a class="nav-search-item"></a>')
+                        .attr('href', item.url)
+                        .css('--i', itemIndex++)
+                        .append($('<span class="nav-search-item-title"></span>').text(item.title))
+                        .append($('<span class="nav-search-item-desc"></span>').text(item.description));
+                    
+                    $dropdown.append($itemLink);
+                    resultItems.push($itemLink[0]);
+                });
+            });
+        }
+
+        function updateSelection() {
+            resultItems.forEach((el, idx) => {
+                if (idx === selectedIndex) {
+                    el.classList.add('is-selected');
+                    el.scrollIntoView({ block: 'nearest' });
+                } else {
+                    el.classList.remove('is-selected');
+                }
+            });
+        }
+
+        // Toggle clear button
+        $input.on('input', function() {
+            const val = $(this).val().trim();
+            updateClearBtnVisibility();
+            fetchResults(val);
+        });
+
+        // Focus & Blur
+        $input.on('focus', function() {
+            showSearch();
+        });
+
+        $backdrop.on('click', function() {
+            hideSearch();
+        });
+
+        // Two-stage X button: 1st click clears text, 2nd click (or empty input) closes search
+        $clearBtn.on('click', function(e) {
+            e.stopPropagation();
+            e.preventDefault();
+            const currentVal = $input.val().trim();
+            if (currentVal.length > 0) {
+                // Stage 1: Clear text, keep search focused
+                $input.val('');
+                $input.focus();
+                fetchResults('');
+            } else {
+                // Stage 2: Input is empty -> close search overlay
+                $input.blur();
+                hideSearch();
+            }
+        });
+
+        // Global shortcuts and navigation keys
+        $(document).on('keydown', function(e) {
+            // Check if user is typing in form inputs (exclude our search input)
+            const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+            const isTyping = activeTag === 'input' || activeTag === 'textarea' || document.activeElement.isContentEditable;
+
+            // 1. Focus search with '/' or 'Ctrl+K' / 'Cmd+K'
+            if (!isTyping && (e.key === '/' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'))) {
+                e.preventDefault();
+                $input.focus();
+                return;
+            }
+
+            // 2. Dropdown Keyboard controls
+            if ($wrapper.hasClass('is-focused') && resultItems.length > 0) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = (selectedIndex + 1) % resultItems.length;
+                    updateSelection();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = (selectedIndex - 1 + resultItems.length) % resultItems.length;
+                    updateSelection();
+                } else if (e.key === 'Enter') {
+                    if (selectedIndex >= 0 && selectedIndex < resultItems.length) {
+                        e.preventDefault();
+                        resultItems[selectedIndex].click();
+                    }
+                }
+            }
+
+            // 3. Escape key to close
+            if (e.key === 'Escape' && $wrapper.hasClass('is-focused')) {
+                $input.blur();
+                hideSearch();
+            }
+        });
+    })();
+</script>
 </body>
 </html>

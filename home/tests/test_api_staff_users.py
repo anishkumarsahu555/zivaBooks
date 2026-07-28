@@ -60,6 +60,8 @@ class StaffUserApiCrudTests(SeededTenantMixin, TestCase):
         detail = self.client.get("/api/get_staff_user_detail/", data={"id": str(staff.pk)})
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.json()["data"]["ID"], staff.pk)
+        self.assertIn("UserGroupName", detail.json()["data"])
+        self.assertIn("PartyGroupName", detail.json()["data"])
 
         edit = self.client.post(
             "/api/edit_staff_api/",

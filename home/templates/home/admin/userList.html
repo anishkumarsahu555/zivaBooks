@@ -337,8 +337,32 @@
             color: #99f6e4 !important;
         }
 
-        html[data-theme="dark"] .actions[style*=\"float: right\"] {
+        html[data-theme="dark"] .actions[style*="float: right"] {
             background: transparent !important;
+        }
+
+        .highlight-flash td {
+            position: relative !important;
+        }
+        .highlight-flash td::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(74, 222, 128, 0.45);
+            pointer-events: none;
+            animation: flashFade 2.5s ease-out forwards;
+            z-index: 10;
+        }
+        html[data-theme="dark"] .highlight-flash td::after {
+            background-color: rgba(74, 222, 128, 0.35);
+        }
+        
+        @keyframes flashFade {
+            0% { opacity: 1; }
+            100% { opacity: 0; }
         }
     </style>
 
@@ -1111,6 +1135,15 @@
         });
 
         function showUserModal() {
+            var limitReached = {% if staff_seat_limit_reached %}true{% else %}false{% endif %};
+            if (limitReached) {
+                $('body').toast({
+                    class: 'error',
+                    message: "{{ staff_seat_limit_msg|escapejs }}",
+                    displayTime: 8000
+                });
+                return;
+            }
             myOwnReset();
             $('#myModalUser').modal({
                 autofocus: false,
@@ -1141,7 +1174,8 @@
                 $('body')
                     .toast({
                         class: 'orange',
-                        message: 'User name, phone number, address, group, status, and password are required.'
+                        message: 'User name, phone number, address, group, status, and password are required.',
+                        displayTime: 6000
                     })
                 ;
                 hideLoading();
@@ -1169,7 +1203,8 @@
                     $('body')
                         .toast({
                             class: 'orange',
-                            message: 'Password not matched!'
+                            message: 'Password not matched!',
+                            displayTime: 6000
                         })
                     ;
                     hideLoading();
@@ -1186,6 +1221,8 @@
 
 
                         success: function (response) {
+                            hideLoading();
+                            $('#myModalUser').modal('hide');
                             if (response.message === 'success') {
                                 $('body')
                                     .toast({
@@ -1194,33 +1231,33 @@
                                     })
                                 ;
 
-
                                 userTab.ajax.reload(null, false);
                                 $('#addForm').trigger('reset');
                                 resetAddUploads();
-                                $('#myModalUser').modal('toggle');
-                                hideLoading();
                             } else {
+                                var errorMsg = response.error || response.message || 'An error occurred !';
                                 $('body')
                                     .toast({
                                         class: 'error',
-                                        message: 'An error occurred !'
+                                        message: errorMsg,
+                                        displayTime: 7000
                                     })
                                 ;
-                                hideLoading();
-
                             }
 
                             return response;
                         },
-                        error: function () {
+                        error: function (xhr) {
+                            hideLoading();
+                            $('#myModalUser').modal('hide');
+                            var errorMsg = (xhr && xhr.responseJSON && (xhr.responseJSON.error || xhr.responseJSON.message)) || 'An error occurred !';
                             $('body')
                                 .toast({
                                     class: 'error',
-                                    message: 'An error occurred !'
+                                    message: errorMsg,
+                                    displayTime: 7000
                                 })
                             ;
-                            hideLoading();
                         }
                     });
                 }
@@ -1231,8 +1268,24 @@
 
 
         // user Details
+        var urlParams = new URLSearchParams(window.location.search);
+        var searchVal = urlParams.get('search') || '';
 
         userTab = $('#UserTable').DataTable({
+            "search": {
+                "search": searchVal
+            },
+            "drawCallback": function(settings) {
+                if (searchVal) {
+                    $('#UserTable tbody tr').each(function() {
+                        var nameText = $(this).find('td').eq(1).text().trim();
+                        if (nameText.toLowerCase() === searchVal.toLowerCase()) {
+                            $(this).addClass('highlight-flash');
+                        }
+                    });
+                    searchVal = '';
+                }
+            },
             dom: 'Blfrtip',
             "scrollY": "350px",
             "scrollX": true,
@@ -1452,7 +1505,8 @@
                 $('body')
                     .toast({
                         class: 'orange',
-                        message: 'User name, phone number, address, group, status, and password are required.'
+                        message: 'User name, phone number, address, group, status, and password are required.',
+                        displayTime: 6000
                     })
                 ;
                 hideLoading();
@@ -1481,7 +1535,8 @@
                     $('body')
                         .toast({
                             class: 'orange',
-                            message: 'Password not matched!'
+                            message: 'Password not matched!',
+                            displayTime: 6000
                         })
                     ;
                     hideLoading();
@@ -1498,6 +1553,8 @@
 
 
                         success: function (response) {
+                            hideLoading();
+                            $('#userModal').modal('hide');
                             if (response.message === 'success') {
                                 $('body')
                                     .toast({
@@ -1506,33 +1563,33 @@
                                     })
                                 ;
 
-
                                 userTab.ajax.reload(null, false);
                                 $('#EditForm').trigger('reset');
                                 prepareEditUploads('', '');
-                                $('#userModal').modal('toggle');
-                                hideLoading();
                             } else {
+                                var errorMsg = response.error || response.message || 'An error occurred !';
                                 $('body')
                                     .toast({
                                         class: 'error',
-                                        message: 'An error occurred !'
+                                        message: errorMsg,
+                                        displayTime: 7000
                                     })
                                 ;
-                                hideLoading();
-
                             }
 
                             return response;
                         },
-                        error: function () {
+                        error: function (xhr) {
+                            hideLoading();
+                            $('#userModal').modal('hide');
+                            var errorMsg = (xhr && xhr.responseJSON && (xhr.responseJSON.error || xhr.responseJSON.message)) || 'An error occurred !';
                             $('body')
                                 .toast({
                                     class: 'error',
-                                    message: 'An error occurred !'
+                                    message: errorMsg,
+                                    displayTime: 7000
                                 })
                             ;
-                            hideLoading();
                         }
                     });
                 }

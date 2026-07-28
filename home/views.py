@@ -37,7 +37,8 @@ from activation.views import is_activated
 from .models import *
 from .books import ensure_books_for_tenant
 from .credential_links import credential_share_token_status, consume_credential_share_token
-from .navigation import build_sidebar_sections, _has_any_perm as _has_tenant_any_perm
+from .navigation import build_sidebar_sections, has_ziva_ai_access, _has_any_perm as _has_tenant_any_perm
+from .utils.feature_guards import require_tenant_feature, tenant_has_feature
 from .tenancy import assign_tenant, get_current_tenant, get_staff_user_for_request, tenant_object_or_superuser, tenant_qs
 from .otp import get_collection_otp_payload, get_collection_status_payload, get_order_delivery_otp_payload, get_order_delivery_status_payload, OTP_TTL_SECONDS
 from utils.logger import logger
@@ -140,6 +141,7 @@ def _tenant_admin_group_name(tenant):
 LOCATION_ASSIGNABLE_PERMISSION_CODENAMES = {
     'can_track_staff_location',
     'can_view_staff_locations',
+    'can_access_ziva_ai',
 }
 
 
@@ -681,6 +683,14 @@ STAFF_GROUP_PRESET_DEFS = [
         ],
     },
     {
+        'key': 'ziva_ai_access',
+        'label': 'Ziva AI Access',
+        'description': 'Open the Ziva AI assistant and use chat history.',
+        'permissions': [
+            'home.can_access_ziva_ai',
+        ],
+    },
+    {
         'key': 'attendance_full',
         'label': 'Attendance Admin',
         'description': 'Full attendance administration with all-staff visibility and reports.',
@@ -1185,8 +1195,12 @@ def preview_500(request):
     return custom_server_error(request)
 @ensure_csrf_cookie
 def loginPage(request):
-    # if not request.user.is_authenticated:
-    return render(request, 'home/login.html')
+    try:
+        from .models import LicensePlan
+        license_plans = LicensePlan.get_active_plans()
+    except Exception:
+        license_plans = []
+    return render(request, 'home/login.html', {'license_plans': license_plans})
 
 
 PASSWORD_RESET_SUCCESS_MESSAGE = 'If an account exists, reset instructions have been sent.'
@@ -3049,6 +3063,7 @@ def staff_home(request):
     }
     return render(request, 'home/NormalStaff/indexStaff.html', context)
 # ---------------------------attendance-------------------
+@require_tenant_feature('staff_attendance')
 @permission_required_any('home.add_attendance', 'home.view_attendance', 'home.change_attendance')
 def add_attendance(request):
     if request.user.is_authenticated:
@@ -3077,6 +3092,7 @@ def _attendance_report_capabilities(user):
     return {
         'can_filter_staff': can_filter_staff,
     }
+@require_tenant_feature('staff_attendance')
 @permission_required_any('home.view_attendance', 'home.add_attendance', 'home.change_attendance', 'home.can_view_all_attendance', 'home.can_view_attendance_reports')
 def attendance_list(request):
     if request.user.is_authenticated:
@@ -3088,20 +3104,24 @@ def attendance_list(request):
         return render(request, 'home/attendanceList.html', context)
     else:
         return redirect('/')
+@require_tenant_feature('staff_attendance')
 @permission_required_any('home.view_attendance', 'home.add_attendance', 'home.change_attendance')
 def attendance_report(request):
     return redirect('homeApp:attendance_list')
+@require_tenant_feature('staff_attendance')
 @permission_required_any('home.can_view_all_attendance', 'home.can_view_attendance_reports')
 def attendance_report_admin(request):
     return redirect('homeApp:attendance_list')
 
 
+@require_tenant_feature('gps_tracking')
 @permission_required_any('home.can_track_staff_location')
 def staff_location_tracker(request):
     staff = get_object_or_404(tenant_qs(request, StaffUser), user_ID__pk=request.user.pk)
     return render(request, 'home/staffLocationTracker.html', {'staff': staff})
 
 
+@require_tenant_feature('gps_tracking')
 @permission_required_any(
     'home.can_view_staff_locations',
 )
@@ -3702,6 +3722,7 @@ def report_order_status(request):
     return render(request, 'home/business/order_status_report.html', context)
 
 
+@require_tenant_feature('staff_attendance')
 @is_activated()
 @permission_required_any('home.can_view_all_attendance', 'home.can_view_attendance_reports', 'home.can_view_party_credentials')
 def report_attendance_business(request):
@@ -4112,3 +4133,195 @@ def party_ledger(request, party_id):
         'is_party_user': is_party_user,
     }
     return render(request, 'home/party/partyLedger.html', context)
+
+
+def quick_search(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'results': []})
+
+    tenant = get_current_tenant(request)
+    if not tenant:
+        return JsonResponse({'results': []})
+
+    # Check if customer login
+    from .navigation import _tenant_membership_role, _perm_match
+    from .models import TenantMembership, Party, StaffUser, Collection, Sales
+    role = _tenant_membership_role(request, tenant)
+    if role == TenantMembership.Role.PARTY:
+        return JsonResponse({'results': []})
+
+    q = request.GET.get('q', '').strip()
+    results = []
+
+    if not q:
+        # Default: list top navigation links (shortcuts) based on permissions
+        sidebar_sections = build_sidebar_sections(request)
+        for section in sidebar_sections:
+            for item in section.get('items', []):
+                results.append({
+                    'category': 'Quick Actions',
+                    'title': item['label'],
+                    'description': f"Jump to {section.get('title')} -> {item['label']}",
+                    'url': item['url']
+                })
+        return JsonResponse({'results': results[:8]})
+
+    # 1. Matches Navigation Menu / Shortcuts (respected by permissions)
+    sidebar_sections = build_sidebar_sections(request)
+    for section in sidebar_sections:
+        for item in section.get('items', []):
+            if q.lower() in item['label'].lower() or q.lower() in section.get('title', '').lower():
+                results.append({
+                    'category': 'Actions & Navigation',
+                    'title': item['label'],
+                    'description': f"Go to {section.get('title')} -> {item['label']}",
+                    'url': item['url']
+                })
+
+    # 2. Search Parties/Customers if permission allows
+    if _perm_match(request, ('home.can_manage_parties', 'home.view_party', 'home.can_view_party_credentials')):
+        parties = Party.objects.filter(tenant=tenant, isDeleted=False).filter(
+            Q(name__icontains=q) | Q(phone__icontains=q) | Q(gstNumber__icontains=q)
+        )[:5]
+        for party in parties:
+            results.append({
+                'category': 'Parties / Customers',
+                'title': party.name,
+                'description': f"Phone: {party.phone or 'N/A'} | GST: {party.gstNumber or 'N/A'}",
+                'url': f"/party-ledger/{party.id}/"
+            })
+
+    # 3. Search Staff if permission allows
+    if _perm_match(request, 'home.can_manage_staff'):
+        staff = StaffUser.objects.filter(tenant=tenant, isDeleted=False).filter(
+            Q(name__icontains=q) | Q(phone__icontains=q) | Q(email__icontains=q)
+        )[:5]
+        for s in staff:
+            results.append({
+                'category': 'Staff Members',
+                'title': s.name,
+                'description': f"Phone: {s.phone or 'N/A'} | Email: {s.email or 'N/A'}",
+                'url': f"/user_list/?q={s.name}"
+            })
+
+    # 4. Search Sales/Invoices if permission allows
+    if _perm_match(request, ('home.view_sales', 'home.can_manage_sales', 'home.can_approve_sales')):
+        sales = Sales.objects.filter(tenant=tenant, isDeleted=False).filter(
+            Q(invoiceNumber__icontains=q) | Q(salesID__icontains=q) | Q(paymentID__icontains=q) | Q(remark__icontains=q)
+        )[:5]
+        for sale in sales:
+            results.append({
+                'category': 'Sales Invoices',
+                'title': f"Invoice: {sale.invoiceNumber or 'N/A'} ({sale.salesID or 'N/A'})",
+                'description': f"Amount: ₹{sale.amount} | Payment: {sale.modeOfPayment} | Date: {sale.buildDate}",
+                'url': f"/edit_sales/{sale.id}/"
+            })
+
+    # 5. Search Collections if permission allows
+    if _perm_match(request, ('home.view_collection', 'home.add_collection', 'home.can_approve_collection')):
+        collections = Collection.objects.filter(tenant=tenant, isDeleted=False).filter(
+            Q(paymentID__icontains=q) | Q(remark__icontains=q) | Q(detail__icontains=q)
+        )[:5]
+        for col in collections:
+            results.append({
+                'category': 'Collections',
+                'title': f"Receipt: {col.paymentID or 'N/A'}",
+                'description': f"Amount: ₹{col.paidAmount} | Mode: {col.modeOfPayment} | Party: {col.partyID.name if col.partyID else 'N/A'}",
+                'url': f"/edit_collection/{col.id}/"
+            })
+
+    return JsonResponse({'results': results})
+
+
+@require_tenant_feature('ziva_ai')
+@ensure_csrf_cookie
+def ziva_ai_page(request):
+    if not request.user.is_authenticated:
+        return redirect('/')
+
+    # Restrict to users with tenant-enabled Ziva AI access.
+    from .navigation import _tenant_membership_role
+    from .models import TenantMembership
+    tenant = get_current_tenant(request)
+    if not tenant:
+        return render(request, 'home/accessDenied.html', {'message': 'No active tenant workspace found.'})
+
+    role = _tenant_membership_role(request, tenant)
+    if role == TenantMembership.Role.PARTY:
+        return redirect('/customer_home/')
+
+    if not has_ziva_ai_access(request, tenant):
+        return custom_permission_denied(request, message="Access denied. You do not have permission to view Ziva AI.")
+
+    plan = getattr(tenant, 'license_plan', None)
+    plan_name = plan.name if plan else 'Free'
+    plan_limit = plan.ziva_ai_max_queries_per_month if plan else 5
+
+    ai_usage, created = TenantAiUsage.objects.get_or_create(
+        tenant=tenant,
+        defaults={
+            'plan_name': plan_name,
+            'max_queries_per_month': plan_limit,
+            'queries_used_this_month': 0
+        }
+    )
+    if not created and plan:
+        if ai_usage.max_queries_per_month != plan_limit or ai_usage.plan_name != plan_name:
+            ai_usage.plan_name = plan_name
+            ai_usage.max_queries_per_month = plan_limit
+            ai_usage.save()
+
+    ai_usage.check_and_reset_usage()
+
+    from .models import ZivaAiChatMessage
+    from django.db.models import Max
+
+    # Get latest active chat message to identify active session
+    latest_chat = ZivaAiChatMessage.objects.filter(
+        tenant=tenant,
+        user=request.user,
+        isDeleted=False
+    ).order_by('-timestamp').first()
+    session_id = latest_chat.session_id if latest_chat else 'default'
+
+    db_chats = ZivaAiChatMessage.objects.filter(
+        tenant=tenant,
+        user=request.user,
+        session_id=session_id,
+        isDeleted=False
+    ).order_by('-timestamp')[:50]
+    chats = list(db_chats)
+    chats.reverse()
+
+    # Get unique session lists for left sidebar
+    unique_sessions = ZivaAiChatMessage.objects.filter(
+        tenant=tenant,
+        user=request.user,
+        isDeleted=False
+    ).values('session_id').annotate(
+        latest_timestamp=Max('timestamp')
+    ).order_by('-latest_timestamp')
+
+    sessions_list = []
+    for s in unique_sessions:
+        sess_id = s['session_id']
+        latest_msg = ZivaAiChatMessage.objects.filter(
+            tenant=tenant,
+            user=request.user,
+            session_id=sess_id,
+            isDeleted=False
+        ).order_by('-timestamp').first()
+        title = latest_msg.session_title if latest_msg else "General Chat"
+        sessions_list.append({
+            'session_id': sess_id,
+            'session_title': title,
+            'latest_timestamp': s['latest_timestamp']
+        })
+
+    context = {
+        'ai_usage': ai_usage,
+        'chats': chats,
+        'session_id': session_id,
+        'sessions': sessions_list,
+    }
+    return render(request, 'home/ziva_ai.html', context)

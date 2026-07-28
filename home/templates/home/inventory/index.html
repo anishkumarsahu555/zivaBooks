@@ -1308,6 +1308,8 @@
         purchaseReturns: [],
         salesReturns: []
     };
+    var inventoryUrlParams = new URLSearchParams(window.location.search);
+    var inventoryDrilldownFilter = inventoryUrlParams.get('filter') || '';
     const nonGstShadowEnabled = {{ non_gst_shadow_enabled|yesno:"true,false" }};
 
     function toastMessage(type, message) { $('body').toast({class: type, message: message}); }
@@ -1528,8 +1530,8 @@
     };
     function adjustmentRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, remark: row.Remark || '-', lineCount: row.LineCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editAdjustmentVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteAdjustmentVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
     function transferRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, route: '<div>' + (row.FromWarehouse || '-') + '</div><div class="inventory-cell-meta">to ' + (row.ToWarehouse || '-') + '</div>', lineCount: row.LineCount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editTransferVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteTransferVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
-    function purchaseReturnRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, party: '<div>' + (row.Party || '-') + '</div><div class="inventory-cell-meta">Purchase: ' + (row.PurchaseInvoice || '-') + ' | Lines: ' + (row.LineCount || 0) + '</div>', amount: row.TotalAmount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editPurchaseReturnVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deletePurchaseReturnVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
-    function salesReturnRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, party: '<div>' + (row.Party || '-') + '</div><div class="inventory-cell-meta">Sales: ' + (row.SalesInvoice || '-') + ' | Lines: ' + (row.LineCount || 0) + '</div>', amount: row.TotalAmount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editSalesReturnVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteSalesReturnVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function purchaseReturnRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, party: '<div>' + (row.PartyID ? ('<span class="lookup-detail-link" onclick="showGeneralLookup(\'party\', \'' + row.PartyID + '\')" style="cursor: pointer;">' + (row.Party || '-') + '</span>') : (row.Party || '-')) + '</div><div class="inventory-cell-meta">Purchase: ' + (row.PurchaseInvoice || '-') + ' | Lines: ' + (row.LineCount || 0) + '</div>', amount: row.TotalAmount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editPurchaseReturnVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deletePurchaseReturnVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
+    function salesReturnRow(row) { return {voucher: row.VoucherNumber, date: row.EntryDate, party: '<div>' + (row.PartyID ? ('<span class="lookup-detail-link" onclick="showGeneralLookup(\'party\', \'' + row.PartyID + '\')" style="cursor: pointer;">' + (row.Party || '-') + '</span>') : (row.Party || '-')) + '</div><div class="inventory-cell-meta">Sales: ' + (row.SalesInvoice || '-') + ' | Lines: ' + (row.LineCount || 0) + '</div>', amount: row.TotalAmount || 0, actionHtml: '<div class="inventory-action-buttons"><button data-tooltip="Edit Detail" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="editSalesReturnVoucher(' + row.ID + ')" class="ui circular facebook icon button green"><i class="pen icon"></i></button><button data-tooltip="Delete" data-position="left center" data-variation="mini" style="font-size:10px;" onclick="deleteSalesReturnVoucher(' + row.ID + ')" class="ui circular youtube icon button"><i class="trash alternate icon"></i></button></div>'}; }
 
     function inventoryLedgerDetailAction(action, id) {
         if (!action || !id) return;
@@ -1701,6 +1703,7 @@
             inventoryState.batchSummary = response.summary || {};
             setDataTableData(inventoryBatchReportTable, inventoryState.batchRows.map(batchReportRow));
             updateBatchAlert(inventoryState.batchSummary);
+            applyInventoryDrilldownFilter();
         });
         $.get('{% url "homeApp:list_inventory_categories_api" %}', function (response) {
             inventoryState.categories = response.data || [];
@@ -1723,6 +1726,7 @@
         $.get('{% url "homeApp:list_inventory_items_api" %}', function (response) {
             inventoryState.items = response.data || [];
             setDataTableData(inventoryItemTable, inventoryState.items.map(itemRow));
+            applyInventoryDrilldownFilter();
             updateMetrics();
         });
         $.get('{% url "homeApp:list_inventory_adjustment_vouchers_api" %}', function (response) {
@@ -2300,6 +2304,17 @@
             inventoryBatchReportTable.column(4).search(status).draw();
         }
     });
+
+    function applyInventoryDrilldownFilter() {
+        if (inventoryDrilldownFilter === 'low_stock' && inventoryItemTable) {
+            inventoryItemTable.column(4).search('Low Stock').draw();
+        }
+        if (inventoryDrilldownFilter === 'expiring_30' && inventoryBatchReportTable) {
+            $('#inventoryBatchStatusFilters button').removeClass('active');
+            $('#inventoryBatchStatusFilters button[data-status="Expiring Soon"]').addClass('active');
+            inventoryBatchReportTable.column(4).search('Expiring Soon').draw();
+        }
+    }
     loadAllMasters();
 </script>
 {% endblock %}

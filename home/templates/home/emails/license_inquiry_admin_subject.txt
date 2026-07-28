@@ -1,0 +1,1 @@
+[zivaBooks Admin] New License Request: {{ inquiry.full_name }} ({{ inquiry.license_plan|title }} Plan)

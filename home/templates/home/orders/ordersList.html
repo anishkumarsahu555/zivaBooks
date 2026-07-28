@@ -291,6 +291,8 @@
     <script>
         $('.ui.dropdown').dropdown({fullTextSearch: true});
 
+        var orderUrlParams = new URLSearchParams(window.location.search);
+        var orderStatusFilter = orderUrlParams.get('status') || '';
         var today = new Date();
         $('#rangestart').calendar({
             initialDate: today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear(),
@@ -317,11 +319,22 @@
             }
         });
 
-        $('#startDateF').val(today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear());
-        $('#endDateF').val(today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear());
-        var todayDateString = $('#startDateF').val();
+        var defaultOrderDate = today.getDate() + '/' + (today.getMonth() + 1) + '/' + today.getFullYear();
+        var initialStartDate = orderUrlParams.get('startDate') || (orderStatusFilter ? '' : defaultOrderDate);
+        var initialEndDate = orderUrlParams.get('endDate') || (orderStatusFilter ? '' : defaultOrderDate);
+        $('#startDateF').val(initialStartDate);
+        $('#endDateF').val(initialEndDate);
         var initialOrderStaffID = $('#staffID').val() || 'All';
-        var initialOrdersAjaxUrl = '{% if order_capabilities.can_filter_staff %}{% url 'homeApp:OrdersByAdminListJson' %}{% else %}{% url 'homeApp:OrdersByStaffListJson' %}{% endif %}?startDate=' + encodeURIComponent(todayDateString) + '&endDate=' + encodeURIComponent(todayDateString) + '&staffID=' + encodeURIComponent(initialOrderStaffID);
+        var initialOrderParams = new URLSearchParams();
+        if (initialStartDate && initialEndDate) {
+            initialOrderParams.set('startDate', initialStartDate);
+            initialOrderParams.set('endDate', initialEndDate);
+        }
+        initialOrderParams.set('staffID', initialOrderStaffID);
+        if (orderStatusFilter) {
+            initialOrderParams.set('status', orderStatusFilter);
+        }
+        var initialOrdersAjaxUrl = '{% if order_capabilities.can_filter_staff %}{% url 'homeApp:OrdersByAdminListJson' %}{% else %}{% url 'homeApp:OrdersByStaffListJson' %}{% endif %}?' + initialOrderParams.toString();
 
         var userTab = $('#UserTable').DataTable({
             dom: 'Blfrtip',
@@ -427,7 +440,16 @@
             var startDate = $('#startDateF').val();
             var endDate = $('#endDateF').val();
             var staffID = $('#staffID').val();
-            userTab.ajax.url('{% if order_capabilities.can_filter_staff %}{% url 'homeApp:OrdersByAdminListJson' %}{% else %}{% url 'homeApp:OrdersByStaffListJson' %}{% endif %}?startDate=' + startDate + '&endDate=' + endDate + '&staffID=' + staffID).load();
+            var params = new URLSearchParams();
+            if (startDate && endDate) {
+                params.set('startDate', startDate);
+                params.set('endDate', endDate);
+            }
+            params.set('staffID', staffID || 'All');
+            if (orderStatusFilter) {
+                params.set('status', orderStatusFilter);
+            }
+            userTab.ajax.url('{% if order_capabilities.can_filter_staff %}{% url 'homeApp:OrdersByAdminListJson' %}{% else %}{% url 'homeApp:OrdersByStaffListJson' %}{% endif %}?' + params.toString()).load();
         }
 
         function delUser(id) {
