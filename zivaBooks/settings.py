@@ -284,11 +284,15 @@ PASSWORD_RESET_EMAIL_ASYNC = _env_flag('PASSWORD_RESET_EMAIL_ASYNC', True)
 ADMIN_NOTIFICATION_EMAIL = os.environ.get('ADMIN_NOTIFICATION_EMAIL', DEFAULT_FROM_EMAIL)
 LICENSE_INQUIRY_NOTIFY_ADMIN = _env_flag('LICENSE_INQUIRY_NOTIFY_ADMIN', True)
 
+_redis_host = os.environ.get("REDIS_HOST", "127.0.0.1")
+_redis_port = os.environ.get("REDIS_PORT", "6380")
+_default_redis_url = f"redis://{_redis_host}:{_redis_port}/1"
+
 if _env_flag('USE_REDIS_CACHE', not DEBUG):
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
-            "LOCATION": os.environ.get("REDIS_CACHE_URL", "redis://127.0.0.1:6379/1"),
+            "LOCATION": os.environ.get("REDIS_CACHE_URL", _default_redis_url),
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
             },
@@ -305,8 +309,8 @@ else:
     }
 
 # Celery Configuration
-CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://127.0.0.1:6379/1')
-CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', 'redis://127.0.0.1:6379/1')
+CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', _default_redis_url)
+CELERY_RESULT_BACKEND = os.environ.get('CELERY_RESULT_BACKEND', _default_redis_url)
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'

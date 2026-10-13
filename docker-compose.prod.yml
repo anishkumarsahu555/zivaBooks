@@ -1,0 +1,310 @@
+# ==============================================================================
+# zivaBooks — Production Stack (Hostinger Docker Manager & VPS)
+# ==============================================================================
+# Fully Self-Contained Compose: Web + Celery + DB + Redis + Nginx + Certbot SSL
+# Requires ZERO external files on the host filesystem.
+# ==============================================================================
+
+services:
+  migrate:
+    build:
+      context: https://github.com/anishkumarsahu555/zivaBooks.git#main
+      dockerfile: Dockerfile
+    image: zivabooks:latest
+    container_name: zivabooks_migrate
+    restart: "no"
+    command: ["uv", "run", "python", "manage.py", "migrate", "--noinput"]
+    environment:
+      - DEBUG=false
+      - DATABASE_ENGINE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5433
+      - POSTGRES_DB=${POSTGRES_DB:-zivaBooks}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-production-secret-key-change-me}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - zivabooks_network
+
+  web:
+    image: zivabooks:latest
+    container_name: zivabooks_web
+    restart: unless-stopped
+    command: ["uv", "run", "uvicorn", "zivaBooks.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--limit-concurrency", "1000", "--backlog", "2048"]
+    environment:
+      - DEBUG=false
+      - SKIP_MIGRATIONS=true
+      - DATABASE_ENGINE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5433
+      - POSTGRES_DB=${POSTGRES_DB:-zivaBooks}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - USE_REDIS_CACHE=true
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MEDIA_ROOT=/app/media
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-production-secret-key-change-me}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://localhost}
+    volumes:
+      - media_data:/app/media
+    networks:
+      - zivabooks_network
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  celery_worker:
+    image: zivabooks:latest
+    container_name: zivabooks_worker
+    restart: unless-stopped
+    command: ["uv", "run", "celery", "-A", "zivaBooks", "worker", "-l", "info", "--concurrency=2", "--max-tasks-per-child=500", "--max-memory-per-child=150000"]
+    environment:
+      - DEBUG=false
+      - DATABASE_ENGINE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5433
+      - POSTGRES_DB=${POSTGRES_DB:-zivaBooks}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - USE_REDIS_CACHE=true
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - MEDIA_ROOT=/app/media
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-production-secret-key-change-me}
+    volumes:
+      - media_data:/app/media
+    networks:
+      - zivabooks_network
+    depends_on:
+      web:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_beat:
+    image: zivabooks:latest
+    container_name: zivabooks_beat
+    restart: unless-stopped
+    command: ["uv", "run", "celery", "-A", "zivaBooks", "beat", "-l", "info"]
+    environment:
+      - DEBUG=false
+      - DATABASE_ENGINE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5433
+      - POSTGRES_DB=${POSTGRES_DB:-zivaBooks}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - USE_REDIS_CACHE=true
+      - REDIS_CACHE_URL=redis://redis:6379/1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-production-secret-key-change-me}
+    networks:
+      - zivabooks_network
+    depends_on:
+      web:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: zivabooks_postgres
+    restart: unless-stopped
+    command: ["postgres", "-p", "5433", "-c", "max_connections=300", "-c", "shared_buffers=128MB", "-c", "work_mem=4MB"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zivaBooks}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - zivabooks_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -p 5433 -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-zivaBooks}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: zivabooks_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - zivabooks_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  nginx:
+    image: nginx:alpine
+    container_name: zivabooks_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN:-}
+    volumes:
+      - certs_data:/etc/letsencrypt
+      - certbot_data:/var/www/certbot
+      - media_data:/app/media:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        cat << 'EOF' > /etc/nginx/conf.d/default.conf
+        upstream app_backend {
+            server web:8000;
+            keepalive 32;
+        }
+
+        server {
+            listen 80;
+            listen [::]:80;
+            server_name _;
+
+            location /.well-known/acme-challenge/ {
+                root /var/www/certbot;
+                try_files $$uri =404;
+            }
+
+            location / {
+                return 301 https://$$host$$request_uri;
+            }
+        }
+
+        server {
+            listen 443 ssl;
+            listen [::]:443 ssl;
+            http2 on;
+            server_name _;
+
+            ssl_certificate /etc/letsencrypt/live/app/fullchain.pem;
+            ssl_certificate_key /etc/letsencrypt/live/app/privkey.pem;
+
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_prefer_server_ciphers off;
+            ssl_session_cache shared:SSL:10m;
+            ssl_session_timeout 1d;
+
+            add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+            add_header X-Content-Type-Options "nosniff" always;
+            add_header X-Frame-Options "SAMEORIGIN" always;
+
+            client_max_body_size 50M;
+
+            location /media/ {
+                alias /app/media/;
+                expires 30d;
+                add_header Cache-Control "public, no-transform";
+            }
+
+            location / {
+                proxy_pass http://app_backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $$http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $$host;
+                proxy_set_header X-Real-IP $$remote_addr;
+                proxy_set_header X-Forwarded-For $$proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto https;
+                proxy_connect_timeout 60s;
+                proxy_send_timeout 120s;
+                proxy_read_timeout 120s;
+            }
+        }
+        EOF
+
+        mkdir -p /etc/letsencrypt/live/app
+        if [ ! -f /etc/letsencrypt/live/app/fullchain.pem ]; then
+            echo "Generating self-signed bootstrap certificate for Nginx startup..."
+            openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+                -keyout /etc/letsencrypt/live/app/privkey.pem \
+                -out /etc/letsencrypt/live/app/fullchain.pem \
+                -subj "/CN=localhost"
+        fi
+
+        while :; do
+            sleep 6h & wait $${!};
+            nginx -s reload 2>/dev/null || true;
+        done &
+
+        exec nginx -g 'daemon off;'
+    networks:
+      - zivabooks_network
+    depends_on:
+      - web
+
+  certbot:
+    image: certbot/certbot
+    container_name: zivabooks_certbot
+    restart: unless-stopped
+    volumes:
+      - certs_data:/etc/letsencrypt
+      - certbot_data:/var/www/certbot
+    environment:
+      - DOMAIN=${DOMAIN:-}
+      - EMAIL=${EMAIL:-admin@zivabooks.com}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        trap exit TERM
+        sleep 10
+        if [ -n "$$DOMAIN" ] && [ "$$DOMAIN" != "localhost" ]; then
+            echo "Requesting official Let's Encrypt SSL certificate for $$DOMAIN..."
+            certbot certonly --webroot -w /var/www/certbot \
+                --cert-name app \
+                -d "$$DOMAIN" \
+                --email "$$EMAIL" \
+                --agree-tos \
+                --no-eff-email \
+                --non-interactive || true
+        fi
+        while :; do
+            certbot renew
+            sleep 12h & wait $${!}
+        done
+    networks:
+      - zivabooks_network
+    depends_on:
+      - nginx
+
+networks:
+  zivabooks_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:
+  certs_data:
+  certbot_data:

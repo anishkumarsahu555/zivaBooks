@@ -11,9 +11,7 @@ def health_check(request):
         'cache': _check_cache(),
     }
     is_healthy = all(item['ok'] for item in checks.values())
-    if is_healthy:
-        logger.info("[HealthCheck] System health check succeeded.")
-    else:
+    if not is_healthy:
         logger.error(f"[HealthCheck] System health check failed: {checks}")
     return JsonResponse(
         {

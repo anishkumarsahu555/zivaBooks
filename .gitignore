@@ -22,12 +22,14 @@ db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
+data/
 
 # Logs / reports
 *.log
 .coverage
 .coverage.*
 htmlcov/
+stress_testing/results/
 
 # Build / packaging
 .pytest_cache/
@@ -41,14 +43,10 @@ build/
 .env
 .env.*
 !.env.example
+!.env*.example
+!**/.env*.example
 
 home/migrations-old
 migrations-old
-.env.example
-server-setup.md
-zivabooks_deployment.md
 
-# Migrations
-**/migrations/*.py
-!**/migrations/__init__.py
-logs
+logs/

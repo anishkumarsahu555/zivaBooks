@@ -24,3 +24,4 @@ class EcomValidityAdmin(admin.ModelAdmin):
 
 
 admin.site.register(EcomValidity, EcomValidityAdmin)
+

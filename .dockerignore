@@ -1,0 +1,41 @@
+# Git and source control
+.git
+.gitignore
+
+# Virtual environments
+.venv
+venv/
+env/
+ENV/
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local databases and runtime state
+data/
+db.sqlite3
+*.db
+
+# Static & media upload artifacts
+media/
+staticfiles/
+*.log
+logs/
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project temporary scratch & output files
+tmp/
+output/
+*.pdf

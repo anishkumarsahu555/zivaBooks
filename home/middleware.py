@@ -29,8 +29,8 @@ class RequestLoggingMiddleware:
         duration_ms = (time.monotonic() - start_time) * 1000
 
         path = request.get_full_path()
-        # Skip static assets and favicon to keep application request logs focused
-        if not (path.startswith('/static/') or path.startswith('/media/') or path == '/favicon.ico'):
+        # Skip static assets, favicon, health check, and manifest to keep request logs focused and fast
+        if not (path.startswith('/static/') or path.startswith('/media/') or path == '/favicon.ico' or path.startswith('/health/') or path == '/manifest.json'):
             user = getattr(request, 'user', None)
             user_info = user.get_username() if user and user.is_authenticated else 'Anonymous'
 

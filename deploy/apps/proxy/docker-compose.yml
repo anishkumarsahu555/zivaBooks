@@ -1,0 +1,40 @@
+# ==============================================================================
+# /opt/apps/proxy/docker-compose.yml
+# ==============================================================================
+# Shared Edge Reverse Proxy (Nginx + Let's Encrypt Certbot)
+# Routes traffic for all applications in /opt/apps/ via 'proxy_network'
+# Persistent SSL state: /appData/proxy/certs/
+# ==============================================================================
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: edge_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/apps/proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /opt/apps/proxy/conf.d:/etc/nginx/conf.d:ro
+      - /appData/proxy/certs:/etc/letsencrypt:ro
+      - /appData/proxy/certbot:/var/www/certbot:ro
+      - /appData/zivabooks/media:/var/www/zivabooks/media:ro
+    networks:
+      - proxy_network
+    depends_on:
+      - certbot
+    command: '/bin/sh -c ''while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g "daemon off;"'''
+
+  certbot:
+    image: certbot/certbot
+    container_name: edge_certbot
+    restart: unless-stopped
+    volumes:
+      - /appData/proxy/certs:/etc/letsencrypt
+      - /appData/proxy/certbot:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+networks:
+  proxy_network:
+    external: true

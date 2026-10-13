@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from datetime import date
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase
@@ -841,7 +843,9 @@ class InventoryPurchaseSalesTests(SeededTenantMixin, TestCase):
         self.assertEqual(conflict_response.json()['message'], 'error')
         self.assertIn('already exists', conflict_response.json()['error'])
 
-    def test_batch_report_summary_and_fefo_enforcement(self):
+    @patch('home.apis.inventory_reports.safe_local_date', return_value=date(2026, 6, 25))
+    @patch('home.services.inventory_lines.safe_local_date', return_value=date(2026, 6, 25))
+    def test_batch_report_summary_and_fefo_enforcement(self, mock_svc_date, mock_report_date):
         self.item.requiresBatchTracking = True
         self.item.save(update_fields=['requiresBatchTracking', 'lastUpdatedOn'])
         purchase_response = self.client.post(

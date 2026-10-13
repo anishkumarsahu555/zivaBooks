@@ -158,6 +158,11 @@ def contact_inquiry_api(request):
 def list_license_plans_api(request):
     """API endpoint returning active dynamic license plans and their configurable features."""
     try:
+        from django.core.cache import cache
+        plan_list = cache.get('active_license_plans_cache')
+        if plan_list is not None:
+            return JsonResponse({'status': 'success', 'plans': plan_list})
+
         from home.models import LicensePlan
         plans = LicensePlan.get_active_plans()
         plan_list = []
@@ -202,6 +207,7 @@ def list_license_plans_api(request):
                 },
                 'features_list': plan.features_list or []
             })
+        cache.set('active_license_plans_cache', plan_list, timeout=300)
         return JsonResponse({'status': 'success', 'plans': plan_list})
     except Exception as exc:
         return JsonResponse({'status': 'error', 'message': f'Failed to fetch plans: {str(exc)}'}, status=500)

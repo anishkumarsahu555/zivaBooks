@@ -86,6 +86,9 @@ class TenantActivationMiddleware:
         if path.startswith("/admin/"):
             return True
 
+        if path.startswith("/health/") or path == "/manifest.json" or path.startswith("/api/license-plans/"):
+            return True
+
         return path in {"/", "/home/", "/postLogin/", "/logout/"}
 
     def _is_api_request(self, request) -> bool:
