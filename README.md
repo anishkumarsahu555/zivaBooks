@@ -39,7 +39,56 @@ uv run python manage.py runserver
 
 Open `http://127.0.0.1:8000/`.
 
+## Docker Compose (local development)
+
+With Docker and the Compose plugin installed, run:
+
+```bash
+docker compose up --build -d
+docker compose exec web python manage.py seed_roles_permissions
+docker compose exec web python manage.py createsuperuser
+```
+
+Open `http://127.0.0.1:8000/`. The stack includes Django, PostgreSQL,
+Redis, and a Celery worker. Migrations and static-file collection run at startup.
+Emails are printed to the container logs.
+
+Compose reads `SECRET_KEY`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`,
+and `WEB_PORT` from your shell or `.env`, with local defaults when unset. It sets
+the database and Redis hosts to their container service names. Other `.env`
+settings are not passed into the containers. This setup uses Django's development
+server with debug enabled and binds only to localhost; it is intended for local use.
+
+```bash
+docker compose logs -f web worker
+docker compose down
+```
+
+Database, Redis, and uploaded media persist in visible host folders through bind
+mounts, by default `local-data/zivabooks/postgres`, `local-data/zivabooks/redis`, and
+`local-data/zivabooks/media` inside this project. They are excluded from Git and
+Docker builds. Set `LOCAL_DATA_ROOT=/absolute/path/to/local-data` and
+`APP_NAME=zivabooks` in `.env` to choose the parent location and app subdirectory.
+The resulting pattern is `${LOCAL_DATA_ROOT}/${APP_NAME}/{postgres,redis,media}`.
+Use a different app name, Compose project name, and web port for each local app.
+The production configuration uses its separate `DATA_ROOT` variable.
+
+`docker compose down` and container rebuilds preserve these folders. Do not delete
+them or point `LOCAL_DATA_ROOT` at an empty location when expecting existing data.
+Existing native PostgreSQL databases and previous named volumes are not imported
+automatically. When migrating named volumes, stop all writers and shut down
+PostgreSQL/Redis cleanly before copying, retain the originals, and verify data after
+restart. Raw PostgreSQL directory copies require the same compatible database
+version and platform; use dump/restore otherwise. Never edit database files in
+Finder. On Docker Desktop, database bind mounts can be slower than named volumes;
+this layout prioritizes visible host storage.
+
+After changing source code, rebuild with `docker compose up --build -d`.
+
 ## Configuration
+
+For Hostinger VPS deployment with existing host Nginx, persistent data, environment
+variables, and backup/restore procedures, see [Production deployment](deploy/README.md).
 
 Local development works without a `.env` file. Production deployments must set at least:
 

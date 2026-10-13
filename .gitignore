@@ -22,6 +22,8 @@ db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
+local-data/
+local-backups/
 
 # Logs / reports
 *.log
@@ -48,7 +50,7 @@ migrations-old
 server-setup.md
 zivabooks_deployment.md
 
-# Migrations
-**/migrations/*.py
-!**/migrations/__init__.py
+# Production migrations are versioned with the application.
 logs
+*.env
+!*.env.example

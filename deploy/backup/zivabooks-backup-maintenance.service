@@ -1,0 +1,15 @@
+[Unit]
+Description=Verify and prune local zivaBooks backups
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/zivabooks/backup.env
+ExecStart=/usr/bin/python3 /opt/zivabooks/deploy/production/operations.py check
+ExecStart=/usr/bin/python3 /opt/zivabooks/deploy/production/operations.py prune
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=50%
+MemoryMax=768M
+UMask=0077
+TimeoutStartSec=infinity
