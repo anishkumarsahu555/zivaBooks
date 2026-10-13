@@ -1,168 +1,80 @@
-# ==============================================================================
-# zivaBooks — Application Stack Docker Compose
-# ==============================================================================
-# Architecture Layout:
-# Code/Config: /opt/apps/zivabooks/
-# Persistent Data: /appData/zivabooks/ (postgres, redis, media)
-# Reverse Proxy: Joined to external 'proxy_network'
-# ==============================================================================
+# Local development stack. Run: docker compose up --build -d
+x-app: &app
+  init: true
+  build:
+    context: .
+    target: development
+  environment:
+    DEBUG: "true"
+    SECRET_KEY: ${SECRET_KEY:-zivabooks-docker-local-dev-insecure-key}
+    ALLOWED_HOSTS: localhost,127.0.0.1,[::1],web
+    DATABASE_ENGINE: postgres
+    POSTGRES_DB: ${POSTGRES_DB:-zivaBooks}
+    POSTGRES_USER: ${POSTGRES_USER:-zivabooks}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zivabooks-local-password}
+    POSTGRES_HOST: db
+    POSTGRES_PORT: "5432"
+    USE_REDIS_CACHE: "true"
+    REDIS_CACHE_URL: redis://redis:6379/1
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CELERY_RESULT_BACKEND: redis://redis:6379/0
+    EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+  volumes:
+    - ${LOCAL_DATA_ROOT:-./local-data}/${APP_NAME:-zivabooks}/media:/app/media
 
 services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: zivabooks:latest
-    container_name: zivabooks_web
-    restart: unless-stopped
-    command: ["uv", "run", "uvicorn", "zivaBooks.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--limit-concurrency", "1000", "--backlog", "2048"]
-    env_file:
-      - .env
-    environment:
-      - DEBUG=false
-      - ALLOWED_HOSTS=localhost,127.0.0.1,web,0.0.0.0,*
-      - DB_CONN_MAX_AGE=0
-      - DB_CONN_HEALTH_CHECKS=true
-      - DATABASE_ENGINE=postgres
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5433
-      - POSTGRES_DB=${POSTGRES_DB:-zivaBooks}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - USE_REDIS_CACHE=true
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - MEDIA_ROOT=/app/media
-    volumes:
-      - ${DATA_DIR:-./data}/media:/app/media
-    ports:
-      - "${PORT:-8000}:8000"
-    networks:
-      - zivabooks_internal
-      - proxy_network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 25s
-
-  celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: zivabooks:latest
-    container_name: zivabooks_worker
-    restart: unless-stopped
-    command: ["uv", "run", "celery", "-A", "zivaBooks", "worker", "-l", "info", "--concurrency=2", "--max-tasks-per-child=500", "--max-memory-per-child=150000"]
-    env_file:
-      - .env
-    environment:
-      - DEBUG=false
-      - DATABASE_ENGINE=postgres
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5433
-      - POSTGRES_DB=${POSTGRES_DB:-zivaBooks}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - USE_REDIS_CACHE=true
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-      - MEDIA_ROOT=/app/media
-    volumes:
-      - ${DATA_DIR:-./data}/media:/app/media
-    networks:
-      - zivabooks_internal
-    depends_on:
-      web:
-        condition: service_started
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  celery_beat:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: zivabooks:latest
-    container_name: zivabooks_beat
-    restart: unless-stopped
-    command: ["uv", "run", "celery", "-A", "zivaBooks", "beat", "-l", "info"]
-    env_file:
-      - .env
-    environment:
-      - DEBUG=false
-      - DATABASE_ENGINE=postgres
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5433
-      - POSTGRES_DB=${POSTGRES_DB:-zivaBooks}
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - USE_REDIS_CACHE=true
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    networks:
-      - zivabooks_internal
-    depends_on:
-      web:
-        condition: service_started
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  postgres:
-    image: postgres:17-alpine
-    container_name: zivabooks_postgres
-    restart: unless-stopped
-    command: ["postgres", "-p", "5433", "-c", "max_connections=300", "-c", "shared_buffers=128MB", "-c", "work_mem=4MB"]
-    env_file:
-      - .env
+  db:
+    image: postgres:17-bookworm
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-zivaBooks}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_USER: ${POSTGRES_USER:-zivabooks}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zivabooks-local-password}
     volumes:
-      - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
-    ports:
-      - "5433:5433"
-    networks:
-      - zivabooks_internal
+      - ${LOCAL_DATA_ROOT:-./local-data}/${APP_NAME:-zivabooks}/postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -p 5433 -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-zivaBooks}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: zivabooks_redis
-    restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
-      - ${DATA_DIR:-./data}/redis:/data
-    ports:
-      - "${REDIS_PORT:-6380}:6379"
-    networks:
-      - zivabooks_internal
+      - ${LOCAL_DATA_ROOT:-./local-data}/${APP_NAME:-zivabooks}/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 3s
-      retries: 5
+      timeout: 5s
+      retries: 10
 
-networks:
-  zivabooks_internal:
-    driver: bridge
-  proxy_network:
-    external: true
+  web:
+    <<: *app
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        python manage.py migrate --noinput &&
+        python manage.py collectstatic --noinput &&
+        exec python manage.py runserver 0.0.0.0:8000 --noreload
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 10
+      start_period: 60s
+
+  worker:
+    <<: *app
+    command: ["celery", "-A", "zivaBooks", "worker", "--loglevel=info", "--concurrency=2"]
+    depends_on:
+      web:
+        condition: service_healthy
+

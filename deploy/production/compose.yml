@@ -1,0 +1,149 @@
+name: ${COMPOSE_PROJECT_NAME:-zivabooks-prod}
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app: &app
+  image: ${APP_IMAGE:?Set APP_IMAGE to a versioned release image}
+  build:
+    context: ../..
+    target: production
+  restart: unless-stopped
+  init: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  logging: *logging
+  pids_limit: 128
+  environment: &app-env
+    DEBUG: "false"
+    SECRET_KEY: ${SECRET_KEY:?Set a unique SECRET_KEY}
+    ALLOWED_HOSTS: ${APP_DOMAIN:?Set APP_DOMAIN},localhost,127.0.0.1
+    CSRF_TRUSTED_ORIGINS: https://${APP_DOMAIN}
+    SESSION_COOKIE_SECURE: "true"
+    CSRF_COOKIE_SECURE: "true"
+    SECURE_HSTS_SECONDS: "3600"
+    SECURE_HSTS_INCLUDE_SUBDOMAINS: "false"
+    # Host Nginx enforces HTTPS; localhost health checks remain HTTP.
+    SECURE_SSL_REDIRECT: "false"
+    DATABASE_ENGINE: postgres
+    POSTGRES_DB: ${POSTGRES_DB:-zivabooks}
+    POSTGRES_USER: ${POSTGRES_USER:-zivabooks}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    POSTGRES_HOST: db
+    POSTGRES_PORT: "5432"
+    DB_CONN_MAX_AGE: "0"
+    USE_REDIS_CACHE: "true"
+    REDIS_CACHE_URL: redis://redis:6379/1
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CELERY_RESULT_BACKEND: redis://redis:6379/0
+    WRITE_LOG_ON_FILE: "false"
+    WRITE_LOG_ON_CONSOLE: "true"
+    EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+    EMAIL_PORT: ${EMAIL_PORT:-587}
+    EMAIL_USE_TLS: ${EMAIL_USE_TLS:-true}
+    EMAIL_USE_SSL: ${EMAIL_USE_SSL:-false}
+    EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+    EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+    DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@zivainfotech.tech}
+    GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+  volumes:
+    - type: bind
+      source: ${DATA_ROOT:?Set DATA_ROOT}/media
+      target: /app/media
+      bind:
+        create_host_path: false
+  networks: [backend]
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+# Used by operations.py, not passed to application containers.
+x-backup:
+  root: ${BACKUP_ROOT:?Set BACKUP_ROOT}
+
+services:
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    mem_limit: ${DB_MEMORY_LIMIT:-1536m}
+    cpus: ${DB_CPU_LIMIT:-0.75}
+    pids_limit: 128
+    logging: *logging
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zivabooks}
+      POSTGRES_USER: ${POSTGRES_USER:-zivabooks}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    command: ["postgres", "-c", "shared_buffers=256MB", "-c", "max_connections=50", "-c", "work_mem=4MB"]
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT}/postgres
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    mem_limit: 384m
+    cpus: "0.25"
+    pids_limit: 64
+    logging: *logging
+    # No eviction: cache pressure must not silently discard queued tasks.
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory", "192mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - type: bind
+        source: ${DATA_ROOT}/redis
+        target: /data
+        bind:
+          create_host_path: false
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    <<: *app
+    mem_limit: ${WEB_MEMORY_LIMIT:-1024m}
+    cpus: ${WEB_CPU_LIMIT:-0.75}
+    command: ["uvicorn", "zivaBooks.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "${WEB_WORKERS:-1}", "--no-proxy-headers"]
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8001}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=5)"]
+      interval: 30s
+      timeout: 6s
+      start_period: 30s
+      retries: 5
+
+  worker:
+    <<: *app
+    mem_limit: ${WORKER_MEMORY_LIMIT:-768m}
+    cpus: ${WORKER_CPU_LIMIT:-0.50}
+    stop_grace_period: 5m
+    command: ["celery", "-A", "zivaBooks", "worker", "--loglevel=info", "--concurrency=${CELERY_CONCURRENCY:-1}", "--prefetch-multiplier=1", "--max-tasks-per-child=100"]
+
+  migrate:
+    <<: *app
+    profiles: ["tools"]
+    restart: "no"
+    mem_limit: 768m
+    cpus: "0.5"
+    command: ["python", "manage.py", "migrate", "--noinput"]
+
+networks:
+  # Private to this project, but outbound access remains available for email/AI.
+  backend: {}
