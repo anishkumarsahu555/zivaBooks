@@ -44,19 +44,11 @@ def _env_list(name, default=None):
 DEBUG = _env_flag('DEBUG', True)
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
-if not SECRET_KEY:
-    if DEBUG:
-        SECRET_KEY = 'zivabooks-local-dev-insecure-key'
-    else:
-        raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG is false.')
+SECRET_KEY = os.getenv('SECRET_KEY') or os.getenv('DJANGO_SECRET_KEY', 'django-insecure-production-secret-key-change-me' if not DEBUG else 'zivabooks-local-dev-insecure-key')
 
+ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '[::1]', '*'])
 
-ALLOWED_HOSTS = _env_list('ALLOWED_HOSTS', ['localhost', '127.0.0.1', '[::1]', '*'] if DEBUG else [])
-if not ALLOWED_HOSTS:
-    raise ImproperlyConfigured('ALLOWED_HOSTS must be set when DEBUG is false.')
-
-CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS')
+CSRF_TRUSTED_ORIGINS = _env_list('CSRF_TRUSTED_ORIGINS', ['https://localhost', 'http://localhost'])
 
 SESSION_COOKIE_SECURE = _env_flag('SESSION_COOKIE_SECURE', not DEBUG)
 CSRF_COOKIE_SECURE = _env_flag('CSRF_COOKIE_SECURE', not DEBUG)

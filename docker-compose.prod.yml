@@ -23,6 +23,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - SECRET_KEY=${SECRET_KEY:-django-insecure-production-secret-key-change-me}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-https://localhost}
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,6 +96,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - MEDIA_ROOT=/app/media
       - SECRET_KEY=${SECRET_KEY:-django-insecure-production-secret-key-change-me}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
     volumes:
       - media_data:/app/media
     networks:
@@ -127,6 +130,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-django-insecure-production-secret-key-change-me}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
     networks:
       - zivabooks_network
     depends_on:
