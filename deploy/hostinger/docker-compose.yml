@@ -45,6 +45,9 @@ services:
       start_period: 25s
 
   celery_worker:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
     image: zivabooks:latest
     container_name: zivabooks_worker
     restart: unless-stopped
@@ -77,6 +80,9 @@ services:
         condition: service_healthy
 
   celery_beat:
+    build:
+      context: ../../
+      dockerfile: Dockerfile
     image: zivabooks:latest
     container_name: zivabooks_beat
     restart: unless-stopped

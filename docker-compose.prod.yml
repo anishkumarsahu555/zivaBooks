@@ -8,7 +8,7 @@
 services:
   migrate:
     build:
-      context: https://github.com/anishkumarsahu555/zivaBooks.git#main
+      context: .
       dockerfile: Dockerfile
     image: zivabooks:latest
     container_name: zivabooks_migrate
@@ -30,6 +30,9 @@ services:
       - zivabooks_network
 
   web:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: zivabooks:latest
     container_name: zivabooks_web
     restart: unless-stopped
@@ -70,6 +73,9 @@ services:
       start_period: 25s
 
   celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: zivabooks:latest
     container_name: zivabooks_worker
     restart: unless-stopped
@@ -101,6 +107,9 @@ services:
         condition: service_healthy
 
   celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: zivabooks:latest
     container_name: zivabooks_beat
     restart: unless-stopped
