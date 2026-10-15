@@ -27,28 +27,40 @@ password = "${DB_PASSWORD}"
 dbname = "${DB_NAME}"
 
 ready = False
+last_error = None
 for attempt in range(45):
     try:
         import psycopg
-        conn = psycopg.connect(
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            dbname=dbname,
-            connect_timeout=3
-        )
+        try:
+            conn = psycopg.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                dbname=dbname,
+                connect_timeout=3
+            )
+        except Exception as db_err:
+            conn = psycopg.connect(
+                host=host,
+                port=port,
+                user=user,
+                password=password,
+                dbname="postgres",
+                connect_timeout=3
+            )
         conn.close()
         ready = True
         break
     except Exception as e:
+        last_error = e
         time.sleep(1)
 
 if ready:
     print(f"[ENTRYPOINT] PostgreSQL is ready and accepting connections.")
     sys.exit(0)
 else:
-    print(f"[ENTRYPOINT] ERROR: Timed out waiting for PostgreSQL at {host}:{port}")
+    print(f"[ENTRYPOINT] ERROR: Timed out waiting for PostgreSQL at {host}:{port} -> {last_error}")
     sys.exit(1)
 EOF
 fi
