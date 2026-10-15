@@ -6,11 +6,22 @@ Welcome to the **zivaBooks** documentation hub! Below is a complete index of all
 
 ## 📚 Documentation Index
 
+### Core Living Governance Suite
 | Guide | Description | Target Audience |
 |---|---|---|
-| 🚀 **[README.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/README.md)** | Quick start, features overview, environment configuration, and basic health checks. | All Developers / Evaluators |
+| 📖 **[README.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/README.md)** | Quick start, features overview, environment configuration, and master portal. | All Developers / Evaluators |
+| 🧠 **[MEMORY.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/MEMORY.md)** | Living project memory, ADR decision ledger, known quirks, and change log. | AI Agents / Developers |
+| 🏗️ **[ARCHITECTURE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/ARCHITECTURE.md)** | System architecture, multi-tenancy, service layers, FEFO inventory, and Docker topology. | Tech Leads / Architects |
+| 📋 **[TASKS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/TASKS.md)** | Sprint board, active tasks, product backlog, technical debt, and milestone changelog. | Project Leads / Engineers |
+| 🎨 **[DESIGN.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DESIGN.md)** | UI/UX design system, color tokens, typography, component rules, A4 & thermal printing. | Frontend Devs / Designers |
+| 📏 **[RULES.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/RULES.md)** | Non-negotiable engineering standards, tenant isolation invariants, and PR checklist. | All Contributors |
+| ⚡ **[COMMANDS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/COMMANDS.md)** | Developer command runbook (uv, migrations, tests, Docker, Celery, database backups). | Developers / DevOps |
+| 🤖 **[AGENTS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/AGENTS.md)** | AI Agent operating manual, 5-step golden workflow, and doc sync matrix. | AI Assistants / Automations |
+
+### Technical Specifications & Operations Guides
+| Guide | Description | Target Audience |
+|---|---|---|
 | 🛠️ **[setup.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/setup.md)** | Detailed local environment setup (SQLite vs PostgreSQL, Redis, email configuration). | Developers / QA |
-| 🏗️ **[ARCHITECTURE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/ARCHITECTURE.md)** | Technical specification covering multi-tenancy, middleware pipelines, domain subsystems, and FEFO inventory logic. | Tech Leads / Architects |
 | 💡 **[DEVELOPMENT.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DEVELOPMENT.md)** | Step-by-step guide for adding new features, APIs, models, migrations, service modules, and tests. | Feature Developers |
 | 🔌 **[API.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/API.md)** | Complete JSON API specification, endpoints catalog, authentication requirements, and error contracts. | Frontend / Backend / Integrators |
 | 🗄️ **[DATABASE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DATABASE.md)** | ER diagrams, data model inheritance hierarchy, table relationships, and indexing rules. | Database Engineers / Backend |

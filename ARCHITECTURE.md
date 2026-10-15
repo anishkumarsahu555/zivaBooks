@@ -12,26 +12,26 @@ This document provides a comprehensive technical overview of the **zivaBooks** s
 graph TD
     Client[Web Browser / PWA / Mobile Client] --> WSGI[Uvicorn / WSGI Gateway]
     WSGI --> MW[Django Middleware Pipeline]
-    
+
     subgraph Middleware Stack
         MW --> SecMW[Security & WhiteNoise MW]
         SecMW --> AuthMW[Authentication MW]
         AuthMW --> LicMW[TenantActivationMiddleware]
         LicMW --> AuditMW[AuditUserMiddleware]
     end
-    
+
     AuditMW --> Router[Django URL Router]
-    
+
     subgraph Layered Application Core
         Router --> Views[View Layer: home/views.py]
         Router --> APIs[API Layer: home/apis/]
-        
+
         Views --> Services[Service Layer: home/services/]
         APIs --> Services
-        
+
         Services --> DomainModels[Data Access Layer: home/models.py]
     end
-    
+
     subgraph Storage & Infrastructure
         DomainModels --> DB[(SQLite / PostgreSQL)]
         Services --> Redis[(Redis Cache & Broker)]
@@ -88,7 +88,7 @@ classDiagram
     AuditedModel <|-- TenantAwareModel
     TenantAwareModel <|-- TenantOwnedModel
     SoftDeleteModel <|-- TenantOwnedModel
-    
+
     TenantOwnedModel <|-- Sales
     TenantOwnedModel <|-- Collection
     TenantOwnedModel <|-- Order
@@ -217,7 +217,7 @@ graph LR
     Purchases --> StockLedger
     Returns --> StockLedger
     CashCounter --> StockLedger
-    
+
     Sales --> PartyLedger
     Collections --> PartyLedger
     Collections --> Books
@@ -289,23 +289,61 @@ sequenceDiagram
 
 ---
 
-## 8. Development & Verification Workflows
+## 8. Containerized Infrastructure & Deployment Topology
 
-### 8.1 Setup & Local Running
-```bash
-uv run python manage.py migrate
-uv run python manage.py seed_roles_permissions
-uv run python manage.py seed_mock_data
-uv run python manage.py runserver
+One root `docker-compose.yml`, selected with `.env.local` or `/etc/zivabooks/production.env`, defines both environments. DATA_ROOT selects `./local-data/zivabooks` locally or `/srv/zivabooks/data` on the VPS.
+
+For local and production deployments, `zivaBooks` uses a decoupled 4-container architecture orchestrated via Docker Compose:
+
+```mermaid
+graph TD
+    User([User Browser / Mobile PWA]) -->|HTTP Port 8000| Web[Django Web Service<br>Uvicorn]
+
+    subgraph Containerized Services
+        Web -->|Port 5432| DB[(PostgreSQL Database)]
+        Web -->|Port 6379| Redis[(Redis Broker & Cache)]
+        Worker[Celery Asynchronous Worker] -->|Listen Queues| Redis
+        Worker -->|DB Queries| DB
+    end
+
+    subgraph Host Bind Mounts
+        DB -.-> MountDB[./local-data/zivabooks/postgres]
+        Redis -.-> MountRedis[./local-data/zivabooks/redis]
+        Web -.-> MountMedia[./local-data/zivabooks/media]
+        Worker -.-> MountMedia
+    end
 ```
 
-### 8.2 Execution of Unit & Integration Tests
-```bash
-# Full test suite (218+ tests covering isolation, OTP, sales, inventory, ledgers)
-uv run python manage.py test
+- **Web Container (`web`)**: Runs Django with WhiteNoise static asset compression. Uses image-built static assets; migrations run explicitly through the `migrate` tools service.
+- **Database Container (`db`)**: PostgreSQL 17 storing tenant-partitioned business entities, with bounded connections and `DB_CONN_MAX_AGE=0` for ASGI.
+- **Cache / Broker Container (`redis`)**: Redis 7+ providing session caching, rate-limiting counters, and task brokering for Celery.
+- **Background Worker (`worker`)**: Celery worker executing long-running PDF compilation, asynchronous email dispatch, and WhatsApp notifications.
+- **Host Bind Mounts**: Persistent data is mounted into host directory `./local-data/` for full operational transparency and straightforward local backups.
 
-# Subsystem test targets
-uv run python manage.py test home.tests.test_inventory_purchase_sales
-uv run python manage.py test home.tests.test_order_collection_approval_permissions
-uv run python manage.py test activation
-```
+---
+
+## 9. System Governance & Documentation Map
+
+This architecture document is part of the synchronized 8-document governance system:
+
+| Document | Primary Role | When to Update |
+|---|---|---|
+| **[README.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/README.md)** | Master Portal & Quick Start | Repo onboarding, stack summary, high-level features |
+| **[MEMORY.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/MEMORY.md)** | Living State & Context Ledger | Every milestone, architectural decision (ADR), bug fix, or gotcha |
+| **[ARCHITECTURE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/ARCHITECTURE.md)** | System Blueprint & Specifications | Model hierarchy, subsystem flows, services refactoring, infrastructure |
+| **[TASKS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/TASKS.md)** | Sprint Board, Backlog & Roadmap | Task planning, in-progress tracking, task completion |
+| **[DESIGN.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DESIGN.md)** | UI/UX & Print Design System | New components, color tokens, layout, A4/thermal templates |
+| **[RULES.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/RULES.md)** | Non-Negotiable Engineering Rules | Coding standards, isolation rules, PR checklists |
+| **[COMMANDS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/COMMANDS.md)** | CLI Runbook & Command Reference | New management commands, docker options, test runner flags |
+| **[AGENTS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/AGENTS.md)** | AI Agent Operating Protocol | Agent workflows, guardrails, automation rules |
+
+---
+
+## 10. Architecture Evolution & Change Tracking Protocol
+
+Whenever new features, services, or updates are introduced:
+1. **Model Changes**: If a new domain model is introduced, verify inheritance from `TenantOwnedModel`, document its relationships, and update the Class Diagram in Section 3.
+2. **Service Layer Boundary**: Ensure business logic resides strictly in `home/services/`. Update Section 5 & 6 if a new domain service is introduced.
+3. **Middleware Changes**: If request interception or auth flows change, update the Sequence Diagram in Section 4.
+4. **Infrastructure Updates**: If caching layers, task queues, or container configs evolve, update Section 8.
+5. **Cross-Document Cascade**: Log decisions in `MEMORY.md` and check off tasks in `TASKS.md`.

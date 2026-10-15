@@ -54,3 +54,6 @@ zivabooks_deployment.md
 logs
 *.env
 !*.env.example
+
+!.env.local.example
+!.env.production.example
