@@ -22,14 +22,14 @@ db.sqlite3
 db.sqlite3-journal
 media/
 staticfiles/
-data/
+local-data/
+local-backups/
 
 # Logs / reports
 *.log
 .coverage
 .coverage.*
 htmlcov/
-stress_testing/results/
 
 # Build / packaging
 .pytest_cache/
@@ -43,10 +43,23 @@ build/
 .env
 .env.*
 !.env.example
-!.env*.example
-!**/.env*.example
 
 home/migrations-old
 migrations-old
+.env.example
+server-setup.md
+zivabooks_deployment.md
 
+# Production migrations are versioned with the application.
+logs
+*.env
+!*.env.example
+
+# Additional exclusions retained from main.
+data/
+stress_testing/results/
+!.env*.example
+!**/.env*.example
 logs/
+!.env.local.example
+!.env.production.example

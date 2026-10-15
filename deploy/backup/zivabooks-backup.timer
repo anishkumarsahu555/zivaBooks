@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly zivaBooks backup (India time)
+
+[Timer]
+# This pauses only this app's writers while capturing DB and media.
+OnCalendar=*-*-* 03:30:00 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

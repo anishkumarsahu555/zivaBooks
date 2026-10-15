@@ -294,28 +294,61 @@ sequenceDiagram
 
 ---
 
-## 8. Development & Verification Workflows
+## 8. Containerized Infrastructure & Deployment Topology
 
-### 8.1 Setup & Local Running
-```bash
-# Using the unified script
-./start.sh dev
+One root `docker-compose.yml`, selected with `.env.local` or `/etc/zivabooks/production.env`, defines both environments. DATA_ROOT selects `./local-data/zivabooks` locally or `/srv/zivabooks/data` on the VPS.
 
-# Or with uv directly:
-uv run python manage.py migrate
-uv run python manage.py seed_roles_permissions
-uv run python manage.py seed_mock_data
-uv run python manage.py runserver
+For local and production deployments, `zivaBooks` uses a decoupled 4-container architecture orchestrated via Docker Compose:
+
+```mermaid
+graph TD
+    User([User Browser / Mobile PWA]) -->|HTTP Port 8000| Web[Django Web Service<br>Uvicorn]
+
+    subgraph Containerized Services
+        Web -->|Port 5432| DB[(PostgreSQL Database)]
+        Web -->|Port 6379| Redis[(Redis Broker & Cache)]
+        Worker[Celery Asynchronous Worker] -->|Listen Queues| Redis
+        Worker -->|DB Queries| DB
+    end
+
+    subgraph Host Bind Mounts
+        DB -.-> MountDB[./local-data/zivabooks/postgres]
+        Redis -.-> MountRedis[./local-data/zivabooks/redis]
+        Web -.-> MountMedia[./local-data/zivabooks/media]
+        Worker -.-> MountMedia
+    end
 ```
 
-### 8.2 Execution of Unit & Integration Tests
-```bash
-# Full test suite covering isolation, OTP, sales, inventory, ledgers, and plans
-uv run python manage.py test
+- **Web Container (`web`)**: Runs Django with WhiteNoise static asset compression. Uses image-built static assets; migrations run explicitly through the `migrate` tools service.
+- **Database Container (`db`)**: PostgreSQL 17 storing tenant-partitioned business entities, with bounded connections and `DB_CONN_MAX_AGE=0` for ASGI.
+- **Cache / Broker Container (`redis`)**: Redis 7+ providing session caching, rate-limiting counters, and task brokering for Celery.
+- **Background Worker (`worker`)**: Celery worker executing long-running PDF compilation, asynchronous email dispatch, and WhatsApp notifications.
+- **Host Bind Mounts**: Persistent data is mounted into host directory `./local-data/` for full operational transparency and straightforward local backups.
 
-# Subsystem test targets
-uv run python manage.py test home.tests.test_license_plans
-uv run python manage.py test home.tests.test_inventory_purchase_sales
-uv run python manage.py test home.tests.test_order_collection_approval_permissions
-uv run python manage.py test activation
-```
+---
+
+## 9. System Governance & Documentation Map
+
+This architecture document is part of the synchronized 8-document governance system:
+
+| Document | Primary Role | When to Update |
+|---|---|---|
+| **[README.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/README.md)** | Master Portal & Quick Start | Repo onboarding, stack summary, high-level features |
+| **[MEMORY.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/MEMORY.md)** | Living State & Context Ledger | Every milestone, architectural decision (ADR), bug fix, or gotcha |
+| **[ARCHITECTURE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/ARCHITECTURE.md)** | System Blueprint & Specifications | Model hierarchy, subsystem flows, services refactoring, infrastructure |
+| **[TASKS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/TASKS.md)** | Sprint Board, Backlog & Roadmap | Task planning, in-progress tracking, task completion |
+| **[DESIGN.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DESIGN.md)** | UI/UX & Print Design System | New components, color tokens, layout, A4/thermal templates |
+| **[RULES.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/RULES.md)** | Non-Negotiable Engineering Rules | Coding standards, isolation rules, PR checklists |
+| **[COMMANDS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/COMMANDS.md)** | CLI Runbook & Command Reference | New management commands, docker options, test runner flags |
+| **[AGENTS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/AGENTS.md)** | AI Agent Operating Protocol | Agent workflows, guardrails, automation rules |
+
+---
+
+## 10. Architecture Evolution & Change Tracking Protocol
+
+Whenever new features, services, or updates are introduced:
+1. **Model Changes**: If a new domain model is introduced, verify inheritance from `TenantOwnedModel`, document its relationships, and update the Class Diagram in Section 3.
+2. **Service Layer Boundary**: Ensure business logic resides strictly in `home/services/`. Update Section 5 & 6 if a new domain service is introduced.
+3. **Middleware Changes**: If request interception or auth flows change, update the Sequence Diagram in Section 4.
+4. **Infrastructure Updates**: If caching layers, task queues, or container configs evolve, update Section 8.
+5. **Cross-Document Cascade**: Log decisions in `MEMORY.md` and check off tasks in `TASKS.md`.

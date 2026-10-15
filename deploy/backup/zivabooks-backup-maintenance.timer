@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly local backup verification and retention
+
+[Timer]
+OnCalendar=Sun *-*-* 05:30:00 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

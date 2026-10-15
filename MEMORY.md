@@ -1,156 +1,125 @@
-# zivaBooks — Core System Memory & Knowledge Base
+# zivaBooks Project Memory & Context Ledger
 
-This document serves as the persistent system memory and architectural source of truth for **zivaBooks** for human engineers and AI developer agents.
-
----
-
-## 1. System Identity & Mission
-
-**zivaBooks** is an enterprise-grade, multi-tenant business operations and accounting platform built on **Python 3.14+** and **Django 6.0+**. It is designed for retail distributors, wholesale traders, multi-counter merchants, and enterprises requiring:
-- Rigid row-level multi-tenancy.
-- First-Expiry-First-Out (**FEFO**) batch inventory tracking.
-- Dual-entry cashbook, bankbook, and party ledger accounting.
-- POS counter operations with dual-party **OTP verification**.
-- Flexible software licensing with dynamic custom plans (25+ granular feature toggles).
-- Built-in **Ziva AI** assistant with monthly quota management and tenant context grounding.
-- Offline-capable **Progressive Web App (PWA)** interface and thermal/A4 document printing.
+This document is the **living memory, persistent state tracker, and decision log** for `zivaBooks`. It ensures unbroken continuity across AI sessions, developer handoffs, and engineering iterations.
 
 ---
 
-## 2. Technology Stack & Runtime
+## 1. Project Identity & Baseline State
 
-| Layer | Component | Details |
-|---|---|---|
-| **Language Runtime** | Python | `>= 3.14` |
-| **Package Manager** | uv | Fast packaging via `pyproject.toml` and `uv.lock` |
-| **Web Framework** | Django | `>= 6.0.3` (ASGI/WSGI via Uvicorn & Gunicorn) |
-| **Database** | Dev / Prod | SQLite 3 (Dev) / PostgreSQL via `psycopg>=3.2.10` (Prod) |
-| **Caching & Queue** | Redis & Celery | `django-redis>=6.0.0`, `celery>=5.4.0` |
-| **Static & Media** | WhiteNoise & StdImage | WhiteNoise (`CompressedManifestStaticFilesStorage`), `django-stdimage>=6.0.2` |
-| **Document Engine** | PDF & Excel | `weasyprint>=68.1`, `openpyxl>=3.1.5`, `qrcode>=8.2` |
-| **Frontend UI** | Django Templates & PWA | HTML5/CSS3, DataTables (`django-datatables-view`), `django-pwa>=2.0.1` |
-| **AI Integration** | OpenAI & Ollama | `openai>=2.44.0` / Ollama Local LLM fallback |
-
----
-
-## 3. Core Architecture & Design Patterns
-
-### 3.1 Model Inheritance Hierarchy
-All tenant data is strictly partitioned using row-level isolation via base abstract models:
-1. `TimeStampedModel`: Provides `datetime` (auto_now_add) and `lastUpdatedOn` (auto_now).
-2. `AuditedModel`: Contains `audit_logs = GenericRelation('home.AuditLog')` and links to thread-local audit events.
-3. `TenantAwareModel`: Inherits from `TimeStampedModel` + `AuditedModel`, defines `tenant = models.ForeignKey('Tenant', on_delete=models.CASCADE)`.
-4. `SoftDeleteModel`: Provides `isDeleted = models.BooleanField(default=False)`.
-5. `TenantOwnedModel`: Inherits from `TenantAwareModel` + `SoftDeleteModel`. **All business models inherit from `TenantOwnedModel`**.
-
-### 3.2 Tenant Context & Isolation Invariant
-- **HTTP Scope**: Middleware inspects authenticated user session/membership to attach `request.tenant`.
-- **Queryset Invariant**: In views and APIs, always use `tenant_qs(request, Model)` or filter explicitly with `tenant=request.tenant, isDeleted=False`.
-- **Thread-Local Audit**: `home.middleware.AuditUserMiddleware` attaches the active user to thread-local storage so that model save operations record the creator/updater in `AuditLog`.
-
-### 3.3 Dynamic License Plan Architecture
-- Plans are represented by `LicensePlan` models:
-  - Standard plans: `Starter` (₹19,999/yr, 5 seats), `Growth` (₹34,999/yr, 15 seats), `Enterprise` (₹59,999/yr, Unlimited).
-  - Custom plans: Created with `is_custom=True`, hidden from public website, assigned to specific enterprise tenants.
-- Assigning a plan via `tenant.apply_license_plan(plan)`:
-  - Syncs boolean flags on `Tenant` (`inventoryEnabled`, `advancedInvoicingEnabled`, `einvoice_enabled`, `nonGstShadowEnabled`, `enableAttendanceLocationMaps`).
-  - Calls `sync_tenant_admin_group_permissions()` to map 25+ feature toggles directly to Django permissions on `{slug}:Tenant Admin` group.
-  - Initializes or resets `TenantAiUsage` with the plan's `ziva_ai_max_queries_per_month` allocation.
-- **Middleware Enforcement**: `activation.middleware.TenantActivationMiddleware` checks license expiration (`Validity` or plan expiration). If expired, all non-allowlisted routes redirect to `/activate/` or return 403 JSON (`{"message": "license_expired"}`).
-  - Allowlisted paths: `/home/` (shows expired banner), `/`, `/postLogin/`, `/logout/`, `/activate/`, `/static/`, `/media/`, `/admin/`.
-
-### 3.4 FEFO Batch Inventory & Stock Ledger
-- Every stock-tracked product maintains batch records (`InventoryBatch`) with `batch_number`, `manufacturing_date`, and `expiry_date`.
-- Stock quantities are mirrored in `InventoryStock` (item-level) and `InventoryBatchStock` (batch + warehouse level).
-- **Mutations**: Controlled strictly via `home/services/inventory_mutations.py`:
-  - Purchases / Opening Stock: Add batches and record positive `InventoryLedgerEntry`.
-  - Sales Invoices: Consumes batches using First-Expiry-First-Out (**FEFO**), decrementing batch stock and logging debit entries.
-  - Transfers & Adjustments: `InventoryTransferVoucher` and `InventoryAdjustmentVoucher` maintain double-sided ledger integrity.
-
-### 3.5 Dual-Entry Bookkeeping & Ledgers
-- `BookAccount`: Accounts categorized by `CASH`, `BANK`, `PARTY`, or `GENERAL`.
-- `BookTransaction`: Cashbook and Bankbook transactions with automatic balance calculation.
-- `PartyLedgerEntry`: Customer and supplier debit/credit records linked to sales invoices, credit notes, and collections.
-- `JournalEntry` & `JournalLine`: General accounting journal vouchers for financial audits.
-
-### 3.6 Counter POS & Dual OTP Workflow
-- Cash counters have active sessions (`CashCounter`).
-- Field collections or counter collections generate a 4-digit or 6-digit OTP sent via SMS/WhatsApp to the payer.
-- Cash collection requires entering customer-provided OTP to complete and lock the transaction, preventing staff misappropriation.
-
-### 3.7 Ziva AI Subsystem
-- Located in `home/apis/ziva_ai.py` and `home/services/ai_context.py`.
-- Features context grounding: Pulls tenant product catalog, sales summaries, and ledger balances to answer conversational queries.
-- Router tries OpenAI first (`gpt-4o-mini` / configured model) and falls back to local Ollama if unavailable.
-- Monthly quota is tracked in `TenantAiUsage`. Each query increments `queries_used_this_month`. If quota is reached, requests are safely blocked until monthly renewal.
+- **Application Name**: `zivaBooks`
+- **Current Active Branch**: `feature/docker-integration`
+- **Core Purpose**: Multi-tenant Django enterprise management platform covering sales, OTP collections, inventory (FEFO), accounting ledgers, POS counter operations, licensing, and reporting.
+- **Runtime & Environment**:
+  - Python: `>= 3.14`
+  - Framework: Django `>= 6.0.3`
+  - Package Runner: `uv` (standard prefix: `uv run python manage.py <cmd>`)
+  - Databases: SQLite (local/dev default) and PostgreSQL via `psycopg>=3.2.10` (Docker/prod)
+  - Cache & Message Broker: Redis (`django-redis>=6.0.0`) & Celery (`celery>=5.4.0`)
+  - PDF & Reporting: WeasyPrint (`weasyprint>=68.1`), `openpyxl`
+  - Frontend: Django Templates, DataTables (server-side), Vanilla JS, PWA (`django-pwa`)
 
 ---
 
-## 4. Key Directory & Module Map
+## 2. Architectural Decisions Record (ADR Summary)
 
-```text
-zivaBooks/
-├── activation/                # License validity checks, activation keys, middleware
-│   ├── middleware.py         # TenantActivationMiddleware (allowlist enforcement)
-│   ├── models.py             # Validity, EcomValidity
-│   └── views.py              # Activation UI & key submission
-├── home/                      # Primary business operations & enterprise app
-│   ├── apis/                 # JSON API endpoints (admin, sales, inventory, books, AI)
-│   ├── management/commands/  # CLI seeds (roles, mock data) & backfill scripts
-│   ├── middleware.py         # AuditUserMiddleware, RequestLoggingMiddleware
-│   ├── models.py             # Tenant, StaffUser, Sales, Collection, Ledgers, Plans
-│   ├── permission_bundles.py # 25+ feature toggles mapped to Django permissions
-│   ├── services/             # Pure service layer (FEFO, invoices, books, AI context)
-│   └── views.py              # HTML views, auth, dashboards, customer portal
-├── inventory/                 # Inventory models re-export, catalog APIs & vouchers
-│   ├── api.py                # CRUD endpoints for inventory entities
-│   ├── models.py             # Exports InventoryItem, Batches, Vouchers from home.models
-│   └── views.py              # Inventory dashboards, stock tables, shadow mode
-├── utils/                     # Shared helpers (OTP generation, formatters, PDF utils)
-├── zivaBooks/                 # Django core config (settings, urls, celery, wsgi/asgi)
-│   ├── celery.py             # Celery broker configuration
-│   ├── health.py             # /health/ probe endpoint
-│   └── settings.py           # Multi-tenant settings, WhiteNoise, Redis, Database
-├── start.sh                   # Unified dev/prod/worker launch script
-├── pyproject.toml             # Python 3.14+ dependencies managed by uv
-└── manage.py                  # Standard Django CLI runner
-```
+### ADR-01: Shared-Database Row-Level Multi-Tenancy
+- **Decision**: Multi-tenancy is enforced at the ORM layer using base model inheritance (`TenantOwnedModel` inheriting from `TenantAwareModel`, `AuditedModel`, `TimeStampedModel`, and `SoftDeleteModel`).
+- **Rationale**: Provides high developer ergonomics, shared schema migrations, and low infrastructure overhead while ensuring strict tenant segregation when queries include `tenant=request.tenant`.
+
+### ADR-02: FEFO Batch Allocation & Double-Entry Stock Ledger
+- **Decision**: Stock deduction follows First-Expired, First-Out (FEFO) batch sorting via `home/services/inventory_lines.py`. Every stock mutation is recorded in `InventoryLedgerEntry`.
+- **Rationale**: Crucial for expiry-sensitive inventory (pharmaceuticals, FMCG, food distribution) and auditable stock reconciliation.
+
+### ADR-03: Layered Service Architecture & `apiView.py` Deprecation
+- **Decision**: Extract all business logic, tax computations, and mutations into `home/services/`. `home/apis/` handles HTTP/JSON.
+- **Rationale**: Prevents fat controllers, eliminates circular dependencies, and enables isolated unit testing of domain logic without HTTP mocking.
+
+### ADR-04: Tenant Licensing Middleware
+- **Decision**: Enforce subscription validity via `TenantActivationMiddleware` which redirects expired web requests to `/activate/` and returns HTTP `403` JSON payloads on `/api/`.
+- **Rationale**: Clean, centralized licensing enforcement without cluttering individual views.
+
+### ADR-05: Docker Compose Local Stack with Host Bind Mounts
+- **Decision**: Multi-container Docker Compose (`web`, `db`, `redis`, `worker`) mounts host directory `local-data/` rather than opaque named volumes.
+- **Rationale**: Ensures transparent host inspection of PostgreSQL data, Redis dumps, and uploaded media while allowing standard containerized development.
 
 ---
 
-## 5. Environment Variables Reference
+## 3. Known Gotchas, Quirks & Technical Context
 
-| Variable | Dev Default | Production Requirement |
-|---|---|---|
-| `DEBUG` | `True` | Must be `False` |
-| `SECRET_KEY` | `zivabooks-local-dev-insecure-key` | High-entropy random secret key |
-| `ALLOWED_HOSTS` | `localhost,127.0.0.1,*` | Explicit comma-separated FQDNs |
-| `CSRF_TRUSTED_ORIGINS` | Empty | `https://app.yourdomain.com` |
-| `DATABASE_ENGINE` | `sqlite` | `postgres` |
-| `POSTGRES_DB` | `zivaBooks` | Production database name |
-| `POSTGRES_USER` | `postgres` | Database username |
-| `POSTGRES_PASSWORD` | Empty | Strong password |
-| `POSTGRES_HOST` | `127.0.0.1` | DB host or container alias |
-| `POSTGRES_PORT` | `5432` | DB port |
-| `USE_REDIS_CACHE` | `False` | `True` |
-| `REDIS_CACHE_URL` | `redis://127.0.0.1:6379/1` | Redis connection URI |
-| `CELERY_BROKER_URL` | `redis://127.0.0.1:6379/0` | Celery broker URI |
-| `OPENAI_API_KEY` | Empty | OpenAI API key for Ziva AI |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama local endpoint |
+1. **Local Test Database Selection**:
+   - The `.env` file defaults to `DATABASE_ENGINE=postgres` with port `5433`. If running tests locally without the PostgreSQL container running, pass `DATABASE_ENGINE=sqlite`:
+     ```bash
+     DATABASE_ENGINE=sqlite uv run python manage.py test
+     ```
+2. **Audit User Context (`AuditUserMiddleware`)**:
+   - `created_by` and `updated_by` are set automatically using thread-local user state in `AuditedModel.save()`. In background tasks or scripts running outside the HTTP request cycle, explicitly pass the user if auditing is required.
+3. **Celery Test Execution**:
+   - In automated test runs, `CELERY_TASK_ALWAYS_EAGER = True` is enforced in settings, executing tasks synchronously without needing a running Redis broker.
+4. **WeasyPrint on macOS**:
+   - WeasyPrint requires native system libraries (`pango`, `cairo`, `gobject`). If generating PDFs locally on macOS without Docker, ensure `brew install pango cairo libffi` is installed.
+5. **Indian Rupee Formatting (`|format_inr`)**:
+   - Always use the custom template filter `formatting.py` for displaying currency in Indian numbering notation (`₹ 1,00,000.00`).
+6. **OTP Hash Lifecycle**:
+   - OTPs generated for collections and order deliveries have a strict TTL and are verified against party ID and payment amounts to prevent replay attacks.
 
 ---
 
-## 6. Critical Engineering Guidelines & Gotchas
+## 4. Recent Decisions & Change Ledger
 
-1. **Always Use `tenant_qs`**:
-   Never execute queries like `Sales.objects.all()` or `Party.objects.filter(...)` in user-facing views without tenant scoping. Always use `tenant_qs(request, Sales)` or filter with `tenant=request.tenant`.
-2. **Atomic Inventory & Ledger Updates**:
-   Every inventory mutation or collection approval must run inside `transaction.atomic()` to guarantee that stock counts and ledger balances never diverge.
-3. **Preserve Soft Deletes**:
-   Do not call `.delete()` on `TenantOwnedModel` instances directly unless hard-delete is explicitly intended. Set `isDeleted = True` and save.
-4. **Group Permissions Sync**:
-   When updating license plans or tenant features, call `tenant.apply_license_plan()` or `tenant.sync_tenant_admin_group_permissions()`. This ensures the Django group permissions cache is invalidated and updated.
-5. **Date Parsing Standard**:
-   Dates from web forms and mobile clients may arrive formatted as `DD/MM/YYYY` or `YYYY-MM-DD`. Use the centralized date parsing helpers in `home/views.py` and `home/services/`.
-6. **PDF Generation Constraints**:
-   WeasyPrint requires Cairo and Pango system libraries. In headless Linux/Docker environments, ensure `libpango-1.0-0`, `libcairo2`, and `libgdk-pixbuf2.0-0` are installed.
+| Date / Commit | Change Summary | Impacted Components | Context / Notes |
+|---|---|---|---|
+| **2026-10-15** | Local Dev Mode without Docker Image Build | `start.sh`, `docker-compose.dev.yml`, `.env.local` | Added `--dev`, `--services`, `--dev-worker`, and `--sqlite` to run host Django with Docker DB/Redis (no image build required). |
+| **2026-10-13** | Docker Integration & Bind Mounts Setup | `Dockerfile`, `docker-compose.yml`, `README.md` | Enabled 4-service Docker stack with host-visible `local-data/` mounts. |
+| **2026-10-13** | Documentation System Overhaul | `README.md`, `MEMORY.md`, `ARCHITECTURE.md`, `TASKS.md`, `DESIGN.md`, `RULES.md`, `COMMANDS.md`, `AGENTS.md` | Established 8-file synchronized living documentation architecture for team & AI agents. |
+| **2026-07-28** | Service Layer Refactoring & AI Context | `home/services/`, `home/apis/`, `home/services/ai_context.py` | Extracted core invoicing, collections, and AI context builders into dedicated modules. |
+| **2026-06-04** | Coverage & CI Setup | `.coverage`, `.github/workflows/` | Added automated CI testing and test coverage reports. |
+
+---
+
+### Shared Compose decision — 2026-10-14
+
+The root `docker-compose.yml` is now authoritative for local and production.
+Select `--env-file .env.local` or `/etc/zivabooks/production.env`; tracked templates
+are `.env.local.example` and `.env.production.example`. Removed the duplicate
+production Compose/template and redirected operations.py to the shared file.
+Both environments use the optimized production image/Uvicorn. Local env overrides
+HTTP cookies, DEBUG and console email. Migrations remain explicit, static assets
+are built into the image. DATA_ROOT replaces local LOCAL_DATA_ROOT/APP_NAME;
+local storage stays `local-data/zivabooks/{postgres,redis,media}`. Never change an
+existing cluster's credentials just by changing env values. Production resource
+limits and Nginx/Certbot/backup workflow remain in place.
+
+Created ignored, mode-600 `.env.local` using existing `.env` credentials; no secrets
+were printed. All three local folders exist. Docker reported no running
+containers; this task did not start them or alter databases/media. Eleven tests
+passed via the SQLite Django runner (health, backup failure paths, both rendered
+Compose configurations). End-to-end container startup remains a separate check.
+
+### Local development wrapper — 2026-10-14
+
+Added executable `start.sh`, defaulting to `.env.local` and root Compose. Startup
+supports --build, opt-in --migrate, --no-worker and --follow; actions cover init,
+status, stop/down/restart, logs, shells, management commands and host uv/SQLite tests.
+Env files are parsed by Compose, never shell-sourced. Resolved configuration must
+use DEBUG=true, a non-production project name and bind paths inside local-data/.
+No volume removal/pruning/reset is exposed. Migration failures leave web/worker
+stopped. --init preserves existing files; it does not import credentials from native
+.env. Existing databases require their original credentials. Source changes need
+rebuilds; generate migration files on the host because code is not bind-mounted.
+Verified Bash syntax and 18 targeted tests through the SQLite Django runner,
+including seven wrapper tests using fake Docker (no live data or containers touched).
+Updated README.md, COMMANDS.md and setup.md with usage.
+
+## 5. Memory Update Protocol
+
+Whenever:
+1. An architectural or schema decision is made $\rightarrow$ Add an ADR entry in Section 2.
+2. A new bug, gotcha, or environment quirk is solved $\rightarrow$ Add to Section 3.
+3. A milestone is completed or major change is committed $\rightarrow$ Append to Section 4.
+
+## Rebase decisions — 2026-10-15
+
+- Rebased Docker integration onto main at `4187eff`. Retained the feature branch shared Compose workflow and matching multi-stage Dockerfile/start script.
+- Preserved main application fixes, initial migration contents, design and engineering guidelines, and combined runtime-data exclusions.
+- Recovery branch: `codex/docker-integration-before-rebase-20261015`.
+- Verification: 17 startup, Compose configuration, and backup tests passed; shell syntax validated.

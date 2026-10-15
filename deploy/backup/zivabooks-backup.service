@@ -1,0 +1,19 @@
+[Unit]
+Description=zivaBooks consistent database and media backup
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/zivabooks/backup.env
+ExecStart=/usr/bin/python3 /opt/zivabooks/deploy/production/operations.py backup
+ExecStopPost=/usr/bin/python3 /opt/zivabooks/deploy/production/operations.py resume-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=50%
+MemoryMax=768M
+UMask=0077
+# Graceful Celery drain may take time; never force-kill active writing tasks.
+TimeoutStartSec=infinity
