@@ -61,6 +61,8 @@ This document is the **living memory, persistent state tracker, and decision log
    - Always use the custom template filter `formatting.py` for displaying currency in Indian numbering notation (`₹ 1,00,000.00`).
 6. **OTP Hash Lifecycle**:
    - OTPs generated for collections and order deliveries have a strict TTL and are verified against party ID and payment amounts to prevent replay attacks.
+7. **PostgreSQL Existing Data Volume vs Changed Password**:
+   - PostgreSQL only initializes credentials (`POSTGRES_PASSWORD`) on the very first cluster startup when the data directory is empty. If the password in `.env` changes or a volume exists from a previous run, Postgres will log `PostgreSQL Database directory appears to contain a database; Skipping initialization` and reject connections with `FATAL: password authentication failed for user "postgres"`. To resolve: either reset the volume (`docker compose down -v`) if testing on a clean environment, or update `.env` to match the volume's original password, or run `ALTER USER postgres WITH PASSWORD '...';` inside the postgres container.
 
 ---
 
@@ -68,6 +70,7 @@ This document is the **living memory, persistent state tracker, and decision log
 
 | Date / Commit | Change Summary | Impacted Components | Context / Notes |
 |---|---|---|---|
+| **2026-10-15** | Unified Port 8001 & Single Compose Config | `docker-compose.yml`, `Dockerfile`, `docker-entrypoint.sh`, `.env.example` | Standardized internal container and host port to 8001. Enhanced entrypoint DB readiness fallback and diagnostic logging. |
 | **2026-10-15** | Clean Single Docker Compose Deployment | `docker-compose.yml`, `Dockerfile`, `docker-entrypoint.sh`, `.env.example`, `start.sh` | Consolidated Docker setup into a single self-contained Compose file with automatic migrations, named volumes, healthchecks, and zero-config defaults. Removed redundant compose files. |
 | **2026-10-15** | Local Dev Mode without Docker Image Build | `start.sh`, `docker-compose.dev.yml`, `.env.local` | Added `--dev`, `--services`, `--dev-worker`, and `--sqlite` to run host Django with Docker DB/Redis (no image build required). |
 | **2026-10-13** | Docker Integration & Bind Mounts Setup | `Dockerfile`, `docker-compose.yml`, `README.md` | Enabled 4-service Docker stack with host-visible `local-data/` mounts. |
