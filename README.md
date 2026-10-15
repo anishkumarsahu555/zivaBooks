@@ -15,18 +15,38 @@ zivaBooks is a Django-based business operations app for tenant-scoped sales, col
 - Activation/license middleware
 - Automated tests for tenant isolation, permissions, API smoke coverage, books, reports, OTP, and key workflows
 
-## Documentation Hub
+## Living Documentation & Governance Suite
 
-Explore the project documentation:
-- 🗺️ **[INDEX.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/INDEX.md)** — Documentation Master Index & Sitemap
-- 🏗️ **[ARCHITECTURE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/ARCHITECTURE.md)** — System Architecture, Multi-Tenancy & FEFO Stock Ledger
-- 💡 **[DEVELOPMENT.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DEVELOPMENT.md)** — Step-by-step Developer Guide for adding features, APIs & models
-- 🔌 **[API.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/API.md)** — API Contracts & JSON Endpoint Specification
-- 🗄️ **[DATABASE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DATABASE.md)** — Database Schema & ER Diagrams
-- 🛠️ **[setup.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/setup.md)** — Environment & Local Setup Guide
-- 🧹 **[MAINTAINABILITY.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/MAINTAINABILITY.md)** — Code Refactoring Boundaries & Service Layer Guidelines
-- 🧪 **[TESTCASES.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/TESTCASES.md)** — QA Test Scenarios & Verification Matrix
-- 🤖 **[SKILLS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/SKILLS.md)** — AI Agent Skill & Context Guide
+`zivaBooks` maintains an integrated, synchronized suite of 8 core living documents that keep track of project state, architecture, tasks, and standards across every change:
+
+| Document | Purpose & What It Tracks | When to Update |
+|---|---|---|
+| 📖 **[README.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/README.md)** | **Master Portal & Overview**: Quick start, stack, Docker setup, and documentation map. | Onboarding changes, top-level features, environment setup. |
+| 🧠 **[MEMORY.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/MEMORY.md)** | **Project Memory & State Ledger**: Active milestones, ADR decisions, known quirks/gotchas, and change ledger. | After every feature, architectural decision, or discovered quirk. |
+| 🏗️ **[ARCHITECTURE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/ARCHITECTURE.md)** | **System Blueprint & Technical Specs**: Multi-tenancy, service layers, FEFO inventory, and Docker topology. | When domain models, services, middleware, or infrastructure evolve. |
+| 📋 **[TASKS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/TASKS.md)** | **Sprint Board & WBS**: Active tasks, product backlog, bug tracker, technical debt, and milestone changelog. | When claiming tasks, updating progress, or shipping milestones. |
+| 🎨 **[DESIGN.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DESIGN.md)** | **UI/UX Design System**: Color tokens, typography, component standards, DataTables, and A4/thermal printing. | When creating/modifying templates, styles, or print formats. |
+| 📏 **[RULES.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/RULES.md)** | **Engineering Standards & Invariants**: Multi-tenant query isolation, service boundary rules, and PR checklist. | When establishing or refining coding standards and constraints. |
+| ⚡ **[COMMANDS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/COMMANDS.md)** | **Developer Runbook & CLI Reference**: Management commands, uv commands, testing, Docker, Celery, and backups. | When adding management commands, test flags, or operational scripts. |
+| 🤖 **[AGENTS.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/AGENTS.md)** | **AI Agent Operating Protocol**: Golden 5-step agent workflow, safety guardrails, and doc sync matrix. | When modifying AI agent instructions, workflows, or guardrails. |
+
+### Supplementary Reference Guides
+- 🗺️ **[INDEX.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/INDEX.md)** — Master documentation index & sitemap
+- 💡 **[DEVELOPMENT.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DEVELOPMENT.md)** — Step-by-step developer tutorial for adding new views & models
+- 🔌 **[API.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/API.md)** — JSON API endpoint contracts & payloads
+- 🗄️ **[DATABASE.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/DATABASE.md)** — Database schema diagrams & table relationships
+- 🧹 **[MAINTAINABILITY.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/MAINTAINABILITY.md)** — Service layer refactoring boundaries
+- 🧪 **[TESTCASES.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/TESTCASES.md)** — QA manual test scenarios & verification matrix
+
+### 🔄 Change Synchronization Protocol
+Whenever a change is introduced to `zivaBooks`, update the corresponding documents in lockstep:
+1. **Starting work**: Claim or add the task in `TASKS.md` (`[IN_PROGRESS]`).
+2. **Writing code**: Follow all constraints in `RULES.md` and design specifications in `DESIGN.md`.
+3. **Completing work**:
+   - Mark task `[COMPLETED]` in `TASKS.md`.
+   - Record the decision, change summary, and any gotchas in `MEMORY.md`.
+   - If architecture, APIs, or commands changed, update `ARCHITECTURE.md`, `API.md`, or `COMMANDS.md` respectively.
+
 
 ## Quick start
 
@@ -39,58 +59,78 @@ uv run python manage.py runserver
 
 Open `http://127.0.0.1:8000/`.
 
-## Docker Compose (local development)
+## Docker Compose (local and production)
 
-With Docker and the Compose plugin installed, run:
+Both environments use the root `docker-compose.yml` and the same optimized
+production image (Uvicorn, collected static files, no source hot reload).
+Select settings explicitly with `--env-file`; the native-development `.env`
+is left untouched. Shell variables take precedence over env-file values.
 
-```bash
-docker compose up --build -d
-docker compose exec web python manage.py seed_roles_permissions
-docker compose exec web python manage.py createsuperuser
-```
-
-Open `http://127.0.0.1:8000/`. The stack includes Django, PostgreSQL,
-Redis, and a Celery worker. Migrations and static-file collection run at startup.
-Emails are printed to the container logs.
-
-Compose reads `SECRET_KEY`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`,
-and `WEB_PORT` from your shell or `.env`, with local defaults when unset. It sets
-the database and Redis hosts to their container service names. Other `.env`
-settings are not passed into the containers. This setup uses Django's development
-server with debug enabled and binds only to localhost; it is intended for local use.
+For convenient local commands, use `./start.sh --help`. First-time setup:
 
 ```bash
-docker compose logs -f web worker
-docker compose down
+./start.sh --init
+# Review .env.local, retaining credentials for any existing database.
+./start.sh --build --migrate
 ```
 
-Database, Redis, and uploaded media persist in visible host folders through bind
-mounts, by default `local-data/zivabooks/postgres`, `local-data/zivabooks/redis`, and
-`local-data/zivabooks/media` inside this project. They are excluded from Git and
-Docker builds. Set `LOCAL_DATA_ROOT=/absolute/path/to/local-data` and
-`APP_NAME=zivabooks` in `.env` to choose the parent location and app subdirectory.
-The resulting pattern is `${LOCAL_DATA_ROOT}/${APP_NAME}/{postgres,redis,media}`.
-Use a different app name, Compose project name, and web port for each local app.
-The production configuration uses its separate `DATA_ROOT` variable.
+Normal startup is `./start.sh`; rebuild after source edits with `./start.sh --build`.
+Migrations are only applied with `--migrate`. Use `--no-worker` to omit Celery,
+`--follow` for startup logs, and `--test <test-label>` for current-source SQLite tests.
+See [script commands](COMMANDS.md#local-development-script) for all options.
+The wrapper accepts only local settings with storage under this repository's
+`local-data/`; use Compose directly for production.
 
-`docker compose down` and container rebuilds preserve these folders. Do not delete
-them or point `LOCAL_DATA_ROOT` at an empty location when expecting existing data.
-Existing native PostgreSQL databases and previous named volumes are not imported
-automatically. When migrating named volumes, stop all writers and shut down
-PostgreSQL/Redis cleanly before copying, retain the originals, and verify data after
-restart. Raw PostgreSQL directory copies require the same compatible database
-version and platform; use dump/restore otherwise. Never edit database files in
-Finder. On Docker Desktop, database bind mounts can be slower than named volumes;
-this layout prioritizes visible host storage.
+Manual equivalent — local first-time setup, from the repository root:
 
-After changing source code, rebuild with `docker compose up --build -d`.
+```bash
+cp -n .env.local.example .env.local
+mkdir -p local-data/zivabooks/{postgres,redis,media}
+```
+
+Before starting, edit `.env.local`. **For an existing Docker database, retain its
+original POSTGRES_DB, POSTGRES_USER and POSTGRES_PASSWORD**; changing these values
+does not rename an initialized database or reset its password. Keep
+`DATA_ROOT=./local-data/zivabooks` to use the existing data folders.
+
+```bash
+docker compose --env-file .env.local build web
+docker compose --env-file .env.local up -d --wait db redis
+docker compose --env-file .env.local run --rm migrate
+docker compose --env-file .env.local up -d --wait web worker
+```
+
+Open `http://127.0.0.1:8000/`. Local HTTP cookies and console email are selected by
+`.env.local`; production defaults use secure cookies and SMTP. Database migrations
+are explicit; static assets are built into the image. Back up existing data before
+applying migrations during an upgrade.
+
+```bash
+docker compose --env-file .env.local logs -f web worker
+docker compose --env-file .env.local down
+```
+
+Data lives in `local-data/zivabooks/{postgres,redis,media}` on your Mac. These bind
+mounts survive container rebuilds and `down`; they are excluded from Git/builds.
+Do not delete them or change DATA_ROOT when expecting the existing data. Bind mounts
+are live storage, not backups. Never copy a running PostgreSQL data directory;
+use dump/restore for moving between versions or platforms. Docker Desktop database
+bind mounts can be slower than Docker-managed volumes.
+
+For production, copy `.env.production.example` to
+`/etc/zivabooks/production.env`, set unique secrets and follow
+[the deployment guide](deploy/README.md) for directory ownership, host Nginx,
+automatic TLS renewal, backups and upgrades. Both env files use the **same** Compose
+file; use unique project names, ports, data paths and backup paths for each app.
+Existing production env files remain compatible. Production keeps
+`DATA_ROOT=/srv/zivabooks/data` and `BACKUP_ROOT=/backups/zivabooks`.
 
 ## Configuration
 
 For Hostinger VPS deployment with existing host Nginx, persistent data, environment
 variables, and backup/restore procedures, see [Production deployment](deploy/README.md).
 
-Local development works without a `.env` file. Production deployments must set at least:
+Native Python development works without a `.env` file. Docker requires an explicit environment file. Production deployments must set at least:
 
 ```dotenv
 DEBUG=false

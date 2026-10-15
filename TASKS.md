@@ -1,91 +1,86 @@
-# zivaBooks — Project Roadmap & Task Tracker
+# zivaBooks Task Board, Backlog & Roadmap
 
-This document tracks completed features, active backlog tasks, technical debt, and future milestones for the **zivaBooks** platform.
-
----
-
-## 🚦 Status Legend
-- 🟢 **Completed** — Tested, merged, and operational in production/main.
-- 🟡 **In Progress** — Under active design or development.
-- ⚪ **Backlog / Planned** — Prioritized for upcoming sprints.
-- 🔴 **Blocked / Deferred** — Awaiting external dependency or architectural alignment.
+This document is the authoritative **Work Breakdown Structure (WBS), Sprint Task Board, and Technical Roadmap** for `zivaBooks`. It tracks active development, upcoming backlogs, technical debt, and historical completed milestones.
 
 ---
 
-## 1. Recently Completed Milestones (v0.1.0)
+## 1. Task Lifecycle & Status Legend
 
-| Epic / Feature | Description | Status |
-|---|---|---|
-| **Custom Tenant License Plans** | Implemented `LicensePlan` with `is_custom=True`, annual pricing, seat limits, and 25+ granular feature toggles. Added `tenant.apply_license_plan()` syncing `{slug}:Tenant Admin` permissions. | 🟢 Completed |
-| **Ziva AI Plan-Linked Quota** | Linked Ziva AI assistant query limits to active subscription tier (`ziva_ai_max_queries_per_month`), with automatic monthly query reset. | 🟢 Completed |
-| **Admin License Inquiry Notifications** | Automated instant email notifications to system administrators whenever a prospect submits an inquiry via the marketing portal. | 🟢 Completed |
-| **Recovery Email & 2FA Enhancements** | Re-engineered recovery email modal, token-based verification, and user credential management. | 🟢 Completed |
-| **Business Profile Settings** | Added tenant self-service business profile settings for GSTIN, legal name, billing address, and logo branding. | 🟢 Completed |
-| **Public Marketing & Pricing Portal** | Implemented public landing website with dynamic plan cards, FAQ section, and contact inquiry modal. | 🟢 Completed |
-| **FEFO Inventory Stock Ledger** | Full First-Expiry-First-Out batch tracking with `InventoryBatchStock` and immutable audit logs via `InventoryLedgerEntry`. | 🟢 Completed |
-| **Dual-Party Collection OTP** | Payer OTP verification on cash/cheque collection vouchers to eliminate collection discrepancies. | 🟢 Completed |
-| **Accounting PDF & Excel Reports** | High-fidelity A4 and thermal printing for Cashbook, Bankbook, and Party Ledgers via WeasyPrint and openpyxl. | 🟢 Completed |
-| **Non-GST Shadow Mode** | PIN-protected dual accounting mode allowing separate tracking of non-GST inventory and transactions. | 🟢 Completed |
-| **Automated Test Coverage** | Added 40+ unit and integration test suites covering tenant isolation, permissions, API smoke, and ledger integrity. | 🟢 Completed |
+Every task follows a strict progression:
+- `[BACKLOG]` — Planned for future iterations; requirements scoped.
+- `[TODO]` — Prioritized for the current sprint; ready for implementation.
+- `[IN_PROGRESS]` — Actively being developed by an engineer or AI agent.
+- `[IN_REVIEW / TESTING]` — Code written; running automated tests and QA validation.
+- `[COMPLETED]` — Shipped to branch, tests passing, and documentation synchronized.
 
 ---
 
-## 2. Active Development Backlog (Sprint 2026-Q4)
+## 2. Active Sprint (Current Focus)
 
-### 2.1 POS & Operations Enhancements
-- [ ] **POS Counter Real-Time Notifications**
-  - Integrate Django Channels / WebSockets for multi-counter live cash handoff alerts.
-  - Priority: Medium | Effort: 3 days.
-- [ ] **PWA Camera Barcode Scanner**
-  - Add native HTML5 camera barcode/QR code reader for fast batch scanning on mobile.
-  - Priority: High | Effort: 2 days.
-- [ ] **Thermal Print Customization Engine**
-  - Add tenant settings for customizable header text, QR payment code, and footer greetings on 2-inch and 3-inch thermal receipts.
-  - Priority: Medium | Effort: 2 days.
-
-### 2.2 GST & Taxation Compliance
-- [ ] **GSTR-1 & GSTR-3B Export Engine**
-  - Standardized JSON and Excel reports formatted according to Indian GST portal requirements.
-  - Priority: High | Effort: 4 days.
-- [ ] **Direct NIC E-Invoice & E-Way Bill Integration**
-  - Finalize production credentials handling for NIC direct API gateway and ClearTax GSP fallback.
-  - Priority: Medium | Effort: 5 days.
-
-### 2.3 Automated Background Jobs (Celery & Redis)
-- [ ] **Celery Beat Scheduled Tasks**
-  - Automatic deactivation of expired zero-stock batches (`deactivate_expired_zero_stock_batches_api`).
-  - Automated monthly reset of `TenantAiUsage.queries_used_this_month`.
-  - Nightly database integrity check and tenant ledger balance reconciliation.
-  - Priority: High | Effort: 2 days.
+### 🚀 Active Tasks
+| Task ID | Component | Description | Priority | Status | Assignee |
+|---|---|---|---|---|---|
+| **TSK-101** | Docs / AI | **Master Documentation & AI Governance Hub**: Establish unified documentation system (`README.md`, `MEMORY.md`, `ARCHITECTURE.md`, `TASKS.md`, `DESIGN.md`, `RULES.md`, `COMMANDS.md`, `AGENTS.md`) with continuous sync rules. | P0 | `[IN_PROGRESS]` | AI Pair / Lead |
+| **TSK-102** | DevOps | **Docker Integration Verification**: Verify end-to-end multi-container setup (Django, PostgreSQL, Redis, Celery) on branch `feature/docker-integration`. | P1 | `[IN_PROGRESS]` | DevOps / Dev |
+| **TSK-103** | Core | **Database Port & Connection Fallback Resilience**: Ensure graceful SQLite development fallback when PostgreSQL on port 5433 is not reachable locally. | P1 | `[TODO]` | Backend |
 
 ---
 
-## 3. Technical Debt & Architectural Optimizations
+## 3. Product Backlog & Upcoming Milestones
 
-| Item | Area | Rationale | Priority |
+### 3.1 High Priority (P0 / P1)
+- [ ] **TSK-104** `[Core/Services]` **Complete Deprecation of `home/apiView.py`**: Migrate remaining legacy helpers to dedicated domain services under `home/services/` per [MAINTAINABILITY.md](file:///Users/anishkumarsahu/ZivaInfotech/longTerm/zivaBooks/MAINTAINABILITY.md).
+- [ ] **TSK-105** `[Celery/Beat]` **Periodic Invoice Due Reminders**: Implement Celery Beat cron job to dispatch WhatsApp/Email payment reminders 3 days before invoice due date.
+- [ ] **TSK-106** `[Inventory]` **Bulk Barcode Stock Intake**: Introduce batch barcode scanning interface for high-volume warehouse goods receipt notes (GRN).
+- [ ] **TSK-107** `[Customer Portal]` **Self-Service Statement Download**: Allow portal customers to export date-range filtered statement of accounts directly to signed PDF.
+
+### 3.2 Medium Priority (P2)
+- [ ] **TSK-108** `[Reports]` **GSTR-1 & GSTR-3B Tax Filing Export**: Generate direct government-compliant JSON/Excel payloads for GST portal upload.
+- [ ] **TSK-109** `[POS / Counter]` **Offline Cash Counter Queue**: Enable local browser IndexedDB storage for offline POS billing with auto-sync when online.
+- [ ] **TSK-110** `[Security]` **Enhanced Two-Factor Authentication (2FA)**: Add TOTP authenticator app support for admin and manager logins.
+
+### 3.3 Low Priority / Future Enhancements (P3)
+- [ ] **TSK-111** `[UI/UX]` **Dark Mode Theme**: Add dark mode color scheme toggle honoring user OS preferences.
+- [ ] **TSK-112** `[Analytics]` **Predictive Stock Reordering**: AI-driven reorder recommendation based on 90-day moving average sales velocity.
+
+---
+
+## 4. Technical Debt & Refactoring Register
+
+| Debt ID | Subsystem | Description | Impact | Target Sprint |
+|---|---|---|---|---|
+| **DEBT-01** | `home/apiView.py` | Legacy monolithic file still holds backwards-compatible endpoints. | Maintainability | Sprint 4 |
+| **DEBT-02** | Tests / Postgres | Some test cases expect active PostgreSQL functions when run under SQLite. Add database-engine conditionals. | Test Portability | Current |
+| **DEBT-03** | Frontend Assets | Static CSS has inline utility duplicates in older templates. Standardize to shared component classes. | Asset Size | Sprint 5 |
+
+---
+
+## 5. Completed Milestones History
+
+- **TSK-114 — Completed 2026-10-14T13:34+05:30**: Added executable local start.sh with lifecycle/build/migrate/log/shell/test shortcuts, local configuration guards and failure-path tests. All 18 targeted tests pass; no live container or data changes.
+
+- **TSK-113 — Completed 2026-10-14T13:23+05:30**: Unified Compose with local/production env templates, retained bind paths and updated backup helper. Eleven relevant Django/configuration/backup tests pass. Live containers were not started.
+
+| Milestone ID | Date | Component | Deliverable Summary |
 |---|---|---|---|
-| **Queryset N+1 Optimization** | Ledger Reports | Add `select_related('party', 'tenant')` and `prefetch_related('lines')` on heavy ledger queries to reduce DB roundtrips. | High |
-| **Migration Squashing** | Database | Clean up and squash historical migration files in `home` and `inventory` before major release. | Medium |
-| **Type Annotations** | Service Layer | Add strict Python 3.14 type annotations across `home/services/` for improved IDE autocompletion and static analysis. | Medium |
-| **PWA Cache Invalidation** | Frontend | Automate cache busting for service worker assets during production `collectstatic`. | Medium |
-| **Redis Session Engine** | Infrastructure | Benchmark Redis session backend (`django.contrib.sessions.backends.cache`) vs DB sessions for high concurrency. | Low |
+| **M-01** | 2026-03 | Multi-Tenancy | Base model hierarchy (`TenantOwnedModel`, `TenantAwareModel`, `SoftDeleteModel`) and row-level isolation. |
+| **M-02** | 2026-04 | Inventory | FEFO batch tracking, `InventoryLedgerEntry` double-entry stock accounting, and warehouse allocation. |
+| **M-03** | 2026-05 | Invoicing & GST | Sales, proforma invoices, GST tax calculation (CGST/SGST/IGST), and thermal POS printing. |
+| **M-04** | 2026-06 | Collections & OTP | Collection posting with OTP verification flow, payment mode tracking, and approval permissions. |
+| **M-05** | 2026-07 | Accounting Books | Cashbook, Bankbook, and dynamic Party Ledger statements with running balances. |
+| **M-06** | 2026-08 | PWA & Offline | Service worker integration, offline shell caching, and responsive mobile navigation. |
+| **M-07** | 2026-09 | Licensing | `TenantActivationMiddleware` with validity period checks, plan gating, and activation portal. |
+| **M-08** | 2026-10 | Docker Integration | Docker Compose multi-container setup (Django, PostgreSQL, Redis, Celery) with host bind mounts. |
 
 ---
 
-## 4. Quality Assurance & Testing Backlog
+## 6. Task Update & Maintenance Protocol
 
-- [ ] **Load Testing with Locust**
-  - Benchmark 500 concurrent sales transactions and OTP validations per tenant.
-- [ ] **Cross-Tenant Security Audit**
-  - Automated penetration test ensuring zero possibility of cross-tenant IDOR vulnerabilities.
-- [ ] **Offline PWA Sync Validation**
-  - Validate offline queueing of collection vouchers and automatic sync when network connectivity is restored.
+Whenever you:
+1. **Start working on a task**: Set status to `[IN_PROGRESS]` and assign your name or agent persona.
+2. **Finish writing code & passing tests**: Move task to `[COMPLETED]`, record in Completed Milestones if major, and cross-reference in `MEMORY.md`.
+3. **Discover an architectural issue or bug**: Log it immediately in the **Technical Debt Register** or **Product Backlog**.
 
----
+## Branch maintenance — 2026-10-15
 
-## 5. Completed Tasks History
-
-- **2026-10**: Merged Pull Request #12: Code refactoring, test suite updates, and dynamic custom license plans.
-- **2026-09**: Added Ziva AI monthly token renewal tied to tenant license plans.
-- **2026-08**: Implemented business profile settings, recovery email verification modal, and admin email dispatch for license inquiries.
-- **2026-07**: Complete migration to `uv` package manager and Python 3.14 compatibility validation.
+- Completed 2026-10-15 (Asia/Kolkata): reconciled `feature/docker-integration` with `origin/main` at `4187eff`. All 17 targeted startup, Compose configuration, and backup tests passed; existing initial migrations remain unchanged.

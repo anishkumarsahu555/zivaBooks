@@ -61,3 +61,5 @@ stress_testing/results/
 !.env*.example
 !**/.env*.example
 logs/
+!.env.local.example
+!.env.production.example

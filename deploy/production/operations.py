@@ -22,7 +22,7 @@ def run(args, **kwargs):
 class Operations:
     def __init__(self, env_file):
         self.compose = ["docker", "compose", "--env-file", str(Path(env_file).resolve()),
-                        "-f", str(Path(__file__).with_name("compose.yml"))]
+                        "-f", str(Path(__file__).resolve().parents[2] / "docker-compose.yml")]
         self.config = json.loads(run(self.compose + ["config", "--format", "json"],
                                      capture_output=True, text=True).stdout)
         self.root = Path(self.config["x-backup"]["root"])

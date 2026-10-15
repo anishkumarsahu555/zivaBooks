@@ -2,7 +2,7 @@
 
 Target: Ubuntu VPS, 2 CPU cores, 8 GB RAM, existing host Nginx,
 `zivainfotech.tech`. No server changes are made by adding these files.
-The root `docker-compose.yml` remains for development.
+The root `docker-compose.yml` serves both local and production environments; select the appropriate env file explicitly.
 
 ## Layout and environment variables
 
@@ -13,7 +13,7 @@ The root `docker-compose.yml` remains for development.
 - Web: `127.0.0.1:8001`, reachable publicly only through Nginx.
 - Postgres and Redis: project network only; no host ports.
 
-Copy `production/production.env.example` to `/etc/zivabooks/production.env`.
+Copy `.env.production.example` (at the repository root) to `/etc/zivabooks/production.env`.
 Set SECRET_KEY and POSTGRES_PASSWORD to separate random values, for example using
 `openssl rand -hex 32`. Do not paste secrets into Git, Dockerfiles, or support logs.
 Use single quotes for literal `$` or `#` in dotenv values. Compose parses this file;
@@ -27,7 +27,7 @@ Use this function in the commands below:
 ```bash
 dc() {
   docker compose --env-file /etc/zivabooks/production.env \
-    -f /opt/zivabooks/deploy/production/compose.yml "$@"
+    -f /opt/zivabooks/docker-compose.yml "$@"
 }
 ```
 
@@ -58,7 +58,7 @@ to this UID; do not recursively change unrelated app directories.
 4. Install the environment file, fill secrets, and validate:
 
 ```bash
-sudo install -m 600 deploy/production/production.env.example /etc/zivabooks/production.env
+sudo install -m 600 .env.production.example /etc/zivabooks/production.env
 # Edit /etc/zivabooks/production.env before continuing.
 dc config --quiet
 dc build web
