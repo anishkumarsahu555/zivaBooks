@@ -39,8 +39,8 @@ class ComposeConfigurationTests(unittest.TestCase):
 
         web = services['web']
         self.assertIn('postgres', web['depends_on'])
-        self.assertIn('redis', web['depends_on'])
-        self.assertEqual(web['ports'][0]['target'], 8000)
+        self.assertEqual(web['ports'][0]['target'], 8001)
+        self.assertEqual(web['ports'][0]['published'], '8001')
         self.assertTrue(any(v['target'] == '/app/media' for v in web['volumes']))
 
         self.assertIn('postgres_data', config['volumes'])

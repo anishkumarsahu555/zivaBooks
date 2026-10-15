@@ -42,7 +42,8 @@ RUN chown -R app:app /app && chmod +x /app/docker-entrypoint.sh
 
 
 USER app
-EXPOSE 8000
+EXPOSE 8001
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["uvicorn", "zivaBooks.asgi:application", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-proxy-headers"]
+CMD ["uvicorn", "zivaBooks.asgi:application", "--host", "0.0.0.0", "--port", "8001", "--workers", "2", "--no-proxy-headers"]
+
