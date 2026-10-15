@@ -130,26 +130,34 @@ uv run coverage html
 
 ## 5. Docker Compose Operations
 
-Use the root Compose file for both environments. Complete first-time setup in
-[README.md](README.md#docker-compose-local-and-production) before running:
+zivaBooks uses a clean, unified `docker-compose.yml` for local and production deployments with automated migrations, static files, and role seeding on startup.
 
 ```bash
-docker compose --env-file .env.local build web
-docker compose --env-file .env.local up -d --wait db redis
-docker compose --env-file .env.local run --rm migrate
-docker compose --env-file .env.local up -d --wait web worker
-docker compose --env-file .env.local logs -f web worker
-docker compose --env-file .env.local exec web python manage.py createsuperuser
-docker compose --env-file .env.local exec web python manage.py seed_roles_permissions
-docker compose --env-file .env.local exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
-docker compose --env-file .env.local down
+# 1. Single command start (builds and starts postgres, redis, web, worker, beat)
+docker compose up -d --build
+
+# 2. View running services and health status
+docker compose ps
+
+# 3. Follow application logs
+docker compose logs -f web worker beat
+
+# 4. Run Django management commands
+docker compose exec web python manage.py createsuperuser
+docker compose exec web python manage.py showmigrations
+
+# 5. Access database shell (psql)
+docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+
+# 6. Stop containers (preserves data volumes)
+docker compose stop
+
+# 7. Tear down containers and network
+docker compose down
 ```
 
-For production commands, replace `.env.local` with `/etc/zivabooks/production.env`.
-Use the [production release procedure](deploy/README.md) for upgrades: it stops
-writers, backs up data and then migrates. Do not run migrations against an active
-production workload. Existing folders persist across rebuilds; never delete them
-to solve a migration error. The backup helper uses the root Compose file too.
+For custom configurations (e.g. ports, domain, production secrets), simply copy `.env.example` to `.env` and Docker Compose automatically loads them.
+
 
 ---
 

@@ -38,9 +38,9 @@ This document is the **living memory, persistent state tracker, and decision log
 - **Decision**: Enforce subscription validity via `TenantActivationMiddleware` which redirects expired web requests to `/activate/` and returns HTTP `403` JSON payloads on `/api/`.
 - **Rationale**: Clean, centralized licensing enforcement without cluttering individual views.
 
-### ADR-05: Docker Compose Local Stack with Host Bind Mounts
-- **Decision**: Multi-container Docker Compose (`web`, `db`, `redis`, `worker`) mounts host directory `local-data/` rather than opaque named volumes.
-- **Rationale**: Ensures transparent host inspection of PostgreSQL data, Redis dumps, and uploaded media while allowing standard containerized development.
+### ADR-05: Unified Single Docker Compose Deployment with Sane Defaults & Auto-Migrations
+- **Decision**: Streamline Docker deployment into a single, self-contained `docker-compose.yml` with named volumes (`postgres_data`, `redis_data`, `media_data`), built-in healthchecks, and an automated startup sequence in `docker-entrypoint.sh` (PostgreSQL connectivity wait -> migrations -> static assets -> role seeding -> server start).
+- **Rationale**: Eliminates multi-file confusion, brittle required env vars, and host path conflicts. Running `docker compose up -d --build` works out-of-the-box on any machine while still allowing `.env` overrides.
 
 ---
 
@@ -68,6 +68,7 @@ This document is the **living memory, persistent state tracker, and decision log
 
 | Date / Commit | Change Summary | Impacted Components | Context / Notes |
 |---|---|---|---|
+| **2026-10-15** | Clean Single Docker Compose Deployment | `docker-compose.yml`, `Dockerfile`, `docker-entrypoint.sh`, `.env.example`, `start.sh` | Consolidated Docker setup into a single self-contained Compose file with automatic migrations, named volumes, healthchecks, and zero-config defaults. Removed redundant compose files. |
 | **2026-10-15** | Local Dev Mode without Docker Image Build | `start.sh`, `docker-compose.dev.yml`, `.env.local` | Added `--dev`, `--services`, `--dev-worker`, and `--sqlite` to run host Django with Docker DB/Redis (no image build required). |
 | **2026-10-13** | Docker Integration & Bind Mounts Setup | `Dockerfile`, `docker-compose.yml`, `README.md` | Enabled 4-service Docker stack with host-visible `local-data/` mounts. |
 | **2026-10-13** | Documentation System Overhaul | `README.md`, `MEMORY.md`, `ARCHITECTURE.md`, `TASKS.md`, `DESIGN.md`, `RULES.md`, `COMMANDS.md`, `AGENTS.md` | Established 8-file synchronized living documentation architecture for team & AI agents. |
@@ -75,6 +76,13 @@ This document is the **living memory, persistent state tracker, and decision log
 | **2026-06-04** | Coverage & CI Setup | `.coverage`, `.github/workflows/` | Added automated CI testing and test coverage reports. |
 
 ---
+
+### Clean Single Docker Compose Rework — 2026-10-15
+- Replaced the fragmented and brittle multi-file compose configuration (`docker-compose.prod.yml`, `docker-compose.dev.yml`, `deploy/hostinger/docker-compose.yml`) with a single, self-contained `docker-compose.yml`.
+- Enabled one-command deployment (`docker compose up -d --build`). Every variable contains a production-ready fallback (`${VAR:-default}`), eliminating crashes caused by unset environment variables.
+- Switched default volume mounts to Docker-managed named volumes (`postgres_data`, `redis_data`, `media_data`), resolving host permission and missing directory startup errors.
+- Enhanced `docker-entrypoint.sh` to wait for PostgreSQL availability using Python psycopg connection checks, automatically apply Django migrations (`python manage.py migrate --noinput`), collect static files, and seed roles/permissions.
+- Verified with 10 automated unit tests (`home.tests.test_start_script` and `deploy.production.test_compose`) and live end-to-end container startup with HTTP health checks (`{"status": "ok", "checks": {"database": {"ok": true}, "cache": {"ok": true}}}`).
 
 ### Shared Compose decision — 2026-10-14
 

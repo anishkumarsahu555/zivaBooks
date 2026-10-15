@@ -39,7 +39,7 @@ Before issuing an SSL certificate, your domain must point to your Hostinger VPS 
    - **Project Name:** `zivabooks`
    - **Repository URL:** Enter your GitHub repo URL (e.g. `https://github.com/your-username/zivaBooks.git`)
    - **Branch:** `main`
-   - **Compose File Path:** `docker-compose.prod.yml`
+   - **Compose File Path:** `docker-compose.yml` (default)
 3. Under **Environment Variables**, paste the following keys:
    ```ini
    DEBUG=false

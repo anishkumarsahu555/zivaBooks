@@ -1,57 +1,77 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# zivaBooks — Container Entrypoint Script
+# zivaBooks — Single Entrypoint Script for Docker Deployment
 # ==============================================================================
 set -eo pipefail
 
-echo "[ENTRYPOINT] Initializing zivaBooks container environment..."
+echo "[ENTRYPOINT] Initializing zivaBooks container..."
 
 # ------------------------------------------------------------------------------
-# 1. Wait for PostgreSQL Database (if configured)
+# 1. Wait for PostgreSQL Database (when configured)
 # ------------------------------------------------------------------------------
 if [ "$DATABASE_ENGINE" = "postgres" ] || [ -n "$POSTGRES_HOST" ]; then
     DB_HOST="${POSTGRES_HOST:-postgres}"
     DB_PORT="${POSTGRES_PORT:-5432}"
     DB_USER="${POSTGRES_USER:-postgres}"
+    DB_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
+    DB_NAME="${POSTGRES_DB:-zivaBooks}"
 
-    echo "[ENTRYPOINT] Waiting for PostgreSQL database at ${DB_HOST}:${DB_PORT}..."
-    RETRIES=30
-    until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" >/dev/null 2>&1 || [ $RETRIES -eq 0 ]; do
-        echo "[ENTRYPOINT] Database not ready yet. Waiting 2 seconds... ($RETRIES attempts remaining)"
-        RETRIES=$((RETRIES - 1))
-        sleep 2
-    done
+    echo "[ENTRYPOINT] Checking PostgreSQL connectivity at ${DB_HOST}:${DB_PORT}..."
+    python - <<EOF
+import os, sys, time
 
-    if [ $RETRIES -eq 0 ]; then
-        echo "[ENTRYPOINT] ERROR: Timed out waiting for PostgreSQL at ${DB_HOST}:${DB_PORT}."
-        exit 1
-    fi
-    echo "[ENTRYPOINT] PostgreSQL is ready and accepting connections."
+host = "${DB_HOST}"
+port = int("${DB_PORT}")
+user = "${DB_USER}"
+password = "${DB_PASSWORD}"
+dbname = "${DB_NAME}"
+
+ready = False
+for attempt in range(45):
+    try:
+        import psycopg
+        conn = psycopg.connect(
+            host=host,
+            port=port,
+            user=user,
+            password=password,
+            dbname=dbname,
+            connect_timeout=3
+        )
+        conn.close()
+        ready = True
+        break
+    except Exception as e:
+        time.sleep(1)
+
+if ready:
+    print(f"[ENTRYPOINT] PostgreSQL is ready and accepting connections.")
+    sys.exit(0)
+else:
+    print(f"[ENTRYPOINT] ERROR: Timed out waiting for PostgreSQL at {host}:{port}")
+    sys.exit(1)
+EOF
 fi
 
 # ------------------------------------------------------------------------------
-# 2. Database Migrations & Static Files (Web Server Only)
+# 2. Database Migrations, Static Files & Setup (Web Server Only)
 # ------------------------------------------------------------------------------
-# Static files are pre-compiled at build time into /app/staticfiles.
-# Migrations are executed by the dedicated 'migrate' container in Docker Compose,
-# but can run here as a fallback if SKIP_MIGRATIONS is not set to true.
 if [[ "$*" == *"uvicorn"* ]] || [[ "$*" == *"runserver"* ]] || [[ "$*" == *"gunicorn"* ]]; then
-    if [ "${SKIP_MIGRATIONS:-false}" != "true" ]; then
-        echo "[ENTRYPOINT] Executing database migrations..."
-        uv run python manage.py migrate --noinput
-    else
-        echo "[ENTRYPOINT] SKIP_MIGRATIONS=true: Schema migrations managed by external runner."
+    if [ "${AUTO_MIGRATE:-true}" = "true" ] && [ "${SKIP_MIGRATIONS:-false}" != "true" ]; then
+        echo "[ENTRYPOINT] Applying database migrations..."
+        python manage.py migrate --noinput
     fi
 
-    if [ "${FORCE_COLLECTSTATIC:-false}" = "true" ]; then
-        echo "[ENTRYPOINT] FORCE_COLLECTSTATIC=true: Re-collecting static files..."
-        uv run python manage.py collectstatic --noinput
+    # Ensure static files exist
+    if [ ! -d "/app/staticfiles" ] || [ -z "$(ls -A /app/staticfiles 2>/dev/null)" ] || [ "${FORCE_COLLECTSTATIC:-false}" = "true" ]; then
+        echo "[ENTRYPOINT] Collecting static files..."
+        python manage.py collectstatic --noinput
     fi
 
-    # Optional automatic role & permission seeding on initial launch
-    if [ "${AUTO_SEED:-false}" = "true" ]; then
-        echo "[ENTRYPOINT] AUTO_SEED=true: Seeding system roles & permissions..."
-        uv run python manage.py seed_roles_permissions || true
+    # Seed roles and permissions
+    if [ "${AUTO_SEED:-true}" = "true" ]; then
+        echo "[ENTRYPOINT] Seeding roles & permissions..."
+        python manage.py seed_roles_permissions || true
     fi
 fi
 

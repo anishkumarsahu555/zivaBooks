@@ -59,71 +59,52 @@ uv run python manage.py runserver
 
 Open `http://127.0.0.1:8000/`.
 
-## Docker Compose (local and production)
+## Docker Deployment (Single Docker Compose)
 
-Both environments use the root `docker-compose.yml` and the same optimized
-production image (Uvicorn, collected static files, no source hot reload).
-Select settings explicitly with `--env-file`; the native-development `.env`
-is left untouched. Shell variables take precedence over env-file values.
+Deploying zivaBooks is completely streamlined with a single, self-contained Docker Compose stack. Database migrations, static assets, and permission seeding run automatically on startup.
 
-For convenient local commands, use `./start.sh --help`. First-time setup:
+### Quick Start (One Command)
 
 ```bash
-./start.sh --init
-# Review .env.local, retaining credentials for any existing database.
-./start.sh --build --migrate
+docker compose up -d --build
 ```
 
-Normal startup is `./start.sh`; rebuild after source edits with `./start.sh --build`.
-Migrations are only applied with `--migrate`. Use `--no-worker` to omit Celery,
-`--follow` for startup logs, and `--test <test-label>` for current-source SQLite tests.
-See [script commands](COMMANDS.md#local-development-script) for all options.
-The wrapper accepts only local settings with storage under this repository's
-`local-data/`; use Compose directly for production.
+That's it! Open `http://localhost:8000/`.
 
-Manual equivalent — local first-time setup, from the repository root:
+The stack automatically provisions:
+- **`web`**: Django ASGI application running via Uvicorn with automated migrations and static assets.
+- **`worker`**: Celery asynchronous background worker.
+- **`beat`**: Celery periodic task scheduler.
+- **`postgres`**: PostgreSQL 17 database with persistent storage (`postgres_data`).
+- **`redis`**: Redis 7 cache and Celery task broker with persistent storage (`redis_data`).
+
+### Managing the Stack
 
 ```bash
-cp -n .env.local.example .env.local
-mkdir -p local-data/zivabooks/{postgres,redis,media}
+# View running services and health status
+docker compose ps
+
+# Follow logs
+docker compose logs -f web worker beat
+
+# Stop containers without losing data
+docker compose stop
+
+# Tear down containers and network
+docker compose down
 ```
 
-Before starting, edit `.env.local`. **For an existing Docker database, retain its
-original POSTGRES_DB, POSTGRES_USER and POSTGRES_PASSWORD**; changing these values
-does not rename an initialized database or reset its password. Keep
-`DATA_ROOT=./local-data/zivabooks` to use the existing data folders.
+### Environment Configuration (Optional)
+
+All settings have built-in production-ready defaults. To customize credentials, port, domain, or email:
 
 ```bash
-docker compose --env-file .env.local build web
-docker compose --env-file .env.local up -d --wait db redis
-docker compose --env-file .env.local run --rm migrate
-docker compose --env-file .env.local up -d --wait web worker
+cp .env.example .env
+# Edit .env with your custom credentials
+docker compose up -d --build
 ```
 
-Open `http://127.0.0.1:8000/`. Local HTTP cookies and console email are selected by
-`.env.local`; production defaults use secure cookies and SMTP. Database migrations
-are explicit; static assets are built into the image. Back up existing data before
-applying migrations during an upgrade.
-
-```bash
-docker compose --env-file .env.local logs -f web worker
-docker compose --env-file .env.local down
-```
-
-Data lives in `local-data/zivabooks/{postgres,redis,media}` on your Mac. These bind
-mounts survive container rebuilds and `down`; they are excluded from Git/builds.
-Do not delete them or change DATA_ROOT when expecting the existing data. Bind mounts
-are live storage, not backups. Never copy a running PostgreSQL data directory;
-use dump/restore for moving between versions or platforms. Docker Desktop database
-bind mounts can be slower than Docker-managed volumes.
-
-For production, copy `.env.production.example` to
-`/etc/zivabooks/production.env`, set unique secrets and follow
-[the deployment guide](deploy/README.md) for directory ownership, host Nginx,
-automatic TLS renewal, backups and upgrades. Both env files use the **same** Compose
-file; use unique project names, ports, data paths and backup paths for each app.
-Existing production env files remain compatible. Production keeps
-`DATA_ROOT=/srv/zivabooks/data` and `BACKUP_ROOT=/backups/zivabooks`.
+For convenient shortcuts, you can also use `./start.sh` (e.g. `./start.sh --status`, `./start.sh --logs`, or `./start.sh --dev` for fast host development).
 
 ## Configuration
 
