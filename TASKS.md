@@ -18,6 +18,7 @@ Every task follows a strict progression:
 ## 2. Active Sprint (Current Focus)
 
 ### 🚀 Active Tasks
+
 | Task ID | Component | Description | Priority | Status | Assignee |
 |---|---|---|---|---|---|
 | **TSK-101** | Docs / AI | **Master Documentation & AI Governance Hub**: Establish unified documentation system (`README.md`, `MEMORY.md`, `ARCHITECTURE.md`, `TASKS.md`, `DESIGN.md`, `RULES.md`, `COMMANDS.md`, `AGENTS.md`) with continuous sync rules. | P0 | `[IN_PROGRESS]` | AI Pair / Lead |
@@ -57,6 +58,8 @@ Every task follows a strict progression:
 ---
 
 ## 5. Completed Milestones History
+
+- **TSK-116 — Completed 2026-10-16T10:08+05:30**: Reduced default web/Celery concurrency to one in the root Compose file and env templates; updated local `.env`. Removed the redundant virtualenv copy and recursive ownership operation from the Dockerfile. Ten startup/Compose tests passed via the SQLite Django runner; image built and local web/worker recreated successfully. Web is healthy; scheduler remains running. Post-restart container memory snapshot: approximately 576 MiB versus 878 MiB before (not a load benchmark).
 
 - **TSK-115 — Completed 2026-10-15T12:40+05:30**: Streamlined Docker deployment into a single, self-contained `docker-compose.yml`. Integrated automated PostgreSQL connectivity checking, migrations, static files, and role seeding in `docker-entrypoint.sh`. Configured named volumes (`postgres_data`, `redis_data`, `media_data`) with zero-config sane defaults. Removed redundant compose files (`docker-compose.prod.yml`, `docker-compose.dev.yml`). Validated through 10 automated unit tests and full live container bootstrap.
 

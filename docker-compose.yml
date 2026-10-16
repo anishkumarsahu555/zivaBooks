@@ -62,7 +62,7 @@ services:
     image: ${APP_IMAGE:-zivabooks:latest}
     container_name: zivabooks_web
     restart: unless-stopped
-    command: ["uvicorn", "zivaBooks.asgi:application", "--host", "0.0.0.0", "--port", "8001", "--workers", "${WEB_WORKERS:-2}", "--no-proxy-headers"]
+    command: ["uvicorn", "zivaBooks.asgi:application", "--host", "0.0.0.0", "--port", "8001", "--workers", "${WEB_WORKERS:-1}", "--no-proxy-headers"]
     ports:
       - "${PORT:-8001}:8001"
     environment:
@@ -84,7 +84,7 @@ services:
       STATIC_ROOT: /app/staticfiles
       AUTO_MIGRATE: ${AUTO_MIGRATE:-true}
       AUTO_SEED: ${AUTO_SEED:-true}
-      WEB_WORKERS: ${WEB_WORKERS:-2}
+      WEB_WORKERS: ${WEB_WORKERS:-1}
       EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
       EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
       EMAIL_PORT: ${EMAIL_PORT:-587}
@@ -120,7 +120,7 @@ services:
     image: ${APP_IMAGE:-zivabooks:latest}
     container_name: zivabooks_worker
     restart: unless-stopped
-    command: ["celery", "-A", "zivaBooks", "worker", "-l", "info", "--concurrency=${CELERY_CONCURRENCY:-2}"]
+    command: ["celery", "-A", "zivaBooks", "worker", "-l", "info", "--concurrency=${CELERY_CONCURRENCY:-1}"]
     environment:
       DEBUG: ${DEBUG:-false}
       SECRET_KEY: ${SECRET_KEY:-django-insecure-zivabooks-auto-key-change-in-prod}

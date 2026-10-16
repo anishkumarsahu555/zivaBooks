@@ -158,6 +158,14 @@ docker compose down
 
 For custom configurations (e.g. ports, domain, production secrets), simply copy `.env.example` to `.env` and Docker Compose automatically loads them.
 
+The image and root Compose file default to one web worker and one Celery worker
+process to reduce RAM use. Set `WEB_WORKERS` and `CELERY_CONCURRENCY` in the
+selected env file to increase throughput when needed. Lower concurrency reduces
+parallel capacity; it does not disable background or scheduled jobs. After changing
+these values, recreate web and worker with `docker compose up -d --build web worker`.
+Use `docker stats --no-stream` to compare memory under similar workloads. Removing
+redundant image copies reduces image/build overhead, not runtime process memory.
+
 
 ---
 

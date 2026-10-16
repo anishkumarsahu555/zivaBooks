@@ -34,16 +34,15 @@ RUN DEBUG=true DATABASE_ENGINE=sqlite USE_REDIS_CACHE=false \
     WRITE_LOG_ON_FILE=false python manage.py collectstatic --noinput
 
 FROM runtime-base AS production
-COPY --from=dependencies /app/.venv /app/.venv
 COPY --from=production-assets --chown=app:app /app /app
 
-# Ensure directory ownership and executable entrypoint
-RUN chown -R app:app /app && chmod +x /app/docker-entrypoint.sh
+# Ownership is assigned during COPY; only the entrypoint needs executable mode.
+RUN chmod +x /app/docker-entrypoint.sh
 
 
 USER app
 EXPOSE 8001
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["uvicorn", "zivaBooks.asgi:application", "--host", "0.0.0.0", "--port", "8001", "--workers", "2", "--no-proxy-headers"]
+CMD ["uvicorn", "zivaBooks.asgi:application", "--host", "0.0.0.0", "--port", "8001", "--workers", "1", "--no-proxy-headers"]
 

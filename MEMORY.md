@@ -68,6 +68,14 @@ This document is the **living memory, persistent state tracker, and decision log
 
 ## 4. Recent Decisions & Change Ledger
 
+### Docker memory reduction — 2026-10-16
+
+- Default Uvicorn workers and Celery concurrency are now one in the image/root Compose and tracked env templates. Local `.env` was updated; existing `.env.local` already uses one. Operators can override `WEB_WORKERS` / `CELERY_CONCURRENCY` for greater parallel throughput.
+- Removed the duplicate virtualenv copy from the final image stage: `production-assets` already includes `/app/.venv`. Retained `COPY --chown` and removed recursive `chown`; image-size improvements are distinct from runtime RAM savings.
+- Validation: 10 tests passed using `DATABASE_ENGINE=sqlite uv run python manage.py test deploy.production.test_compose home.tests.test_start_script`; Docker image build passed; resolved Compose commands confirmed concurrency one. Local web/worker recreated; web health check passed, worker running, scheduler unchanged.
+- Measured container RAM before/after: approximately 878/576 MiB (web 314.3 → 142.5 MiB; worker 290 → 160.3 MiB). This post-restart snapshot excludes Docker Desktop overhead and is not a sustained-load comparison.
+
+
 | Date / Commit | Change Summary | Impacted Components | Context / Notes |
 |---|---|---|---|
 | **2026-10-15** | Unified Port 8001 & Single Compose Config | `docker-compose.yml`, `Dockerfile`, `docker-entrypoint.sh`, `.env.example` | Standardized internal container and host port to 8001. Enhanced entrypoint DB readiness fallback and diagnostic logging. |
