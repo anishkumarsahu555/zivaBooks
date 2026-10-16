@@ -142,12 +142,8 @@ fi
 
 # Compose definitions
 compose=(docker compose --project-directory "$ROOT" --env-file "$env_file" -f "$ROOT/docker-compose.yml")
-dev_compose_file="$ROOT/docker-compose.dev.yml"
-compose_dev_args=(-f "$ROOT/docker-compose.yml")
-if [ -f "$dev_compose_file" ]; then
-  compose_dev_args+=(-f "$dev_compose_file")
-fi
-compose_dev=(docker compose --project-directory "$ROOT" --env-file "$env_file" "${compose_dev_args[@]}")
+compose_dev=("${compose[@]}")
+
 
 # Compose parses dotenv syntax; never source an env file as executable shell code.
 # Validate the resolved config, including shell overrides, without printing secrets.
@@ -161,12 +157,14 @@ if str(web["environment"].get("DEBUG", "")).lower() != "true":
 if config["name"].endswith("-prod"):
     sys.exit("Refusing production project name.")
 paths = []
-for service in ("db", "redis", "web"):
-    for mount in config["services"][service].get("volumes", []):
-        path = pathlib.Path(mount["source"]).resolve()
-        if mount["type"] != "bind" or root not in path.parents:
-            sys.exit("Refusing storage outside the repository local-data directory.")
-        paths.append(path)
+for service in ("db", "postgres", "redis", "web"):
+    if service in config.get("services", {}):
+        for mount in config["services"][service].get("volumes", []):
+            if mount.get("type") == "bind":
+                path = pathlib.Path(mount["source"]).resolve()
+                if root not in path.parents:
+                    sys.exit("Refusing storage outside the repository local-data directory.")
+                paths.append(path)
 if sys.argv[2] == "init":
     for path in paths:
         path.mkdir(parents=True, exist_ok=True)

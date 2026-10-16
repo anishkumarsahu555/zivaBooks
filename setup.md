@@ -130,23 +130,24 @@ uv run python manage.py test zivaBooks.tests
 uv run python manage.py test home.tests.test_regression
 ```
 
-## Shared Docker configuration (2026-10-14)
+## Clean Single Docker Compose Deployment
 
-Use root `docker-compose.yml` with `.env.local` or `/etc/zivabooks/production.env`.
-Follow [README local setup](README.md#docker-compose-local-and-production) and
-[production setup](deploy/README.md). Keep native `.env` separate. Local data
-remains under `local-data/zivabooks/{postgres,redis,media}`; the root Compose file
-now reads DATA_ROOT instead of LOCAL_DATA_ROOT/APP_NAME. Existing databases require
-their original credentials. Missing bind directories cause startup to fail rather
-than silently create empty storage. On Linux set directory ownership as described
-in the production guide. Local Uvicorn serves built assets; rebuild after code changes.
+zivaBooks features a clean, unified `docker-compose.yml` for zero-friction deployment. Database migrations, static assets, and permission seeding run automatically on startup.
 
-### Local start.sh shortcuts
+### Quick Start
 
-Run `./start.sh --init`, review `.env.local`, then `./start.sh --build --migrate`.
-Normal startup: `./start.sh`; code updates: `./start.sh --build`; tests:
-`./start.sh --test zivaBooks.tests`. Add `--no-worker` to save local resources or
-`--follow` to view startup logs. See `./start.sh --help` and COMMANDS.md for lifecycle,
-shell and management commands. No hot reload is enabled. The script requires
-local data under this repository's `local-data/` and refuses production settings.
-It never resets data and applies migrations only when explicitly requested.
+```bash
+docker compose up -d --build
+```
+
+Access the application at `http://localhost:8000/`.
+
+All services (`postgres`, `redis`, `web`, `worker`, `beat`) start with built-in healthchecks. Persistent data is preserved in managed Docker volumes (`postgres_data`, `redis_data`, `media_data`).
+
+To customize settings (ports, secrets, domain, email), copy `.env.example` to `.env` and Docker Compose will load it automatically:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+

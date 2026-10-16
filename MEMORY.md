@@ -38,9 +38,9 @@ This document is the **living memory, persistent state tracker, and decision log
 - **Decision**: Enforce subscription validity via `TenantActivationMiddleware` which redirects expired web requests to `/activate/` and returns HTTP `403` JSON payloads on `/api/`.
 - **Rationale**: Clean, centralized licensing enforcement without cluttering individual views.
 
-### ADR-05: Docker Compose Local Stack with Host Bind Mounts
-- **Decision**: Multi-container Docker Compose (`web`, `db`, `redis`, `worker`) mounts host directory `local-data/` rather than opaque named volumes.
-- **Rationale**: Ensures transparent host inspection of PostgreSQL data, Redis dumps, and uploaded media while allowing standard containerized development.
+### ADR-05: Unified Single Docker Compose Deployment with Sane Defaults & Auto-Migrations
+- **Decision**: Streamline Docker deployment into a single, self-contained `docker-compose.yml` with named volumes (`postgres_data`, `redis_data`, `media_data`), built-in healthchecks, and an automated startup sequence in `docker-entrypoint.sh` (PostgreSQL connectivity wait -> migrations -> static assets -> role seeding -> server start).
+- **Rationale**: Eliminates multi-file confusion, brittle required env vars, and host path conflicts. Running `docker compose up -d --build` works out-of-the-box on any machine while still allowing `.env` overrides.
 
 ---
 
@@ -61,13 +61,25 @@ This document is the **living memory, persistent state tracker, and decision log
    - Always use the custom template filter `formatting.py` for displaying currency in Indian numbering notation (`₹ 1,00,000.00`).
 6. **OTP Hash Lifecycle**:
    - OTPs generated for collections and order deliveries have a strict TTL and are verified against party ID and payment amounts to prevent replay attacks.
+7. **PostgreSQL Existing Data Volume vs Changed Password**:
+   - PostgreSQL only initializes credentials (`POSTGRES_PASSWORD`) on the very first cluster startup when the data directory is empty. If the password in `.env` changes or a volume exists from a previous run, Postgres will log `PostgreSQL Database directory appears to contain a database; Skipping initialization` and reject connections with `FATAL: password authentication failed for user "postgres"`. To resolve: either reset the volume (`docker compose down -v`) if testing on a clean environment, or update `.env` to match the volume's original password, or run `ALTER USER postgres WITH PASSWORD '...';` inside the postgres container.
 
 ---
 
 ## 4. Recent Decisions & Change Ledger
 
+### Docker memory reduction — 2026-10-16
+
+- Default Uvicorn workers and Celery concurrency are now one in the image/root Compose and tracked env templates. Local `.env` was updated; existing `.env.local` already uses one. Operators can override `WEB_WORKERS` / `CELERY_CONCURRENCY` for greater parallel throughput.
+- Removed the duplicate virtualenv copy from the final image stage: `production-assets` already includes `/app/.venv`. Retained `COPY --chown` and removed recursive `chown`; image-size improvements are distinct from runtime RAM savings.
+- Validation: 10 tests passed using `DATABASE_ENGINE=sqlite uv run python manage.py test deploy.production.test_compose home.tests.test_start_script`; Docker image build passed; resolved Compose commands confirmed concurrency one. Local web/worker recreated; web health check passed, worker running, scheduler unchanged.
+- Measured container RAM before/after: approximately 878/576 MiB (web 314.3 → 142.5 MiB; worker 290 → 160.3 MiB). This post-restart snapshot excludes Docker Desktop overhead and is not a sustained-load comparison.
+
+
 | Date / Commit | Change Summary | Impacted Components | Context / Notes |
 |---|---|---|---|
+| **2026-10-15** | Unified Port 8001 & Single Compose Config | `docker-compose.yml`, `Dockerfile`, `docker-entrypoint.sh`, `.env.example` | Standardized internal container and host port to 8001. Enhanced entrypoint DB readiness fallback and diagnostic logging. |
+| **2026-10-15** | Clean Single Docker Compose Deployment | `docker-compose.yml`, `Dockerfile`, `docker-entrypoint.sh`, `.env.example`, `start.sh` | Consolidated Docker setup into a single self-contained Compose file with automatic migrations, named volumes, healthchecks, and zero-config defaults. Removed redundant compose files. |
 | **2026-10-15** | Local Dev Mode without Docker Image Build | `start.sh`, `docker-compose.dev.yml`, `.env.local` | Added `--dev`, `--services`, `--dev-worker`, and `--sqlite` to run host Django with Docker DB/Redis (no image build required). |
 | **2026-10-13** | Docker Integration & Bind Mounts Setup | `Dockerfile`, `docker-compose.yml`, `README.md` | Enabled 4-service Docker stack with host-visible `local-data/` mounts. |
 | **2026-10-13** | Documentation System Overhaul | `README.md`, `MEMORY.md`, `ARCHITECTURE.md`, `TASKS.md`, `DESIGN.md`, `RULES.md`, `COMMANDS.md`, `AGENTS.md` | Established 8-file synchronized living documentation architecture for team & AI agents. |
@@ -75,6 +87,13 @@ This document is the **living memory, persistent state tracker, and decision log
 | **2026-06-04** | Coverage & CI Setup | `.coverage`, `.github/workflows/` | Added automated CI testing and test coverage reports. |
 
 ---
+
+### Clean Single Docker Compose Rework — 2026-10-15
+- Replaced the fragmented and brittle multi-file compose configuration (`docker-compose.prod.yml`, `docker-compose.dev.yml`, `deploy/hostinger/docker-compose.yml`) with a single, self-contained `docker-compose.yml`.
+- Enabled one-command deployment (`docker compose up -d --build`). Every variable contains a production-ready fallback (`${VAR:-default}`), eliminating crashes caused by unset environment variables.
+- Switched default volume mounts to Docker-managed named volumes (`postgres_data`, `redis_data`, `media_data`), resolving host permission and missing directory startup errors.
+- Enhanced `docker-entrypoint.sh` to wait for PostgreSQL availability using Python psycopg connection checks, automatically apply Django migrations (`python manage.py migrate --noinput`), collect static files, and seed roles/permissions.
+- Verified with 10 automated unit tests (`home.tests.test_start_script` and `deploy.production.test_compose`) and live end-to-end container startup with HTTP health checks (`{"status": "ok", "checks": {"database": {"ok": true}, "cache": {"ok": true}}}`).
 
 ### Shared Compose decision — 2026-10-14
 
