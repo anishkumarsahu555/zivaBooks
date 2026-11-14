@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.contrib.auth.models import Group, Permission
 from unittest import mock
@@ -33,6 +33,12 @@ class ZivaAiTests(SeededTenantMixin, TestCase):
         response = self.client.get(reverse('homeApp:ziva_ai'))
         # Should redirect to login page
         self.assertEqual(response.status_code, 302)
+
+    @override_settings(USE_TZ=True)
+    def test_business_snapshot_supports_timezone_aware_dates(self):
+        from home.services.ai_context import get_tenant_business_data_snapshot
+
+        self.assertTrue(get_tenant_business_data_snapshot(self.tenant))
 
     def test_ziva_ai_page_blocks_customer_login(self):
         # Log in as a customer
@@ -143,7 +149,7 @@ class ZivaAiTests(SeededTenantMixin, TestCase):
             {'message': 'Hello AI'},
             content_type='application/json'
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(response.json()['status'], 'pending')
         message_id = response.json()['message_id']
 
@@ -572,7 +578,6 @@ class ZivaAiTests(SeededTenantMixin, TestCase):
 
 from django.test import TransactionTestCase, Client
 import threading
-import time
 
 class ZivaAiConcurrencyTests(SeededTenantMixin, TransactionTestCase):
     def setUp(self):
@@ -600,9 +605,14 @@ class ZivaAiConcurrencyTests(SeededTenantMixin, TransactionTestCase):
 
     @mock.patch('requests.post')
     def test_concurrent_chat_requests(self, mock_post):
-        # We simulate a slow API response from Gemini to ensure overlapping requests
+        from django.db import connection
+        if connection.vendor == 'sqlite':
+            self.skipTest('Concurrent writes require PostgreSQL; SQLite test databases use shared table locks.')
+
+        # All requests must reach the provider before any of them can finish.
+        provider_barrier = threading.Barrier(3, timeout=20)
         def slow_mock_post(*args, **kwargs):
-            time.sleep(0.5)
+            provider_barrier.wait()
             mock_res = mock.Mock()
             mock_res.status_code = 200
             mock_res.json.return_value = {
@@ -622,13 +632,16 @@ class ZivaAiConcurrencyTests(SeededTenantMixin, TransactionTestCase):
         results = []
         errors = []
 
+        clients = []
+        for _ in range(3):
+            client = Client()
+            client.force_login(self.owner)
+            clients.append(client)
+
         def make_request(thread_idx):
             from django.db import connections
-            client = Client()
-            # Login as owner
-            client.force_login(self.owner)
             try:
-                response = client.post(
+                response = clients[thread_idx].post(
                     reverse('homeApp:ziva_ai_chat_api'),
                     {'message': f'Hello from thread {thread_idx}'},
                     content_type='application/json'
@@ -650,10 +663,11 @@ class ZivaAiConcurrencyTests(SeededTenantMixin, TransactionTestCase):
 
         # Check for any exception raised during request execution (e.g. database locks)
         self.assertEqual(len(errors), 0, f"Encountered concurrent errors: {errors}")
+        self.assertEqual(len(results), 3, f"Missing concurrent responses: {results}")
 
         # Check that all requests returned status 200 (pending)
         for thread_idx, status_code, body in results:
-            self.assertEqual(status_code, 200)
+            self.assertEqual(status_code, 200, body)
             self.assertEqual(body['status'], 'pending')
 
 

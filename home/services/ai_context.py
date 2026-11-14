@@ -97,10 +97,15 @@ def get_tenant_business_data_snapshot(tenant, permission_names=None, is_superuse
     purchase_returns_count = PurchaseReturnVoucher.objects.filter(tenant=tenant, isDeleted=False).count()
 
     # Calculate attendances today
+    from django.conf import settings
     from django.utils import timezone
     import datetime
-    today_start = timezone.make_aware(datetime.datetime.combine(datetime.date.today(), datetime.time.min))
-    today_end = timezone.make_aware(datetime.datetime.combine(datetime.date.today(), datetime.time.max))
+    today = timezone.localdate() if settings.USE_TZ else timezone.now().date()
+    today_start = datetime.datetime.combine(today, datetime.time.min)
+    today_end = datetime.datetime.combine(today, datetime.time.max)
+    if settings.USE_TZ:
+        today_start = timezone.make_aware(today_start)
+        today_end = timezone.make_aware(today_end)
     attendances_today = Attendance.objects.filter(tenant=tenant, isDeleted=False, datetime__range=(today_start, today_end)).count()
 
     lines = []

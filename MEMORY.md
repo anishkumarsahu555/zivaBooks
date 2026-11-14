@@ -76,6 +76,10 @@ This document is the **living memory, persistent state tracker, and decision log
 
 - The Docker app runs as UID/GID 10001. The legacy VPS setup now creates new media directories with that ownership; existing media trees are preserved for an explicit repair. `setup.md` documents named-volume and bind-mount recovery, including user namespace caveats. Fourteen deployment, startup and attendance tests passed. The running deployment was not inspected or modified.
 
+### Ziva AI date and concurrency tests — 2026-11-14
+
+- AI snapshot attendance date bounds respect `USE_TZ`, preventing SQLite from rejecting timezone-aware datetimes in the default `USE_TZ=False` configuration. The chat concurrency test creates sessions before starting threads, requires all three requests to overlap, and runs on PostgreSQL; the shared in-memory SQLite test database skips that test because of table locking. A PostgreSQL CI job covers it separately. The full SQLite suite passed (258 tests, one skipped), and the PostgreSQL concurrency test passed locally. SQLite production concurrency is not established by this test.
+
 ## 4. Recent Decisions & Change Ledger
 
 ### Reusable Docker generator — 2026-10-16

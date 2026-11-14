@@ -60,6 +60,8 @@ Every task follows a strict progression:
 
 ## 5. Completed Milestones History
 
+- **TSK-119 — Completed 2026-11-14T20:44+0530**: Fixed AI snapshot timezone handling and moved the actual concurrent-request check to PostgreSQL CI. Full SQLite suite: 258 tests passed, one PostgreSQL-only test skipped; PostgreSQL concurrency test passed.
+
 - **TSK-118 — Completed 2026-11-14T18:50+0530**: Set ownership for newly created VPS media directories and document existing media mount repairs. Fourteen deployment, startup and attendance tests passed; no live Docker volume was changed.
 
 - **TSK-117 — Completed 2026-10-16T11:20+05:30**: Added standalone `docker_generator.sh` for other projects using an existing Dockerfile/image, PostgreSQL/MySQL/none and optional authenticated Redis. Generates Compose-scoped resources, loopback web ports, private credentials, ignore rules and deployment instructions; refuses overwrites. Seven generator tests pass (all six service combinations plus isolation/input/preservation checks), and all ten existing startup/Compose tests pass. No live deployment performed.
