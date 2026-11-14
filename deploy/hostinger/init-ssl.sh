@@ -20,10 +20,8 @@ if [ -z "$EMAIL" ]; then
     read -r EMAIL
 fi
 
-COMPOSE_FILE="docker-compose.prod.yml"
-if [ ! -f "$COMPOSE_FILE" ]; then
-    COMPOSE_FILE="deploy/hostinger/docker-compose.yml"
-fi
+COMPOSE_FILE="docker-compose.yml"
+
 
 echo "======================================================================"
 echo "  🔒 Initializing Let's Encrypt SSL for: ${DOMAIN}"

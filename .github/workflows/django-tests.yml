@@ -28,3 +28,37 @@ jobs:
       run: |
         uv run python manage.py makemigrations
         uv run python manage.py test
+
+  postgres-concurrency:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: zivabooks
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zivabooks"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+    - uses: actions/checkout@v4
+    - uses: astral-sh/setup-uv@v5
+      with:
+        python-version: '3.14'
+        enable-cache: true
+    - name: Test concurrent chat requests on PostgreSQL
+      env:
+        SECRET_KEY: ci-secret-key-for-testing
+        USE_REDIS_CACHE: 'False'
+        DATABASE_ENGINE: postgres
+        POSTGRES_DB: zivabooks
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        POSTGRES_HOST: 127.0.0.1
+        POSTGRES_PORT: '5432'
+      run: uv run python manage.py test home.tests.test_ziva_ai.ZivaAiConcurrencyTests
