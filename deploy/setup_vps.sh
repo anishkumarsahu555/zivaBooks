@@ -34,7 +34,13 @@ mkdir -p /opt/apps/proxy/conf.d
 # Stateful Persistent Data Volumes (/appData/<app>)
 mkdir -p /appData/zivabooks/postgres
 mkdir -p /appData/zivabooks/redis
-mkdir -p /appData/zivabooks/media
+if [ ! -e /appData/zivabooks/media ]; then
+    # Match the non-root app user in the Docker image. Preserve existing trees:
+    # they may need a separately reviewed ownership repair.
+    install -d -o 10001 -g 10001 -m 750 /appData/zivabooks/media
+else
+    echo "[INFO] Existing media directory retained; review its ownership and contents."
+fi
 mkdir -p /appData/proxy/certs
 mkdir -p /appData/proxy/certbot
 
@@ -50,6 +56,7 @@ echo "[STEP 2] Setting file system permissions..."
 chmod 755 /opt/apps /appData
 chmod 700 /opt/backups
 chmod 750 /appData/zivabooks/postgres /appData/zivabooks/redis /appData/zivabooks/media
+# Existing media trees are not recursively changed; see setup.md for repair.
 
 # ------------------------------------------------------------------------------
 # 3. Deploy Reverse Proxy Configuration

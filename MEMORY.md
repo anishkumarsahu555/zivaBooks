@@ -42,6 +42,12 @@ This document is the **living memory, persistent state tracker, and decision log
 - **Decision**: Streamline Docker deployment into a single, self-contained `docker-compose.yml` with named volumes (`postgres_data`, `redis_data`, `media_data`), built-in healthchecks, and an automated startup sequence in `docker-entrypoint.sh` (PostgreSQL connectivity wait -> migrations -> static assets -> role seeding -> server start).
 - **Rationale**: Eliminates multi-file confusion, brittle required env vars, and host path conflicts. Running `docker compose up -d --build` works out-of-the-box on any machine while still allowing `.env` overrides.
 
+### ADR-06: Promotional Video Assets & Minimalist SaaS Motion Graphics Suite
+- **Decision**: Generated high-fidelity promotional media assets directly from the repository's core value propositions (OTP verification, defensive keyboard POS, FEFO expiry allocation, live GPS workforce telemetry, automated reconciliations):
+  - `zivabooks_minimal_promo_english.mp4` & `zivabooks_minimal_promo_hindi.mp4`: Apple/Linear-inspired dark slate minimalist 55s video suite (no character mascot, pure product UI cards, precision typography, ducked background music).
+  - `zivabooks_animated_cartoon_promo_english.mp4` & `zivabooks_animated_cartoon_promo_hindi.mp4`: Character-led narrative promo suite with animated mascot Rohan.
+  - `zivabooks_promo_english_with_bgm.mp4` & `zivabooks_promo_hindi_with_bgm.mp4`: High-precision neural audio synchronization on original product footage.
+
 ---
 
 ## 3. Known Gotchas, Quirks & Technical Context
@@ -66,7 +72,20 @@ This document is the **living memory, persistent state tracker, and decision log
 
 ---
 
+### Media upload permissions — 2026-11-14
+
+- The Docker app runs as UID/GID 10001. The legacy VPS setup now creates new media directories with that ownership; existing media trees are preserved for an explicit repair. `setup.md` documents named-volume and bind-mount recovery, including user namespace caveats. Fourteen deployment, startup and attendance tests passed. The running deployment was not inspected or modified.
+
 ## 4. Recent Decisions & Change Ledger
+
+### Reusable Docker generator — 2026-10-16
+
+- Added standalone executable `docker_generator.sh` for other projects. Requires Bash/OpenSSL; generates `compose.yaml`, mode-600 `.env` and `app.env`, a deployment guide, and secret exclusions in existing/new ignore files. Never starts Docker or overwrites existing generated/Compose files.
+- Uses existing Dockerfile or supplied image and its startup command; framework-specific commands, drivers, healthchecks, migrations, workers and upload paths require application integration. Generic DB_* / DATABASE_URL are deliberately not a direct replacement for zivaBooks POSTGRES_* settings.
+- PostgreSQL 17, MySQL 8.4 or no managed DB; opt-in authenticated Redis 7 with AOF. All data-service ports stay unpublished. Compose project names scope networks/volumes/containers; each web port binds localhost for a shared host reverse proxy. Containerized proxies need explicit network adaptation. No changes to the existing zivaBooks stack.
+- Validation: 16 tests passed initially (six generator tests plus ten existing deployment/startup tests); the final seven-test generator suite also passed after adding cross-project resource/credential isolation coverage. Bash syntax and diff whitespace checks passed. Tests parse real Compose configurations without starting containers; no live image startup was tested.
+- Operational constraints: unique project names and host ports are operator-selected; changing names selects new resources, and editing DB passwords does not rotate initialized credentials. Generated guide covers this and backup/TLS integration.
+
 
 ### Docker memory reduction — 2026-10-16
 

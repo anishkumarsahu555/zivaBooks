@@ -164,3 +164,11 @@ Run one app or test file:
 uv run python manage.py test home
 uv run python manage.py test zivaBooks.tests
 ```
+
+### Docker generator for other projects
+
+Use [`docker_generator.sh`](docker_generator.sh) to generate isolated Compose
+stacks for multiple projects on one VPS, using PostgreSQL, MySQL, or no database,
+with optional Redis. It accepts an existing Dockerfile or application image and
+creates private credentials plus a deployment guide. See the
+[usage examples and prerequisites](COMMANDS.md#generate-docker-deployment-files-for-another-project).

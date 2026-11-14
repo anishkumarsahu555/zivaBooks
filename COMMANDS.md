@@ -298,3 +298,60 @@ Whenever:
 3. Docker Compose services or container commands are changed,
 
 **Update this file immediately** to keep all team members and AI agents aligned.
+
+## Generate Docker deployment files for another project
+
+`docker_generator.sh` is standalone (Bash + OpenSSL) and can be copied to another
+machine. It generates files only; it never deploys or changes zivaBooks containers.
+Choose a unique project name and localhost port for each project on the same VPS.
+
+```bash
+# Project with an existing Dockerfile: PostgreSQL + Redis
+./docker_generator.sh --project inventory --output /opt/apps/inventory \
+  --host-port 8101 --app-port 8000 --database postgres --redis
+
+# Existing image: MySQL + Redis (replace the image with your real image)
+./docker_generator.sh --project shop --output /opt/apps/shop \
+  --host-port 8102 --app-port 3000 --image registry.example.com/shop:1.0 \
+  --database mysql --redis
+
+# App without a managed database/cache
+./docker_generator.sh --project portal --output /opt/apps/portal \
+  --host-port 8103 --image registry.example.com/portal:1.0 --database none
+
+./docker_generator.sh --help
+```
+
+The target directory must be writable. `--database` defaults to `postgres`;
+`--app-port` defaults to `8000`; Redis is opt-in. Without `--image`, a Dockerfile
+must already exist in the output directory. Its CMD/ENTRYPOINT remains responsible
+for application startup. Framework-specific Dockerfiles are not generated.
+
+Output: `compose.yaml`, private `.env` credentials, `app.env` for application
+settings, `DOCKER.generated.md`, and appended `.gitignore`/`.dockerignore` secret
+exclusions. Existing Compose files or generated files cause a safe refusal, with
+no overwrite option. Existing ignore rules are preserved.
+
+Before starting, read the generated guide, map the generic `DB_*`, `DATABASE_URL`,
+and Redis URLs to the application's configuration, and add required drivers,
+media volumes, healthchecks, migration commands, and worker services. MySQL root
+credentials are not passed to web. Database/Redis volumes and the default network
+are scoped by Compose project name; database/cache ports are not published.
+
+Run `docker compose --env-file .env -f compose.yaml config --quiet` in the output
+directory, then `docker compose --env-file .env -f compose.yaml up -d --build`.
+A single **host-installed** reverse proxy routes domains to `127.0.0.1:8101`,
+`127.0.0.1:8102`, etc., and handles TLS. Containerized proxies require an explicit
+network adaptation described in the generated guide. Port availability is checked
+at deployment, not generation. Do not reuse project names, change them after
+initialization, or rotate database credentials merely by editing `.env`.
+
+Configuration references: [Compose project names](https://docs.docker.com/compose/how-tos/project-name/),
+[startup dependencies](https://docs.docker.com/compose/how-tos/startup-order/), and
+[MySQL image configuration](https://hub.docker.com/_/mysql).
+
+Verification:
+
+```bash
+DATABASE_ENGINE=sqlite uv run python manage.py test home.tests.test_docker_generator
+```

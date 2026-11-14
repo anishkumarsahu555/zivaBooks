@@ -22,6 +22,7 @@ Every task follows a strict progression:
 | Task ID | Component | Description | Priority | Status | Assignee |
 |---|---|---|---|---|---|
 | **TSK-101** | Docs / AI | **Master Documentation & AI Governance Hub**: Establish unified documentation system (`README.md`, `MEMORY.md`, `ARCHITECTURE.md`, `TASKS.md`, `DESIGN.md`, `RULES.md`, `COMMANDS.md`, `AGENTS.md`) with continuous sync rules. | P0 | `[IN_PROGRESS]` | AI Pair / Lead |
+| **TSK-116** | Media / Mktg | **Minimalist Dark SaaS Product Promo Video (English & Hindi)**: Linear/Apple aesthetic motion graphics (55s, 1080p @ 30 FPS) with neural voiceover, zero mascot distractions, and core domain showcases. | P1 | `[COMPLETED]` | AI Pair / Lead |
 | **TSK-115** | DevOps | **Clean & Unified Single Docker Compose Deployment**: Rework Docker deployment into a single, self-contained `docker-compose.yml` with automatic migrations, volume management, healthchecks, and zero-config defaults. | P0 | `[COMPLETED]` | AI Pair / Lead |
 | **TSK-102** | DevOps | **Docker Integration Verification**: Verify end-to-end multi-container setup (Django, PostgreSQL, Redis, Celery) on branch `feature/docker-integration`. | P1 | `[COMPLETED]` | DevOps / Dev |
 | **TSK-103** | Core | **Database Port & Connection Fallback Resilience**: Ensure graceful SQLite development fallback when PostgreSQL on port 5433 is not reachable locally. | P1 | `[TODO]` | Backend |
@@ -58,6 +59,10 @@ Every task follows a strict progression:
 ---
 
 ## 5. Completed Milestones History
+
+- **TSK-118 — Completed 2026-11-14T18:50+0530**: Set ownership for newly created VPS media directories and document existing media mount repairs. Fourteen deployment, startup and attendance tests passed; no live Docker volume was changed.
+
+- **TSK-117 — Completed 2026-10-16T11:20+05:30**: Added standalone `docker_generator.sh` for other projects using an existing Dockerfile/image, PostgreSQL/MySQL/none and optional authenticated Redis. Generates Compose-scoped resources, loopback web ports, private credentials, ignore rules and deployment instructions; refuses overwrites. Seven generator tests pass (all six service combinations plus isolation/input/preservation checks), and all ten existing startup/Compose tests pass. No live deployment performed.
 
 - **TSK-116 — Completed 2026-10-16T10:08+05:30**: Reduced default web/Celery concurrency to one in the root Compose file and env templates; updated local `.env`. Removed the redundant virtualenv copy and recursive ownership operation from the Dockerfile. Ten startup/Compose tests passed via the SQLite Django runner; image built and local web/worker recreated successfully. Web is healthy; scheduler remains running. Post-restart container memory snapshot: approximately 576 MiB versus 878 MiB before (not a load benchmark).
 
